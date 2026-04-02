@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Menlo" name="TitleFont" size="20" bold="true"/>
+        <font font-name="Menlo" name="SubtitleFont" size="13"/>
+        <font font-name="Menlo" name="KnobLabelFont" size="13" bold="true"/>
+        <font font-name="Menlo" name="ValueFont" size="12"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="SliderDiv" rgba="#c8874aff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 458"
+              minSize="300, 458" maxSize="300, 458"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title block at top -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM LR2XHGR" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="Stereo to AmbiX via Haar" transparent="true"/>
+
+        <!-- Divergence (orange) -->
+        <view class="CTextLabel" origin="20, 80" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Divergence" transparent="true"/>
+        <view class="CSlider" origin="20, 100" size="260, 20" control-tag="Divergence" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderDiv" draw-value-from-center="true"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 122" size="260, 18" font="ValueFont" control-tag="Divergence"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- Yaw (Z) -->
+        <view class="CTextLabel" origin="20, 148" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Yaw (Z)" transparent="true"/>
+        <view class="CSlider" origin="20, 168" size="260, 20" control-tag="Yaw" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 190" size="260, 18" font="ValueFont" control-tag="Yaw"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- Pitch (Y) -->
+        <view class="CTextLabel" origin="20, 216" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Pitch (Y)" transparent="true"/>
+        <view class="CSlider" origin="20, 236" size="260, 20" control-tag="Pitch" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 258" size="260, 18" font="ValueFont" control-tag="Pitch"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- Roll (X) -->
+        <view class="CTextLabel" origin="20, 284" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Roll (X)" transparent="true"/>
+        <view class="CSlider" origin="20, 304" size="260, 20" control-tag="Roll" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 326" size="260, 18" font="ValueFont" control-tag="Roll"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- Logo centered at bottom -->
+        <view class="CView" origin="30, 362" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Divergence" tag="99"/>
+        <control-tag name="Yaw" tag="100"/>
+        <control-tag name="Pitch" tag="101"/>
+        <control-tag name="Roll" tag="102"/>
+    </control-tags>
+</vstgui-ui-description>

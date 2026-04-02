@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Menlo" name="TitleFont" size="20" bold="true"/>
+        <font font-name="Menlo" name="SubtitleFont" size="13"/>
+        <font font-name="Menlo" name="InfoFont" size="12"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 200"
+              minSize="300, 200" maxSize="300, 200"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title block at top -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM SDMX" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="Sum and Difference Matrix" transparent="true"/>
+        <view class="CTextLabel" origin="0, 68" size="300, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="A = A&#x207B;&#xB9; (involutory)" transparent="true"/>
+
+        <!-- Logo centered at bottom -->
+        <view class="CView" origin="30, 100" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags/>
+</vstgui-ui-description>
