@@ -11,14 +11,38 @@ project(seam-ltm
 )
 
 # ─── VST3 SDK ────────────────────────────────────────────────────────────────
-# Path to the VST3 SDK (cloned in seam/sdk/vst3sdk)
-set(vst3sdk_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/vst3sdk")
+# Default: ../vst3sdk (SDK cloned alongside seam-ltm).
+# Override: cmake -B build -DSEAM_VST3SDK_DIR=/your/path/to/vst3sdk
+set(SEAM_VST3SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vst3sdk"
+    CACHE PATH "Path to the VST3 SDK")
+set(vst3sdk_SOURCE_DIR "${SEAM_VST3SDK_DIR}")
 
 if(NOT EXISTS "${vst3sdk_SOURCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR
         "VST3 SDK not found at ${vst3sdk_SOURCE_DIR}\n"
-        "Clone it with: git clone --recursive https://github.com/steinbergmedia/vst3sdk.git"
+        "Clone it with:\n"
+        "  git clone --recursive https://github.com/steinbergmedia/vst3sdk.git ../vst3sdk\n"
+        "Or specify a custom path:\n"
+        "  cmake -B build -DSEAM_VST3SDK_DIR=/path/to/vst3sdk"
     )
+endif()
+
+# ─── GCC 15 fix ─────────────────────────────────────────────────────────────
+# VSTGUI's iplatformtaskexecutor.h uses uint64_t without including <cstdint>.
+# GCC 15 no longer provides it transitively. We patch the file at configure
+# time so that the build works out of the box on Arch/Manjaro/Fedora.
+# Upstream issue: https://github.com/steinbergmedia/vstgui/issues/XXX
+set(_taskexec_header "${vst3sdk_SOURCE_DIR}/vstgui4/vstgui/lib/platform/iplatformtaskexecutor.h")
+if(EXISTS "${_taskexec_header}")
+    file(READ "${_taskexec_header}" _taskexec_content)
+    if(NOT _taskexec_content MATCHES "#include <cstdint>")
+        string(REPLACE
+            "#include <functional>"
+            "#include <cstdint>\n#include <functional>"
+            _taskexec_patched "${_taskexec_content}")
+        file(WRITE "${_taskexec_header}" "${_taskexec_patched}")
+        message(STATUS "[SEAM] Patched iplatformtaskexecutor.h — added #include <cstdint> (GCC 15 fix)")
+    endif()
 endif()
 
 # VSTGUI for custom plugin GUI (logo + knobs)

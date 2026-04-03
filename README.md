@@ -31,10 +31,35 @@ needed to do the job.
 
 ## Requirements
 
-### Common
+### VST3 SDK
+
+The plugins depend on the [VST3 SDK](https://github.com/steinbergmedia/vst3sdk),
+cloned **with submodules** alongside this repo:
+
+```bash
+git clone --recursive https://github.com/steinbergmedia/vst3sdk.git
+```
+
+> **Note:** the `--recursive` flag is essential — it pulls VSTGUI and other
+> components needed for the build.
+
+The expected directory layout is:
+
+```
+some-folder/
+├── vst3sdk/       ← git clone --recursive here
+└── seam-ltm/      ← this repo
+```
+
+If your SDK is elsewhere, pass the path at configure time:
+
+```bash
+cmake -B build-release -DSEAM_VST3SDK_DIR=/path/to/vst3sdk
+```
+
+### CMake
 
 - CMake 3.25+
-- [VST3 SDK](https://github.com/steinbergmedia/vst3sdk) cloned at `../../sdk/vst3sdk` relative to this repo
 
 ### macOS
 
@@ -58,6 +83,13 @@ sudo apt install build-essential cmake pkg-config \
     libcairo2-dev libpango1.0-dev libfontconfig1-dev libfreetype6-dev \
     libxkbcommon-dev libgtk-3-dev
 ```
+
+### GCC 15 note
+
+The VSTGUI header `iplatformtaskexecutor.h` is missing `#include <cstdint>`,
+which causes a build failure on GCC 15+ (Arch, Manjaro, Fedora).
+The CMake configuration **patches this automatically** at configure time —
+no manual intervention needed.
 
 ## Build
 
