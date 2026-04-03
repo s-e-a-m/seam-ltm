@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <vstgui-ui-description version="1">
     <fonts>
-        <font font-name="Menlo" name="TitleFont" size="20" bold="true"/>
-        <font font-name="Menlo" name="SubtitleFont" size="13"/>
-        <font font-name="Menlo" name="KnobLabelFont" size="13" bold="true"/>
-        <font font-name="Menlo" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
     </fonts>
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
