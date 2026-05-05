@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 270"
+              minSize="300, 270" maxSize="300, 270"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM DDELAY" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="Quad Speaker-Alignment Delay" transparent="true"/>
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="c = 331.4 m/s · nextprime · 4ch sync" transparent="true"/>
+
+        <!-- Distance slider -->
+        <view class="CTextLabel" origin="20, 100" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Distance" transparent="true"/>
+        <view class="CSlider" origin="20, 120" size="260, 20" control-tag="Distance" default-value="0"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 142" size="260, 18" font="ValueFont" control-tag="Distance"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="3" style-no-frame="true"/>
+
+        <!-- Logo at bottom -->
+        <view class="CView" origin="30, 175" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Distance" tag="100"/>
+    </control-tags>
+</vstgui-ui-description>
