@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.25.0)
 # ─────────────────────────────────────────────────────────────────────────────
 
 project(seam-ltm
-    VERSION 0.1.1
+    VERSION 0.1.3
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
 )
 
@@ -61,3 +61,5 @@ add_subdirectory(plugins/xyprrot)
 add_subdirectory(plugins/b2xrot)
 add_subdirectory(plugins/lr2xhgr)
 add_subdirectory(plugins/m2xhgr)
+add_subdirectory(plugins/bamodulex)
+add_subdirectory(plugins/ddelay)

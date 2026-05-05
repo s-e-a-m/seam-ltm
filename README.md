@@ -5,7 +5,7 @@
 A pedagogical VST3 plugin suite for the [SEAM](https://github.com/s-e-a-m)
 project (Sustained Electro-Acoustic Music).
 
-Five plugins built directly on the Steinberg VST3 SDK — no JUCE, no
+Seven plugins built directly on the Steinberg VST3 SDK — no JUCE, no
 frameworks. Clean C++17, VSTGUI for the interface, and the minimum code
 needed to do the job.
 
@@ -18,16 +18,18 @@ needed to do the job.
 | **M2XHGR** | mono &rarr; AmbiX | Mono to first-order AmbiX via Haar encoding with YPR rotation |
 | **LR2XHGR** | stereo &rarr; AmbiX | Stereo to first-order AmbiX via Haar with divergence control and YPR rotation |
 | **XYPRrot** | AmbiX &rarr; AmbiX | First-order AmbiX rotation (Yaw, Pitch, Roll) |
+| **BAMODULEX** | AmbiX &rarr; tetrahedral (4ch) | Gerzon BA-module (AmbiX variant): decoder to LFU/RFD/RBU/LBD loudspeakers |
+| **DDELAY** | 4ch &rarr; 4ch | Quad distance delay for loudspeaker time-alignment. Distance in metres → integer-sample delay (c = 331.4 m/s, nextprime quantized) |
 
 ### Screenshots
 
-| SDMX | B2Xrot | XYPRrot |
-|:---:|:---:|:---:|
-| ![SDMX](doc/img/sdmx.png) | ![B2Xrot](doc/img/b2xrot.png) | ![XYPRrot](doc/img/xyprrot.png) |
+| SDMX | B2Xrot | XYPRrot | BAMODULEX |
+|:---:|:---:|:---:|:---:|
+| ![SDMX](doc/img/sdmx.png) | ![B2Xrot](doc/img/b2xrot.png) | ![XYPRrot](doc/img/xyprrot.png) | ![BAMODULEX](doc/img/bamodulex.png) |
 
-| M2XHGR | LR2XHGR |
-|:---:|:---:|
-| ![M2XHGR](doc/img/m2xhgr.png) | ![LR2XHGR](doc/img/lr2xhgr.png) |
+| M2XHGR | LR2XHGR | DDELAY |
+|:---:|:---:|:---:|
+| ![M2XHGR](doc/img/m2xhgr.png) | ![LR2XHGR](doc/img/lr2xhgr.png) | ![DDELAY](doc/img/ddelay.png) |
 
 ## Requirements
 
