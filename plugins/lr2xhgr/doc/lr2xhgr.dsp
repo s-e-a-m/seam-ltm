@@ -18,10 +18,10 @@ declare description "Stereo to first-order spatial field via Haar wavelet with d
 //   3. Sum the two 4-channel fields into one
 //   4. Global rotation (yaw only) to orient the entire field
 //
-// Divergence controls the angular aperture of the stereo image:
+// Divergence controls the total angular aperture of the stereo image:
 //   0°   → L and R overlapping (mono)
-//   90°  → L and R at ±45° (default, natural maximum separation)
-//   180° → L and R opposite (maximum divergence)
+//   90°  → L and R at ±45° (default)
+//   360° → L and R at ±180° (full wrap-around)
 //
 // The DIVERGENCE parameter is halved internally:
 // a value of 90° positions L at +45° and R at -45°.
@@ -92,7 +92,7 @@ with {
 //
 // ─────────────────────── Parameters ───────────────────────────────────
 //
-divergence = hslider("[00]DIVERGENCE",90,0,180,0.1) / 2 : ma.deg2rad;
+divergence = hslider("[00]DIVERGENCE",90,0,360,0.1) / 2 : ma.deg2rad;
 yaw   = hslider("[01]YAW Rotation around Z-axis",0,-180,180,0.5) : ma.deg2rad;
 pitch = hslider("[02]PITCH Rotation around Y-axis",0,-180,180,0.5) : ma.deg2rad;
 roll  = hslider("[03]ROLL Rotation around X-axis",0,-180,180,0.5) : ma.deg2rad;

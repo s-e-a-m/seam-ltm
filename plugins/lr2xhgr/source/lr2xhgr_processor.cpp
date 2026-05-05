@@ -50,11 +50,12 @@ tresult PLUGIN_API LR2XHGRProcessor::initialize (FUnknown* context)
     addAudioInput  (STR16 ("Stereo In"), SpeakerArr::kStereo);
     addAudioOutput (STR16 ("AmbiX Out"), SpeakerArr::kAmbi1stOrderACN);
 
-    // Divergence: 0° to 180°, default 90° (as in the Faust code)
-    // The Faust slider divides by 2 internally: divergence/2 is the half-angle
+    // Divergence: total angle between L and R channels.
+    // Internally halved: L rotates by +div/2, R by -div/2.
+    // Range 0–360°, default 90° (i.e. L at +45°, R at -45°).
     parameters.addParameter (
         new RangeParameter (STR16 ("Divergence"), kParamDivergence, STR16 ("\u00B0"),
-                            0.0, 180.0, 90.0, 0, ParameterInfo::kCanAutomate));
+                            0.0, 360.0, 90.0, 0, ParameterInfo::kCanAutomate));
 
     // Rotation angles: -180° to +180°, default 0°
     parameters.addParameter (
@@ -115,8 +116,8 @@ tresult PLUGIN_API LR2XHGRProcessor::process (ProcessData& data)
                 switch (id)
                 {
                     case kParamDivergence:
-                        // Normalized 0–1 → plain 0–180°, then halved and converted to radians
-                        fDivergence = (value * 180.0 / 2.0) * M_PI / 180.0;
+                        // Normalized 0–1 → plain 0–360°, then halved and converted to radians
+                        fDivergence = (value * 360.0 / 2.0) * M_PI / 180.0;
                         break;
                     case kParamYaw:
                         fYaw = (-180.0 + value * 360.0) * M_PI / 180.0;
@@ -262,8 +263,8 @@ tresult PLUGIN_API LR2XHGRProcessor::setState (IBStream* state)
     if (state->read (saved, sizeof (saved)) != kResultOk)
         return kResultFalse;
 
-    // Divergence: normalized 0–1 maps to plain 0–180°
-    fDivergence = (saved[0] * 180.0 / 2.0) * M_PI / 180.0;
+    // Divergence: normalized 0–1 maps to plain 0–360°
+    fDivergence = (saved[0] * 360.0 / 2.0) * M_PI / 180.0;
     fYaw   = (-180.0 + saved[1] * 360.0) * M_PI / 180.0;
     fPitch = (-180.0 + saved[2] * 360.0) * M_PI / 180.0;
     fRoll  = (-180.0 + saved[3] * 360.0) * M_PI / 180.0;

@@ -28,9 +28,9 @@
         <!-- Divergence (orange) -->
         <view class="CTextLabel" origin="20, 80" size="260, 18" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Divergence" transparent="true"/>
-        <view class="CSlider" origin="20, 100" size="260, 20" control-tag="Divergence" default-value="0.5"
+        <view class="CSlider" origin="20, 100" size="260, 20" control-tag="Divergence" default-value="0.25"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
-              draw-value="true" draw-value-color="SliderDiv" draw-value-from-center="true"
+              draw-value="true" draw-value-color="SliderDiv" draw-value-from-center="false"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
         <view class="CTextEdit" origin="20, 122" size="260, 18" font="ValueFont" control-tag="Divergence"
