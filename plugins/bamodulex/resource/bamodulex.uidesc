@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="12"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 220"
+              minSize="300, 220" maxSize="300, 220"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title block at top -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM BAMODULEX" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="AmbiX → Tetrahedral Decoder" transparent="true"/>
+        <view class="CTextLabel" origin="0, 68" size="300, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="LFU · RFD · RBU · LBD" transparent="true"/>
+        <view class="CTextLabel" origin="0, 86" size="300, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="(Gerzon BA-module, AmbiX)" transparent="true"/>
+
+        <!-- Logo centered at bottom -->
+        <view class="CView" origin="30, 120" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags/>
+</vstgui-ui-description>
