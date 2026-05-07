@@ -28,15 +28,23 @@ tresult PLUGIN_API MULTIPINKProcessor::initialize(FUnknown* context) {
     // One stereo output bus by default; setBusArrangements may widen it later.
     addAudioOutput(STR16("Output"), SpeakerArr::kStereo);
 
-    // Parameters — minimal stubs, real implementation in Task 5.
-    parameters.addParameter(STR16("Reference"), STR16("dBFS RMS"),
-                            kReferenceStepCount - 1, 0,
-                            ParameterInfo::kCanAutomate | ParameterInfo::kIsList,
-                            kParamReference);
-    parameters.addParameter(STR16("Trim"), STR16("dB"), 0, 0.5,
-                            ParameterInfo::kCanAutomate, kParamTrim);
-    parameters.addParameter(STR16("Mute"), STR16(""), 1, 0,
-                            ParameterInfo::kCanAutomate, kParamMute);
+    auto* refParam = new StringListParameter(
+        STR16("Reference"), kParamReference, STR16("dBFS RMS"),
+        ParameterInfo::kCanAutomate | ParameterInfo::kIsList);
+    refParam->appendString(STR16("-23"));
+    refParam->appendString(STR16("-20"));
+    refParam->appendString(STR16("-18"));
+    parameters.addParameter(refParam);
+
+    parameters.addParameter(new RangeParameter(
+        STR16("Trim"), kParamTrim, STR16("dB"),
+        -6.0, 6.0, 0.0, 0,
+        ParameterInfo::kCanAutomate));
+
+    parameters.addParameter(new RangeParameter(
+        STR16("Mute"), kParamMute, STR16(""),
+        0.0, 1.0, 0.0, 1,
+        ParameterInfo::kCanAutomate | ParameterInfo::kIsList));
 
     return kResultOk;
 }
@@ -80,6 +88,7 @@ tresult PLUGIN_API MULTIPINKProcessor::setupProcessing(ProcessSetup& setup) {
 }
 
 tresult PLUGIN_API MULTIPINKProcessor::process(ProcessData& data) {
+    readParameterChanges(data);
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
     int numChannels = data.outputs[0].numChannels;
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
@@ -131,8 +140,46 @@ void MULTIPINKProcessor::resetPinkFilters() {
         for (int k = 0; k < 3; ++k) pinkY_[i][k] = 0.0;
     }
 }
-double MULTIPINKProcessor::computeGainLin() const { return 0.0; /* Task 5 */ }
-void MULTIPINKProcessor::readParameterChanges(ProcessData&) { /* Task 5 */ }
+double MULTIPINKProcessor::computeGainLin() const {
+    if (paramMute_.load()) return 0.0;
+    if (poolStatus_.load() == (int)PoolStatus::Exhausted) return 0.0;
+    int idx = paramReferenceIdx_.load();
+    if (idx < 0) idx = 0;
+    if (idx > kReferenceStepCount - 1) idx = kReferenceStepCount - 1;
+    double refDb = kReferenceLevelsDb[idx];
+    double trim = paramTrimDb_.load();
+    double db = refDb + trim + kCalibrationOffsetDb;
+    return std::pow(10.0, db / 20.0);
+}
+
+void MULTIPINKProcessor::readParameterChanges(ProcessData& data) {
+    auto* changes = data.inputParameterChanges;
+    if (!changes) return;
+    int32 n = changes->getParameterCount();
+    for (int32 i = 0; i < n; ++i) {
+        auto* q = changes->getParameterData(i);
+        if (!q) continue;
+        ParamID id = q->getParameterId();
+        int32 cnt = q->getPointCount();
+        if (cnt <= 0) continue;
+        ParamValue v; int32 off;
+        if (q->getPoint(cnt - 1, off, v) != kResultOk) continue;
+        switch (id) {
+            case kParamReference: {
+                int idx = (int)std::round(v * (kReferenceStepCount - 1));
+                if (idx < 0) idx = 0;
+                if (idx > kReferenceStepCount - 1) idx = kReferenceStepCount - 1;
+                paramReferenceIdx_.store(idx);
+            } break;
+            case kParamTrim:
+                paramTrimDb_.store(v * 12.0 - 6.0);
+                break;
+            case kParamMute:
+                paramMute_.store(v >= 0.5 ? 1 : 0);
+                break;
+        }
+    }
+}
 
 template <typename SampleType>
 void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
@@ -169,17 +216,18 @@ void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
         pinkY_[ch][0] = y1; pinkY_[ch][1] = y2; pinkY_[ch][2] = y3;
     }
     // (void)x4 silences potential unused-warning if optimization is aggressive.
-    // 3. Slot routing — copy claimed slots straight to outputs at unity gain.
-    //    Real gain stage comes in Task 5.
+    // 3. Slot routing + gain stage.
     if (claimedStart_ < 0 || claimedChannels_ == 0) {
         for (int c = 0; c < numChannels; ++c)
             std::memset(outputs[c], 0, sizeof(SampleType) * numSamples);
         return;
     }
+    SampleType g = (SampleType)computeGainLin();
     int n = std::min(numChannels, claimedChannels_);
     for (int c = 0; c < n; ++c) {
         SampleType* src = scratch.data() + (size_t)(claimedStart_ + c) * numSamples;
-        std::memcpy(outputs[c], src, sizeof(SampleType) * numSamples);
+        SampleType* dst = outputs[c];
+        for (int s = 0; s < numSamples; ++s) dst[s] = src[s] * g;
     }
     for (int c = n; c < numChannels; ++c)
         std::memset(outputs[c], 0, sizeof(SampleType) * numSamples);
