@@ -5,7 +5,7 @@
 A pedagogical VST3 plugin suite for the [SEAM](https://github.com/s-e-a-m)
 project (Sustained Electro-Acoustic Music).
 
-Seven plugins built directly on the Steinberg VST3 SDK — no JUCE, no
+Eight plugins built directly on the Steinberg VST3 SDK — no JUCE, no
 frameworks. Clean C++17, VSTGUI for the interface, and the minimum code
 needed to do the job.
 
@@ -20,6 +20,7 @@ needed to do the job.
 | **XYPRrot** | AmbiX &rarr; AmbiX | First-order AmbiX rotation (Yaw, Pitch, Roll) |
 | **BAMODULEX** | AmbiX &rarr; tetrahedral (4ch) | Gerzon BA-module (AmbiX variant): decoder to LFU/RFD/RBU/LBD loudspeakers |
 | **DDELAY** | 4ch &rarr; 4ch | Quad distance delay for loudspeaker time-alignment. Distance in metres → integer-sample delay (c = 331.4 m/s, nextprime quantized) |
+| **MULTIPINK** | none &rarr; 1..64ch | Multichannel pink noise generator with shared 64-slot logical pool. Layout-adaptive (mono → 64ch). RMS-calibrated output (-23/-20/-18 dBFS RMS, ±6 dB trim). Cross-instance decorrelation via static slot allocator |
 
 ### Screenshots
 

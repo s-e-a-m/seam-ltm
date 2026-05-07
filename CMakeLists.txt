@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.25.0)
 # ─────────────────────────────────────────────────────────────────────────────
 
 project(seam-ltm
-    VERSION 0.1.3
+    VERSION 0.1.4
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
 )
 
