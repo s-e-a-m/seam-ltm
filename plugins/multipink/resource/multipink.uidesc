@@ -15,8 +15,8 @@
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 360"
-              minSize="300, 360" maxSize="300, 360"
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 380"
+              minSize="300, 380" maxSize="300, 380"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Title -->
@@ -70,8 +70,8 @@
         <view class="CParamDisplay" origin="80, 272" size="200, 16" control-tag="PoolStatus"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
 
-        <!-- Logo at bottom -->
-        <view class="CView" origin="30, 295" size="240, 60" bitmap="logo"/>
+        <!-- Logo at bottom (native aspect 240x77) -->
+        <view class="CView" origin="30, 295" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
