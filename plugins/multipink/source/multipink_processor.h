@@ -62,10 +62,12 @@ private:
     static constexpr double kPinkA[3] = {
         -2.494956002,  2.017265875, -0.522189400 };
 
-    // Calibration constant. After the one-off measurement (see Task 9),
-    // replace 0.0 with the measured offset so that
-    // "reference = -23 dBFS RMS, trim = 0" produces -23.0 ±0.1 dBFS RMS.
-    static constexpr double kCalibrationOffsetDb = 0.0;
+    // Calibration constant — measured 2026-05-07 against a 30 s render at
+    // 48 kHz, Reference=-23, Trim=0: sox reported RMS amplitude 0.003370
+    // (= -49.45 dBFS RMS). Raw pink RMS at unity gain is therefore
+    // -26.45 dBFS, so the offset to make "Reference=-23, Trim=0" land at
+    // -23.0 dBFS RMS is +26.45 dB.
+    static constexpr double kCalibrationOffsetDb = 26.45;
 
     // Active output channel count (set by setBusArrangements).
     int activeChannels_ = 2;
