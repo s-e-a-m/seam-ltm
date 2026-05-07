@@ -15,8 +15,8 @@
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 270"
-              minSize="300, 270" maxSize="300, 270"
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 360"
+              minSize="300, 360" maxSize="300, 360"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Title -->
@@ -26,13 +26,60 @@
               font-color="TextDim" text-alignment="center" title="Multichannel Pink Noise" transparent="true"/>
         <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
               font-color="TextDim" text-alignment="center"
-              title="Task 8: parameters, slot badge, status" transparent="true"/>
+              title="64-slot shared pool · RMS-calibrated" transparent="true"/>
+
+        <!-- Reference (3-step list) -->
+        <view class="CTextLabel" origin="20, 100" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Reference (dBFS RMS)" transparent="true"/>
+        <view class="COptionMenu" origin="80, 120" size="140, 20" control-tag="Reference"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- Trim slider -->
+        <view class="CTextLabel" origin="20, 154" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Trim (dB)" transparent="true"/>
+        <view class="CSlider" origin="20, 174" size="260, 20" control-tag="Trim" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 196" size="260, 18" font="ValueFont" control-tag="Trim"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="2" style-no-frame="true"/>
+
+        <!-- Mute -->
+        <view class="COnOffButton" origin="120, 222" size="60, 20" control-tag="Mute"/>
+        <view class="CTextLabel" origin="180, 222" size="100, 20" font="ValueFont"
+              font-color="TextDim" text-alignment="left" title=" mute" transparent="true"/>
+
+        <!-- Slot badge -->
+        <view class="CTextLabel" origin="20, 252" size="60, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="left" title="Slot:" transparent="true"/>
+        <view class="CParamDisplay" origin="55, 252" size="40, 16" control-tag="SlotStart"
+              font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
+        <view class="CTextLabel" origin="100, 252" size="60, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="left" title="N:" transparent="true"/>
+        <view class="CParamDisplay" origin="120, 252" size="40, 16" control-tag="SlotCount"
+              font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
+        <view class="CTextLabel" origin="170, 252" size="110, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="right" title="of 64 pool" transparent="true"/>
+
+        <!-- Pool Status -->
+        <view class="CTextLabel" origin="20, 272" size="60, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="left" title="Status:" transparent="true"/>
+        <view class="CParamDisplay" origin="80, 272" size="200, 16" control-tag="PoolStatus"
+              font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
 
         <!-- Logo at bottom -->
-        <view class="CView" origin="30, 175" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 295" size="240, 60" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
     <control-tags>
+        <control-tag name="Reference"  tag="100"/>
+        <control-tag name="Trim"       tag="101"/>
+        <control-tag name="Mute"       tag="102"/>
+        <control-tag name="SlotStart"  tag="200"/>
+        <control-tag name="SlotCount"  tag="201"/>
+        <control-tag name="PoolStatus" tag="202"/>
     </control-tags>
 </vstgui-ui-description>

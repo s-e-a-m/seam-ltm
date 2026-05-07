@@ -47,6 +47,20 @@ tresult PLUGIN_API MULTIPINKProcessor::initialize(FUnknown* context) {
         0.0, 1.0, 0.0, 1,
         ParameterInfo::kCanAutomate | ParameterInfo::kIsList));
 
+    // Read-only display parameters (pushed from process() via outputParameterChanges).
+    parameters.addParameter(new RangeParameter(
+        STR16("Slot Start"), kParamSlotStart, STR16(""),
+        -1.0, 63.0, -1.0, 64,
+        ParameterInfo::kIsReadOnly));
+    parameters.addParameter(new RangeParameter(
+        STR16("Slot Count"), kParamSlotCount, STR16(""),
+        0.0, 64.0, 0.0, 64,
+        ParameterInfo::kIsReadOnly));
+    parameters.addParameter(new RangeParameter(
+        STR16("Pool Status"), kParamPoolStatus, STR16(""),
+        0.0, 3.0, 0.0, 3,
+        ParameterInfo::kIsReadOnly));
+
     return kResultOk;
 }
 
@@ -90,6 +104,23 @@ tresult PLUGIN_API MULTIPINKProcessor::setupProcessing(ProcessSetup& setup) {
 
 tresult PLUGIN_API MULTIPINKProcessor::process(ProcessData& data) {
     readParameterChanges(data);
+
+    // Push display state for the GUI (read-only parameters).
+    if (auto* outChanges = data.outputParameterChanges) {
+        int32 idx;
+        auto pushNorm = [&](ParamID id, double v01) {
+            auto* q = outChanges->addParameterData(id, idx);
+            if (q) { int32 off = 0; q->addPoint(0, v01, off); }
+        };
+        // Normalize:
+        //   slotStart in [-1, 63] -> [0,1]
+        //   slotCount in [0,  64] -> [0,1]
+        //   poolStatus in [0,  3] -> [0,1]
+        pushNorm(kParamSlotStart,  ((double)claimedStart_ + 1.0) / 64.0);
+        pushNorm(kParamSlotCount,  (double)claimedChannels_ / 64.0);
+        pushNorm(kParamPoolStatus, (double)poolStatus_.load() / 3.0);
+    }
+
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
     int numChannels = data.outputs[0].numChannels;
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
