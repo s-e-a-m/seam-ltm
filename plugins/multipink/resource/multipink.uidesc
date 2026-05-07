@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 270"
+              minSize="300, 270" maxSize="300, 270"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM MULTIPINK" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="Multichannel Pink Noise" transparent="true"/>
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="Task 8: parameters, slot badge, status" transparent="true"/>
+
+        <!-- Logo at bottom -->
+        <view class="CView" origin="30, 175" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+    </control-tags>
+</vstgui-ui-description>
