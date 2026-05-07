@@ -10,6 +10,7 @@
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include "pluginterfaces/base/ibstream.h"
 #include "pluginterfaces/base/ustring.h"
+#include "base/source/fstreamer.h"
 
 #include <cmath>
 #include <cstring>
@@ -114,8 +115,45 @@ tresult PLUGIN_API MULTIPINKProcessor::setBusArrangements(
     return SingleComponentEffect::setBusArrangements(ins, numIns, outs, numOuts);
 }
 
-tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* /*state*/) { return kResultOk; }
-tresult PLUGIN_API MULTIPINKProcessor::getState(IBStream* /*state*/) { return kResultOk; }
+tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
+    if (!state) return kResultFalse;
+    IBStreamer s(state, kLittleEndian);
+    int32 refIdx = 0; double trim = 0.0; int32 mute = 0; int32 prefStart = -1;
+    if (!s.readInt32(refIdx))    return kResultFalse;
+    if (!s.readDouble(trim))     return kResultFalse;
+    if (!s.readInt32(mute))      return kResultFalse;
+    if (!s.readInt32(prefStart)) return kResultFalse;
+
+    paramReferenceIdx_.store(std::clamp<int>(refIdx, 0, kReferenceStepCount - 1));
+    paramTrimDb_.store(std::clamp(trim, -6.0, 6.0));
+    paramMute_.store(mute ? 1 : 0);
+    preferredStart_ = (prefStart >= -1 && prefStart < kPoolSize) ? prefStart : -1;
+
+    // Mirror normalized values into the parameter container so the host
+    // and GUI see them on next refresh.
+    if (auto* p = parameters.getParameter(kParamReference))
+        p->setNormalized((double)paramReferenceIdx_.load() / (kReferenceStepCount - 1));
+    if (auto* p = parameters.getParameter(kParamTrim))
+        p->setNormalized((paramTrimDb_.load() + 6.0) / 12.0);
+    if (auto* p = parameters.getParameter(kParamMute))
+        p->setNormalized(paramMute_.load() ? 1.0 : 0.0);
+
+    return kResultOk;
+}
+
+tresult PLUGIN_API MULTIPINKProcessor::getState(IBStream* state) {
+    if (!state) return kResultFalse;
+    IBStreamer s(state, kLittleEndian);
+    int32 refIdx = paramReferenceIdx_.load();
+    double trim  = paramTrimDb_.load();
+    int32 mute   = paramMute_.load();
+    int32 prefStart = claimedStart_;
+    if (!s.writeInt32(refIdx))     return kResultFalse;
+    if (!s.writeDouble(trim))      return kResultFalse;
+    if (!s.writeInt32(mute))       return kResultFalse;
+    if (!s.writeInt32(prefStart))  return kResultFalse;
+    return kResultOk;
+}
 
 IPlugView* PLUGIN_API MULTIPINKProcessor::createView(FIDString name) {
     if (FIDStringsEqual(name, ViewType::kEditor))
