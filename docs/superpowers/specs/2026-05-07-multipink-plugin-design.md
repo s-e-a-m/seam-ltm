@@ -25,29 +25,92 @@ with a different seed) with a single plugin that:
 
 ## 2. DSP Core
 
-The DSP is a thin Faust wrapper around the existing
-`sno.multipink(N, g)` from `seam.noise.lib` (which itself is built on
-`no.multinoise(N) : par(i,N,no.pink_filter)`).
+Per project convention (see `seam-ltm/CLAUDE.md`), the DSP is **hand-written
+C++**, with `seam.noise.lib::sno.multipink` cited as the mathematical
+reference in a `FAUST REFERENCE` comment block at the top of
+`multipink_processor.h`. No Faust-generated code is committed.
 
-**Channel count.** Faust DSP graphs are static. Each plugin instance compiles a
-generator for the **maximum N = 64**, but emits only the N channels
-corresponding to its claimed slot range.
+The reference implementation in Faust is:
 
-**Logical pool semantics.** Because Faust's `multirandom`/`multinoise` is
-deterministic for a given seed, the samples produced at slot index `k` by any
-two instances using the same seed are bit-identical. A plugin instance that
-claims slots `[a, b]` therefore emits the *exact* samples that a single 64-ch
-master generator would emit on those same indices. The "shared pool" is logical
-rather than physical: no inter-instance audio communication, no thread
-synchronization, but the audible result is indistinguishable from a true shared
-generator.
+```faust
+// from librerie/faust-libraries/src/seam.noise.lib
+multipink(N,g) = no.multinoise(N) : par(i,N,no.pink_filter : *(g));
+```
 
-**RMS calibration.** The Faust `pink_filter` (Paul Kellet IIR, 4th order)
-attenuates the input white noise. To make the knob's "0 dB" position correspond
-to a real reference RMS level, a one-time offline calibration measures the RMS
-of the unscaled `pink_noise` output (via `faust2octave` on a long buffer) and
-the resulting offset is hard-coded as a constant `kCalibrationOffsetDb` in the
-DSP wrapper.
+Which expands to N independent linear-congruential white-noise generators,
+each fed into a Paul Kellet 4th-order IIR pink-shaping filter. The IIR
+coefficients are explicit in `noises.lib:402`:
+
+```
+b = (0.049922035, -0.095993537, 0.050612699, -0.004408786)
+a = (-2.494956002, 2.017265875, -0.522189400)
+```
+
+**C++ structure.** The processor holds:
+
+- 64 × `uint32_t` LCG states (seeded deterministically from the Faust seed
+  `12345`, see §2.1).
+- 64 × `PinkFilterState` (4 input history + 3 output history).
+- A scratch buffer of `64 × maxBlockSize` floats filled in `process()`.
+
+Per call to `IAudioProcessor::process`:
+
+1. Advance all 64 LCG/IIR pairs for `numSamples` samples into the scratch
+   buffer. (Always all 64 — see §2.2 for why.)
+2. Copy the channels `[start_slot, start_slot + N_active)` into the host's
+   output buffers, multiplied by the linear gain from §5.
+
+### 2.1 Seeding for cross-instance bit-identity
+
+To preserve the "logical shared pool" semantics — i.e., slot `k` emits
+identical samples in any plugin instance — all instances seed their 64 LCGs
+identically. The seed of slot `i` is derived deterministically from the Faust
+master seed and the slot index:
+
+```cpp
+constexpr uint32_t kFaustSeed = 12345;
+uint32_t seed_for_slot(int i) {
+    // Mirrors no.multirandom's per-channel seed derivation.
+    // To be locked once, verified bit-identical against a Faust-generated
+    // reference buffer during initial calibration.
+    return ...;
+}
+```
+
+The exact derivation will be locked during implementation by generating a
+short reference buffer with `faust -lang cpp` (used as a *one-off scratch
+tool*, not committed) and verifying the C++ port produces bit-identical
+output. The locked formula is then frozen in code with a comment citing the
+Faust source line.
+
+### 2.2 Always compute all 64 channels
+
+Even when only N (≤64) channels are emitted, all 64 LCG/IIR pairs are
+advanced every sample. This is intentional:
+
+- It guarantees that slot `k` produces a stream that does not depend on which
+  *other* slots are active in the same instance. (If we only ran the active
+  slots, the LCG of slot 4 would advance at the same rate regardless, but the
+  semantic of "the pool is one big 64-ch generator running continuously"
+  would be a lie.)
+- CPU cost is trivial: 64 LCG + 64 four-tap IIR ≈ ~1.3k FLOPs/sample =
+  ~0.06 GFLOPs at 48 kHz, i.e. well under 1% of one core on modern CPUs.
+
+### 2.3 RMS calibration
+
+The pink IIR attenuates the input white noise. To make knob "0 dB"
+correspond to the chosen reference RMS, a one-time measurement determines
+`kCalibrationOffsetDb`:
+
+1. Build the plugin with `kCalibrationOffsetDb = 0`, reference = -23 dBFS RMS,
+   trim = 0.
+2. Render 30 s of mono output to a WAV.
+3. Measure long-term RMS with `sox stat` (or equivalent).
+4. Set `kCalibrationOffsetDb = -23.0 - measured_dBFS_RMS` and rebuild.
+5. Re-render, verify within ±0.1 dB.
+
+This constant is locked in `multipink_processor.cpp` with a comment recording
+the measurement date and method.
 
 ## 3. Bus Configuration
 
@@ -165,22 +228,20 @@ No live editor; `VSTGUI_LIVE_EDITING=0` per repo convention.
 
 ## 8. File Layout
 
+Following the `ddelay` / `bamodulex` convention (see `seam-ltm/CLAUDE.md`):
+
 ```
 plugins/multipink/
 ├── CMakeLists.txt
 ├── source/
-│   ├── multipink_cids.h              # plugin UID, parameter IDs
-│   ├── multipink_processor.h
-│   ├── multipink_processor.cpp       # IAudioProcessor + setBusArrangements
-│   ├── multipink_controller.h
-│   ├── multipink_controller.cpp      # IEditController + GUI binding
-│   ├── multipink_dsp.h
-│   ├── multipink_dsp.cpp             # thin C++ wrapper around Faust output
+│   ├── multipink_ids.h               # plugin UID, parameter IDs
+│   ├── multipink_processor.h         # opens with FAUST REFERENCE comment
+│   ├── multipink_processor.cpp       # IAudioProcessor + DSP (LCGs + IIRs)
 │   ├── multipink_pool.h
 │   ├── multipink_pool.cpp            # static bitmap + claim/release
-│   └── multipink_faust.cpp           # GENERATED:
-│                                     #   faust -lang cpp -cn multipink_faust \
-│                                     #         -a minimal.cpp source/multipink.dsp
+│                                     # (justified extra file: shared static
+│                                     #  state across instances)
+│   └── version.h
 ├── resource/
 │   └── multipink.uidesc              # VSTGUI XML
 └── doc/
@@ -193,40 +254,48 @@ Plus one line added to root `CMakeLists.txt`:
 add_subdirectory(plugins/multipink)
 ```
 
-## 9. Faust Source
+Note: no separate `_controller.cpp/.h` (existing plugins keep controller in
+the processor file or omit it where VSTGUI's default suffices — to confirm
+during implementation by mirroring `ddelay` exactly).
 
-A single tiny `.dsp` file in `plugins/multipink/source/multipink.dsp`:
+## 9. Faust Reference (header comment)
 
-```faust
-declare name "multipink";
-import("seam.lib");
+The top of `multipink_processor.h` carries a comment block citing the Faust
+source, in the same form as `ddelay_processor.h:23` and
+`bamodulex_processor.h:26`:
 
-N = 64;
-
-// gain is applied in C++; here we just emit the 64 raw pink channels.
-process = sno.multipink(N, 1.0);
+```cpp
+// FAUST REFERENCE (seam.noise.lib):
+//
+//   multipink(N,g) = no.multinoise(N) : par(i,N,no.pink_filter : *(g));
+//
+// where no.pink_filter is (noises.lib:402):
+//
+//   pink_filter = fi.iir(
+//       (0.049922035, -0.095993537, 0.050612699, -0.004408786),
+//       (-2.494956002, 2.017265875, -0.522189400));
+//
+// and no.multinoise(N) is N parallel LCGs seeded from noise_env(12345).
+//
+// This plugin re-implements the above in hand-written C++ (project
+// convention — see seam-ltm/CLAUDE.md). N is fixed at 64 (the shared
+// logical pool size). Per-instance gain is applied in C++ after the IIR.
 ```
 
-The C++ DSP wrapper:
-
-- runs the Faust `compute()` which fills a 64-channel scratch buffer;
-- copies the channels `[start_slot, start_slot+N_active)` into the host's
-  output buffers;
-- multiplies by the linear gain computed from `reference + trim` (or zeroes if
-  mute / exhausted).
-
-**Library Faust changes:** none required. `sno.multipink` exists at
+**Library Faust changes:** none required. `sno.multipink` already exists in
 `librerie/faust-libraries/src/seam.noise.lib`.
 
 ## 10. Calibration Procedure (doc/calibration.md)
 
-1. Render 10 s of plugin output with `reference = -23 dBFS RMS`, `trim = 0`,
+1. Render 30 s of plugin output with `reference = -23 dBFS RMS`, `trim = 0`,
    on a stereo track in Reaper.
-2. Measure file RMS with `sox stat`, iZotope Insight, or equivalent.
-3. Expected: `-23.0 ±0.1 dBFS RMS` per channel (long-term integrated).
-4. If offset > 0.1 dB: adjust `kCalibrationOffsetDb` in `multipink_dsp.cpp`
-   and rebuild.
-5. Repeat for `-20` and `-18` references.
+2. Measure long-term RMS with `sox stat`, iZotope Insight, or equivalent.
+3. Expected: `-23.0 ±0.1 dBFS RMS` per channel.
+4. If offset > 0.1 dB: adjust `kCalibrationOffsetDb` in
+   `multipink_processor.cpp` (a `constexpr` near the top) and rebuild.
+5. Repeat for `-20` and `-18` references — they should all match within
+   ±0.1 dB if the constant is correct (the offset is filter-intrinsic, not
+   reference-dependent).
 
 ## 11. Out of Scope
 
