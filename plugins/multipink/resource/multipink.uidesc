@@ -47,9 +47,10 @@
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="2" style-no-frame="true"/>
 
         <!-- Mute -->
-        <view class="COnOffButton" origin="120, 222" size="60, 20" control-tag="Mute"/>
-        <view class="CTextLabel" origin="180, 222" size="100, 20" font="ValueFont"
-              font-color="TextDim" text-alignment="left" title=" mute" transparent="true"/>
+        <view class="CCheckBox" origin="100, 222" size="100, 20" control-tag="Mute"
+              title="MUTE" font="ValueFont" font-color="TextLight"
+              boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
+              frame-width="1" transparent="true" autosize-to-fit="false"/>
 
         <!-- Slot badge -->
         <view class="CTextLabel" origin="20, 252" size="60, 16" font="InfoFont"

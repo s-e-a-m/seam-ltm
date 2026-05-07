@@ -56,10 +56,14 @@ tresult PLUGIN_API MULTIPINKProcessor::initialize(FUnknown* context) {
         STR16("Slot Count"), kParamSlotCount, STR16(""),
         0.0, 64.0, 0.0, 64,
         ParameterInfo::kIsReadOnly));
-    parameters.addParameter(new RangeParameter(
+    auto* statusParam = new StringListParameter(
         STR16("Pool Status"), kParamPoolStatus, STR16(""),
-        0.0, 3.0, 0.0, 3,
-        ParameterInfo::kIsReadOnly));
+        ParameterInfo::kIsReadOnly | ParameterInfo::kIsList);
+    statusParam->appendString(STR16("Unclaimed"));
+    statusParam->appendString(STR16("OK (preferred)"));
+    statusParam->appendString(STR16("OK (first-fit)"));
+    statusParam->appendString(STR16("EXHAUSTED"));
+    parameters.addParameter(statusParam);
 
     return kResultOk;
 }
