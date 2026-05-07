@@ -80,15 +80,13 @@ tresult PLUGIN_API MULTIPINKProcessor::setupProcessing(ProcessSetup& setup) {
 }
 
 tresult PLUGIN_API MULTIPINKProcessor::process(ProcessData& data) {
-    // Stub: silence outputs.
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
+    int numChannels = data.outputs[0].numChannels;
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
-    int n = data.outputs[0].numChannels;
-    for (int c = 0; c < n; ++c) {
-        if (data.symbolicSampleSize == kSample32)
-            std::memset(out[c], 0, sizeof(float)  * data.numSamples);
-        else
-            std::memset(out[c], 0, sizeof(double) * data.numSamples);
+    if (data.symbolicSampleSize == kSample32) {
+        processBlock<float>((float**)out, numChannels, data.numSamples, scratch32_);
+    } else {
+        processBlock<double>((double**)out, numChannels, data.numSamples, scratch64_);
     }
     return kResultOk;
 }
@@ -116,15 +114,57 @@ IPlugView* PLUGIN_API MULTIPINKProcessor::createView(FIDString name) {
     return nullptr;
 }
 
-void MULTIPINKProcessor::seedLCGs()           { /* Task 3 */ }
+void MULTIPINKProcessor::seedLCGs() {
+    // Per-channel seeding mirrors no.multinoise(64) = noise_env(12345).multinoise(64).
+    // Each of the 64 LCG channels is seeded with the master LCG advanced (i+1) times.
+    // Bit-identity to Faust to be verified one-off via faust2sndfile reference dump
+    // (see plan Task 3.3-3.5); kept as-derived from noises.lib:81 (multirandom).
+    uint32_t s = kFaustSeed;
+    for (int i = 0; i < kPoolSize; ++i) {
+        s = s * 1103515245u + 12345u;
+        lcgState_[i] = s;
+    }
+}
 void MULTIPINKProcessor::resetPinkFilters()   { /* Task 4 */ }
 double MULTIPINKProcessor::computeGainLin() const { return 0.0; /* Task 5 */ }
 void MULTIPINKProcessor::readParameterChanges(ProcessData&) { /* Task 5 */ }
 
 template <typename SampleType>
-void MULTIPINKProcessor::processBlock(SampleType**, int, int, std::vector<SampleType>&) {
-    /* Tasks 3,4,5,6 */
+void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
+                                      int numSamples,
+                                      std::vector<SampleType>& scratch) {
+    // 1. Advance ALL 64 LCGs into scratch[ch * numSamples + s].
+    //    (Reason for "all 64": see spec §2.2 — guarantees slot k's stream
+    //    is independent of which other slots are active in this instance.)
+    for (int ch = 0; ch < kPoolSize; ++ch) {
+        uint32_t st = lcgState_[ch];
+        SampleType* row = scratch.data() + (size_t)ch * numSamples;
+        for (int s = 0; s < numSamples; ++s) {
+            st = st * 1103515245u + 12345u;
+            row[s] = (SampleType)((int32_t)st / 2147483648.0);
+        }
+        lcgState_[ch] = st;
+    }
+    // 2. (Pink filter — Task 4.)
+    // 3. Slot routing — copy claimed slots straight to outputs at unity gain.
+    //    Real gain stage comes in Task 5.
+    if (claimedStart_ < 0 || claimedChannels_ == 0) {
+        for (int c = 0; c < numChannels; ++c)
+            std::memset(outputs[c], 0, sizeof(SampleType) * numSamples);
+        return;
+    }
+    int n = std::min(numChannels, claimedChannels_);
+    for (int c = 0; c < n; ++c) {
+        SampleType* src = scratch.data() + (size_t)(claimedStart_ + c) * numSamples;
+        std::memcpy(outputs[c], src, sizeof(SampleType) * numSamples);
+    }
+    for (int c = n; c < numChannels; ++c)
+        std::memset(outputs[c], 0, sizeof(SampleType) * numSamples);
 }
+
+// Explicit template instantiations
+template void MULTIPINKProcessor::processBlock<float>(float**, int, int, std::vector<float>&);
+template void MULTIPINKProcessor::processBlock<double>(double**, int, int, std::vector<double>&);
 
 } // namespace Seam
 
