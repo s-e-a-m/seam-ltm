@@ -125,7 +125,12 @@ void MULTIPINKProcessor::seedLCGs() {
         lcgState_[i] = s;
     }
 }
-void MULTIPINKProcessor::resetPinkFilters()   { /* Task 4 */ }
+void MULTIPINKProcessor::resetPinkFilters() {
+    for (int i = 0; i < kPoolSize; ++i) {
+        for (int k = 0; k < 4; ++k) pinkX_[i][k] = 0.0;
+        for (int k = 0; k < 3; ++k) pinkY_[i][k] = 0.0;
+    }
+}
 double MULTIPINKProcessor::computeGainLin() const { return 0.0; /* Task 5 */ }
 void MULTIPINKProcessor::readParameterChanges(ProcessData&) { /* Task 5 */ }
 
@@ -145,7 +150,25 @@ void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
         }
         lcgState_[ch] = st;
     }
-    // 2. (Pink filter — Task 4.)
+    // 2. Pink-shape ALL 64 channels in place (Direct Form I IIR).
+    //    y[n] =  b0*x[n] + b1*x[n-1] + b2*x[n-2] + b3*x[n-3]
+    //          - a1*y[n-1] - a2*y[n-2] - a3*y[n-3]
+    for (int ch = 0; ch < kPoolSize; ++ch) {
+        SampleType* row = scratch.data() + (size_t)ch * numSamples;
+        double x1 = pinkX_[ch][0], x2 = pinkX_[ch][1], x3 = pinkX_[ch][2], x4 = pinkX_[ch][3];
+        double y1 = pinkY_[ch][0], y2 = pinkY_[ch][1], y3 = pinkY_[ch][2];
+        for (int s = 0; s < numSamples; ++s) {
+            double x0 = (double)row[s];
+            double y0 = kPinkB[0]*x0 + kPinkB[1]*x1 + kPinkB[2]*x2 + kPinkB[3]*x3
+                      - kPinkA[0]*y1 - kPinkA[1]*y2 - kPinkA[2]*y3;
+            row[s] = (SampleType)y0;
+            x4 = x3; x3 = x2; x2 = x1; x1 = x0;
+            y3 = y2; y2 = y1; y1 = y0;
+        }
+        pinkX_[ch][0] = x1; pinkX_[ch][1] = x2; pinkX_[ch][2] = x3; pinkX_[ch][3] = x4;
+        pinkY_[ch][0] = y1; pinkY_[ch][1] = y2; pinkY_[ch][2] = y3;
+    }
+    // (void)x4 silences potential unused-warning if optimization is aggressive.
     // 3. Slot routing — copy claimed slots straight to outputs at unity gain.
     //    Real gain stage comes in Task 5.
     if (claimedStart_ < 0 || claimedChannels_ == 0) {
