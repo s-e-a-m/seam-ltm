@@ -1,5 +1,6 @@
 #include "multipink_processor.h"
 #include "multipink_ids.h"
+#include "multipink_pool.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -45,6 +46,29 @@ tresult PLUGIN_API MULTIPINKProcessor::terminate() {
 }
 
 tresult PLUGIN_API MULTIPINKProcessor::setActive(TBool state) {
+    if (state) {
+        int actualStart = -1;
+        auto r = MultipinkPool::claim(activeChannels_, preferredStart_, actualStart);
+        claimedStart_     = actualStart;
+        claimedChannels_  = (actualStart >= 0) ? activeChannels_ : 0;
+        switch (r) {
+            case MultipinkPool::ClaimResult::ClaimedAtPreferred:
+                poolStatus_.store((int)PoolStatus::ClaimedAtPreferred); break;
+            case MultipinkPool::ClaimResult::ClaimedFirstFit:
+                poolStatus_.store((int)PoolStatus::ClaimedFirstFit); break;
+            case MultipinkPool::ClaimResult::Exhausted:
+                poolStatus_.store((int)PoolStatus::Exhausted); break;
+        }
+        seedLCGs();
+        resetPinkFilters();
+    } else {
+        if (claimedStart_ >= 0) {
+            MultipinkPool::release(claimedStart_, claimedChannels_);
+        }
+        claimedStart_    = -1;
+        claimedChannels_ = 0;
+        poolStatus_.store((int)PoolStatus::Unclaimed);
+    }
     return SingleComponentEffect::setActive(state);
 }
 
