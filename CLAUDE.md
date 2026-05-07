@@ -62,6 +62,19 @@ finished GUIs, not editable templates.
 VST3 SDK expected at `../vst3sdk` (sibling of `seam-ltm`), overridable via
 `-DSEAM_VST3SDK_DIR=...`.
 
+## Peer-aware plugins (pattern introduced by `multipink`)
+
+`multipink` is the first plugin in the suite to use **shared static state in
+the `.vst3` module** for cross-instance coordination (a 64-slot allocation
+bitmap). The implementation lives in `plugins/multipink/source/multipink_pool.{h,cpp}`.
+
+If a future plugin needs a similar peer-aware behaviour (instances that need
+to know about each other to function correctly), reuse `multipink_pool` as
+the reference implementation rather than reinventing the pattern. **Do not
+retrofit peer awareness into existing plugins speculatively** — only when a
+real user-facing problem motivates it. Each candidate upgrade gets its own
+brainstorming and spec.
+
 ## Working language
 
 Giuseppe communicates in Italian. Code, commits, and documentation are in
