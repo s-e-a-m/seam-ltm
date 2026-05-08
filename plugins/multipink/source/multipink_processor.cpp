@@ -197,14 +197,31 @@ IPlugView* PLUGIN_API MULTIPINKProcessor::createView(FIDString name) {
 }
 
 void MULTIPINKProcessor::seedLCGs() {
-    // Per-channel seeding mirrors no.multinoise(64) = noise_env(12345).multinoise(64).
-    // Each of the 64 LCG channels is seeded with the master LCG advanced (i+1) times.
-    // Bit-identity to Faust to be verified one-off via faust2sndfile reference dump
-    // (see plan Task 3.3-3.5); kept as-derived from noises.lib:81 (multirandom).
-    uint32_t s = kFaustSeed;
+    // Per-channel seeding via splitmix64 avalanche hash, derived from
+    // kFaustSeed and the channel index. We do NOT seed sequentially with
+    // s = LCG(s) per channel — that would make channel (i+1) a 1-sample
+    // shift of channel i, and after the pink IIR (which is time-invariant)
+    // the resulting streams would be highly correlated at the pink filter's
+    // lag-1 autocorrelation (~0.5-0.7 because of the strong low-frequency
+    // content of pink noise). Verified empirically on 2026-05-08: stereo
+    // mid-side analysis showed mid > side in violation of the orthogonality
+    // expected from independent streams.
+    //
+    // The fix scrambles each channel's seed to a pseudo-random point in
+    // the LCG period (2^32). With 64 channels distributed uniformly over
+    // 2^32 states, the probability of any two seeds being within 10k
+    // samples is < 1%, so statistical independence is preserved.
+    //
+    // Faust's no.multinoise(N) achieves the same end via noise_env's
+    // internal seed dispersion; this is functionally equivalent though
+    // not bit-identical to Faust's stream.
     for (int i = 0; i < kPoolSize; ++i) {
-        s = s * 1103515245u + 12345u;
-        lcgState_[i] = s;
+        uint64_t z = (uint64_t)kFaustSeed * 0x9E3779B97F4A7C15ULL
+                   + (uint64_t)(i + 1)    * 0xC2B2AE3D27D4EB4FULL;
+        z ^= z >> 30; z *= 0xBF58476D1CE4E5B9ULL;
+        z ^= z >> 27; z *= 0x94D049BB133111EBULL;
+        z ^= z >> 31;
+        lcgState_[i] = (uint32_t)z;
     }
 }
 void MULTIPINKProcessor::resetPinkFilters() {

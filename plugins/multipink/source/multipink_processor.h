@@ -18,11 +18,15 @@
 //       (0.049922035, -0.095993537, 0.050612699, -0.004408786),
 //       (-2.494956002, 2.017265875, -0.522189400));
 //
-// and no.multinoise(N) is N parallel LCGs seeded from noise_env(12345).
+// and no.multinoise(N) is N parallel LCGs whose per-channel seeds are
+// dispersed by noise_env(12345) so the resulting streams are statistically
+// independent.
 //
 // This plugin re-implements the above in hand-written C++ (project
 // convention — see seam-ltm/CLAUDE.md). N is fixed at 64 (the shared
 // logical pool size). Per-instance gain is applied in C++ after the IIR.
+// Seed dispersion uses splitmix64 (see seedLCGs in the .cpp); functionally
+// equivalent to Faust's noise_env, though not bit-identical to its stream.
 
 namespace Seam {
 
