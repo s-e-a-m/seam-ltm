@@ -12,6 +12,33 @@ filter coefficients (see `multipink_processor.h`, `kPinkB`/`kPinkA`). To
 make the knob "0 dB" position correspond to a real reference RMS, a
 hard-coded compensation `kCalibrationOffsetDb` is applied.
 
+## Measurement convention — IMPORTANT
+
+The plugin's calibration target is **AES17 unweighted RMS** as reported by
+`sox stat` (pure `sqrt(mean(x²))`, in dBFS = `20·log10`). This is the
+engineering RMS that corresponds 1:1 to acoustic RMS at a loudspeaker, and
+therefore the convention that aligns with a true SPL meter at the
+listening position.
+
+Many pro audio tools use a different convention — **AES17 alignment** —
+that multiplies RMS by `√2` (≈ +3.01 dB) so that a full-scale sine wave
+reads 0 dBFS on both Peak and RMS meters. The same signal that `sox`
+reports as `-23.0 dBFS RMS` will appear as approximately:
+
+| Tool                       | Reading | Convention                         |
+|----------------------------|---------|------------------------------------|
+| `sox stat`                 | -23.0   | Pure RMS (AES17 unweighted)        |
+| iZotope RX                 | -20.0   | AES17 alignment (+3.01 dB)         |
+| Reaper RMS meter (default) | ~-19.0  | AES17 alignment + stereo summing   |
+| Real SPL meter at speaker  | (rig)   | Pure acoustic RMS = sox alignment  |
+
+**None of these is "wrong"** — they're three different rulers on the same
+signal. Pick the one that matches your downstream tooling, and read this
+table every time you compare cross-tool measurements.
+
+For SEAM speaker calibration (Stone arrays etc.), the SPL-meter alignment
+is what matters, so we calibrate against `sox`.
+
 ## Re-verifying
 
 1. Add `multipink` to a stereo track in Reaper.
@@ -22,7 +49,8 @@ hard-coded compensation `kCalibrationOffsetDb` is applied.
    sox multipink_cal.wav -n stat 2>&1 | grep "RMS amplitude"
    ```
 5. Convert to dBFS: `dB = 20 · log10(RMS_amplitude)`.
-6. Expected: -23.0 ± 0.1 dBFS RMS per channel.
+6. Expected: -23.0 ± 0.1 dBFS RMS per channel (sox/AES17 unweighted).
+   In AES17-aligned tools this will read as ≈ -20.0.
 
 ## Recalibrating
 
