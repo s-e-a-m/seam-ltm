@@ -32,6 +32,63 @@ needed to do the job.
 |:---:|:---:|:---:|
 | ![M2XHGR](doc/img/m2xhgr.png) | ![LR2XHGR](doc/img/lr2xhgr.png) | ![DDELAY](doc/img/ddelay.png) |
 
+## Installation
+
+Prebuilt VST3 bundles are attached to each
+[release](https://github.com/s-e-a-m/seam-ltm/releases/latest). The macOS
+builds are **universal binaries** (Intel `x86_64` + Apple Silicon `arm64`).
+
+> To build from source instead, skip to [Requirements](#requirements).
+
+### macOS
+
+The bundles are **not code-signed or notarized** (no Apple Developer ID).
+Gatekeeper will therefore quarantine them on download and refuse to load them
+until you clear the quarantine attribute. This is a one-time step per download.
+
+```bash
+# 1. Unzip the downloaded bundle(s)
+cd ~/Downloads
+unzip 'multipink-*-macOS.vst3.zip'
+
+# 2. Install into the standard user VST3 path
+cp -R multipink.vst3 ~/Library/Audio/Plug-Ins/VST3/
+
+# 3. Clear the Gatekeeper quarantine flag (-r: .vst3 is a bundle/directory)
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/multipink.vst3
+
+# 4. Rescan plugins in your DAW
+```
+
+To install and unblock **all** plugins at once:
+
+```bash
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/*.vst3
+```
+
+Verify a bundle is clean (the command should print **no**
+`com.apple.quarantine` line):
+
+```bash
+xattr -l ~/Library/Audio/Plug-Ins/VST3/multipink.vst3
+```
+
+Alternatively, after the first blocked load attempt you can authorize each
+plugin via **System Settings → Privacy & Security → "Open Anyway"** — but the
+`xattr` route is faster and covers every plugin in one command.
+
+### Linux
+
+Copy the `.vst3` bundles into a standard VST3 search path:
+
+```bash
+mkdir -p ~/.vst3
+cp -R *.vst3 ~/.vst3/
+```
+
+No quarantine mechanism exists on Linux; the plugins load once your host
+rescans them.
+
 ## Requirements
 
 ### VST3 SDK
