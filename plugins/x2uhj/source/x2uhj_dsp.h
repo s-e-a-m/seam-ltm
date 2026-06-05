@@ -40,4 +40,13 @@ struct QuadratureNetwork {
     }
 };
 
+// AmbiX (ACN order W,Y,Z,X ; SN3D) -> FuMa WXYZ with W scaled by 1/√2.
+inline void ambixToFuMa(const double* acn, double* wxyz) {
+    static const double kInvSqrt2 = 0.7071067811865476;
+    wxyz[0] = acn[0] * kInvSqrt2; // W
+    wxyz[1] = acn[3];             // X
+    wxyz[2] = acn[1];             // Y
+    wxyz[3] = acn[2];             // Z
+}
+
 }} // namespace

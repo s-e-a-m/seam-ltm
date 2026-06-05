@@ -44,6 +44,17 @@ static double cascadePhaseDeg(const APSpec* spec, int n, double f, double fs) {
     return std::atan2(-sinAcc, cosAcc) * 180.0 / M_PI;
 }
 
+TEST_CASE("ambixToFuMa reorders ACN and scales W by 1/sqrt(2)") {
+    // AmbiX ACN input: [W, Y, Z, X]
+    double in[4] = {1.0, 2.0, 3.0, 4.0};
+    double out[4];
+    ambixToFuMa(in, out);                 // -> [W/√2, X, Y, Z]
+    CHECK(out[0] == doctest::Approx(1.0 / std::sqrt(2.0)));
+    CHECK(out[1] == doctest::Approx(4.0));   // X (ACN 3)
+    CHECK(out[2] == doctest::Approx(2.0));   // Y (ACN 1)
+    CHECK(out[3] == doctest::Approx(3.0));   // Z (ACN 2)
+}
+
 TEST_CASE("Quadrature pair is ~90 deg apart across the band") {
     const double fs = 48000.0;
     for (double f : {100.0, 500.0, 1000.0, 5000.0, 10000.0}) {
