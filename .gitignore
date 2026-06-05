@@ -3,3 +3,6 @@ build-release/
 .DS_Store
 *.xcworkspace
 xcuserdata/
+
+# Audio measurement artefacts (RMS calibration captures, etc.)
+*.wav

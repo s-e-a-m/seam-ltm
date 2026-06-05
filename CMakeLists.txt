@@ -5,6 +5,18 @@ cmake_minimum_required(VERSION 3.25.0)
 # A pedagogical VST3 plugin suite for the SEAM project
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─── macOS architecture default ─────────────────────────────────────────────
+# Xcode builds a universal binary (x86_64 + arm64) by default. On Macs where the
+# system expat (MacPorts /opt/local, Homebrew /usr/local) is single-arch, the
+# VSTGUI EXPAT dependency fails to link for the missing slice. Unless the user
+# explicitly asks for a universal/cross build, pin to the host architecture.
+# Must be set BEFORE project() so the toolchain is probed for the right arch.
+# See: https://github.com/s-e-a-m/seam-ltm/issues/3
+if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
+    set(CMAKE_OSX_ARCHITECTURES "${CMAKE_HOST_SYSTEM_PROCESSOR}"
+        CACHE STRING "macOS build architecture (defaults to host)")
+endif()
+
 project(seam-ltm
     VERSION 0.1.5
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
