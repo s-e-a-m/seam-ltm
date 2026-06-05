@@ -22,6 +22,12 @@ project(seam-ltm
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
 )
 
+# ─── Unit tests (SDK-free DSP cores) ─────────────────────────────────────────
+option(SEAM_BUILD_TESTS "Build SEAM-LTM unit tests" ON)
+if(SEAM_BUILD_TESTS)
+    enable_testing()
+endif()
+
 # ─── VST3 SDK ────────────────────────────────────────────────────────────────
 # Default: ../vst3sdk (SDK cloned alongside seam-ltm).
 # Override: cmake -B build -DSEAM_VST3SDK_DIR=/your/path/to/vst3sdk
@@ -76,3 +82,7 @@ add_subdirectory(plugins/m2xhgr)
 add_subdirectory(plugins/bamodulex)
 add_subdirectory(plugins/ddelay)
 add_subdirectory(plugins/multipink)
+
+if(SEAM_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
