@@ -1,6 +1,7 @@
 // SEAM-LTM · X2UHJ — SDK-free DSP core (header-only, unit-testable).
 #pragma once
 #include <cmath>
+#include <initializer_list>
 #include "x2uhj_coeffs.h"
 
 namespace Seam { namespace x2uhj {
@@ -48,5 +49,37 @@ inline void ambixToFuMa(const double* acn, double* wxyz) {
     wxyz[2] = acn[1];             // Y
     wxyz[3] = acn[2];             // Z
 }
+
+// Full AmbiX -> UHJ C-format encoder (per-sample).
+// Structure: filter bank (H_R on W,X,Y,Z ; H_I on W,X) then static matrix.
+// Matrix constants: Gerzon (1985) standard UHJ values.
+// FAUST REFERENCE (seam.smg.lib): smg.uhj_encode
+class UHJEncoder {
+public:
+    void prepare(double fs) {
+        for (auto* n : {&hrW,&hrX,&hrY,&hrZ}) n->set(kHR, kNumSections, fs);
+        for (auto* n : {&hiW,&hiX})           n->set(kHI, kNumSections, fs);
+    }
+    void reset() {
+        hrW.reset(); hrX.reset(); hrY.reset(); hrZ.reset();
+        hiW.reset(); hiX.reset();
+    }
+    // acn: 4-sample AmbiX frame (ACN/SN3D). Outputs L,R,T,Q.
+    void process(const double* acn, double& L, double& R, double& T, double& Q) {
+        double f[4]; ambixToFuMa(acn, f);
+        const double W = f[0], X = f[1], Y = f[2], Z = f[3];
+        const double Wr = hrW.process(W), Xr = hrX.process(X);
+        const double Yr = hrY.process(Y), Zr = hrZ.process(Z);
+        const double Wi = hiW.process(W), Xi = hiX.process(X);
+        const double Sigma = 0.9396926*Wr + 0.1855740*Xr;
+        const double Delta = (-0.3420201*Wi + 0.5098604*Xi) + 0.6554516*Yr;
+        L = 0.5 * (Sigma + Delta);
+        R = 0.5 * (Sigma - Delta);
+        T = (-0.1432*Wi + 0.6512*Xi) - 0.7071*Yr;
+        Q = 0.9772 * Zr;
+    }
+private:
+    QuadratureNetwork hrW, hrX, hrY, hrZ, hiW, hiX;
+};
 
 }} // namespace

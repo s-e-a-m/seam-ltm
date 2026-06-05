@@ -64,3 +64,32 @@ TEST_CASE("Quadrature pair is ~90 deg apart across the band") {
         CHECK(std::abs(std::abs(diff) - 90.0) < 5.0);
     }
 }
+
+TEST_CASE("UHJEncoder: W-only input produces nonzero L,R and zero Q") {
+    UHJEncoder enc; enc.prepare(48000.0);
+    // AmbiX ACN W-only (omni). W contributes to Sigma (both L and R).
+    // Z=0, so Q must be zero. W does not enter Q path.
+    double in[4] = {1.0, 0.0, 0.0, 0.0};
+    double L,R,T,Q;
+    // Settle the filters.
+    for (int i = 0; i < 4096; ++i) enc.process(in, L, R, T, Q);
+    CHECK(L != doctest::Approx(0.0));   // Sigma path active
+    CHECK(R != doctest::Approx(0.0));   // Sigma path active
+    CHECK(Q == doctest::Approx(0.0));   // Z=0 -> Q=0
+}
+
+TEST_CASE("UHJEncoder: Q channel carries only Z (scaled, filtered)") {
+    UHJEncoder enc; enc.prepare(48000.0);
+    double inZ[4]  = {0,0,1.0,0};   // ACN Z only
+    double inXY[4] = {0,1.0,0,1.0}; // ACN Y and X, no Z
+    double L,R,T,Q, Lo,Ro,To,Qo;
+    for (int i = 0; i < 4096; ++i) {
+        enc.process(inZ, L, R, T, Q);
+    }
+    UHJEncoder enc2; enc2.prepare(48000.0);
+    for (int i = 0; i < 4096; ++i) {
+        enc2.process(inXY, Lo, Ro, To, Qo);
+    }
+    CHECK(std::abs(Q) > 1e-6);     // Z drives Q
+    CHECK(std::abs(Qo) < 1e-9);    // X,Y do not drive Q
+}
