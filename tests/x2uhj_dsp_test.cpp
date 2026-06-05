@@ -24,3 +24,32 @@ TEST_CASE("AllpassSection has unit magnitude") {
     CHECK(sectionMagnitude(1000.0, 0.5, 48000.0, 1000.0) == doctest::Approx(1.0).epsilon(0.01));
     CHECK(sectionMagnitude(1000.0, 0.5, 48000.0,  300.0) == doctest::Approx(1.0).epsilon(0.01));
 }
+
+#include "x2uhj_coeffs.h"
+
+// Measure phase of a real sinusoid through a cascade by cross-correlation.
+static double cascadePhaseDeg(const APSpec* spec, int n, double f, double fs) {
+    AllpassSection s[8];
+    for (int i = 0; i < n; ++i) s[i].set(spec[i].f, spec[i].Q, fs);
+    const int N = 16384; double cosAcc = 0, sinAcc = 0;
+    for (int k = 0; k < N; ++k) {
+        double x = std::cos(2.0 * M_PI * f * k / fs);
+        double y = x;
+        for (int i = 0; i < n; ++i) y = s[i].process(y);
+        if (k > N/2) {
+            cosAcc += y * std::cos(2.0 * M_PI * f * k / fs);
+            sinAcc += y * std::sin(2.0 * M_PI * f * k / fs);
+        }
+    }
+    return std::atan2(-sinAcc, cosAcc) * 180.0 / M_PI;
+}
+
+TEST_CASE("Quadrature pair is ~90 deg apart across the band") {
+    const double fs = 48000.0;
+    for (double f : {100.0, 500.0, 1000.0, 5000.0, 10000.0}) {
+        double pr = cascadePhaseDeg(kHR, kNumSections, f, fs);
+        double pi = cascadePhaseDeg(kHI, kNumSections, f, fs);
+        double diff = std::fmod(pi - pr + 540.0, 360.0) - 180.0;
+        CHECK(std::abs(std::abs(diff) - 90.0) < 5.0);
+    }
+}
