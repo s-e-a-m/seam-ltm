@@ -52,8 +52,10 @@ inline void ambixToFuMa(const double* acn, double* wxyz) {
 
 // Full AmbiX -> UHJ C-format encoder (per-sample).
 // Structure: filter bank (H_R on W,X,Y,Z ; H_I on W,X) then static matrix.
-// Matrix constants: Gerzon (1985) standard UHJ values.
-// FAUST REFERENCE (seam.smg.lib): smg.uhj_encode
+// Matrix constants: Gerzon, "Ambisonics in Multichannel Broadcasting and
+// Video", JAES 1983 — standard UHJ values.
+// FAUST REFERENCE (seam.ambisonics.lib): sam.x2uhj (canonical form added by
+// this work; see plugins/x2uhj design spec).
 class UHJEncoder {
 public:
     void prepare(double fs) {
