@@ -1,0 +1,8 @@
+doc/math/*.aux
+doc/math/*.log
+doc/math/*.out
+doc/math/*.toc
+doc/math/*.bbl
+doc/math/*.blg
+doc/math/*.fls
+doc/math/*.fdb_latexmk
