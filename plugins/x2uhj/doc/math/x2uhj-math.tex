@@ -89,8 +89,84 @@ The super-stereo model feeds $(L, R)$ to two frontal loudspeakers at \ang{30} an
 The surround model illuminates why Gerzon selected these coefficients: the reconstructed field localises faithfully across the full azimuth circle.
 The super-stereo model demonstrates the stereo listening result: a frontal pair at $\pm30^\circ$ conveys the same source direction with small angular error.
 Agreement between the two models across azimuth confirms that the published coefficients serve both listening contexts.
-% \section{The j Problem: Wideband 90 Degrees}     % Task 10
-% \section{The Sample-Rate-Independent Design}     % Task 10
+\section{The \texorpdfstring{$j$}{j} Problem: Wideband 90 Degrees}
+
+The $j$ operator in the UHJ matrix denotes a 90-degree phase shift applied uniformly across the audio band.
+A broadband 90-degree phase difference between two filter paths realises this operator.
+A FIR Hilbert pair achieves the phase difference with a tap set fixed to one sample rate and one length.
+An IIR all-pass pair carries the same phase relation in physical $(f_0, Q)$ units, which expresses the design in sample-rate-free terms.
+This section develops the IIR all-pass approach and establishes the procedure that holds the quadrature at every sample rate.
+
+\section{The Sample-Rate-Independent Design}
+
+The analog second-order all-pass prototype and its phase response are:
+
+\begin{equation}
+H_a(s) = \frac{s^2 - (\omega_0/Q)\,s + \omega_0^2}{s^2 + (\omega_0/Q)\,s + \omega_0^2},
+\qquad \omega_0 = 2\pi f_0 .
+\end{equation}
+
+\begin{equation}
+\varphi_a(\omega) = -2\arctan\!\frac{(\omega_0/Q)\,\omega}{\omega_0^2 - \omega^2} .
+\end{equation}
+
+Each network is a cascade of three second-order all-pass sections, one for the real path $H_R$ and one for the imaginary path $H_I$.
+Optimising the six $(f_0, Q)$ pairs so that $\varphi_{H_I} - \varphi_{H_R} = -\ang{90}$ over \SIrange{20}{20000}{\hertz} on the analog phase reaches a maximum error of \ang{0.40} in the continuous domain.
+
+\begin{table}[h]
+\centering
+\caption{Analog $s$-domain ideal $(f_0, Q)$ pairs. Maximum phase error \ang{0.40} across \SIrange{20}{20000}{\hertz}.}
+\label{tab:analog-pairs}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Path & $f_0$ (Hz) & $Q$ \\
+\midrule
+$H_R$ & 107.988  & 0.2267 \\
+$H_R$ & 449.085  & 0.2406 \\
+$H_R$ & 19474.604 & 0.3194 \\
+\addlinespace
+$H_I$ & 20.540   & 0.3194 \\
+$H_I$ & 1756.151 & 0.4026 \\
+$H_I$ & 1878.679 & 0.1198 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The RBJ bilinear realisation maps each analog section to a digital biquad all-pass:
+
+\begin{equation}
+a_1 = \frac{-2\cos\omega}{1+\alpha},\quad a_2 = \frac{1-\alpha}{1+\alpha},\quad
+\alpha = \frac{\sin\omega}{2Q},\quad \omega = \frac{2\pi f_0}{f_s},
+\end{equation}
+
+with all-pass numerator $b = [a_2,\, a_1,\, 1]$.
+
+The bilinear transform maps a digital frequency $f$ to the analog frequency $F = (f_s/\pi)\tan(\pi f / f_s)$.
+A fixed $(f_0, Q)$ set therefore presents its broadband phase on a warped frequency axis that depends on $f_s$.
+The quadrature holds near the sample rate the set was designed for, and the phase difference departs from \ang{90} as the sample rate moves away.
+Sample-rate independence belongs to the design procedure: re-running the digital phase fit at the actual sample rate restores the quadrature at that rate.
+The deliverable stores a per-rate $(f_0, Q)$ table, with one entry produced by the same procedure for each standard rate.
+
+\begin{table}[h]
+\centering
+\caption{Per-rate design maxima. Each row is designed independently at its own sample rate.}
+\label{tab:per-rate}
+\begin{tabular}{@{}cc@{}}
+\toprule
+Sample rate (kHz) & Max phase error (deg) \\
+\midrule
+44.1  & 2.040 \\
+48    & 1.362 \\
+88.2  & 0.529 \\
+96    & 0.505 \\
+176.4 & 0.429 \\
+192   & 0.425 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The per-rate table holds the quadrature within roughly two degrees at every standard rate.
+Section~7 visualises this against the phase drift of a fixed set applied across varying sample rates.
 % \section{Validation}                             % Task 11
 % \section*{References}                            % Task 11
 
