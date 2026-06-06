@@ -56,7 +56,39 @@ $L$ and $R$ are the two transmitted stereo channels, formed from the sum and dif
 $T$ is the third C-format channel; it carries additional directional resolution that extends spatial accuracy beyond the stereo base.
 $Q$ is the height-related channel; it carries the vertical component $Z$ scaled by $0.9772$ to match the overall normalisation scheme.
 The symbol $j$ denotes a broadband 90-degree phase shift applied across the full audio bandwidth; its implementation as a sample-rate-independent all-pass network is the subject of Sections~5 and~6.
-% \section{Reconstructing Gerzon's Coefficients}   % Task 9
+\section{Reconstructing Gerzon's Coefficients}
+
+Gerzon chose the UHJ coefficients to reproduce the psychoacoustic localization of the original sound field.
+The velocity vector $\mathbf{r}_V$ governs perceived direction below roughly \SI{700}{\hertz}, and the energy vector $\mathbf{r}_E$ governs it above.
+Both vectors are weighted averages of the loudspeaker direction unit vectors $\hat{\mathbf{u}}_i$:
+
+\begin{equation}
+\mathbf{r}_V = \frac{\sum_i g_i\,\hat{\mathbf{u}}_i}{\sum_i g_i},
+\qquad
+\mathbf{r}_E = \frac{\sum_i g_i^{2}\,\hat{\mathbf{u}}_i}{\sum_i g_i^{2}} .
+\end{equation}
+
+The velocity vector uses the loudspeaker gains $g_i$ directly, and the energy vector uses their squared values.
+A well-designed encoding keeps both vectors pointing toward the original source azimuth, with magnitude near unity.
+
+The constants in the $\Sigma$ and $\Delta$ expressions carry geometric meaning.
+The coefficient $0.9396926 = \cos 20^\circ$ and $0.3420201 = \sin 20^\circ$ reveal the $20^\circ$ design angle that Gerzon selected to balance spatial precision and robust mono compatibility.
+$\Sigma$ realises a forward first-order microphone pattern, which secures mono compatibility across all playback configurations.
+The $j$ term in $\Delta$ supplies the degree of freedom that maps the full \ang{360} of azimuth into two channels reversibly.
+
+Inverse verification takes the published coefficients as given and confirms numerically that they realise good localization.
+The verification evaluates two listening models.
+The surround model feeds $(L, R)$ to a symmetric illustrative loudspeaker layout and reads the localization vectors of the reconstructed field.
+The super-stereo model feeds $(L, R)$ to two frontal loudspeakers at \ang{30} and \ang{-30} and reads the localization a listener perceives at those positions.
+
+\begin{figure}[h]\centering
+\includegraphics[width=\linewidth]{gerzon_localization.png}
+\caption{Velocity-vector angular error versus source azimuth: surround decode (left) and super-stereo (right). Both models confirm that Gerzon's published coefficients localise the source across azimuth.}
+\end{figure}
+
+The surround model illuminates why Gerzon selected these coefficients: the reconstructed field localises faithfully across the full azimuth circle.
+The super-stereo model demonstrates the stereo listening result: a frontal pair at $\pm30^\circ$ conveys the same source direction with small angular error.
+Agreement between the two models across azimuth confirms that the published coefficients serve both listening contexts.
 % \section{The j Problem: Wideband 90 Degrees}     % Task 10
 % \section{The Sample-Rate-Independent Design}     % Task 10
 % \section{Validation}                             % Task 11
