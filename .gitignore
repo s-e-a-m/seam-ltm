@@ -6,3 +6,7 @@ xcuserdata/
 
 # Audio measurement artefacts (RMS calibration captures, etc.)
 *.wav
+
+# Python venvs
+.venv/
+__pycache__/
