@@ -28,10 +28,11 @@ struct AllpassSection {
 
 // A cascade of N all-pass sections (one network of the quadrature pair).
 struct QuadratureNetwork {
-    AllpassSection sec[8];
+    static constexpr int kMaxSections = 8;
+    AllpassSection sec[kMaxSections];
     int n = 0;
     void set(const APSpec* spec, int count, double fs) {
-        n = count;
+        n = count < kMaxSections ? count : kMaxSections; // guard fixed storage
         for (int i = 0; i < n; ++i) sec[i].set(spec[i].f, spec[i].Q, fs);
     }
     void reset() { for (int i = 0; i < n; ++i) sec[i].reset(); }

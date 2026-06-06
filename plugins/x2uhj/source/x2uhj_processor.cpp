@@ -45,6 +45,10 @@ tresult PLUGIN_API X2UHJProcessor::process(ProcessData& data) {
     void** in  = getChannelBuffersPointer(processSetup, data.inputs[0]);
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
 
+    // Silent input → silent output. Known limitation (as in the suite's other
+    // IIR plugins): the all-pass tail from prior content is not flushed here,
+    // so it is suppressed rather than allowed to decay. Acceptable for an
+    // encoder fed by upstream Ambisonics that goes silent between cues.
     if (data.inputs[0].silenceFlags == getChannelMask(data.inputs[0].numChannels)) {
         data.outputs[0].silenceFlags = data.inputs[0].silenceFlags;
         for (int32 i = 0; i < numCh; ++i)

@@ -4,6 +4,10 @@ import json
 with open("coeffs.json") as fp:
     d = json.load(fp)
 
+# Both networks must have the same section count: kNumSections is shared by the
+# C++ QuadratureNetwork::set for H_R and H_I alike.
+assert len(d["H_R"]) == len(d["H_I"]), "H_R and H_I must have equal section counts"
+
 def fmt(sections):
     return ",\n".join(f"    {{ {s['f']:.6f}, {s['Q']:.6f} }}" for s in sections)
 
