@@ -27,11 +27,15 @@ needed to do the job.
 
 | SDMX | B2Xrot | XYPRrot | BAMODULEX |
 |:---:|:---:|:---:|:---:|
-| ![SDMX](doc/img/sdmx.png) | ![B2Xrot](doc/img/b2xrot.png) | ![XYPRrot](doc/img/xyprrot.png) | ![BAMODULEX](doc/img/bamodulex.png) |
+| ![SDMX](docs/img/sdmx.png) | ![B2Xrot](docs/img/b2xrot.png) | ![XYPRrot](docs/img/xyprrot.png) | ![BAMODULEX](docs/img/bamodulex.png) |
 
 | M2XHGR | LR2XHGR | DDELAY |
 |:---:|:---:|:---:|
-| ![M2XHGR](doc/img/m2xhgr.png) | ![LR2XHGR](doc/img/lr2xhgr.png) | ![DDELAY](doc/img/ddelay.png) |
+| ![M2XHGR](docs/img/m2xhgr.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![DDELAY](docs/img/ddelay.png) |
+
+| MULTIPINK | X2UHJ |
+|:---:|:---:|
+| ![MULTIPINK](docs/img/multipink.png) | ![X2UHJ](docs/img/x2uhj.png) |
 
 ## Installation
 
