@@ -18,7 +18,7 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
 endif()
 
 project(seam-ltm
-    VERSION 0.1.5
+    VERSION 0.2.0
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
 )
 
