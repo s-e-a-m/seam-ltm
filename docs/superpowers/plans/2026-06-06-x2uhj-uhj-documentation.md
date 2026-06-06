@@ -4,7 +4,7 @@
 
 **Goal:** Build a standalone LaTeX PDF that explains the `x2uhj` plugin mathematics step by step, backed by reproducible design-time Python tools.
 
-**Architecture:** New Python tools under `plugins/x2uhj/tools/` derive and verify the math; each tool maps to one document section and emits figures into `plugins/x2uhj/doc/math/figures/`. The LaTeX source lives in `plugins/x2uhj/doc/math/` and compiles to `x2uhj-math.pdf`. The shipped plugin coefficients (`coeffs.json` → `x2uhj_coeffs.h`) stay untouched; the new analog design lands as `coeffs_analog.json` alongside.
+**Architecture:** New Python tools under `plugins/x2uhj/tools/` derive and verify the math; each tool maps to one document section and emits figures into `plugins/x2uhj/doc/math/figures/`. The LaTeX source lives in `plugins/x2uhj/doc/math/` and compiles to `x2uhj-math.pdf`. The shipped plugin coefficients (`coeffs.json` → `x2uhj_coeffs.h`) stay untouched; the s-domain ideal lands as `coeffs_analog.json` and the per-rate table as `coeffs_perfs.json` alongside. A research spike established that sample-rate independence is a property of the design procedure, not of a fixed coefficient set; the per-rate table embodies that, and the plugin C++ fix that consumes it is a separate follow-up.
 
 **Tech Stack:** Python 3.14 (numpy, scipy, matplotlib, pytest) in `plugins/x2uhj/tools/.venv`; LaTeX via `latexmk`/`pdflatex` (TeX Live at `/Library/TeX/texbin`).
 
@@ -31,11 +31,14 @@ Created or modified by this plan:
 | `plugins/x2uhj/tools/tests/test_analog_prototype.py` | analog phase invariants + analog↔RBJ low-frequency agreement |
 | `plugins/x2uhj/tools/design_quadrature_sdomain.py` | minimax fit of the analog quadrature pair, emits `coeffs_analog.json` |
 | `plugins/x2uhj/tools/tests/test_design_sdomain.py` | determinism + 90° target accuracy + JSON schema |
-| `plugins/x2uhj/tools/coeffs_analog.json` | generated analog design (fs-free f,Q pairs) |
+| `plugins/x2uhj/tools/coeffs_analog.json` | generated s-domain ideal (fs-free f,Q pairs, 0.40°) |
+| `plugins/x2uhj/tools/design_quadrature_perfs.py` | per-rate digital fit, emits `coeffs_perfs.json` (Task 5A) |
+| `plugins/x2uhj/tools/tests/test_design_perfs.py` | one entry per standard rate + per-rate quadrature met + determinism |
+| `plugins/x2uhj/tools/coeffs_perfs.json` | generated per-rate (f,Q) table for standard rates |
 | `plugins/x2uhj/tools/gerzon_verify.py` | r_V/r_E in surround and super-stereo models, figures |
 | `plugins/x2uhj/tools/tests/test_gerzon_verify.py` | vector invariants (symmetry, magnitude bounds) |
-| `plugins/x2uhj/tools/validate_multifs.py` | phase error at 44.1/48/96/192 kHz, table + plot |
-| `plugins/x2uhj/tools/tests/test_validate_multifs.py` | table shape + bounded finite errors |
+| `plugins/x2uhj/tools/validate_multifs.py` | fixed-set drift vs per-rate flat across standard rates, table + plot (Task 5B) |
+| `plugins/x2uhj/tools/tests/test_validate_multifs.py` | per-rate flat + fixed-set drift assertions |
 | `plugins/x2uhj/doc/math/x2uhj-math.tex` | the document |
 | `plugins/x2uhj/doc/math/refs.bib` | bibliography (5 references) |
 | `plugins/x2uhj/doc/math/figures/` | generated figures (git-tracked PNG/PDF) |
@@ -472,46 +475,186 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-## Task 5: Multi-sample-rate validation
+## Task 5A: Per-rate coefficient table
+
+> **Spike finding context:** a fixed (f, Q) set realized via the RBJ bilinear form does NOT hold the 90° quadrature across sample rates (bilinear warping shifts the broadband phase). Sample-rate independence is a property of the *design procedure*: re-run the digital phase fit at the actual rate. This task produces the per-rate table the future plugin consumes.
 
 **Files:**
-- Create: `plugins/x2uhj/tools/validate_multifs.py`
-- Test: `plugins/x2uhj/tools/tests/test_validate_multifs.py`
+- Create: `plugins/x2uhj/tools/design_quadrature_perfs.py`
+- Create (generated): `plugins/x2uhj/tools/coeffs_perfs.json`
+- Test: `plugins/x2uhj/tools/tests/test_design_perfs.py`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `plugins/x2uhj/tools/tests/test_validate_multifs.py`:
+Create `plugins/x2uhj/tools/tests/test_design_perfs.py`:
+
+```python
+import json, subprocess, sys, os
+import numpy as np
+from rbj import cascade_phase
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STD_RATES = [44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0]
+
+def _run():
+    subprocess.run([sys.executable, "design_quadrature_perfs.py"], cwd=HERE, check=True)
+    with open(os.path.join(HERE, "coeffs_perfs.json")) as fp:
+        return json.load(fp)
+
+def test_one_entry_per_standard_rate():
+    d = _run()
+    assert set(float(k) for k in d["rates"].keys()) == set(STD_RATES)
+
+def test_each_rate_meets_quadrature_at_its_own_fs():
+    """Each per-rate design holds the 90° quadrature at the rate it was designed for."""
+    d = _run()
+    freqs = np.geomspace(20.0, 20000.0, 512)
+    for k, entry in d["rates"].items():
+        fs = float(k)
+        hr = [(s["f"], s["Q"]) for s in entry["H_R"]]
+        hi = [(s["f"], s["Q"]) for s in entry["H_I"]]
+        diff = cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs)
+        err = np.degrees(np.abs(diff - (-np.pi/2)).max())
+        assert err < 2.5, f"{fs}: {err:.2f} deg"   # 44.1k is the worst at ~2.04 deg
+
+def test_determinism():
+    a = _run(); b = _run()
+    assert a == b
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd plugins/x2uhj/tools && .venv/bin/python -m pytest tests/test_design_perfs.py -v`
+Expected: FAIL (`design_quadrature_perfs.py` missing).
+
+- [ ] **Step 3: Write the implementation**
+
+Create `plugins/x2uhj/tools/design_quadrature_perfs.py`:
+
+```python
+"""Per-rate quadrature design: the sample-rate-independent procedure.
+
+A fixed (f, Q) set realized via the bilinear form drifts with fs, because
+the bilinear warping shifts the broadband phase. The fs-free quantity is the
+design procedure: fit phase(H_I) - phase(H_R) = -90° in the digital domain
+at the actual sample rate. We run that fit at each standard rate and store
+the resulting (f, Q) table for the plugin to select by fs.
+"""
+import json
+import numpy as np
+from scipy.optimize import least_squares
+from rbj import cascade_phase
+
+F_LO, F_HI = 20.0, 20000.0
+N_SECTIONS = 3
+TARGET = -np.pi / 2.0
+STD_RATES = [44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0]
+
+# Shared seed (Hz, Q) for all rates; the optimizer adapts per fs.
+SEED = np.array([
+    141.9, 0.2019, 671.7, 0.2122, 18654.0, 0.3031,   # H_R
+    24.0, 0.3090, 2992.0, 0.3848, 3220.0, 0.0963,     # H_I
+])
+
+def _unpack(x):
+    hr = [(x[0], x[1]), (x[2], x[3]), (x[4], x[5])]
+    hi = [(x[6], x[7]), (x[8], x[9]), (x[10], x[11])]
+    return hr, hi
+
+def design_at(fs):
+    freqs = np.geomspace(F_LO, F_HI, 512)
+    def residuals(x):
+        hr, hi = _unpack(x)
+        return cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs) - TARGET
+    lo = np.array([10.0, 0.01] * (2 * N_SECTIONS))
+    hi_b = np.array([fs / 2 - 1.0, 5.0] * (2 * N_SECTIONS))
+    res = least_squares(residuals, SEED, bounds=(lo, hi_b), xtol=1e-13, ftol=1e-13)
+    hr, hi_sec = _unpack(res.x)
+    err = float(np.degrees(np.abs(residuals(res.x)).max()))
+    return hr, hi_sec, err
+
+def main():
+    out = {"band": [F_LO, F_HI], "rates": {}}
+    for fs in STD_RATES:
+        hr, hi_sec, err = design_at(fs)
+        out["rates"][f"{fs:.1f}"] = {
+            "H_R": [{"f": round(f, 6), "Q": round(q, 6)} for (f, q) in hr],
+            "H_I": [{"f": round(f, 6), "Q": round(q, 6)} for (f, q) in hi_sec],
+            "max_error_deg": round(err, 6),
+        }
+    with open("coeffs_perfs.json", "w") as fp:
+        json.dump(out, fp, indent=2)
+    print("rates:", {k: v["max_error_deg"] for k, v in out["rates"].items()})
+
+if __name__ == "__main__":
+    main()
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd plugins/x2uhj/tools && .venv/bin/python design_quadrature_perfs.py && .venv/bin/python -m pytest tests/test_design_perfs.py -v`
+Expected: 3 passed. Confirm `coeffs.json`, `coeffs_analog.json`, `design_quadrature.py`, `design_quadrature_sdomain.py` are unchanged.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add plugins/x2uhj/tools/design_quadrature_perfs.py plugins/x2uhj/tools/coeffs_perfs.json plugins/x2uhj/tools/tests/test_design_perfs.py
+git commit -m "feat(x2uhj): per-rate quadrature design table (coeffs_perfs.json)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+```
+
+---
+
+## Task 5B: Multi-sample-rate validation (drift versus flat)
+
+This task REWRITES the existing `validate_multifs.py` and its test (which currently carry a committed failing test from the paused first attempt). The new version contrasts a fixed coefficient set (drifts with fs) against the per-rate table (stays flat). This is the §7 key result.
+
+**Files:**
+- Modify: `plugins/x2uhj/tools/validate_multifs.py`
+- Modify: `plugins/x2uhj/tools/tests/test_validate_multifs.py`
+
+- [ ] **Step 1: Rewrite the test**
+
+Replace `plugins/x2uhj/tools/tests/test_validate_multifs.py` with:
 
 ```python
 import numpy as np
-from validate_multifs import phase_error_table, RATES
+from validate_multifs import fixed_set_errors, per_rate_errors, RATES
 
-def test_table_has_one_row_per_rate():
-    table = phase_error_table()
-    assert set(table.keys()) == set(RATES)
+def test_tables_have_one_entry_per_rate():
+    assert set(fixed_set_errors().keys()) == set(RATES)
+    assert set(per_rate_errors().keys()) == set(RATES)
 
-def test_errors_finite_and_bounded():
-    table = phase_error_table()
-    for fs, err in table.items():
-        assert np.isfinite(err)
-        assert 0.0 <= err < 5.0   # degrees; generous bound
+def test_per_rate_table_stays_flat():
+    """The per-rate design holds the quadrature at every rate."""
+    for fs, err in per_rate_errors().items():
+        assert np.isfinite(err) and err < 2.5
+
+def test_fixed_set_drifts():
+    """A fixed coefficient set drifts away from its design rate."""
+    errs = fixed_set_errors()
+    # The fixed set is the shipped 48k design; away from 48k the max error grows large.
+    assert max(errs.values()) > 10.0
+    assert errs[48000.0] < 2.0
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd plugins/x2uhj/tools && .venv/bin/python -m pytest tests/test_validate_multifs.py -v`
-Expected: FAIL (`validate_multifs.py` missing).
+Expected: FAIL (the rewritten functions `fixed_set_errors`, `per_rate_errors` do not exist yet).
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 3: Rewrite the implementation**
 
-Create `plugins/x2uhj/tools/validate_multifs.py`:
+Replace `plugins/x2uhj/tools/validate_multifs.py` with:
 
 ```python
-"""Measure quadrature phase error of the analog design across sample rates.
+"""Contrast a fixed coefficient set against the per-rate table across sample rates.
 
-The analog (f0, Q) design is fs-free; each rate realizes it with the RBJ
-bilinear form. The residual error growth with fs is the bilinear warping,
-quantified here at the four common audio rates.
+The shipped design fixes (f, Q) at 48 kHz; realized via the bilinear form at
+other rates its quadrature drifts. The per-rate table re-runs the fit at each
+rate, so its quadrature stays flat. This is the central result of the
+sample-rate-independence claim.
 """
 import json
 import numpy as np
@@ -520,38 +663,47 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from rbj import cascade_phase
 
-RATES = [44100.0, 48000.0, 96000.0, 192000.0]
+RATES = [44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0]
 F_LO, F_HI = 20.0, 20000.0
 
-def _design():
-    with open("coeffs_analog.json") as fp:
-        d = json.load(fp)
-    hr = [(s["f"], s["Q"]) for s in d["H_R"]]
-    hi = [(s["f"], s["Q"]) for s in d["H_I"]]
-    return hr, hi
+def _sections(entry):
+    return ([(s["f"], s["Q"]) for s in entry["H_R"]],
+            [(s["f"], s["Q"]) for s in entry["H_I"]])
 
-def phase_error_table():
-    hr, hi = _design()
+def _max_err(hr, hi, fs, freqs):
+    diff = cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs)
+    return float(np.degrees(np.abs(diff - (-np.pi / 2)).max()))
+
+def fixed_set_errors():
+    """Max quadrature error of the shipped fixed 48k coefficient set at each rate."""
+    with open("coeffs.json") as fp:
+        hr, hi = _sections(json.load(fp))
     freqs = np.geomspace(F_LO, F_HI, 512)
-    table = {}
+    return {fs: _max_err(hr, hi, fs, freqs) for fs in RATES}
+
+def per_rate_errors():
+    """Max quadrature error of the per-rate table, each entry at its own rate."""
+    with open("coeffs_perfs.json") as fp:
+        table = json.load(fp)["rates"]
+    freqs = np.geomspace(F_LO, F_HI, 512)
+    out = {}
     for fs in RATES:
-        diff = cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs)
-        table[fs] = float(np.degrees(np.abs(diff - (-np.pi/2)).max()))
-    return table
+        hr, hi = _sections(table[f"{fs:.1f}"])
+        out[fs] = _max_err(hr, hi, fs, freqs)
+    return out
 
 def main():
-    hr, hi = _design()
-    freqs = np.geomspace(F_LO, F_HI, 512)
+    fixed, per = fixed_set_errors(), per_rate_errors()
+    rates = sorted(RATES)
     plt.figure(figsize=(9, 5))
-    for fs in RATES:
-        diff = cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs)
-        err = np.degrees(np.abs(diff - (-np.pi/2)))
-        plt.semilogx(freqs, err, label=f"{fs/1000:.1f} kHz (max {err.max():.2f}°)")
-    plt.xlabel("Hz"); plt.ylabel("|phase diff − 90°| (deg)")
-    plt.title("UHJ quadrature error vs sample rate (analog design)")
-    plt.legend(); plt.grid(True, which="both", alpha=0.3); plt.tight_layout()
+    plt.plot([r / 1000 for r in rates], [fixed[r] for r in rates], "o-", label="fixed 48k set (drifts)")
+    plt.plot([r / 1000 for r in rates], [per[r] for r in rates], "s-", label="per-rate table (flat)")
+    plt.xlabel("sample rate (kHz)"); plt.ylabel("max |phase diff − 90°| (deg)")
+    plt.title("UHJ quadrature: fixed coefficients versus per-rate design")
+    plt.legend(); plt.grid(True, alpha=0.3); plt.tight_layout()
     plt.savefig("../doc/math/figures/multifs_validation.png", dpi=120)
-    print("table:", phase_error_table())
+    print("fixed:", fixed)
+    print("per-rate:", per)
 
 if __name__ == "__main__":
     main()
@@ -560,13 +712,13 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd plugins/x2uhj/tools && .venv/bin/python -m pytest tests/test_validate_multifs.py -v`
-Expected: 2 passed.
+Expected: 3 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add plugins/x2uhj/tools/validate_multifs.py plugins/x2uhj/tools/tests/test_validate_multifs.py
-git commit -m "feat(x2uhj): multi-sample-rate phase-error validation
+git commit -m "feat(x2uhj): multi-fs validation contrasts fixed set drift vs per-rate flat
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -583,11 +735,12 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 Run:
 ```bash
 cd plugins/x2uhj/tools
+.venv/bin/python design_quadrature_perfs.py   # refresh coeffs_perfs.json (validate_multifs reads it)
 .venv/bin/python gerzon_verify.py
 .venv/bin/python validate_multifs.py
 .venv/bin/python compare_empirical.py
 ```
-Expected: three scripts print their output paths without error.
+Expected: the scripts print their output without error.
 
 - [ ] **Step 2: Verify the figures exist**
 
@@ -597,7 +750,7 @@ Expected: `gerzon_localization.png`, `multifs_validation.png` present; the empir
 - [ ] **Step 3: Run the full test suite**
 
 Run: `cd plugins/x2uhj/tools && .venv/bin/python -m pytest -v`
-Expected: all tests pass (Tasks 1–5).
+Expected: all tests pass (Tasks 1–5B).
 
 - [ ] **Step 4: Commit**
 
@@ -667,7 +820,7 @@ It covers the AmbiX-to-UHJ C-format encoding, the origin of Gerzon's matrix coef
 % \section{The UHJ C-Format Matrix}                % Task 8
 % \section{Reconstructing Gerzon's Coefficients}   % Task 9
 % \section{The j Problem: Wideband 90 Degrees}     % Task 10
-% \section{The Sample-Rate-Independent Network}    % Task 10
+% \section{The Sample-Rate-Independent Design}     % Task 10
 % \section{Validation}                             % Task 11
 % \section*{References}                            % Task 11
 
@@ -804,7 +957,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-## Task 10: Sections 5–6 (the j problem, the analog network)
+## Task 10: Sections 5–6 (the j problem, the sample-rate-independent design)
 
 **Files:**
 - Modify: `plugins/x2uhj/doc/math/x2uhj-math.tex`
@@ -814,9 +967,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 §5 The j problem, one sentence per line, affirmative voice:
 - A broadband \ang{90} phase difference realizes the $j$ operator across the audio band.
 - A FIR Hilbert pair ties its tap set to one sample rate and one length.
-- An IIR all-pass pair carries the phase relation in physical $(f_0, Q)$ units, which frees it from the sample rate.
+- An IIR all-pass pair carries the phase relation in physical $(f_0, Q)$ units, which expresses the design in sample-rate-free terms.
 
-§6 The analog network. Include the analog all-pass and the RBJ realization.
+§6 The sample-rate-independent design. Present the analog ideal, the bilinear realization, the drift finding, and the per-rate resolution.
 ```latex
 \begin{equation}
 H_a(s) = \frac{s^2 - (\omega_0/Q)\,s + \omega_0^2}{s^2 + (\omega_0/Q)\,s + \omega_0^2},
@@ -826,7 +979,8 @@ H_a(s) = \frac{s^2 - (\omega_0/Q)\,s + \omega_0^2}{s^2 + (\omega_0/Q)\,s + \omeg
 \varphi_a(\omega) = -2\arctan\!\frac{(\omega_0/Q)\,\omega}{\omega_0^2 - \omega^2} .
 \end{equation}
 ```
-Describe the design: optimize $(f_0,Q)$ for $\varphi_{H_I}-\varphi_{H_R} = -\ang{90}$ over \SIrange{20}{20000}{\hertz} on the analog phase, then realize each section with the bilinear RBJ biquad
+Describe the analog ideal: optimizing $(f_0,Q)$ for $\varphi_{H_I}-\varphi_{H_R} = -\ang{90}$ over \SIrange{20}{20000}{\hertz} on the analog phase reaches \ang{0.40} in the continuous domain.
+Present the bilinear RBJ realization of each section:
 ```latex
 \begin{equation}
 a_1 = \frac{-2\cos\omega}{1+\alpha},\quad a_2 = \frac{1-\alpha}{1+\alpha},\quad
@@ -834,18 +988,23 @@ a_1 = \frac{-2\cos\omega}{1+\alpha},\quad a_2 = \frac{1-\alpha}{1+\alpha},\quad
 \end{equation}
 ```
 with all-pass numerator $b = [a_2, a_1, 1]$.
-State the resulting coefficient table from `coeffs_analog.json` (read the file and transcribe the six $(f_0,Q)$ pairs into a `booktabs` table).
+State the finding, one sentence per line, affirmative voice:
+- The bilinear transform maps a digital frequency $f$ to the analog frequency $F = (f_s/\pi)\tan(\pi f / f_s)$.
+- A fixed $(f_0, Q)$ set therefore shifts its broadband phase with $f_s$, so its quadrature holds only near the rate it was designed for.
+- Sample-rate independence belongs to the design procedure: re-running the digital phase fit at the actual rate restores the quadrature at every rate.
+- The deliverable stores a per-rate $(f_0, Q)$ table for the standard rates, each entry produced by the same procedure.
+Transcribe two `booktabs` tables: the s-domain ideal pairs from `coeffs_analog.json`, and the per-rate maxima from `coeffs_perfs.json` (one row per standard rate with its max error).
 
 - [ ] **Step 2: Verify it compiles**
 
 Run: `cd plugins/x2uhj/doc/math && latexmk -pdf -interaction=nonstopmode x2uhj-math.tex`
-Expected: PDF rebuilds with §5–§6 and the coefficient table.
+Expected: PDF rebuilds with §5–§6 and the two coefficient tables.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add plugins/x2uhj/doc/math/x2uhj-math.tex plugins/x2uhj/doc/math/x2uhj-math.pdf
-git commit -m "docs(x2uhj): sections 5-6 (the j problem, analog all-pass network)
+git commit -m "docs(x2uhj): sections 5-6 (the j problem, sample-rate-independent design)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -859,7 +1018,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write section 7, references, appendices**
 
-§7 Validation: embed the two figures and a multi-fs table.
+§7 Validation: embed the two figures and the drift-versus-flat table.
 ```latex
 \begin{figure}[h]\centering
 \includegraphics[width=0.8\linewidth]{quadrature_validation.png}
@@ -867,15 +1026,16 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 \end{figure}
 \begin{figure}[h]\centering
 \includegraphics[width=0.8\linewidth]{multifs_validation.png}
-\caption{Quadrature phase error of the analog design realized at four sample rates.}
+\caption{Maximum quadrature error versus sample rate: the fixed 48~kHz coefficient set drifts, while the per-rate table stays flat.}
 \end{figure}
 ```
-Transcribe the multi-fs maxima (from `validate_multifs.py` output) into a `booktabs` table with columns sample rate and max error.
+Transcribe two columns of maxima (from `validate_multifs.py` output: `fixed_set_errors` and `per_rate_errors`) into one `booktabs` table with columns sample rate, fixed-set error, per-rate error.
+State the reading: the fixed set holds the quadrature only near 48~kHz, the per-rate table holds it everywhere.
 Add `\cite{}` calls so the bibliography renders: cite `gerzon1977uhj`, `gerzon1983broadcast`, `mastrorillo2023uhj`, `nycemf_cformat`, `superstereo_guide` in the relevant sections.
 
-Appendix A: the six analog $(f_0, Q)$ pairs and the shipped digital pairs side by side.
+Appendix A: the s-domain ideal $(f_0, Q)$ pairs (`coeffs_analog.json`) and the shipped 48~kHz digital pairs (`coeffs.json`) side by side.
 Appendix B: the C++ `AllpassSection::set` and `process` snippets from `x2uhj_dsp.h`, shown verbatim.
-Appendix C (conditional): the migration path. Include it only when the multi-fs table shows the analog design improves on the shipped digital design; describe regenerating `x2uhj_coeffs.h` from `coeffs_analog.json` as a deliberate human review step.
+Appendix C: the migration path. Describe how a future plugin selects the per-rate entry from `coeffs_perfs.json` by sample rate, how an unusual rate falls back to the nearest entry, and note the closed-form prewarp-remap as a documented approximation (adequate for $f_s \ge 48$~kHz, \ang{12} at 44.1~kHz). State that the plugin C++ change is a separate follow-up with its own spec and audio testing.
 
 - [ ] **Step 2: Verify it compiles with references**
 
@@ -904,9 +1064,10 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ## Self-review notes
 
-- **Spec coverage:** §1–§8 of the spec map to Tasks 7–11; tooling (analog prototype, s-domain design, gerzon_verify, multi-fs, single source of truth) maps to Tasks 2–6; the dual listening model is Task 4 + Task 9; the migration path is Task 11 Appendix C (conditional, as the spec requires).
-- **`coeffs.json` untouched:** no task modifies the shipped coefficients or `x2uhj_coeffs.h`; the analog design stays in `coeffs_analog.json` (Task 3) per spec scope.
+- **Spec coverage:** §1–§8 of the spec map to Tasks 7–11; tooling maps to Tasks 1–6 (analog prototype, s-domain design, per-rate table, gerzon_verify, multi-fs); the dual listening model is Task 4 + Task 9; the per-rate design finding is Task 5A + Task 5B + §6/§7; the migration path is Task 11 Appendix C.
+- **`coeffs.json` untouched:** no task modifies the shipped coefficients or `x2uhj_coeffs.h`; the s-domain ideal stays in `coeffs_analog.json` (Task 3) and the per-rate table in `coeffs_perfs.json` (Task 5A); the plugin C++ fix is a separate follow-up.
 - **Paper out of scope:** no task produces the paper; the doc is the deposit, as agreed.
-- **Sample rates:** 44.1/48/96/192 kHz fixed in Task 5 `RATES`, matching the spec.
-- **Type consistency:** `localization_vectors(az, model)`, `cascade_phase_analog(sections, freqs)`, `phase_error_table()`, `analog_allpass_phase(f0, Q, freqs)` are used with identical signatures across tasks and tests.
+- **Sample rates:** 44.1/48/88.2/96/176.4/192 kHz fixed in `STD_RATES`/`RATES` (Tasks 5A, 5B), matching the revised spec.
+- **Spike finding integration:** Task 5A produces the per-rate table; Task 5B contrasts it against the fixed-set drift; §6 (Task 10) and §7 (Task 11) document the finding and resolution.
+- **Type consistency:** `localization_vectors(az, model)`, `cascade_phase_analog(sections, freqs)`, `cascade_phase(sections, fs, freqs)`, `design_at(fs)`, `fixed_set_errors()`, `per_rate_errors()`, `analog_allpass_phase(f0, Q, freqs)` are used with identical signatures across tasks and tests.
 ```
