@@ -15,7 +15,9 @@ N_SECTIONS = 3
 TARGET = -np.pi / 2.0
 freqs = np.geomspace(F_LO, F_HI, 512)
 
-# Seed from the shipped digital design so the optimizer starts in basin.
+# Seed values empirically adapted from the digital design's neighbourhood:
+# they were hand-tuned until the optimizer converged to a good basin, and
+# are not mechanically derived from the digital coefficients.
 X0 = np.array([
     141.9, 0.2019, 671.7, 0.2122, 18654.0, 0.3031,   # H_R seed
     24.0, 0.3090, 2992.0, 0.3848, 3220.0, 0.0963,     # H_I seed
