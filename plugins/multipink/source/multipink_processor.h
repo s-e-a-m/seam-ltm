@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <vector>
 
-// FAUST REFERENCE (seam.noise.lib):
+// FAUST REFERENCE (seam.noises.lib):
 //
 //   multipink(N,g) = no.multinoise(N) : par(i,N,no.pink_filter : *(g));
 //
