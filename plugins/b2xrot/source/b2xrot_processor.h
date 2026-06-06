@@ -17,7 +17,7 @@
 //
 // Then rotateYPR applies Roll → Pitch → Yaw rotation.
 //
-// FAUST REFERENCE (test2/B2Xrot.dsp):
+// FAUST REFERENCE (seam.ambisonics.lib): btox, rotateYPR
 //   process = rotateYPR(yaw,pitch,roll) : btox;
 //
 // Note: in the Faust code, rotation is applied BEFORE btox because

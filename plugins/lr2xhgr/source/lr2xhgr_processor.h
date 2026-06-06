@@ -16,12 +16,11 @@
 // The two rotated fields are summed to produce the final AmbiX output.
 // A global rotation (Yaw, Pitch, Roll) is applied after the merge.
 //
-// FAUST REFERENCE (test2/LR2XHGR.dsp):
-//   m2xhgr = haarmn(1) : ro.cross(4);
-//   lr2xhgr = par(i,2,m2xhgr) :
+// FAUST REFERENCE (seam.ambisonics.lib): lr2xhgr  (Haar via seam.dwt.lib)
+//   lr2xhgr(divergence, yaw, pitch, roll) = par(i,2,m2xhgr) :
 //       rotateYPR(divergence,pitch,roll),
 //       rotateYPR(0-divergence,pitch,roll)
-//       :> si.bus(4);
+//       :> si.bus(4) : rotateYPR(yaw,0,0);
 //
 // Note: the Faust code uses Divergence as the yaw parameter of two
 // opposing rotations. Our C++ version separates this more clearly:

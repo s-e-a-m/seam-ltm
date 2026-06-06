@@ -10,8 +10,8 @@
 // The Haar QMF bank decomposes the mono input into 4 spatial components
 // which are then rotated by Yaw, Pitch, Roll.
 //
-// FAUST REFERENCE (test2/M2XHGR.dsp):
-//   m2xhgr = haarmn(1) : ro.cross(4);
+// FAUST REFERENCE (seam.ambisonics.lib): m2xhgr  (Haar via seam.dwt.lib)
+//   m2xhgr = sdw.haarmn(1);   // W lands in ACN channel 0; no reversal needed
 //   process = m2xhgr : rotateYPR(yaw, pitch, roll);
 //─────────────────────────────────────────────────────────────────────────────
 

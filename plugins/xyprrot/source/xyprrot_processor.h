@@ -13,7 +13,7 @@
 //   Pitch = rotation around Y-axis (tilts front-back vertical plane)
 //   Yaw   = rotation around Z-axis (rotates horizontal plane)
 //
-// FAUST REFERENCE (test2/XYPRrot.dsp):
+// FAUST REFERENCE (seam.ambisonics.lib): rotateYPR
 //   rotateYPR(yaw, pitch, roll, a0, a1, a2, a3) =
 //       a0, a1_ypr, a2_ypr, a3_ypr
 //─────────────────────────────────────────────────────────────────────────────
