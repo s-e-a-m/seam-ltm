@@ -42,6 +42,8 @@ public:
         Steinberg::Vst::SpeakerArrangement* in, Steinberg::int32 numIn,
         Steinberg::Vst::SpeakerArrangement* out, Steinberg::int32 numOut) SMTG_OVERRIDE;
 
+    Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) SMTG_OVERRIDE;
+
 private:
     template <typename S> void processBlock(S** in, S** out, Steinberg::int32 n);
     x2uhj::UHJEncoder encoder;

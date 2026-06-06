@@ -14,6 +14,7 @@ set(x2uhj_sources
     source/x2uhj_processor.cpp
     source/x2uhj_processor.h
     source/version.h
+    resource/x2uhj.uidesc
 )
 
 set(target x2uhj)
@@ -22,7 +23,14 @@ smtg_add_vst3plugin(${target} ${x2uhj_sources})
 smtg_target_configure_version_file(${target})
 
 target_compile_features(${target} PUBLIC cxx_std_17)
-target_link_libraries(${target} PRIVATE sdk)
+target_link_libraries(${target} PRIVATE sdk vstgui_support)
+
+smtg_target_add_plugin_resources(${target}
+    RESOURCES
+        resource/x2uhj.uidesc
+        ${CMAKE_CURRENT_SOURCE_DIR}/../common/resource/seam_logo.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/../common/resource/Fonts/SourceCodePro-Light.otf
+)
 
 if(SMTG_MAC)
     target_sources(${target} PRIVATE ${vst3sdk_SOURCE_DIR}/public.sdk/source/main/macmain.cpp)

@@ -8,6 +8,7 @@
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
 #include "pluginterfaces/base/ibstream.h"
+#include "vstgui/plugin-bindings/vst3editor.h"
 #include <cstring>
 
 namespace Seam {
@@ -97,6 +98,14 @@ tresult PLUGIN_API X2UHJProcessor::setBusArrangements(
         SpeakerArr::getChannelCount(out[0]) == 4)
         return SingleComponentEffect::setBusArrangements(in, numIn, out, numOut);
     return kResultFalse;
+}
+
+// Branded editor (stateless: no controls, just title + logo) — matches the
+// rest of the suite, which always ships a finished GUI.
+IPlugView* PLUGIN_API X2UHJProcessor::createView(FIDString name) {
+    if (name && FIDStringsEqual(name, ViewType::kEditor))
+        return new VSTGUI::VST3Editor(this, "view", "x2uhj.uidesc");
+    return nullptr;
 }
 
 } // namespace Seam
