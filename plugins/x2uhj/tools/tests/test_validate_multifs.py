@@ -11,8 +11,8 @@ def test_per_rate_table_stays_flat():
         assert np.isfinite(err) and err < 2.5
 
 def test_fixed_set_drifts():
-    """A fixed coefficient set drifts away from its design rate."""
+    """A fixed coefficient set drifts away from its design rate at every other rate."""
     errs = fixed_set_errors()
-    # The fixed set is the shipped 48k design; away from 48k the max error grows large.
-    assert max(errs.values()) > 10.0
-    assert errs[48000.0] < 2.0
+    assert errs[48000.0] < 2.0   # accurate at its design rate
+    off_design = [errs[fs] for fs in RATES if fs != 48000.0]
+    assert all(v > 5.0 for v in off_design)   # every off-design rate drifts

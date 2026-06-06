@@ -37,6 +37,7 @@ def per_rate_errors():
     freqs = np.geomspace(F_LO, F_HI, 512)
     out = {}
     for fs in RATES:
+        # Key format must match design_quadrature_perfs.py's f"{fs:.1f}" formatting.
         hr, hi = _sections(table[f"{fs:.1f}"])
         out[fs] = _max_err(hr, hi, fs, freqs)
     return out
