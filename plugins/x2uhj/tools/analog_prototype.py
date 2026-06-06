@@ -10,7 +10,11 @@ The plugin realizes each section with the bilinear RBJ form in rbj.py.
 import numpy as np
 
 def analog_allpass_phase(f0, Q, freqs):
-    """Unwrapped phase (radians) of one analog all-pass at the given Hz points."""
+    """Unwrapped phase (radians) of one analog all-pass at the given Hz points.
+
+    The returned phase uses the natural convention, starting near 0 as ω→0 and
+    decreasing toward -2π as ω→∞; np.unwrap removes the atan2 branch jump at ω=ω0.
+    """
     w = 2.0 * np.pi * np.asarray(freqs, dtype=float)
     w0 = 2.0 * np.pi * f0
     phase = -2.0 * np.arctan2((w0 / Q) * w, w0 * w0 - w * w)
@@ -18,7 +22,9 @@ def analog_allpass_phase(f0, Q, freqs):
 
 def cascade_phase_analog(sections, freqs):
     """Sum of analog all-pass phases for a list of (f0, Q) sections."""
-    total = np.zeros(len(np.asarray(freqs, dtype=float)))
+    freqs_arr = np.asarray(freqs, dtype=float)
+    total = np.zeros_like(freqs_arr)
     for (f0, Q) in sections:
-        total = total + analog_allpass_phase(f0, Q, freqs)
+        # each section is already unwrapped, so summing needs no further unwrap
+        total = total + analog_allpass_phase(f0, Q, freqs_arr)
     return total
