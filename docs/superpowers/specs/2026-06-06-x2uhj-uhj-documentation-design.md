@@ -41,8 +41,11 @@ The second derivation covers a sample-rate-independent quadrature all-pass netwo
 3. **The UHJ C-format matrix.**
    Present Σ, Δ, L, R, T, Q with all constants and the meaning of each channel.
 4. **Reconstructing Gerzon's coefficients (inverse verification).**
-   Present the localization theory (velocity vector and energy vector), the mono-compatibility constraint, and the 20° angle.
+   Present the localization theory (velocity vector r_V and energy vector r_E), the mono-compatibility constraint, and the 20° angle.
    Take the published coefficients and show numerically that they satisfy the localization conditions, plotting the cost landscape around them.
+   Evaluate r_V and r_E under two listening models, shown side by side: surround decode (the reconstructed B-format field, Gerzon's original framework) and super-stereo (L/R on two frontal loudspeakers at ±30°, the practical E4L use).
+   The surround model explains why Gerzon chose these coefficients; the super-stereo model explains what a listener hears on stereo.
+   The side-by-side presentation lets a reader new to ambisonics follow §4 through the familiar stereo case.
 5. **The j problem: wideband 90° phase shift.**
    Explain why the quadrature term is required, and why FIR designs tie to sample rate and tap count.
 6. **The sample-rate-independent all-pass network (the contribution).**
@@ -65,7 +68,7 @@ One module maps to one concern, and each mirrors a document section.
 | `analog_prototype.py` *(new)* | §6 | s-domain all-pass, continuous phase, plus bilinear transform to each fs |
 | `design_quadrature.py` *(exists, unchanged)* | §6 | digital minimax fit at 48 kHz, emits `coeffs.json` (current plugin source) |
 | `design_quadrature_sdomain.py` *(new)* | §6 | minimax fit on the analog prototype, emits `coeffs_analog.json` |
-| `gerzon_verify.py` *(new)* | §4 | inverse verification: evaluate the localization cost on published coefficients, plot the surrounding landscape |
+| `gerzon_verify.py` *(new)* | §4 | inverse verification: evaluate r_V/r_E on published coefficients under both listening models (surround decode and super-stereo), plot angular error per azimuth and the cost landscape |
 | `validate_multifs.py` *(new)* | §7 | phase error at 44.1/48/96/192 kHz, table plus plot |
 | `compare_empirical.py` *(exists)* | §7 | 2023 empirical versus analytic |
 | `emit_header.py` *(exists)* | — | `coeffs.json` to `x2uhj_coeffs.h` |
@@ -103,6 +106,7 @@ The new analog design writes a separate `coeffs_analog.json` and touches the plu
 ## Success criteria
 
 - A student reads the PDF and follows, step by step, the path from AmbiX to L/R/T/Q, including why those coefficients hold and how the all-pass stays sample-rate independent.
+- A reader new to ambisonics follows §4 through the super-stereo model, while a reader with ambisonic background reads the surround model; the two presentations agree on the conclusion.
 - Every figure and coefficient regenerates from one command, from the single source.
 
 ## Migration-path note
