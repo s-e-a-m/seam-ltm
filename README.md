@@ -30,9 +30,9 @@ needed to do the job.
 |:---:|:---:|:---:|:---:|
 | ![SDMX](docs/img/sdmx.png) | ![B2Xrot](docs/img/b2xrot.png) | ![XYPRrot](docs/img/xyprrot.png) | ![BAMODULEX](docs/img/bamodulex.png) |
 
-| M2XHGR | LR2XHGR | DDELAY |
-|:---:|:---:|:---:|
-| ![M2XHGR](docs/img/m2xhgr.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![DDELAY](docs/img/ddelay.png) |
+| ABMODULEX | M2XHGR | LR2XHGR | DDELAY |
+|:---:|:---:|:---:|:---:|
+| ![ABMODULEX](docs/img/abmodulex.png) | ![M2XHGR](docs/img/m2xhgr.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![DDELAY](docs/img/ddelay.png) |
 
 | MULTIPINK | X2UHJ |
 |:---:|:---:|
