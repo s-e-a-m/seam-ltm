@@ -17,11 +17,12 @@ SUPER_STEREO = "super_stereo"
 
 # Horizontal B-format (FuMa) of a planewave at azimuth az.
 def bformat(az):
-    return np.array([1.0 / np.sqrt(2.0), np.cos(az), np.sin(az)])  # W, X, Y
+    return np.array([1.0 / np.sqrt(2.0), np.cos(az), np.sin(az)])  # W, X, Y  # FuMa: W is omnidirectional, attenuated by 1/√2
 
 # UHJ C-format Σ/Δ with the j term applied as a real quadrature on a planewave
 # (a planewave is analytic, so j multiplies by +90°, i.e. a complex unit).
 def uhj_lr(az):
+    # Gerzon's published UHJ C-format coefficients (Gerzon, JAES 1983/1985).
     W, X, Y = bformat(az)
     Sigma = 0.9396926 * W + 0.1855740 * X
     Delta = 1j * (-0.3420201 * W + 0.5098604 * X) + 0.6554516 * Y
@@ -46,7 +47,9 @@ def localization_vectors(az, model):
     # SURROUND: a minimal symmetric 4-speaker decode of L/R back to the plane.
     speakers = [0, 90, 180, 270]
     dirs = [(np.cos(np.radians(a)), np.sin(np.radians(a))) for a in speakers]
-    # Pantophonic re-encode of the two channels (illustrative symmetric decode).
+    # Illustrative symmetric decode (see module docstring): NOT a rigorous pantophonic decoder.
+    # This illustrative decode uses the in-phase (real) part of the sum/difference channels for simplicity; the SUPER_STEREO path uses complex magnitude in _vectors.
+    # Rear speakers carry half weight in this illustrative decode.
     gains = [ (L + R).real,  (L - R).real, (L + R).real * 0.5, (L - R).real * 0.5 ]
     return _vectors(gains, dirs)
 
