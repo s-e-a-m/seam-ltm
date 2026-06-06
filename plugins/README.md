@@ -69,6 +69,15 @@ Add complementary `.cpp/.h` pairs only when a real concern justifies it (e.g.
 header-only SDK-free DSP core like `x2uhj/source/x2uhj_dsp.h` so the math can be
 unit-tested without the VST3 SDK). Do not split prematurely.
 
+### Shared code
+
+`_common/` is **not a plugin** — the leading underscore sorts it apart from the
+plugin directories. It holds shared headers (e.g. `seam_haar.h`,
+`seam_rotation.h`, `seam_btox.h`) and shared GUI assets
+(`_common/resource/seam_logo.png`, fonts). Plugins reference it via relative
+paths in their `CMakeLists.txt` (`../_common`); it is not added with
+`add_subdirectory`.
+
 ### Naming
 
 - Plugin target/dir: lowercase short name (`x2uhj`, `m2xhgr`, `ddelay`).
@@ -166,7 +175,7 @@ Output bundles land in `build-release/VST3/Release/` and are symlinked into
 `~/Library/Audio/Plug-Ins/VST3/` (macOS). On Linux, copy them to `~/.vst3/`.
 
 Each plugin's `CMakeLists.txt` links `sdk vstgui_support`, registers its
-resources (`.uidesc` + shared logo/font from `../common/resource`), and is added
+resources (`.uidesc` + shared logo/font from `../_common/resource`), and is added
 to the root `CMakeLists.txt` via `add_subdirectory(plugins/<name>)`. VSTGUI live
 editing is disabled suite-wide (`VSTGUI_LIVE_EDITING=0`).
 

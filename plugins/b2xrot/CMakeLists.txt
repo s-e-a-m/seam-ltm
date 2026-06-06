@@ -23,13 +23,13 @@ smtg_target_configure_version_file(${target})
 target_compile_features(${target} PUBLIC cxx_std_17)
 target_link_libraries(${target} PRIVATE sdk vstgui_support)
 
-target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../common)
+target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../_common)
 
 smtg_target_add_plugin_resources(${target}
     RESOURCES
         resource/b2xrot.uidesc
-        ${CMAKE_CURRENT_SOURCE_DIR}/../common/resource/seam_logo.png
-        ${CMAKE_CURRENT_SOURCE_DIR}/../common/resource/Fonts/SourceCodePro-Light.otf
+        ${CMAKE_CURRENT_SOURCE_DIR}/../_common/resource/seam_logo.png
+        ${CMAKE_CURRENT_SOURCE_DIR}/../_common/resource/Fonts/SourceCodePro-Light.otf
 )
 
 if(SMTG_MAC)
