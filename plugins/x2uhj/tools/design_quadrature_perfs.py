@@ -16,7 +16,9 @@ N_SECTIONS = 3
 TARGET = -np.pi / 2.0
 STD_RATES = [44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0]
 
-# Shared seed (Hz, Q) for all rates; the optimizer adapts per fs.
+# SEED is the 48 kHz design neighbourhood, shared across all rates intentionally;
+# the optimizer adapts it per fs. It is a starting point only — the solver may
+# converge to a different local minimum at rates far from 48 kHz.
 SEED = np.array([
     141.9, 0.2019, 671.7, 0.2122, 18654.0, 0.3031,   # H_R
     24.0, 0.3090, 2992.0, 0.3848, 3220.0, 0.0963,     # H_I
@@ -28,6 +30,7 @@ def _unpack(x):
     return hr, hi
 
 def design_at(fs):
+    """Fit the quadrature pair in the digital domain at sample rate fs; return (H_R, H_I, max_error_deg)."""
     freqs = np.geomspace(F_LO, F_HI, 512)
     def residuals(x):
         hr, hi = _unpack(x)

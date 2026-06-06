@@ -29,3 +29,14 @@ def test_each_rate_meets_quadrature_at_its_own_fs():
 def test_determinism():
     a = _run(); b = _run()
     assert a == b
+
+def test_max_errors_match_known_good():
+    """Guard against optimizer drift on scipy/numpy upgrades."""
+    d = _run()
+    expected = {
+        "44100.0": 2.04, "48000.0": 1.36, "88200.0": 0.53,
+        "96000.0": 0.51, "176400.0": 0.43, "192000.0": 0.43,
+    }
+    for k, exp in expected.items():
+        got = d["rates"][k]["max_error_deg"]
+        assert abs(got - exp) < 0.05, f"{k}: {got} vs {exp}"
