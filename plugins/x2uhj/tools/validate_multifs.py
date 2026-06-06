@@ -1,8 +1,9 @@
-"""Measure quadrature phase error of the analog design across sample rates.
+"""Contrast a fixed coefficient set against the per-rate table across sample rates.
 
-The analog (f0, Q) design is fs-free; each rate realizes it with the RBJ
-bilinear form. The residual error growth with fs is the bilinear warping,
-quantified here at the four common audio rates.
+The shipped design fixes (f, Q) at 48 kHz; realized via the bilinear form at
+other rates its quadrature drifts. The per-rate table re-runs the fit at each
+rate, so its quadrature stays flat. This is the central result of the
+sample-rate-independence claim.
 """
 import json
 import numpy as np
@@ -11,38 +12,47 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from rbj import cascade_phase
 
-RATES = [44100.0, 48000.0, 96000.0, 192000.0]
+RATES = [44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0]
 F_LO, F_HI = 20.0, 20000.0
 
-def _design():
-    with open("coeffs_analog.json") as fp:
-        d = json.load(fp)
-    hr = [(s["f"], s["Q"]) for s in d["H_R"]]
-    hi = [(s["f"], s["Q"]) for s in d["H_I"]]
-    return hr, hi
+def _sections(entry):
+    return ([(s["f"], s["Q"]) for s in entry["H_R"]],
+            [(s["f"], s["Q"]) for s in entry["H_I"]])
 
-def phase_error_table():
-    hr, hi = _design()
+def _max_err(hr, hi, fs, freqs):
+    diff = cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs)
+    return float(np.degrees(np.abs(diff - (-np.pi / 2)).max()))
+
+def fixed_set_errors():
+    """Max quadrature error of the shipped fixed 48k coefficient set at each rate."""
+    with open("coeffs.json") as fp:
+        hr, hi = _sections(json.load(fp))
     freqs = np.geomspace(F_LO, F_HI, 512)
-    table = {}
+    return {fs: _max_err(hr, hi, fs, freqs) for fs in RATES}
+
+def per_rate_errors():
+    """Max quadrature error of the per-rate table, each entry at its own rate."""
+    with open("coeffs_perfs.json") as fp:
+        table = json.load(fp)["rates"]
+    freqs = np.geomspace(F_LO, F_HI, 512)
+    out = {}
     for fs in RATES:
-        diff = cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs)
-        table[fs] = float(np.degrees(np.abs(diff - (-np.pi/2)).max()))
-    return table
+        hr, hi = _sections(table[f"{fs:.1f}"])
+        out[fs] = _max_err(hr, hi, fs, freqs)
+    return out
 
 def main():
-    hr, hi = _design()
-    freqs = np.geomspace(F_LO, F_HI, 512)
+    fixed, per = fixed_set_errors(), per_rate_errors()
+    rates = sorted(RATES)
     plt.figure(figsize=(9, 5))
-    for fs in RATES:
-        diff = cascade_phase(hi, fs, freqs) - cascade_phase(hr, fs, freqs)
-        err = np.degrees(np.abs(diff - (-np.pi/2)))
-        plt.semilogx(freqs, err, label=f"{fs/1000:.1f} kHz (max {err.max():.2f}°)")
-    plt.xlabel("Hz"); plt.ylabel("|phase diff − 90°| (deg)")
-    plt.title("UHJ quadrature error vs sample rate (analog design)")
-    plt.legend(); plt.grid(True, which="both", alpha=0.3); plt.tight_layout()
+    plt.plot([r / 1000 for r in rates], [fixed[r] for r in rates], "o-", label="fixed 48k set (drifts)")
+    plt.plot([r / 1000 for r in rates], [per[r] for r in rates], "s-", label="per-rate table (flat)")
+    plt.xlabel("sample rate (kHz)"); plt.ylabel("max |phase diff - 90 deg| (deg)")
+    plt.title("UHJ quadrature: fixed coefficients versus per-rate design")
+    plt.legend(); plt.grid(True, alpha=0.3); plt.tight_layout()
     plt.savefig("../doc/math/figures/multifs_validation.png", dpi=120)
-    print("table:", phase_error_table())
+    print("fixed:", fixed)
+    print("per-rate:", per)
 
 if __name__ == "__main__":
     main()
