@@ -22,6 +22,7 @@ needed to do the job.
 | **DDELAY** | 4ch &rarr; 4ch | Quad distance delay for loudspeaker time-alignment. Distance in metres → integer-sample delay (c = 331.4 m/s, nextprime quantized) |
 | **MULTIPINK** | none &rarr; 1..64ch | Multichannel pink noise generator with shared 64-slot logical pool. Layout-adaptive (mono → 64ch). RMS-calibrated output (-23/-20/-18 dBFS RMS, ±6 dB trim). Cross-instance decorrelation via static slot allocator |
 | **X2UHJ** | AmbiX 4ch &rarr; UHJ C-format 4ch | First-Order AmbiX (ACN/SN3D) to UHJ C-format (L,R,T,Q). "UHJ decoder" for 2-channel listening; analytic quadrature pair (re-derived, SR-correct, ~1.36° max phase error). Stateless |
+| **ABMODULEX** | A-format 4ch &rarr; AmbiX 4ch | Tetrahedral mic A-format (LFU,RFD,RBU,LBD) to First-Order AmbiX (ACN/SN3D). Front-end of the TETRAREC chain (→ X2UHJ → stereo). Involutory matrix (inverse of BAMODULEX). Stateless |
 
 ### Screenshots
 
@@ -29,9 +30,9 @@ needed to do the job.
 |:---:|:---:|:---:|:---:|
 | ![SDMX](docs/img/sdmx.png) | ![B2Xrot](docs/img/b2xrot.png) | ![XYPRrot](docs/img/xyprrot.png) | ![BAMODULEX](docs/img/bamodulex.png) |
 
-| M2XHGR | LR2XHGR | DDELAY |
-|:---:|:---:|:---:|
-| ![M2XHGR](docs/img/m2xhgr.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![DDELAY](docs/img/ddelay.png) |
+| ABMODULEX | M2XHGR | LR2XHGR | DDELAY |
+|:---:|:---:|:---:|:---:|
+| ![ABMODULEX](docs/img/abmodulex.png) | ![M2XHGR](docs/img/m2xhgr.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![DDELAY](docs/img/ddelay.png) |
 
 | MULTIPINK | X2UHJ |
 |:---:|:---:|

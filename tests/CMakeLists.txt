@@ -17,3 +17,13 @@ target_include_directories(x2uhj_dsp_test PRIVATE
 )
 target_compile_features(x2uhj_dsp_test PRIVATE cxx_std_17)
 add_test(NAME x2uhj_dsp_test COMMAND x2uhj_dsp_test)
+
+add_executable(abmodulex_dsp_test
+    abmodulex_dsp_test.cpp
+)
+target_include_directories(abmodulex_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/abmodulex/source
+)
+target_compile_features(abmodulex_dsp_test PRIVATE cxx_std_17)
+add_test(NAME abmodulex_dsp_test COMMAND abmodulex_dsp_test)
