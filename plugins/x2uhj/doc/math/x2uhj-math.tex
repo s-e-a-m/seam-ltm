@@ -15,9 +15,47 @@ It covers the AmbiX-to-UHJ C-format encoding, the origin of Gerzon's matrix coef
 \end{abstract}
 \tableofcontents
 
-% \section{Introduction and Historical Framing}   % Task 8
-% \section{AmbiX to FuMa}                          % Task 8
-% \section{The UHJ C-Format Matrix}                % Task 8
+\section{Introduction and Historical Framing}
+
+UHJ is a hierarchical multichannel encoding system that represents a periphonic or horizontal sound field in a small number of channels suitable for stereo-compatible transmission and subsequent decoding.
+The name ``UHJ'' derives from the BBC Matrix-H system and the 45J variant, both developed at the BBC in the 1970s as practical approaches to compatible surround sound.
+Michael Gerzon unified and extended these systems in his 1985 AES paper, establishing the coefficient set that the \texttt{x2uhj} plugin implements.
+The C-format variant carries four channels: the stereo pair $(L, R)$, a third directional channel $T$, and a height-related channel $Q$.
+
+The \texttt{x2uhj} plugin accepts a First-Order AmbiX signal (four channels in ACN order, SN3D normalisation) and delivers UHJ C-format output.
+This document derives Gerzon's matrix coefficients by inverse verification against known decoded loudspeaker positions.
+It establishes the quadrature all-pass network as a sample-rate-independent design procedure, enabling consistent behaviour across all standard audio sample rates.
+
+\section{AmbiX to FuMa}
+
+The plugin first converts the incoming ACN/SN3D channels to the FuMa convention used throughout the UHJ literature.
+ACN orders the four first-order channels as $A_0$ (omnidirectional), $A_1$ (front--back), $A_2$ (up--down), $A_3$ (left--right), corresponding to the spherical harmonic sequence $W, Y, Z, X$.
+FuMa arranges the same signals as $W, X, Y, Z$ and scales the omnidirectional component by $1/\sqrt{2}$.
+The conversion is therefore a reindexing together with a single rescaling:
+
+\begin{equation}
+W = \tfrac{1}{\sqrt{2}}\,A_0,\quad X = A_3,\quad Y = A_1,\quad Z = A_2 .
+\end{equation}
+
+All subsequent matrix operations in this document refer to the FuMa signals $W, X, Y, Z$.
+
+\section{The UHJ C-Format Matrix}
+
+Gerzon's UHJ encoding proceeds in two stages: formation of the intermediate sum and difference signals $\Sigma$ and $\Delta$, followed by the channel assignments for $L$, $R$, $T$, and $Q$.
+
+\begin{align}
+\Sigma &= 0.9396926\,W + 0.1855740\,X ,\\
+\Delta &= j(-0.3420201\,W + 0.5098604\,X) + 0.6554516\,Y ,\\
+L &= \tfrac{1}{2}(\Sigma + \Delta), \qquad R = \tfrac{1}{2}(\Sigma - \Delta),\\
+T &= j(-0.1432\,W + 0.6512\,X) - 0.7071\,Y, \qquad Q = 0.9772\,Z .
+\end{align}
+
+$\Sigma$ is the forward-facing sum channel; its first-order pattern secures mono compatibility across all playback configurations.
+$\Delta$ is the difference channel; the factor $j$ introduces a broadband 90-degree phase shift that encodes lateral width.
+$L$ and $R$ are the two transmitted stereo channels, formed from the sum and difference of $\Sigma$ and $\Delta$.
+$T$ is the third C-format channel; it carries additional directional resolution that extends spatial accuracy beyond the stereo base.
+$Q$ is the height-related channel; it carries the vertical component $Z$ scaled by $0.9772$ to match the overall normalisation scheme.
+The symbol $j$ denotes a broadband 90-degree phase shift applied across the full audio bandwidth; its implementation as a sample-rate-independent all-pass network is the subject of Sections~5 and~6.
 % \section{Reconstructing Gerzon's Coefficients}   % Task 9
 % \section{The j Problem: Wideband 90 Degrees}     % Task 10
 % \section{The Sample-Rate-Independent Design}     % Task 10
