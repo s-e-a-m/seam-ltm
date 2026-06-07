@@ -590,6 +590,12 @@ def test_each_topology_has_per_rate_errors():
         for err in entry["per_fs_error"].values():
             assert isinstance(err, (int, float))
 
+def test_group_delay_present():
+    d = _run()
+    for entry in d["topologies"].values():
+        gd = entry["group_delay"]
+        assert len(gd["freqs"]) == len(gd["gd_us"]) > 0
+
 def test_deterministic():
     assert _run() == _run()
 ```
@@ -641,6 +647,20 @@ def _error_vs_order(mod, orders, design_kwargs):
         out[str(o)] = round(phase_error_deg(mod.phase(c, REF_FS, band_freqs())), 4)
     return out
 
+def _group_delay(mod, order, design_kwargs):
+    """Differential group delay between the two paths at REF_FS, in microseconds.
+
+    The group delay is -d(phase difference)/d(omega); it shows how the 90-degree
+    relationship disperses in time across frequency. Stored on a coarse grid.
+    """
+    freqs = np.geomspace(20.0, 20000.0, 64)
+    c = mod.design(order, REF_FS, **design_kwargs)
+    diff = mod.phase(c, REF_FS, freqs)
+    omega = 2.0 * np.pi * freqs
+    gd_s = -np.gradient(diff, omega)            # seconds
+    return {"freqs": [round(float(f), 3) for f in freqs],
+            "gd_us": [round(float(g * 1e6), 4) for g in gd_s]}
+
 def _entry(mod, order, orders, design_kwargs):
     c = mod.design(order, REF_FS, **design_kwargs)
     return {
@@ -649,6 +669,7 @@ def _entry(mod, order, orders, design_kwargs):
         "per_fs_error": _per_fs(mod, order, design_kwargs),
         "fixed_error": _fixed(mod, order, design_kwargs),
         "error_vs_order": _error_vs_order(mod, orders, design_kwargs),
+        "group_delay": _group_delay(mod, order, design_kwargs),
     }
 
 def build():
@@ -700,7 +721,8 @@ FIGDIR = os.path.join(HERE, "..", "doc", "figures")
 
 def test_plots_emit_files():
     subprocess.run([sys.executable, "plots.py"], cwd=HERE, check=True)
-    for fn in ("fixed_vs_perfs.png", "pareto_cost_quality.png", "error_vs_order.png"):
+    for fn in ("fixed_vs_perfs.png", "pareto_cost_quality.png",
+               "error_vs_order.png", "group_delay.png"):
         assert os.path.exists(os.path.join(FIGDIR, fn))
 ```
 
@@ -760,10 +782,20 @@ def error_vs_order(topos):
     plt.title("Phase error versus order"); plt.legend(); plt.grid(True, alpha=0.3)
     plt.tight_layout(); plt.savefig(os.path.join(FIGDIR, "error_vs_order.png"), dpi=120); plt.close()
 
+def group_delay(topos):
+    plt.figure(figsize=(8, 5))
+    for name, e in topos.items():
+        gd = e["group_delay"]
+        plt.semilogx(gd["freqs"], gd["gd_us"], "-", label=name)
+    plt.xlabel("Hz"); plt.ylabel("differential group delay (us)")
+    plt.title("Differential group delay between the two paths (48 kHz)")
+    plt.legend(); plt.grid(True, which="both", alpha=0.3)
+    plt.tight_layout(); plt.savefig(os.path.join(FIGDIR, "group_delay.png"), dpi=120); plt.close()
+
 def main():
     os.makedirs(FIGDIR, exist_ok=True)
     topos = _load()
-    fixed_vs_perfs(topos); pareto(topos); error_vs_order(topos)
+    fixed_vs_perfs(topos); pareto(topos); error_vs_order(topos); group_delay(topos)
     print("wrote figures to", os.path.abspath(FIGDIR))
 
 if __name__ == "__main__":
@@ -773,7 +805,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd plugins/x2uhj/study-topologies/tools && /Users/giuseppe/Documents/github/seam/librerie/seam-ltm/plugins/x2uhj/tools/.venv/bin/python -m pytest tests/test_plots.py -v`
-Expected: 1 passed; three PNGs in `doc/figures/`.
+Expected: 1 passed; four PNGs in `doc/figures/` (`fixed_vs_perfs.png`, `pareto_cost_quality.png`, `error_vs_order.png`, `group_delay.png`).
 
 - [ ] **Step 5: Commit**
 ```bash
@@ -946,6 +978,10 @@ Replace the §4-§6 comment lines, one sentence per line, affirmative voice.
 \includegraphics[width=0.8\linewidth]{error_vs_order.png}
 \caption{Phase error versus the number of sections per path.}
 \end{figure}
+\begin{figure}[ht]\centering
+\includegraphics[width=0.8\linewidth]{group_delay.png}
+\caption{Differential group delay between the two paths across frequency at 48~kHz.}
+\end{figure}
 ```
 Read `plugins/x2uhj/study-topologies/results.json` and transcribe a `booktabs` table: one row per topology with cost (multiplies/sample), error at 48 kHz (per-fs), and the worst fixed-mode error across rates.
 
@@ -983,7 +1019,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Self-review notes
 
 - **Spec coverage:** uniform interface (Task 1); three benchmarked topologies (Tasks 2-4); historical illustrative (Task 5); harness + results.json (Task 6); plots (Task 7); README (Task 8); LaTeX study doc (Tasks 9-11); four metrics (per_fs/fixed errors, cost, error_vs_order in Task 6; group delay noted below).
-- **Group-delay metric:** the spec lists group delay / transient as a metric. Tasks 6-7 capture phase error, cost, fs-robustness, and error-vs-order. Group delay is computed and plotted as an OPTIONAL extension within Task 7 if time allows; the core ranking stands on the other three metrics. (If the executor wants it mandatory, add a `group_delay` field to `_entry` in Task 6 via `-d(phase)/d(omega)` and a fourth figure in Task 7.)
+- **Group-delay metric (mandatory):** Task 6 records the differential group delay `-d(phase difference)/d(omega)` per topology at REF_FS in `results.json`, and Task 7 renders `group_delay.png`; §4 (Task 11) embeds it. This covers the spec's group-delay/transient metric on the uniform interface.
 - **Niemitalo relative delay:** `topo_polyphase.phase` applies a one-sample delay on path B; Task 3 Step 4 flags checking this sign if the per-fs fit misses target.
 - **Half-band risk:** Task 4 carries the spec's documented-partial fallback.
 - **Type consistency:** every topology exposes `name`, `design(order, fs, ...)`, `phase(coeffs, fs, freqs)`, `cost(coeffs)`; `compare.py` and `plots.py` consume `per_fs_error`, `fixed_error`, `error_vs_order`, `cost` consistently.
