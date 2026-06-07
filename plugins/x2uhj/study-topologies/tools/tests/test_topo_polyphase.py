@@ -8,8 +8,16 @@ def test_section_phase_is_allpass_unity():
 
 def test_fixed_mode_returns_literature_coeffs():
     c = topo_polyphase.design(4, 48000.0, mode="fixed")
+    assert len(c["A"]) == 4 and len(c["B"]) == 4
     assert abs(c["A"][0] - 0.6923878) < 1e-9
+    assert abs(c["A"][3] - 0.9987488452737) < 1e-9
     assert abs(c["B"][0] - 0.4021921162426) < 1e-9
+
+
+def test_fixed_mode_order_too_high_raises():
+    import pytest
+    with pytest.raises(ValueError):
+        topo_polyphase.design(5, 48000.0, mode="fixed")
 
 def test_cost_one_multiply_per_section():
     c = topo_polyphase.design(4, 48000.0, mode="fixed")

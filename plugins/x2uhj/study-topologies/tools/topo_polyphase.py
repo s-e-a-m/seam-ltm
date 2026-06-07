@@ -26,12 +26,14 @@ def section_response(a, fs, freqs):
     return h
 
 def _path_phase(coeffs, fs, freqs):
+    # Per-section np.unwrap is valid because each first-order polyphase section's phase swing stays within a single 2π range.
     total = np.zeros(len(freqs))
     for a in coeffs:
         total = total + np.unwrap(np.angle(section_response(a, fs, freqs)))
     return total
 
 def phase(coeffs, fs, freqs):
+    """Return phase(path B) − phase(path A), with the one-sample relative delay on B, in radians."""
     # Path B carries an extra one-sample delay relative to path A (polyphase).
     w = 2.0 * np.pi * np.asarray(freqs) / fs
     pa = _path_phase(coeffs["A"], fs, freqs)
@@ -40,8 +42,9 @@ def phase(coeffs, fs, freqs):
 
 def design(order, fs, mode="fixed"):
     if mode == "fixed":
-        n = min(order, 4)
-        return {"A": _FIXED_A[:n], "B": _FIXED_B[:n], "mode": "fixed"}
+        if order > 4:
+            raise ValueError(f"fixed mode supports order up to 4 (published table); got {order}")
+        return {"A": _FIXED_A[:order], "B": _FIXED_B[:order], "mode": "fixed"}
     # perfs: optimise the per-section coefficients at this fs.
     freqs = band_freqs()
     x0 = np.array(_FIXED_A[:order] + _FIXED_B[:order]) if order <= 4 else \
@@ -52,9 +55,13 @@ def design(order, fs, mode="fixed"):
         return phase(split(x), fs, freqs) - TARGET
     lo = np.full(2 * order, 0.01); hi = np.full(2 * order, 0.999999)
     res = least_squares(residuals, x0, bounds=(lo, hi), xtol=1e-13, ftol=1e-13)
+    from topology import phase_error_deg
     c = split(res.x)
     c["A"] = [round(v, 9) for v in c["A"]]
     c["B"] = [round(v, 9) for v in c["B"]]
+    err = phase_error_deg(phase(c, fs, freqs))
+    if err > 15.0:
+        raise RuntimeError(f"polyphase perfs did not converge at order={order}, fs={fs}: {err:.1f} deg")
     return c
 
 def cost(coeffs):
