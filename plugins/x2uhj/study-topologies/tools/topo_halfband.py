@@ -2,15 +2,14 @@
 
 An elliptic half-band low-pass has poles that split into two parallel all-pass
 branches; the branch pole radii become the first-order polyphase section
-coefficients. The Hilbert pair reuses the polyphase section model from
-topo_polyphase. This is the published elliptic route; the exact pole split is
-derived numerically here.
-
-Derivation used: elliptic half-band prototype → pole magnitudes sorted
-ascending → interleaved into two branches (A: even indices, B: odd indices).
-This gives a reasonable seed; a short least_squares refinement then minimises
-|phase(coeffs) - (-pi/2)| across the band so the topology is honestly
-"elliptic-half-band-derived, then numerically realised".
+coefficients.
+The Hilbert pair reuses the polyphase section model from topo_polyphase.
+Branch coefficients are derived from the elliptic half-band pole split:
+pole magnitudes sorted ascending are interleaved into branches A (even indices)
+and B (odd indices).
+A least_squares refinement is applied ONLY when the elliptic seed phase error
+exceeds the threshold (~10°); otherwise the pure elliptic split is returned
+as-is.
 """
 import numpy as np
 from scipy.signal import ellip, tf2zpk
@@ -41,6 +40,11 @@ def _elliptic_seed(order):
 
 
 def design(order, fs):
+    """Return {"A": [...], "B": [...]} branch coefficients for the given order and sample rate.
+
+    Coefficients come from the elliptic half-band pole split.
+    Least_squares refinement is applied only when the seed phase error exceeds ~10°.
+    """
     A_seed, B_seed = _elliptic_seed(order)
     freqs = band_freqs()
 
@@ -48,7 +52,7 @@ def design(order, fs):
     seed_coeffs = {"A": list(A_seed), "B": list(B_seed)}
     seed_err = phase_error_deg(_poly_phase(seed_coeffs, fs, freqs))
 
-    if seed_err < 10.0:
+    if seed_err < 10.0:  # seed is good enough: return pure elliptic split without refinement
         return {
             "A": [round(v, 9) for v in A_seed],
             "B": [round(v, 9) for v in B_seed],
