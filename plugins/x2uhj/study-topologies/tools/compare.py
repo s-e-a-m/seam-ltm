@@ -48,16 +48,16 @@ def _error_vs_order(mod, orders, design_kwargs):
             out[str(o)] = None  # convergence guard fired
     return out
 
-def _group_delay(mod, order, design_kwargs):
-    """Differential group delay between the two paths at REF_FS, in microseconds."""
+def _group_delay(mod, c, fs):
+    """Differential group delay between the two paths at fs, in microseconds."""
     freqs = np.geomspace(20.0, 20000.0, 64)
-    c = mod.design(order, REF_FS, **design_kwargs)
-    diff = mod.phase(c, REF_FS, freqs)
+    diff = mod.phase(c, fs, freqs)
     omega = 2.0 * np.pi * freqs
     gd_s = -np.gradient(diff, omega)
     return {"freqs": [round(float(f), 3) for f in freqs],
             "gd_us": [round(float(g * 1e6), 4) for g in gd_s]}
 
+# Every topology's design(order, fs, **kwargs) accepts the same call shape; extra kwargs like `mode` are topology-specific.
 def _entry(mod, order, orders, design_kwargs):
     c = mod.design(order, REF_FS, **design_kwargs)
     return {
@@ -66,7 +66,7 @@ def _entry(mod, order, orders, design_kwargs):
         "per_fs_error": _per_fs(mod, order, design_kwargs),
         "fixed_error": _fixed(mod, order, design_kwargs),
         "error_vs_order": _error_vs_order(mod, orders, design_kwargs),
-        "group_delay": _group_delay(mod, order, design_kwargs),
+        "group_delay": _group_delay(mod, c, REF_FS),
     }
 
 def build():

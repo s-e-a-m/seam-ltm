@@ -20,7 +20,7 @@ _SEED_HI = [(24.0, 0.3090), (2992.0, 0.3848), (3220.0, 0.0963),
             (89.4, 0.30), (2828.0, 0.30), (20000.0, 0.30)]
 
 
-def design(order, fs):
+def design(order, fs, **_ignored):  # accepts and ignores extra keyword args so the harness can call every topology uniformly
     """Fit a pair of RBJ all-pass biquad cascades for quadrature at *fs*.
 
     Returns a dict ``{"order": int, "H_R": [[f,q],...], "H_I": [[f,q],...]}``

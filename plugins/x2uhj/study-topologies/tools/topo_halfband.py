@@ -39,7 +39,7 @@ def _elliptic_seed(order):
     return A, B
 
 
-def design(order, fs):
+def design(order, fs, **_ignored):  # accepts and ignores extra keyword args so the harness can call every topology uniformly
     """Return {"A": [...], "B": [...]} branch coefficients for the given order and sample rate.
 
     Coefficients come from the elliptic half-band pole split.
