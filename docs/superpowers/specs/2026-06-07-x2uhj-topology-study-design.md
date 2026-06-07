@@ -27,6 +27,7 @@ The harness already exists in embryo as `plugins/x2uhj/tools/design_quadrature_p
 - Plot generation and a standalone LaTeX study document with its own PDF.
 - Three benchmarked modern topologies plus a historical narrative with one illustrative measurement.
 - Tests for each topology module and for the harness.
+- A scope `README.md` that documents every script, its purpose, how to run the harness, and how the pieces fit, so the process reads clearly from outside and serves as our own record.
 
 ### Out of scope
 
@@ -41,6 +42,7 @@ The harness already exists in embryo as `plugins/x2uhj/tools/design_quadrature_p
 
 ```
 plugins/x2uhj/study-topologies/
+├── README.md              # scope: what each script does, how to run, how it fits
 ├── tools/
 │   ├── topology.py        # the uniform interface (Protocol) + shared helpers
 │   ├── topo_rbj.py        # second-order RBJ biquad cascade (reuses ../../tools/rbj.py, analog_prototype.py)
@@ -146,6 +148,7 @@ One sentence per line; affirmative explanatory voice.
 - A reader sees, on one footing, how each topology trades phase accuracy against computational cost, and how each behaves across sample rates.
 - The study yields a clear, evidence-based recommendation of a topology for the standalone quadrature plugin.
 - Every figure, table, and number regenerates from one command via `results.json`.
+- A reader new to the study opens `README.md` and understands what each script does, how to run the harness, and how the parts connect, with no need to read the code first.
 
 ## Risks and mitigations
 
