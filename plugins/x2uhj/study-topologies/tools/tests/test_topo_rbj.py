@@ -1,5 +1,6 @@
 import json, os
 import numpy as np
+import pytest
 import topo_rbj
 from topology import band_freqs, phase_error_deg
 
@@ -22,3 +23,11 @@ def test_matches_shipped_perrate_table_at_48k():
     ref_err = ref["max_error_deg"]
     got_err = phase_error_deg(topo_rbj.phase(c, 48000.0, band_freqs()))
     assert abs(got_err - ref_err) < 0.25
+
+def test_order_four_converges_at_48k():
+    c = topo_rbj.design(4, 48000.0)
+    assert phase_error_deg(topo_rbj.phase(c, 48000.0, band_freqs())) < 2.5
+
+def test_order_out_of_range_raises():
+    with pytest.raises(ValueError):
+        topo_rbj.design(7, 48000.0)
