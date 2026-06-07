@@ -15,9 +15,143 @@ It measures phase accuracy, computational cost, sample-rate behaviour, and group
 \end{abstract}
 \tableofcontents
 
-% \section{Introduction}              % Task 10
-% \section{Topologies Under Test}     % Task 10
-% \section{Method}                    % Task 10
+%% ─── §1 Introduction ─────────────────────────────────────────────────────────
+\section{Introduction}
+
+The UHJ encoding matrix requires a wideband 90-degree phase shift — the
+\emph{j} operator — applied across the full audible spectrum with sub-degree
+accuracy.
+Two questions organise this study: which all-pass topology delivers the
+greatest phase accuracy per unit computational cost, and how each topology
+behaves as the sample rate changes from \SI{44.1}{\kilo\hertz} to
+\SI{192}{\kilo\hertz}.
+
+The problem has a continuous history.
+Analog phase-difference networks, analysed by Bedrosian \cite{Bedrosian1960},
+showed that cascaded first- and second-order all-pass sections can approximate
+a 90-degree differential phase over a prescribed bandwidth.
+Schroeder's 1958 differential all-pass arrangement is the conceptual origin of
+transforming a mono signal into a perceived stereo image through phase
+manipulation; its design goal was decorrelation rather than a held quadrature
+relationship, yet it established the building block that later work would
+repurpose.
+Gerzon applied the quadrature idea to UHJ surround encoding
+\cite{gerzon1983broadcast}, where a precise 90-degree shift converts
+mid-side signals into the spatially encoded B-format lateral component.
+The modern digital realisation rests on the lattice all-pass section studied by
+Regalia, Mitra, and Vaidyanathan \cite{RegaliaMitraVaidyanathan1988}, which
+provides a numerically well-conditioned structure with a single tunable
+coefficient.
+
+This study contributes a single evaluation harness that places every topology
+on one footing across four metrics and produces an evidence-based
+recommendation for the quadrature processor inside a standalone UHJ plugin.
+
+%% ─── §2 Topologies Under Test ────────────────────────────────────────────────
+\section{Topologies Under Test}
+
+\subsection{RBJ Second-Order Biquad Cascade}
+
+The RBJ all-pass biquad \cite{RBJCookbook} realises the continuous-time
+prototype
+\begin{equation}
+  H(s) = \frac{s^2 - (\omega_0/Q)\,s + \omega_0^2}
+              {s^2 + (\omega_0/Q)\,s + \omega_0^2},
+\end{equation}
+bilinearly transformed to the $z$-domain.
+A cascade of such sections, with centre frequencies and $Q$ values chosen by a
+minimax phase-error optimisation at the target sample rate, approximates the
+90-degree differential phase across the desired band.
+This is the topology currently employed in the \texttt{x2uhj} plugin, where
+coefficients are redesigned whenever the host sample rate changes.
+
+\subsection{First-Order Polyphase (Niemitalo)}
+
+The first-order polyphase all-pass section \cite{Niemitalo2003,Ansari1987Hilbert}
+has the transfer function
+\begin{equation}
+  H(z) = \frac{a^2 - z^{-2}}{1 - a^2\,z^{-2}},
+\end{equation}
+requiring one multiply per section after the coefficient $a$ is fixed.
+Two parallel paths, each a cascade of such sections with complementary
+coefficients, deliver the 90-degree quadrature pair.
+The WigWare distribution \cite{WigginsWigWare} ships a widely cited set of
+fixed coefficients designed for \SI{44.1}{\kilo\hertz}; this study evaluates
+those published coefficients as one realisation mode and a per-rate minimax
+redesign as the second.
+
+\subsection{Elliptic Half-Band Derived Hilbert (Harris–Berdahl–Abel)}
+
+Harris, Berdahl, and Abel \cite{HarrisBerdahlAbel2010} derive a Hilbert
+transformer by splitting an elliptic half-band lowpass filter into two
+parallel all-pass branches whose outputs are in quadrature.
+The prototype is designed in normalised frequency against an elliptic
+approximation \cite{SchusslerSteffen1998}, giving steep transition-band
+attenuation with a low filter order.
+The two branch outputs form the in-phase and quadrature signals directly,
+making this a structurally efficient realisation for hardware or fixed-point
+contexts.
+
+\subsection{Historical Context: Schroeder Differential All-Pass}
+
+Schroeder's 1958 differential all-pass network is the conceptual ancestor of
+all the topologies above.
+Its purpose was decorrelation: by splitting a mono signal into two paths that
+share identical magnitude responses but differ in phase, it creates the
+perception of spaciousness without altering spectral balance.
+The study treats it as historical framing rather than as a competitor, because
+its design target — maximum decorrelation over frequency — differs from the
+present goal of a held 90-degree phase difference across the audio band.
+
+%% ─── §3 Method ───────────────────────────────────────────────────────────────
+\section{Method}
+
+\subsection{Uniform Evaluation Interface}
+
+Every topology is accessed through a common interface that exposes three
+operations: \texttt{design}, which accepts a sample rate and returns a
+coefficient set; \texttt{phase}, which evaluates the differential phase
+response at a specified frequency grid; and \texttt{cost}, which returns the
+multiply count per output sample.
+The uniform interface ensures that the harness logic is topology-agnostic and
+that comparisons reflect only the properties of the all-pass networks
+themselves.
+
+\subsection{Realisation Modes}
+
+Each topology is exercised in two realisation modes.
+In the \emph{fixed-coefficient} mode, coefficients are designed once at a
+single reference rate (\SI{44.1}{\kilo\hertz} for the Niemitalo polyphase, using
+the published WigWare values \cite{WigginsWigWare}) and applied unchanged at
+every test rate.
+In the \emph{per-rate} mode, the minimax optimisation runs afresh at each
+sample rate, yielding the best achievable accuracy for that rate.
+Comparing the two modes reveals how much accuracy degrades when a fixed
+design is used outside its intended rate.
+
+\subsection{Metrics}
+
+Four metrics are recorded for each topology and realisation mode.
+\emph{Maximum phase error} quantifies the worst-case deviation from 90 degrees
+across the evaluation band, reported in degrees; the companion \emph{error
+versus order} curve shows how accuracy scales with the number of all-pass
+sections.
+\emph{Sample-rate robustness} measures the maximum phase error at each of the
+six standard rates: 44.1, 48, 88.2, 96, 176.4, and \SI{192}{\kilo\hertz}.
+\emph{Computational cost} counts the real multiplies required to produce one
+pair of quadrature output samples, enabling a cost-normalised accuracy
+comparison.
+\emph{Differential group delay} records the deviation of the group-delay
+difference between the two quadrature paths from a flat \SI{0}{\second}
+response, which affects the perceived image stability of encoded material.
+
+\subsection{Minimax All-Pass Design}
+
+Coefficient optimisation follows the established minimax all-pass design
+method described by Lang \cite{Lang1998Allpass}, which minimises the
+Chebyshev norm of the phase error over the target band subject to the
+all-pass magnitude constraint.
+
 % \section{Results}                   % Task 11
 % \section{Discussion and Recommendation} % Task 11
 % \section*{References}               % Task 11
