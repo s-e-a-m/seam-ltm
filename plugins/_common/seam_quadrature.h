@@ -71,6 +71,7 @@ struct QuadratureDesign {
     APSpec hi[kMaxSections];
     int    nSections = 0;
     double maxErrorDeg = 0.0;
+    double sampleRate = 0.0; // fs the design was computed at, for readout/UI
     bool   converged = false;
 };
 
@@ -130,6 +131,7 @@ inline QuadratureDesign designQuadrature(double fs, double fLo, double fHi, int 
     if (nSections < 1) nSections = 1;
     if (nSections > QuadratureDesign::kMaxSections) nSections = QuadratureDesign::kMaxSections;
     d.nSections = nSections;
+    d.sampleRate = fs;
 
     const int N = 4 * nSections;
     const int M = 512;

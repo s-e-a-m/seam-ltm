@@ -112,9 +112,19 @@ IPlugView* PLUGIN_API X2UHJProcessor::createView(FIDString name) {
 
 VSTGUI::CView* PLUGIN_API X2UHJProcessor::createCustomView(
     VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes&,
-    const VSTGUI::IUIDescription*, VSTGUI::VST3Editor*) {
-    if (name && std::string(name) == "QuadratureReadout")
-        return new Seam::QuadratureReadoutView(VSTGUI::CRect(0, 0, 240, 96), &encoder);
+    const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor*) {
+    if (name && std::string(name) == "QuadratureReadout") {
+        // Match the suite's text scheme: TextDim labels, TextLight data, the
+        // same monospace font as the title block, all resolved from the uidesc.
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor label = VSTGUI::kGreyCColor, value = VSTGUI::kWhiteCColor;
+        if (description) {
+            description->getColor("TextDim", label);
+            description->getColor("TextLight", value);
+        }
+        return new Seam::QuadratureReadoutView(
+            VSTGUI::CRect(0, 0, 240, 96), &encoder, font, label, value);
+    }
     return nullptr;
 }
 
