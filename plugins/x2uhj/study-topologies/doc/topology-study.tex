@@ -32,7 +32,7 @@ showed that cascaded first- and second-order all-pass sections can approximate
 a 90-degree differential phase over a prescribed bandwidth.
 Schroeder's 1958 differential all-pass arrangement is the conceptual origin of
 transforming a mono signal into a perceived stereo image through phase
-manipulation; its design goal was decorrelation rather than a held quadrature
+manipulation; its design goal was decorrelation, a goal distinct from a held quadrature
 relationship, yet it established the building block that later work would
 repurpose.
 Gerzon applied the quadrature idea to UHJ surround encoding
@@ -98,8 +98,8 @@ Schroeder's 1958 differential all-pass network is the conceptual ancestor of
 all the topologies above.
 Its purpose was decorrelation: by splitting a mono signal into two paths that
 share identical magnitude responses but differ in phase, it creates the
-perception of spaciousness without altering spectral balance.
-The study treats it as historical framing rather than as a competitor, because
+perception of spaciousness while preserving spectral balance.
+The study treats it as historical framing and excludes it from the benchmark, because
 its design target — maximum decorrelation over frequency — differs from the
 present goal of a held 90-degree phase difference across the audio band.
 
@@ -170,7 +170,7 @@ accumulate errors that reach \SI{54.4}{\degree} for the RBJ cascade and
 The elliptic half-band presents a special case: its prototype is designed in
 normalised frequency, so the fixed-coefficient and per-rate columns nearly
 coincide — the topology absorbs sample-rate change through frequency scaling
-rather than coefficient redesign.
+which re-solves the coefficients at each rate.
 
 \subsection{Cost and Accuracy}
 
