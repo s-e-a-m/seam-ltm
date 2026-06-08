@@ -88,6 +88,18 @@ parallel all-pass branches whose outputs are in quadrature.
 The prototype is designed in normalised frequency against an elliptic
 approximation \cite{SchusslerSteffen1998}, giving steep transition-band
 attenuation with a low filter order.
+The half-band lowpass admits a parallel all-pass decomposition
+\begin{equation}
+H(z) = \tfrac{1}{2}\big[A_0(z^2) + z^{-1} A_1(z^2)\big],
+\end{equation}
+where each branch $A_k$ is a product of first-order all-pass sections
+\begin{equation}
+A_k(z^2) = \prod_i \frac{a_i^2 - z^{-2}}{1 - a_i^2\,z^{-2}},
+\end{equation}
+the same section the first-order polyphase topology uses.
+The coefficients $a_i$ follow from the pole radii of the elliptic prototype,
+so this topology shares the polyphase realisation and differs only in how it
+derives the coefficients.
 The two branch outputs form the in-phase and quadrature signals directly,
 making this a structurally efficient realisation for hardware or fixed-point
 contexts.
@@ -284,8 +296,23 @@ Both configurations share the same per-rate redesign requirement, which the
 \texttt{x2uhj} plugin already implements through its sample-rate change
 handler.
 The near-flat differential group delay measured for all three topologies
-confirms that none introduces perceptible pre-ringing or transient smearing on
-encoded material, supporting their use on broadband programme.
+confirms that each one keeps pre-ringing and transient smearing below
+perceptible levels on encoded material, supporting their use on broadband
+programme.
+
+\subsection{Further Comparison Candidates}
+
+The uniform harness invites cross-environment comparison with established
+quadrature implementations.
+Miller Puckette's Pure Data phase-quadrature patches provide a widely used
+reference in the live-electronics community.
+The Max/MSP \texttt{hilbert\textasciitilde} object offers a second reference,
+which a Max external built from the RBJ topology would place on the same
+footing.
+A Csound user-defined opcode would extend the comparison to a third
+environment.
+Each of these objects enters the study through the same interface, so the
+harness measures it with the same four metrics and adds it to the ranking.
 
 %% ─── §6 References ───────────────────────────────────────────────────────────
 \section*{References}
