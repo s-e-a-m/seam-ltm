@@ -1,17 +1,23 @@
-// SEAM reusable quadrature design engine (SDK-free, header-only).
+//──────────────────────────────────────────────────────────────────────────
+// SEAM-LTM · Common · seam_quadrature — wideband 90° quadrature design engine
+//
 // Designs an all-pass quadrature pair (H_R, H_I) whose phase difference holds
-// -90 degrees across a band, by a minimax phase fit at the actual sample rate.
-// Ported from the Python harness design_quadrature_perfs.py.
+// −90° across a band, by a minimax phase fit at the actual sample rate.
+//
+// PYTHON REFERENCE: plugins/x2uhj/tools/design_quadrature_perfs.py
+// FAUST REFERENCE (seam.ambisonics.lib): the UHJ quadrature pair.
+//──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include <cmath>
 #include <complex>
 
-namespace seam { namespace quadrature {
+namespace Seam { namespace quadrature {
 
 struct APSpec { double f; double Q; };
 
 // Coefficients (a1, a2) of one RBJ all-pass biquad at (f, Q, fs).
 inline void allpassCoeffs(double f, double Q, double fs, double& a1, double& a2) {
+    if (Q < 1e-6) Q = 1e-6; // bilinear coefficients require a positive Q
     const double w0 = 2.0 * M_PI * f / fs;
     const double alpha = std::sin(w0) / (2.0 * Q);
     const double n = 1.0 + alpha;
@@ -59,4 +65,4 @@ inline void cascadePhase(const APSpec* secs, int n, double fs,
     }
 }
 
-}} // namespace
+}} // namespace Seam::quadrature

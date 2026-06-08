@@ -3,7 +3,7 @@
 #include "seam_quadrature.h"
 #include <cmath>
 
-using namespace seam::quadrature;
+using namespace Seam::quadrature;
 
 TEST_CASE("allpass section has unit magnitude (phase-only)") {
     const double fs = 48000.0;
@@ -14,15 +14,17 @@ TEST_CASE("allpass section has unit magnitude (phase-only)") {
     }
 }
 
-TEST_CASE("cascade phase sums section phases") {
+TEST_CASE("cascade phase sums distinct section phases") {
     const double fs = 48000.0;
     const int M = 8;
     double freqs[M];
     for (int i = 0; i < M; ++i) freqs[i] = 20.0 * std::pow(1000.0, double(i)/(M-1));
-    APSpec one[1]  = {{1000.0, 0.7071}};
-    APSpec two[2]  = {{1000.0, 0.7071}, {1000.0, 0.7071}};
-    double p1[M], p2[M];
-    cascadePhase(one, 1, fs, freqs, M, p1);
-    cascadePhase(two, 2, fs, freqs, M, p2);
-    for (int i = 0; i < M; ++i) CHECK(p2[i] == doctest::Approx(2.0 * p1[i]).epsilon(1e-9));
+    APSpec a[1]    = {{300.0,  0.5}};
+    APSpec b[1]    = {{4000.0, 0.8}};
+    APSpec both[2] = {{300.0,  0.5}, {4000.0, 0.8}};
+    double pa[M], pb[M], pab[M];
+    cascadePhase(a,    1, fs, freqs, M, pa);
+    cascadePhase(b,    1, fs, freqs, M, pb);
+    cascadePhase(both, 2, fs, freqs, M, pab);
+    for (int i = 0; i < M; ++i) CHECK(pab[i] == doctest::Approx(pa[i] + pb[i]).epsilon(1e-9));
 }
