@@ -67,6 +67,16 @@ The DSP no longer includes `x2uhj_coeffs.h`, but the file stays as a record of t
 
 One build fix landed alongside Task 4: the x2uhj plugin target lacked `plugins/_common` on its include path (only the test target had it), so the engine header was unresolved; the path now matches the tests.
 
+## Postscript — readout polish and visual confirmation (2026-06-08)
+
+The readout is now confirmed in the host at 48 and 96 kHz, so the values above are verified, not just engine output.
+The view adopts the suite text scheme: `TextDim` labels and `TextLight` data in Source Code Pro Light, all resolved from the uidesc rather than hard-coded.
+A font must be set on the draw context explicitly, because outside the UI editor no default font is bound and `drawString` would otherwise paint nothing.
+The HR/HI coefficients render as a table with a narrow tag column, and the achieved error plus design sample rate sit on a separate footer line (`max err N deg @ M kHz`).
+`QuadratureDesign` gained a `sampleRate` field so the footer can name the rate the design was computed at.
+A hot sample-rate change refreshes the readout on its own: `prepare(fs)` already re-runs in `setActive`, and the view now polls `design().sampleRate` in `onIdle` and invalidates itself when it changes.
+The info line `L R T Q · quadrature ±90°` was aligned with multipink (InfoFont size 11, row at y=66) for a consistent header across the suite.
+
 ## Open follow-ups
 
 A standalone quadrature plugin that exposes the three topologies remains planned.
