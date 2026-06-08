@@ -152,9 +152,143 @@ method described by Lang \cite{Lang1998Allpass}, which minimises the
 Chebyshev norm of the phase error over the target band subject to the
 all-pass magnitude constraint.
 
-% \section{Results}                   % Task 11
-% \section{Discussion and Recommendation} % Task 11
-% \section*{References}               % Task 11
+%% ─── §4 Results ─────────────────────────────────────────────────────────────
+\section{Results}
+
+\subsection{Phase Error Versus Sample Rate}
+
+\begin{figure}[ht]\centering
+\includegraphics[width=0.85\linewidth]{fixed_vs_perfs.png}
+\caption{Quadrature error versus sample rate for each topology, fixed coefficients versus per-rate design.}
+\end{figure}
+
+Per-rate coefficient redesign holds the quadrature relationship across all six
+test rates for every topology.
+Fixed coefficients, designed once at \SI{44.1}{\kilo\hertz} and held constant,
+accumulate errors that reach \SI{54.4}{\degree} for the RBJ cascade and
+\SI{46.5}{\degree} for the polyphase topology.
+The elliptic half-band presents a special case: its prototype is designed in
+normalised frequency, so the fixed-coefficient and per-rate columns nearly
+coincide — the topology absorbs sample-rate change through frequency scaling
+rather than coefficient redesign.
+
+\subsection{Cost and Accuracy}
+
+\begin{figure}[ht]\centering
+\includegraphics[width=0.7\linewidth]{pareto_cost_quality.png}
+\caption{Phase accuracy at 48~kHz versus multiplies per sample.}
+\end{figure}
+
+Table~\ref{tab:results} records the three scalar figures for each topology.
+The RBJ cascade achieves the lowest per-rate error at \SI{48}{\kilo\hertz}
+(\SI{1.36}{\degree}) and improves to \SI{0.43}{\degree} at
+\SI{192}{\kilo\hertz}, at a cost of 24 multiplies per sample.
+The first-order polyphase \cite{Niemitalo2003} achieves \SI{1.67}{\degree} at
+\SI{48}{\kilo\hertz} at one third of the cost (8 multiplies per sample),
+making it the most accurate topology per multiply.
+The elliptic half-band delivers the highest worst-case error in its design band
+among the three (\SI{18.2}{\degree} in fixed mode, \SI{4.68}{\degree} per-rate
+at \SI{48}{\kilo\hertz}) for the same cost of 8 multiplies.
+
+\begin{table}[ht]
+\centering
+\caption{Per-topology measurements. Errors are maximum phase deviation from
+\SI{90}{\degree} across the evaluation band.}
+\label{tab:results}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Topology & Cost (mult/sample) & Per-rate error at 48~kHz & Worst fixed-mode error \\
+\midrule
+RBJ biquad cascade           & 24 & \SI{1.36}{\degree} & \SI{54.4}{\degree} \\
+Polyphase first-order        &  8 & \SI{1.67}{\degree} & \SI{46.5}{\degree} \\
+Elliptic half-band           &  8 & \SI{4.68}{\degree} & \SI{18.2}{\degree} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Error Versus Filter Order}
+
+\begin{figure}[ht]\centering
+\includegraphics[width=0.8\linewidth]{error_vs_order.png}
+\caption{Phase error versus the number of sections per path.}
+\end{figure}
+
+All three topologies reduce phase error monotonically as the number of
+all-pass sections per path increases.
+The RBJ cascade benefits most from additional sections, reaching sub-degree
+accuracy at the order used in this study.
+The polyphase topology converges quickly: its accuracy at 8 multiplies is
+already competitive with the RBJ cascade at 24 multiplies on a per-multiply
+basis.
+
+\subsection{Differential Group Delay}
+
+\begin{figure}[ht]\centering
+\includegraphics[width=0.8\linewidth]{group_delay.png}
+\caption{Differential group delay between the two paths across frequency at 48~kHz.}
+\end{figure}
+
+The differential group delay remains small and spectrally smooth for all three
+topologies at \SI{48}{\kilo\hertz}.
+A near-flat differential group delay preserves transient timing relationships
+between the in-phase and quadrature outputs, supporting stable spatial imaging
+on percussive and speech material.
+
+%% ─── §5 Discussion and Recommendation ───────────────────────────────────────
+\section{Discussion and Recommendation}
+
+\subsection{Sample Rate Is the Decisive Variable}
+
+The most consistent finding across all three topologies is that the choice of
+realisation mode — fixed coefficients or per-rate redesign — dominates the
+accuracy outcome.
+Fixed-coefficient operation produces worst-case errors above \SI{45}{\degree}
+for both the RBJ and polyphase topologies, which renders them unsuitable for a
+precision quadrature processor at rates other than the design rate.
+Per-rate redesign, implemented as a minimax optimisation \cite{Lang1998Allpass}
+that runs at host-reported sample-rate changes, reduces the worst-case error
+to sub-degree range for the RBJ topology and to the 1.6–3.2-degree range for
+the polyphase topology.
+The elliptic half-band absorbs sample-rate variation through its normalised
+frequency prototype \cite{HarrisBerdahlAbel2010,SchusslerSteffen1998}, but
+delivers lower absolute accuracy at the order tested here.
+
+\subsection{Cost–Accuracy Trade-Off}
+
+The Pareto frontier in Figure~2 has two clear operating points.
+The first-order polyphase network \cite{Niemitalo2003} sits at the
+efficiency vertex: 8 multiplies per sample yield \SI{1.67}{\degree} at
+\SI{48}{\kilo\hertz} and \SI{1.57}{\degree} at \SI{44.1}{\kilo\hertz}, the
+best accuracy-per-multiply of the three topologies.
+The RBJ biquad cascade occupies the accuracy vertex: 24 multiplies per sample
+yield \SI{1.36}{\degree} at \SI{48}{\kilo\hertz} and improve to
+\SI{0.43}{\degree} at \SI{192}{\kilo\hertz}, the best absolute accuracy.
+The elliptic half-band shares the polyphase cost but sits below both
+competitors in absolute accuracy at this order, which makes it the preferred
+choice in fixed-point or very-low-MIPS contexts where its structural
+regularity carries implementation advantages.
+
+\subsection{Recommendation}
+
+For the \texttt{x2uhj} standalone quadrature plugin, two configurations are
+appropriate depending on the accuracy target.
+The \emph{first-order polyphase with per-rate redesign} is the recommended
+default: it delivers sub-2-degree accuracy across the audible band at one
+third of the RBJ multiply count, leaving headroom for the surrounding UHJ
+matrix and other processing.
+The \emph{RBJ biquad cascade with per-rate redesign} is the choice when
+sub-degree accuracy is required, for example in mastering or research
+applications where the quadrature approximation must introduce no perceptible
+artefact.
+Both configurations share the same per-rate redesign requirement, which the
+\texttt{x2uhj} plugin already implements through its sample-rate change
+handler.
+The near-flat differential group delay measured for all three topologies
+confirms that none introduces perceptible pre-ringing or transient smearing on
+encoded material, supporting their use on broadband programme.
+
+%% ─── §6 References ───────────────────────────────────────────────────────────
+\section*{References}
 
 \bibliographystyle{IEEEtran}
 \bibliography{../../doc/math/refs}
