@@ -11,8 +11,8 @@
         <color name="TextDim" rgba="#888888ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 200"
-              minSize="300, 200" maxSize="300, 200"
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 300"
+              minSize="300, 300" maxSize="300, 300"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Title block at top -->
@@ -24,8 +24,11 @@
               font-color="TextDim" text-alignment="center"
               title="L R T Q &#xB7; quadrature &#xB1;90&#xB0;" transparent="true"/>
 
+        <!-- Live-designed quadrature coefficients readout -->
+        <view class="CView" origin="30, 92" size="240, 96" custom-view-name="QuadratureReadout"/>
+
         <!-- Logo centered at bottom -->
-        <view class="CView" origin="30, 100" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 200" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>

@@ -9,7 +9,9 @@
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
 #include "pluginterfaces/base/ibstream.h"
 #include "vstgui/plugin-bindings/vst3editor.h"
+#include "x2uhj_readout_view.h"
 #include <cstring>
+#include <string>
 
 namespace Seam {
 using namespace Steinberg;
@@ -105,6 +107,14 @@ tresult PLUGIN_API X2UHJProcessor::setBusArrangements(
 IPlugView* PLUGIN_API X2UHJProcessor::createView(FIDString name) {
     if (name && FIDStringsEqual(name, ViewType::kEditor))
         return new VSTGUI::VST3Editor(this, "view", "x2uhj.uidesc");
+    return nullptr;
+}
+
+VSTGUI::CView* PLUGIN_API X2UHJProcessor::createCustomView(
+    VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes&,
+    const VSTGUI::IUIDescription*, VSTGUI::VST3Editor*) {
+    if (name && std::string(name) == "QuadratureReadout")
+        return new Seam::QuadratureReadoutView(VSTGUI::CRect(0, 0, 240, 96), &encoder);
     return nullptr;
 }
 
