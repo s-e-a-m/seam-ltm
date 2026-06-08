@@ -4,6 +4,7 @@ Date: 2026-06-08
 Status: Approved (brainstorming), pending spec review
 Owner: Giuseppe Silvi (grammaton)
 Related: [UHJ quadrature fs-dependence finding](../../../plugins/x2uhj) and the topology study spec (2026-06-07).
+Development log: ../logs/2026-06-08-seam-quadrature-engine-uhj-fix.md
 
 ## Purpose
 
