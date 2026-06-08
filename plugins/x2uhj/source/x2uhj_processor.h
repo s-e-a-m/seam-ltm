@@ -19,11 +19,13 @@
 #pragma once
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "pluginterfaces/vst/ivstplugview.h"
+#include "vstgui/plugin-bindings/vst3editor.h"
 #include "x2uhj_dsp.h"
 
 namespace Seam {
 
-class X2UHJProcessor : public Steinberg::Vst::SingleComponentEffect {
+class X2UHJProcessor : public Steinberg::Vst::SingleComponentEffect,
+                       public VSTGUI::VST3EditorDelegate {
 public:
     X2UHJProcessor();
 
@@ -43,6 +45,10 @@ public:
         Steinberg::Vst::SpeakerArrangement* out, Steinberg::int32 numOut) SMTG_OVERRIDE;
 
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) SMTG_OVERRIDE;
+
+    VSTGUI::CView* PLUGIN_API createCustomView(
+        VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& attributes,
+        const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* editor) override;
 
 private:
     template <typename S> void processBlock(S** in, S** out, Steinberg::int32 n);

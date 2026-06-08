@@ -14,6 +14,7 @@ add_executable(x2uhj_dsp_test
 target_include_directories(x2uhj_dsp_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/x2uhj/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
 )
 target_compile_features(x2uhj_dsp_test PRIVATE cxx_std_17)
 add_test(NAME x2uhj_dsp_test COMMAND x2uhj_dsp_test)
@@ -27,3 +28,13 @@ target_include_directories(abmodulex_dsp_test PRIVATE
 )
 target_compile_features(abmodulex_dsp_test PRIVATE cxx_std_17)
 add_test(NAME abmodulex_dsp_test COMMAND abmodulex_dsp_test)
+
+add_executable(seam_quadrature_test
+    seam_quadrature_test.cpp
+)
+target_include_directories(seam_quadrature_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_quadrature_test PRIVATE cxx_std_17)
+add_test(NAME seam_quadrature_test COMMAND seam_quadrature_test)

@@ -11,6 +11,7 @@ set(x2uhj_sources
     source/x2uhj_ids.h
     source/x2uhj_coeffs.h
     source/x2uhj_dsp.h
+    source/x2uhj_readout_view.h
     source/x2uhj_processor.cpp
     source/x2uhj_processor.h
     source/version.h
@@ -23,6 +24,10 @@ smtg_add_vst3plugin(${target} ${x2uhj_sources})
 smtg_target_configure_version_file(${target})
 
 target_compile_features(${target} PUBLIC cxx_std_17)
+target_include_directories(${target} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_common
+)
 target_link_libraries(${target} PRIVATE sdk vstgui_support)
 
 smtg_target_add_plugin_resources(${target}

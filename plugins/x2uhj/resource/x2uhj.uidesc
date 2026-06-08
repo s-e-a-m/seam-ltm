@@ -3,7 +3,7 @@
     <fonts>
         <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
         <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
-        <font font-name="Source Code Pro Light" name="InfoFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
     </fonts>
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
@@ -11,8 +11,8 @@
         <color name="TextDim" rgba="#888888ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 200"
-              minSize="300, 200" maxSize="300, 200"
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 300"
+              minSize="300, 300" maxSize="300, 300"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Title block at top -->
@@ -20,12 +20,15 @@
               font-color="TextLight" text-alignment="center" title="SEAM X2UHJ" transparent="true"/>
         <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
               font-color="TextDim" text-alignment="center" title="AmbiX &#x2192; UHJ C-format" transparent="true"/>
-        <view class="CTextLabel" origin="0, 68" size="300, 16" font="InfoFont"
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
               font-color="TextDim" text-alignment="center"
               title="L R T Q &#xB7; quadrature &#xB1;90&#xB0;" transparent="true"/>
 
+        <!-- Live-designed quadrature coefficients readout -->
+        <view class="CView" origin="30, 92" size="240, 96" custom-view-name="QuadratureReadout"/>
+
         <!-- Logo centered at bottom -->
-        <view class="CView" origin="30, 100" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 200" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
