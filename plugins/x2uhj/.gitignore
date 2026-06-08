@@ -6,3 +6,11 @@ doc/math/*.bbl
 doc/math/*.blg
 doc/math/*.fls
 doc/math/*.fdb_latexmk
+study-topologies/doc/*.aux
+study-topologies/doc/*.log
+study-topologies/doc/*.out
+study-topologies/doc/*.toc
+study-topologies/doc/*.bbl
+study-topologies/doc/*.blg
+study-topologies/doc/*.fls
+study-topologies/doc/*.fdb_latexmk

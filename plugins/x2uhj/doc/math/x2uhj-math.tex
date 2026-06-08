@@ -19,7 +19,7 @@ It covers the AmbiX-to-UHJ C-format encoding, the origin of Gerzon's matrix coef
 
 UHJ is a hierarchical multichannel encoding system that represents a periphonic or horizontal sound field in a small number of channels suitable for stereo-compatible transmission and subsequent decoding.
 The name ``UHJ'' derives from the BBC Matrix-H system and the 45J variant, both developed at the BBC in the 1970s as practical approaches to compatible surround sound~\cite{gerzon1977uhj}.
-Michael Gerzon unified and extended these systems in his 1983 AES paper~\cite{gerzon1983broadcast}, establishing the coefficient set that the \texttt{x2uhj} plugin implements.
+Michael Gerzon unified and extended these systems in his 1985 AES paper~\cite{gerzon1983broadcast}, establishing the coefficient set that the \texttt{x2uhj} plugin implements.
 The C-format variant carries four channels: the stereo pair $(L, R)$, a third directional channel $T$, and a height-related channel $Q$.
 
 The \texttt{x2uhj} plugin accepts a First-Order AmbiX signal (four channels in ACN order, SN3D normalisation) and delivers UHJ C-format output.
@@ -97,6 +97,14 @@ A FIR Hilbert pair achieves the phase difference with a tap set fixed to one sam
 An IIR all-pass pair carries the same phase relation in physical $(f_0, Q)$ units, which expresses the design in sample-rate-free terms~\cite{mastrorillo2023uhj,superstereo_guide}.
 This section develops the IIR all-pass approach and establishes the procedure that holds the quadrature at every sample rate.
 
+The classic realisation of the broadband 90-degree pair is a two-path polyphase network of first-order all-pass sections, designed in normalised frequency~\cite{Ansari1987Hilbert,RegaliaMitraVaidyanathan1988,Niemitalo2003}.
+A widely used audio design holds the difference within \ang{0.7} across most of the band with eight multiplies~\cite{Niemitalo2003}.
+The polyphase first-order structure is well documented by half-band and Hilbert transformer theory~\cite{SchusslerSteffen1998}, and the open C++ library HIIR provides a production-ready realisation~\cite{deSorasHIIR}.
+The open WigWare UHJ encoder follows this polyphase form with fixed normalised coefficients~\cite{WigginsWigWare}, so its protected frequency band scales with the sample rate.
+The Ambisonic Toolkit takes the convolution route with a single impulse response that it applies at every sample rate~\cite{ATKkernels}.
+Minimax and least-squares all-pass phase design~\cite{Lang1998Allpass} and the half-band-to-Hilbert procedure~\cite{HarrisBerdahlAbel2010} supply the methods this document applies.
+The normalised-frequency design tradition reaches back to the analog phase-difference networks~\cite{Bedrosian1960}.
+
 \section{The Sample-Rate-Independent Design}
 
 The analog second-order all-pass prototype and its phase response are:
@@ -132,7 +140,7 @@ $H_I$ & 1878.679 & 0.1198 \\
 \end{tabular}
 \end{table}
 
-The RBJ bilinear realisation maps each analog section to a digital biquad all-pass:
+The RBJ bilinear realisation maps each analog section to a digital biquad all-pass~\cite{RBJCookbook}:
 
 \begin{equation}
 a_1 = \frac{-2\cos\omega}{1+\alpha},\quad a_2 = \frac{1-\alpha}{1+\alpha},\quad
