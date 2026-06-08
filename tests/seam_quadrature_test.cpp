@@ -28,3 +28,26 @@ TEST_CASE("cascade phase sums distinct section phases") {
     cascadePhase(both, 2, fs, freqs, M, pab);
     for (int i = 0; i < M; ++i) CHECK(pab[i] == doctest::Approx(pa[i] + pb[i]).epsilon(1e-9));
 }
+
+TEST_CASE("designQuadrature reproduces the per-rate table max error") {
+    struct Ref { double fs, err; };
+    const Ref refs[] = {
+        {44100.0, 2.04}, {48000.0, 1.36}, {88200.0, 0.53},
+        {96000.0, 0.51}, {176400.0, 0.43}, {192000.0, 0.43},
+    };
+    for (auto r : refs) {
+        QuadratureDesign d = designQuadrature(r.fs, 20.0, 20000.0, 3);
+        CHECK(d.converged);
+        CHECK(d.nSections == 3);
+        CHECK(std::fabs(d.maxErrorDeg - r.err) <= 0.15);
+    }
+}
+
+TEST_CASE("designQuadrature is deterministic") {
+    QuadratureDesign a = designQuadrature(48000.0, 20.0, 20000.0, 3);
+    QuadratureDesign b = designQuadrature(48000.0, 20.0, 20000.0, 3);
+    for (int i = 0; i < 3; ++i) {
+        CHECK(a.hr[i].f == doctest::Approx(b.hr[i].f));
+        CHECK(a.hi[i].Q == doctest::Approx(b.hi[i].Q));
+    }
+}
