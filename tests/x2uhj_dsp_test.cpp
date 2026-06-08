@@ -93,3 +93,14 @@ TEST_CASE("UHJEncoder: Q channel carries only Z (scaled, filtered)") {
     CHECK(std::abs(Q) > 1e-6);     // Z drives Q
     CHECK(std::abs(Qo) < 1e-9);    // X,Y do not drive Q
 }
+
+#include "seam_quadrature.h"
+TEST_CASE("UHJEncoder retains a converged design at several rates") {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
+        UHJEncoder enc;
+        enc.prepare(fs);
+        const auto& d = enc.design();
+        CHECK(d.converged);
+        CHECK(d.maxErrorDeg < 2.5);
+    }
+}

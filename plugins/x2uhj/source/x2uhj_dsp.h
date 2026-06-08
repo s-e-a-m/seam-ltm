@@ -2,7 +2,7 @@
 #pragma once
 #include <cmath>
 #include <initializer_list>
-#include "x2uhj_coeffs.h"
+#include "seam_quadrature.h"
 
 namespace Seam { namespace x2uhj {
 
@@ -31,7 +31,7 @@ struct QuadratureNetwork {
     static constexpr int kMaxSections = 8;
     AllpassSection sec[kMaxSections];
     int n = 0;
-    void set(const APSpec* spec, int count, double fs) {
+    void set(const Seam::quadrature::APSpec* spec, int count, double fs) {
         n = count < kMaxSections ? count : kMaxSections; // guard fixed storage
         for (int i = 0; i < n; ++i) sec[i].set(spec[i].f, spec[i].Q, fs);
     }
@@ -60,9 +60,11 @@ inline void ambixToFuMa(const double* acn, double* wxyz) {
 class UHJEncoder {
 public:
     void prepare(double fs) {
-        for (auto* n : {&hrW,&hrX,&hrY,&hrZ}) n->set(kHR, kNumSections, fs);
-        for (auto* n : {&hiW,&hiX})           n->set(kHI, kNumSections, fs);
+        lastDesign_ = Seam::quadrature::designQuadrature(fs, 20.0, 20000.0, 3);
+        for (auto* nw : {&hrW,&hrX,&hrY,&hrZ}) nw->set(lastDesign_.hr, lastDesign_.nSections, fs);
+        for (auto* nw : {&hiW,&hiX})           nw->set(lastDesign_.hi, lastDesign_.nSections, fs);
     }
+    const Seam::quadrature::QuadratureDesign& design() const { return lastDesign_; }
     void reset() {
         hrW.reset(); hrX.reset(); hrY.reset(); hrZ.reset();
         hiW.reset(); hiX.reset();
@@ -83,6 +85,7 @@ public:
     }
 private:
     QuadratureNetwork hrW, hrX, hrY, hrZ, hiW, hiX;
+    Seam::quadrature::QuadratureDesign lastDesign_;
 };
 
 }} // namespace
