@@ -99,3 +99,14 @@ GUI rendering has no unit test: verification is build + visual load (report the 
 - Elliptic half-band topology (deferred).
 - Refactoring x2uhj to share the `QuadraturePair` processor (no speculative unification; x2uhj already consumes the RBJ designer and stays as-is).
 - A Faust `seam.filters.lib` spec for the quadrature pair (separate roadmap item).
+
+## Follow-up: FIR Hilbert (analytic-signal form)
+
+All three topologies in this plugin are IIR all-pass **phase-difference networks**: both outputs are all-pass-filtered, their phase difference holds −90°, and *neither output equals the input*.
+This matches Max/Pd `hilbert~` (Pd's is literally an all-pass pair; see the Puckette material in `plugins/x2uhj/_temp/`) and the topologies measured in the study.
+The reason is structural: the design constrains only the relative phase (−90°), not the absolute phase of either branch, and a wideband IIR all-pass cannot realize a pure delay, so one branch cannot equal the input.
+
+A complementary teaching object is the **FIR Hilbert with a reference delay**: the real branch is the input delayed to match the FIR group delay, and the imaginary branch is the FIR Hilbert transform — so the real output *is* the (delayed) input, realizing the textbook analytic signal `x(t) + j·x̂(t)`.
+Adding this as a fourth menu entry would let the listener compare the phase-difference family against the true analytic-signal form, which is precisely the distinction that makes the "neither output is the dry signal" property concrete.
+References for the ideal transform and the analytic signal: Bracewell; Oppenheim–Schafer.
+Deferred to a future iteration (its own brainstorm + spec); tracked as GitHub issue #5.
