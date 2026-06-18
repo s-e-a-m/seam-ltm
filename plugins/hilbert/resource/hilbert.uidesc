@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 380"
+              minSize="300, 380" maxSize="300, 380"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title block at top -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM HILBERT" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="wideband quadrature transformer" transparent="true"/>
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="quadrature &#xB1;90&#xB0; &#xB7; mono &#x2192; I/Q" transparent="true"/>
+
+        <!-- Topology selector -->
+        <view class="CTextLabel" origin="20, 96" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Topology" transparent="true"/>
+        <view class="COptionMenu" origin="80, 116" size="140, 20" control-tag="Topology"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- Live-designed coefficients readout (adapts to active topology) -->
+        <view class="CView" origin="30, 150" size="240, 120" custom-view-name="HilbertReadout"/>
+
+        <!-- Logo centered at bottom (native aspect 240x77) -->
+        <view class="CView" origin="30, 290" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Topology" tag="0"/>
+    </control-tags>
+</vstgui-ui-description>
