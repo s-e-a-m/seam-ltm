@@ -41,7 +41,28 @@ Disporre di un generatore di burst calibrato e documentato permette quindi di so
 Infine, questo documento risponde a un'assenza concreta nella letteratura tecnica disponibile in lingua italiana: non esiste, a conoscenza dell'autore, alcun testo che accompagni un lettore italiano attraverso la teoria, la ricostruzione matematica e l'implementazione di un segnale di test di questo tipo a partire dalle fonti originali.
 
 \section{Studio delle fonti}\label{sec:fonti}
-Da scrivere nel Task 5.
+
+Il metodo del tone-burst sagomato è il frutto di un percorso in due tappe distinte della stessa ricerca.
+La prima tappa è il preprint AES 1342, presentato alla sessantesima Convention della Audio Engineering Society a Los Angeles nel maggio 1978~\cite{linkwitz1978narrowband}: un testo più esteso, che contiene le derivazioni matematiche e le motivazioni progettuali dettagliate del sistema di misura.
+La seconda tappa è l'articolo pubblicato sul \emph{Journal of the Audio Engineering Society}, volume~28, numero~4, nell'aprile 1980~\cite{linkwitz1980shaped}: una versione condensata e rivista, che sintetizza i risultati del preprint in una forma adatta alla pubblicazione su rivista peer-reviewed.
+I due contributi descrivono sostanzialmente lo stesso metodo e devono essere letti in sequenza: il preprint per la derivazione, l'articolo per la formulazione definitiva.
+
+Il cuore concettuale dei due lavori è una lettura del problema nella prospettiva dell'analisi di reti.
+Una sinusoide continua $g(t)$ viene moltiplicata per una finestra $w(t)$ per ottenere il burst sagomato $x(t) = w(t) \cdot g(t)$, che viene poi applicato alla rete in esame~\cite{linkwitz1980shaped}.
+L'uscita $y(t)$ della rete, la cui risposta impulsiva è $h(t)$, è la convoluzione tra l'ingresso e quella risposta: $y(t) = x(t) * h(t)$.
+Nel dominio della frequenza questa operazione di convoluzione nel tempo corrisponde a una semplice moltiplicazione, per cui lo spettro di uscita vale $Y(f) = X(f) \cdot H(f)$, dove $X(f)$ è lo spettro del burst e $H(f)$ è la risposta in frequenza a regime della rete~\cite{linkwitz1980shaped}.
+La formulazione completa di questa relazione è sviluppata nella Sezione~\ref{sec:teoria}; qui basta osservare che l'equazione $Y(f) = X(f) H(f)$ stabilisce il fondamento teorico per ricavare la risposta in frequenza della rete dall'ampiezza del burst ricevuto.
+
+La scelta della durata del burst richiede un compromesso esplicito tra due obiettivi tra loro in tensione.
+Se il burst è molto lungo, la sua larghezza spettrale si riduce e il picco di ampiezza in uscita converge alla risposta in frequenza a regime $H(f)$; l'informazione transitoria, però, va perduta perché la rete ha tutto il tempo per raggiungere il regime~\cite{linkwitz1980shaped}.
+Se il burst è molto corto, invece, l'ampiezza di uscita dipende dalla velocità di risposta della rete e fornisce informazione transitoria utile, ma la risoluzione in frequenza si degrada e la discriminazione degli echi diventa meno efficace alle basse frequenze~\cite{linkwitz1978narrowband}.
+Linkwitz risolve il compromesso osservando che, in psicoacustica, per larghezze di banda inferiori a un terzo di ottava la distribuzione spettrale del suono non influisce sulla sensazione di loudness~\cite{linkwitz1980shaped}: una risoluzione di un terzo di ottava è quindi sufficiente per correlare i risultati con la percezione soggettiva.
+Questo criterio porta direttamente alla scelta di cinque cicli: con una finestra di Hanning, un burst di cinque cicli produce un lobo principale di ampiezza spettrale di circa un terzo di ottava, con un numero di cicli costante al variare della frequenza e una durata della finestra che diminuisce all'aumentare della frequenza~\cite{linkwitz1980shaped}.
+
+L'implementazione hardware originale introduce un'ulteriore semplificazione di rilievo storico e pedagogico.
+Per evitare la complessità circuitale di due generatori sincronizzati, Linkwitz approssima l'inviluppo raised-cosine con un attenuatore programmabile che commuta il livello della sinusoide a ogni passaggio per lo zero~\cite{linkwitz1980shaped}.
+Il risultato è una finestra a scalini, in cui ciascun semiciclo della sinusoide viene emesso a un'ampiezza costante; le discontinuità di pendenza ai passaggi per lo zero generano armoniche di ordine dispari che limitano la dinamica del sistema di misura~\cite{linkwitz1978narrowband}.
+Questa finestra a scalini — nata da un vincolo pratico dell'elettronica discreta degli anni Settanta — costituisce l'origine storica della variante staircase che verrà analizzata matematicamente nella Sezione~\ref{sec:teoria}.
 
 \section{Teoria e matematica}\label{sec:teoria}
 Da scrivere nel Task 6.
