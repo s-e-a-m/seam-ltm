@@ -38,3 +38,14 @@ target_include_directories(seam_quadrature_test PRIVATE
 )
 target_compile_features(seam_quadrature_test PRIVATE cxx_std_17)
 add_test(NAME seam_quadrature_test COMMAND seam_quadrature_test)
+
+add_executable(hilbert_dsp_test
+    hilbert_dsp_test.cpp
+)
+target_include_directories(hilbert_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/hilbert/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(hilbert_dsp_test PRIVATE cxx_std_17)
+add_test(NAME hilbert_dsp_test COMMAND hilbert_dsp_test)

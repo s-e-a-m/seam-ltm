@@ -70,8 +70,12 @@ option(SMTG_ENABLE_VST3_HOSTING_EXAMPLES "Enable VST 3 Hosting Examples" OFF)
 
 add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
 
-# Disable the VSTGUI live editor ("Open UI Editor" button) — not for end users.
-add_compile_definitions(VSTGUI_LIVE_EDITING=0)
+# The VSTGUI live editor ("Open UIDescription Editor") is gated by the macro
+# VSTGUI_LIVE_EDITING, which is consumed only inside the vstgui library's own
+# translation units (added just above). vstgui enables it per-config — on in
+# Debug, off in Release (vstgui_init.cmake) — so finished GUIs ship without the
+# editor while Debug builds keep it for design work. Defining the macro on our
+# plugin targets here had no effect (they never test it), so it is omitted.
 
 # ─── Plugins ─────────────────────────────────────────────────────────────────
 add_subdirectory(plugins/sdmx)
@@ -84,6 +88,7 @@ add_subdirectory(plugins/ddelay)
 add_subdirectory(plugins/multipink)
 add_subdirectory(plugins/x2uhj)
 add_subdirectory(plugins/abmodulex)
+add_subdirectory(plugins/hilbert)
 
 if(SEAM_BUILD_TESTS)
     add_subdirectory(tests)
