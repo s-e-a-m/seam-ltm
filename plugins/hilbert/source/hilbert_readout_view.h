@@ -5,6 +5,7 @@
 #include "vstgui/lib/ccolor.h"
 #include "hilbert_dsp.h"
 
+#include <algorithm>
 #include <cstdio>
 
 namespace Seam {
@@ -40,56 +41,69 @@ public:
         const CRect r = getViewSize();
         const CCoord rowH = 12.0;
         const CCoord tagW = 22.0; // narrow label column for the row table
-        const CCoord x0 = r.left + 4;
-        CCoord y = r.top;
-        char buf[128];
-        // Each row: tag (dim) + value (light). The CRect overload vertically
-        // centres each line, so the row top is the anchor.
-        auto row = [&](const char* tag, const char* value) {
-            c->setFontColor(labelColor);
-            c->drawString(tag, CRect(x0, y, x0 + tagW, y + rowH), kLeftText);
-            c->setFontColor(valueColor);
-            c->drawString(value, CRect(x0 + tagW, y, r.right - 2, y + rowH), kLeftText);
-            y += rowH;
-        };
 
+        // Collect the rows first (tag + value), so the whole block can be
+        // centred horizontally instead of hugging the left edge.
+        char tags[8][4];
+        char vals[8][64];
+        int n = 0;
         double maxErrorDeg = 0.0, sampleRate = dsp->sampleRate();
         bool converged = false;
         if (dsp->topology() == hilbert::Topology::RBJ) {
             const auto& d = dsp->rbjDesign();
-            for (int i = 0; i < d.nSections; ++i) {
-                std::snprintf(buf, sizeof buf, "%8.2f Hz  Q %.3f", d.hr[i].f, d.hr[i].Q);
-                row("HR", buf);
+            for (int i = 0; i < d.nSections && n < 8; ++i, ++n) {
+                std::snprintf(tags[n], 4, "HR");
+                std::snprintf(vals[n], 64, "%8.2f Hz  Q %.3f", d.hr[i].f, d.hr[i].Q);
             }
-            for (int i = 0; i < d.nSections; ++i) {
-                std::snprintf(buf, sizeof buf, "%8.2f Hz  Q %.3f", d.hi[i].f, d.hi[i].Q);
-                row("HI", buf);
+            for (int i = 0; i < d.nSections && n < 8; ++i, ++n) {
+                std::snprintf(tags[n], 4, "HI");
+                std::snprintf(vals[n], 64, "%8.2f Hz  Q %.3f", d.hi[i].f, d.hi[i].Q);
             }
             maxErrorDeg = d.maxErrorDeg; converged = d.converged;
         } else {
             const auto& d = dsp->polyDesign();
-            for (int i = 0; i < d.nA; ++i) {
-                std::snprintf(buf, sizeof buf, "a %.9f", d.a[i]);
-                row("A", buf);
+            for (int i = 0; i < d.nA && n < 8; ++i, ++n) {
+                std::snprintf(tags[n], 4, "A");
+                std::snprintf(vals[n], 64, "a %.9f", d.a[i]);
             }
-            for (int i = 0; i < d.nB; ++i) {
-                std::snprintf(buf, sizeof buf, "a %.9f", d.a[d.nA + i]);
-                row("B", buf);
+            for (int i = 0; i < d.nB && n < 8; ++i, ++n) {
+                std::snprintf(tags[n], 4, "B");
+                std::snprintf(vals[n], 64, "a %.9f", d.a[d.nA + i]);
             }
             maxErrorDeg = d.maxErrorDeg; converged = d.converged;
         }
 
-        // Achieved error as a footer line below a small gap.
+        // The widest value fixes the block width; centre the tag+value block.
+        CCoord maxValW = 0.0;
+        for (int i = 0; i < n; ++i)
+            maxValW = std::max(maxValW, c->getStringWidth(vals[i]));
+        const CCoord blockW = tagW + maxValW;
+        const CCoord x0 = r.left + std::max(0.0, (r.getWidth() - blockW) / 2.0);
+
+        // Each row: tag (dim) + value (light).
+        CCoord y = r.top;
+        for (int i = 0; i < n; ++i) {
+            c->setFontColor(labelColor);
+            c->drawString(tags[i], CRect(x0, y, x0 + tagW, y + rowH), kLeftText);
+            c->setFontColor(valueColor);
+            c->drawString(vals[i], CRect(x0 + tagW, y, x0 + blockW, y + rowH), kLeftText);
+            y += rowH;
+        }
+
+        // Achieved error as a footer line below a small gap, centred as a whole.
         y += 6.0;
         const char* errLabel = "max err ";
-        c->setFontColor(labelColor);
-        c->drawString(errLabel, CRect(x0, y, r.right - 2, y + rowH), kLeftText);
-        const CCoord errLabelW = c->getStringWidth(errLabel);
-        std::snprintf(buf, sizeof buf, "%.2f deg @ %.4g kHz%s",
+        char errVal[80];
+        std::snprintf(errVal, sizeof errVal, "%.2f deg @ %.4g kHz%s",
                       maxErrorDeg, sampleRate / 1000.0,
                       converged ? "" : " (fallback)");
+        const CCoord errLabelW = c->getStringWidth(errLabel);
+        const CCoord footW = errLabelW + c->getStringWidth(errVal);
+        const CCoord fx = r.left + std::max(0.0, (r.getWidth() - footW) / 2.0);
+        c->setFontColor(labelColor);
+        c->drawString(errLabel, CRect(fx, y, fx + errLabelW, y + rowH), kLeftText);
         c->setFontColor(valueColor);
-        c->drawString(buf, CRect(x0 + errLabelW, y, r.right - 2, y + rowH), kLeftText);
+        c->drawString(errVal, CRect(fx + errLabelW, y, fx + footW, y + rowH), kLeftText);
         setDirty(false);
     }
 

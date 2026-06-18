@@ -15,8 +15,8 @@
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 380"
-              minSize="300, 380" maxSize="300, 380"
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 358"
+              minSize="300, 358" maxSize="300, 358"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Title block at top -->
@@ -36,10 +36,10 @@
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
         <!-- Live-designed coefficients readout (adapts to active topology) -->
-        <view class="CView" origin="30, 150" size="240, 120" custom-view-name="HilbertReadout"/>
+        <view class="CView" origin="30, 150" size="240, 96" custom-view-name="HilbertReadout"/>
 
         <!-- Logo centered at bottom (native aspect 240x77) -->
-        <view class="CView" origin="30, 290" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 258" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
