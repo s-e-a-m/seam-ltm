@@ -65,7 +65,63 @@ Il risultato è una finestra a scalini, in cui ciascun semiciclo della sinusoide
 Questa finestra a scalini — nata da un vincolo pratico dell'elettronica discreta degli anni Settanta — costituisce l'origine storica della variante staircase che verrà analizzata matematicamente nella Sezione~\ref{sec:teoria}.
 
 \section{Teoria e matematica}\label{sec:teoria}
-Da scrivere nel Task 6.
+
+Il burst sagomato si ottiene moltiplicando una sinusoide continua di frequenza $f_0$ per un inviluppo raised-cosine, secondo la formulazione completa anticipata nella Sezione~\ref{sec:fonti}.
+\begin{equation}
+x(t) = w(t)\,\sin(2\pi f_0 t), \qquad
+w(t) = \tfrac{1}{2} - \tfrac{1}{2}\cos\!\frac{2\pi t}{T}, \qquad
+T = \frac{N}{f_0}, \quad N = 5 .
+\end{equation}
+La finestra $w(t)$ è una raised-cosine, nota anche come finestra di Hann (o Hanning), che vale zero agli estremi dell'intervallo $[0,T]$ e raggiunge l'unità al centro~\cite{linkwitz1980shaped}.
+Questa finestra premoltiplica la sinusoide esattamente come una finestra premoltiplica un segnale nell'analisi di Fourier discreta, e tutte le finestre sviluppate per quel contesto si applicano altrettanto bene alla sagomatura del burst~\cite{linkwitz1980shaped}.
+La durata $T$ della finestra contiene un numero intero di cicli $N$ della sinusoide, con $T = N/f_0$ e $N = 5$ nella scelta di Linkwitz.
+
+La proprietà che rende il burst uno strumento di misura a banda costante discende direttamente dal mantenere $N$ fisso al variare di $f_0$.
+Poiché $T = N/f_0$, tenere $N$ costante fa diminuire la durata $T$ all'aumentare della frequenza, in proporzione inversa a $f_0$.
+La larghezza spettrale del lobo principale è inversamente proporzionale a $T$, quindi è proporzionale a $f_0$: la larghezza di banda resta perciò una frazione fissa della frequenza centrale, pari a circa un terzo di ottava per $N = 5$~\cite{linkwitz1980shaped}.
+Il burst è dunque un segnale a Q costante per costruzione, e mantiene la stessa risoluzione relativa in frequenza su tutto lo spettro.
+
+Lo spettro del burst sagomato ha una forma asimmetrica caratteristica, visibile nella Fig.~1 dell'articolo originale~\cite{linkwitz1980shaped}.
+Verso le alte frequenze le code laterali decadono a circa \SI{12}{dB/oct}, mentre verso le basse frequenze il decadimento è molto più lento, dell'ordine di \SI{6}{dB/oct}~\cite{linkwitz1980shaped}.
+Questa larga estensione verso il basso, evidente su una scala logaritmica delle frequenze, è la ragione per cui un burst a frequenza $f_0$ può comunque eccitare risonanze di rete situate al di sotto di $f_0$, producendo distorsione di inviluppo nell'uscita.
+
+Quando il burst viene applicato a una rete con risposta in frequenza $H(f)$, lo spettro di uscita è il prodotto dello spettro del burst per la risposta della rete.
+\begin{equation}
+Y(f) = X(f)\,H(f),
+\end{equation}
+dove $X(f)$ è lo spettro del burst e $H(f)$ è la risposta in frequenza a regime della rete in esame~\cite{linkwitz1980shaped}.
+Questa relazione nel dominio della frequenza corrisponde, nel dominio del tempo, alla convoluzione $y(t) = x(t) \ast h(t)$ tra il burst e la risposta impulsiva $h(t)$ della rete.
+L'ampiezza di picco del burst ricevuto fornisce quindi una stima della risposta in frequenza a regime $H(f_0)$ alla frequenza centrale, con la risoluzione di circa un terzo di ottava propria del burst.
+
+L'implementazione hardware originale approssima l'inviluppo raised-cosine con una finestra a gradini, secondo la variante storica descritta nella Sezione~\ref{sec:fonti}.
+Un attenuatore programmabile commuta l'ampiezza della sinusoide a ogni passaggio per lo zero, cosicché ciascun mezzo-ciclo viene emesso a un livello costante~\cite{linkwitz1980shaped}.
+Le ampiezze dei mezzi-cicli sono ottimizzate per sopprimere il contenuto in bassa frequenza, e sono simmetriche rispetto al centro del burst di cinque cicli, che conta dieci mezzi-cicli complessivi.
+La Tabella~\ref{tab:staircase} riporta le cinque ampiezze della prima metà del burst, lette dalla Fig.~8 dell'articolo originale~\cite{linkwitz1980shaped}.
+
+\begin{table}[h]\centering
+\begin{tabular}{lccccc}
+\toprule
+mezzo-ciclo & 1 & 2 & 3 & 4 & 5 \\
+\midrule
+ampiezza & 0.081 & 0.298 & 0.583 & 0.845 & 1.000 \\
+\bottomrule
+\end{tabular}
+\caption{Ampiezze di mezzo-ciclo dell'approssimazione a gradini di Linkwitz, simmetriche sui dieci mezzi-cicli del burst di cinque cicli.}
+\label{tab:staircase}
+\end{table}
+
+L'approssimazione a gradini mantiene l'inviluppo costante entro ciascun mezzo-ciclo e lo fa variare per salti ai passaggi per lo zero della sinusoide.
+Proprio in corrispondenza di questi salti la pendenza del segnale presenta discontinuità, perché due segmenti di seno di ampiezza diversa si raccordano dove il seno attraversa lo zero~\cite{linkwitz1980shaped}.
+Una discontinuità di pendenza è una caratteristica dispari rispetto al passaggio per lo zero, e la sua serie di Fourier contiene perciò armoniche di ordine dispari della frequenza fondamentale $f_0$.
+Queste armoniche dispari spurie aggiungono energia fuori banda che limita la dinamica utile del sistema di misura, perché si sovrappongono al segnale di interesse e ne riducono il margine rispetto al rumore di fondo~\cite{linkwitz1978narrowband}.
+La finestra di Hann esatta non presenta alcuna discontinuità di pendenza, essendo continua e differenziabile su tutto l'intervallo, e non genera quindi armoniche spurie: la Fig.~8 mostra in effetti che lo spettro a gradini si avvicina a quello della finestra di Hann esatta (Fig.~3) e migliora rispetto alla finestra rettangolare (Fig.~1)~\cite{linkwitz1980shaped}.
+Il confronto tra la variante esatta e quella a gradini è quindi un confronto tra accuratezza spettrale e semplicità realizzativa, ed è uno dei punti di verifica centrali di questo studio.
+
+La durata ridotta del burst è ciò che permette di discriminare contro gli echi nelle misure in ambiente riflettente~\cite{linkwitz1980shaped}.
+Il segnale di test viene emesso a intervalli regolari, con un periodo di ripetizione (dwell) sufficientemente lungo da lasciar estinguere gli echi dell'ambiente prima del burst successivo~\cite{linkwitz1980shaped}.
+All'interno di ciascun intervallo, il burst dura solo $T = N/f_0$, un tempo breve perché contiene appena cinque cicli.
+Il limite in bassa frequenza per le misure in campo libero è raggiunto quando la differenza di cammino tra il suono diretto e la prima riflessione eguaglia la durata del burst~\cite{linkwitz1980shaped}.
+Finché il burst è più corto di questo ritardo, l'analisi dell'ampiezza ricevuta si completa prima che la prima riflessione raggiunga il punto di misura, e l'eco non contamina la stima di $H(f_0)$; la discriminazione inoltre migliora con l'aumentare della frequenza, perché $T$ diminuisce.
 
 \section{Obiettivi di validazione}\label{sec:validazione}
 Da scrivere nel Task 7.
