@@ -19,7 +19,26 @@ Ricostruisce il tone-burst sagomato di Siegfried Linkwitz a partire dalla letter
 \tableofcontents
 
 \section{Introduzione e motivazione}\label{sec:intro}
-Da scrivere nel Task 4.
+
+Il tone-burst sagomato è un segnale di test a banda stretta ottenuto moltiplicando una sinusoide continua per una finestra raised-cosine (Hanning), in modo che lo spettro risultante sia concentrato in una banda di circa un terzo di ottava attorno alla frequenza centrale~\cite{linkwitz1978narrowband, linkwitz1980shaped}.
+Il numero di cicli della sinusoide rimane costante (tipicamente cinque) al variare della frequenza, cosicché la durata temporale della finestra si riduce con l'aumentare della frequenza e la larghezza di banda percentuale rimane costante: il segnale è pertanto a Q costante per definizione.
+Questa proprietà conferisce al burst una risoluzione in frequenza pari a circa un terzo di ottava su tutto lo spettro udibile, analoga a quella dei filtri a banda costante utilizzati in psicoacustica.
+
+Nella suite \textsc{seam-ltm}, \emph{ltburst} occupa una posizione particolare sotto tre aspetti distinti.
+È il primo generatore di segnale della suite, che fino a questo momento è composta esclusivamente da processori e plugin di spazializzazione.
+È il primo oggetto per cui la specifica Faust non preesiste, ma viene redatta come parte integrante di questo stesso lavoro di studio, e andrà a costituire la libreria \texttt{seam.linkwitz.lib} (prefisso \texttt{slw}), seguendo il modello già adottato per Gerzon, Moorer e Roads.
+È infine il primo plugin della suite costruito come diario di studio sistematico a partire dalla letteratura primaria, con l'obiettivo di rendere ogni passaggio — dalla matematica al codice C++ — leggibile e verificabile da uno studente.
+
+Un aspetto pedagogicamente rilevante riguarda il confronto tra la finestra di Hann continua e l'approssimazione a scalini quantizzati descritta da Linkwitz nel sistema hardware originale~\cite{linkwitz1980shaped}.
+Nell'implementazione analogica, un attenuatore programmabile commuta il livello a ogni semiciclo della sinusoide, introducendo discontinuità di pendenza ai passaggi per lo zero.
+Queste discontinuità generano armoniche dispari che limitano la dinamica del sistema di misura, un effetto assente nella finestra matematicamente esatta.
+Il confronto tra le due varianti — la finestra ideale e l'approssimazione hardware — costituisce uno degli esercizi centrali di questo studio.
+
+La motivazione più diretta per includere \emph{ltburst} nella suite è la sua utilità come strumento di validazione per le reti passa-tutto già sviluppate: il plugin \emph{hilbert} e il codificatore \emph{x2uhj}.
+Linkwitz stesso osserva che il burst sagomato ``\emph{appears to be a very sensitive indicator of phase distortion in subjective evaluations of all-pass networks}''~\cite{linkwitz1980shaped}, confermando che questo tipo di segnale rivela distorsioni di fase che misure in frequenza a regime potrebbero mascherare.
+Disporre di un generatore di burst calibrato e documentato permette quindi di sottoporre le reti all-pass della suite a una verifica sistematica nel dominio del tempo.
+
+Infine, questo documento risponde a un'assenza concreta nella letteratura tecnica disponibile in lingua italiana: non esiste, a conoscenza dell'autore, alcun testo che accompagni un lettore italiano attraverso la teoria, la ricostruzione matematica e l'implementazione di un segnale di test di questo tipo a partire dalle fonti originali.
 
 \section{Studio delle fonti}\label{sec:fonti}
 Da scrivere nel Task 5.
