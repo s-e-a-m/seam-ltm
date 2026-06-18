@@ -79,3 +79,4 @@ brainstorming and spec.
 
 Giuseppe communicates in Italian. Code, commits, and documentation are in
 English (consistent with the rest of the SEAM workspace).
+Exception: narrative *study diaries* under a plugin's `doc/study/` may be written in Italian (e.g. `ltburst`), to fill the gap in Italian-language DSP literature; the formal `doc/math/` documentation stays English.
