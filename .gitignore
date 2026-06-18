@@ -10,3 +10,6 @@ xcuserdata/
 # Python venvs
 .venv/
 __pycache__/
+
+# x2uhj scratch (reference material relocated; remainder kept local)
+plugins/x2uhj/_temp/
