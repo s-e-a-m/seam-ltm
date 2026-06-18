@@ -135,9 +135,45 @@ The realisation fixes the kernel to one length, and its accuracy at the band edg
 
 \subsection{Puckette's \texttt{hilbert\textasciitilde} as the Bridge}
 
-Miller Puckette's Pure~Data ships a \texttt{hilbert\textasciitilde} object, and its patch builds the output from a pair of fourth-order all-pass filters realised with \texttt{biquad\textasciitilde}~\cite{Puckette2007}.
-The two branches are all-pass filtered and differ by \ang{90}, and neither branch equals the input, so the object belongs to the phase-difference family that the \texttt{hilbert} plugin implements.
-The companion all-pass examples in Pure~Data build the same primitive from a real one-pole \texttt{rpole\textasciitilde} and a real one-zero \texttt{rzero\_rev\textasciitilde}, which exposes the all-pass section as a pole-zero reflection pair.
+Miller Puckette's Pure~Data ships a \texttt{hilbert\textasciitilde} object, and its patch builds each output from two \texttt{biquad\textasciitilde} sections in series, so each branch is a fourth-order all-pass and the pair holds about \ang{90} between the branches~\cite{Puckette2007}.
+The patch adapts a 4X design by Emmanuel Favreau from around 1982, and its coefficients are fixed.
+Both branches are all-pass filtered and neither branch equals the input, so the object belongs to the phase-difference family that the \texttt{hilbert} plugin implements.
+
+The Pure~Data \texttt{biquad\textasciitilde} is a canonical direct-form-II section with the difference equations
+\begin{equation}
+w[n] = x[n] + \mathit{fb}_1\,w[n-1] + \mathit{fb}_2\,w[n-2],
+\qquad
+y[n] = \mathit{ff}_1\,w[n] + \mathit{ff}_2\,w[n-1] + \mathit{ff}_3\,w[n-2],
+\end{equation}
+
+which realises $H(z) = (\mathit{ff}_1 + \mathit{ff}_2 z^{-1} + \mathit{ff}_3 z^{-2})/(1 - \mathit{fb}_1 z^{-1} - \mathit{fb}_2 z^{-2})$.
+A section is all-pass when its numerator is the denominator reversed, that is $(\mathit{ff}_1, \mathit{ff}_2, \mathit{ff}_3) = (-\mathit{fb}_2, -\mathit{fb}_1, 1)$, and every \texttt{biquad\textasciitilde} in \texttt{hilbert\textasciitilde} satisfies this condition exactly.
+
+Each of the four sections has real poles, so each factors into two first-order real all-pass sections of the form $(z^{-1} - a)/(1 - a z^{-1})$.
+This first-order section is the all-pass primitive that the Pure~Data examples build from a real one-pole \texttt{rpole\textasciitilde}, namely $1/(1 - a z^{-1})$, in series with a real reversed one-zero \texttt{rzero\_rev\textasciitilde}, namely $z^{-1} - a$, which places a pole at $a$ and a zero at its reciprocal $1/a$.
+Table~\ref{tab:puckette} lists the eight coefficients that result from factoring the patch.
+Puckette's transformer is therefore a cascade of first-order real all-pass sections, the same family as the plugin's polyphase topology, with coefficients fixed at the design's original rate, so its quadrature drifts as the sample rate departs from that rate.
+
+\begin{table}[h]
+\centering
+\caption{Pure Data \texttt{hilbert\textasciitilde} factored into first-order real all-pass sections. Each branch is two \texttt{biquad\textasciitilde} in series, and each \texttt{biquad\textasciitilde} factors into two sections $(z^{-1}-a)/(1-a z^{-1})$.}
+\label{tab:puckette}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Branch & First-order all-pass coefficient $a$ \\
+\midrule
+Branch 1 & 0.99485 \\
+Branch 1 & 0.95147 \\
+Branch 1 & 0.75364 \\
+Branch 1 & 0.08410 \\
+\addlinespace
+Branch 2 & 0.49771 \\
+Branch 2 & $-0.52340$ \\
+Branch 2 & 0.98048 \\
+Branch 2 & 0.88802 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 The contrast between Puckette's object and the FIR analytic-signal form makes the structural point concrete.
 The phase-difference network constrains only the relative phase of the two branches, so it returns two filtered signals and holds the quadrature with low latency.
@@ -172,6 +208,31 @@ The following listing is the runtime section that both topologies share: a first
         else                          { quad = b; }
     }
 \end{lstlisting}
+
+\section{Realization Topologies}
+
+A transfer function $H(z)$ fixes the response, and the structure that computes it is a separate choice.
+The same second-order all-pass admits several realizations that differ in memory layout and numerical behaviour while they share the response.
+This document has shown three of them on the same section.
+Pure~Data's \texttt{biquad\textasciitilde} is canonical direct form~II, which carries a single two-sample state $w$ shared between the recursive and the feed-forward parts.
+The SEAM C++ core of the previous section is direct form~I, which carries separate input and output histories $x_1, x_2, y_1, y_2$.
+Faust's \texttt{filters.lib} expresses both the direct form and its transpose in a few lines~\cite{SmithDirectForms}, and \texttt{seam.filters.lib} builds the quadrature pair on the direct form \texttt{fi.tf2}:
+
+\begin{lstlisting}[basicstyle=\small\ttfamily,frame=single]
+// Faust filters.lib (Julius O. Smith III): one biquad, two structures.
+// Direct form (canonical) -- used by seam.filters.lib aprbj / appoly:
+iir(bv,av) = ma.sub ~ fir(av) : fir(bv);
+tf2(b0,b1,b2,a1,a2) = iir((b0,b1,b2),(a1,a2));
+
+// Direct form 2 transposed -- identical response, adders on the output:
+tf22t(b0,b1,b2,a1,a2) =
+    _ : (_,_,(_ <: *(b2)',*(b1)',*(b0))
+      : _,+',_,_ :> _)~*(-a1)~*(-a2) : _;
+\end{lstlisting}
+
+The direct form and the transposed form return the same samples for the same coefficients.
+The transposed structure reorders the additions onto the output path, which changes the rounding behaviour and the state update while it holds the response.
+Reading the Pure~Data section, the SEAM C++ section, and these Faust definitions side by side shows one all-pass response across direct form~I, direct form~II, and the transposed direct form~II, which separates the mathematical specification from its realization.
 
 \appendix
 
