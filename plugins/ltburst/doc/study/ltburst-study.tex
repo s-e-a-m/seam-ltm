@@ -124,7 +124,60 @@ Il limite in bassa frequenza per le misure in campo libero è raggiunto quando l
 Finché il burst è più corto di questo ritardo, l'analisi dell'ampiezza ricevuta si completa prima che la prima riflessione raggiunga il punto di misura, e l'eco non contamina la stima di $H(f_0)$; la discriminazione inoltre migliora con l'aumentare della frequenza, perché $T$ diminuisce.
 
 \section{Obiettivi di validazione}\label{sec:validazione}
-Da scrivere nel Task 7.
+
+Questa sezione stabilisce il contratto di validazione che ogni fase successiva deve soddisfare,
+traducendo la teoria della Sezione~\ref{sec:teoria} in criteri di confronto operativi tra i grafici
+generati dalla specifica e le figure originali di Linkwitz.
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.7\linewidth]{orig-fig1-spectrum-rect.png}
+\caption{Riferimento originale: spettro del tone-burst rettangolare a cinque cicli (Linkwitz, Fig.~1).}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.7\linewidth]{orig-fig3-spectrum-hann.png}
+\caption{Riferimento originale: spettro con finestra di Hann (Linkwitz, Fig.~3).}
+\end{figure}
+
+\begin{figure}[h]\centering
+\includegraphics[width=0.7\linewidth]{orig-fig8-spectrum-staircase.png}
+\caption{Riferimento originale: spettro dell'approssimazione a gradini (Linkwitz, Fig.~8).}
+\end{figure}
+
+Il primo elemento da verificare è la forma temporale del burst: una sinusoide a frequenza $f_0$
+sagomata dalla finestra raised-cosine $w(t) = \tfrac{1}{2}(1 - \cos(2\pi t / T))$ per esattamente
+$N = 5$ cicli, con ampiezza nulla agli estremi e ampiezza unitaria al centro.
+Il numero di cicli rimane costante al variare di $f_0$, cosicché la durata della finestra $T = 5/f_0$
+si accorcia proporzionalmente all'aumentare della frequenza, confermando la proprietà a Q costante
+descritta nella Sezione~\ref{sec:teoria}.
+
+Il secondo elemento da verificare è lo spettro del burst su un asse logaritmico delle frequenze
+normalizzato a $f/f_0$: il lobo principale deve avere una larghezza di circa un terzo di ottava e
+le code laterali devono presentare il decadimento asimmetrico caratteristico di \SI{12}{dB/oct} verso
+le alte frequenze e \SI{6}{dB/oct} verso le basse frequenze, come evidenziato nella Fig.~3
+dell'articolo originale~\cite{linkwitz1980shaped}.
+La pendenza delle code è la conseguenza diretta delle proprietà analitiche della finestra di Hann,
+che è continua e differenziabile, e il confronto visivo deve mostrare che questi andamenti asintotico
+corrispondono alle code visibili nelle figure di riferimento.
+
+Il terzo elemento da verificare riguarda il confronto tra la variante con finestra di Hann esatta e
+la variante a gradini storica di Linkwitz: lo spettro della finestra a gradini deve mostrare la
+presenza di armoniche dispari di $f_0$ a livelli apprezzabilmente superiori rispetto allo spettro
+della finestra di Hann, mentre il lobo principale e il decadimento asintotico delle code devono
+restare confrontabili tra le due varianti.
+Questa differenza di comportamento spettrale sulle armoniche dispari è la conseguenza diretta delle
+discontinuità di pendenza ai passaggi per lo zero dell'approssimazione a scalini, come spiegato
+nella Sezione~\ref{sec:teoria}, ed è il motivo per cui Linkwitz preferisce la finestra di Hann
+nell'implementazione finale~\cite{linkwitz1980shaped}.
+
+I grafici di confronto da utilizzare in tutte le fasi successive saranno generati a partire dalla
+specifica Faust sviluppata nella Fase~2 (Sezione~\ref{sec:faust}), mediante uno strumento di analisi
+offline la cui scelta e configurazione è fissata nel piano della Fase~2.
+Il confronto tra i grafici generati e le figure originali è di natura qualitativa: si valutano la
+forma del lobo principale, la pendenza delle code laterali, la larghezza di banda di circa un terzo
+di ottava e la presenza o assenza delle armoniche dispari, senza richiedere una corrispondenza
+numerica esatta dei livelli assoluti, che dipendono dall'asse verticale e dalle convenzioni di
+normalizzazione dei grafici originali.
 
 \section{Ricostruzione in Faust}\label{sec:faust}
 Sviluppata nella Fase 2.
