@@ -1,0 +1,224 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{amsmath,amssymb,graphicx,booktabs,hyperref,siunitx,listings}
+\usepackage[margin=2.5cm]{geometry}
+\graphicspath{{figures/}{../}}
+
+\title{HILBERT: A Wideband Quadrature Transformer\\\large The Mathematics of the SEAM-LTM Hilbert Plugin}
+\author{Giuseppe Silvi --- SEAM}
+\date{2026}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+This document derives the mathematics of the \texttt{hilbert} plugin step by step.
+It develops the two all-pass topologies the plugin ships, the RBJ biquad cascade and the polyphase first-order pair, and it explains the quadrature property they share.
+It then documents the topologies the plugin sets aside, the elliptic half-band form and the FIR analytic-signal form, so that a reader can study the differences that motivated the choices.
+The FIR discussion analyses Miller Puckette's Pure~Data \texttt{hilbert\textasciitilde} object, which serves as the bridge between the phase-difference family the plugin implements and the analytic-signal form it documents.
+\end{abstract}
+\tableofcontents
+
+\section{Introduction and Pedagogical Framing}
+
+A quadrature transformer takes one real input and produces two outputs whose phase differs by \ang{90} across the audio band.
+The \texttt{hilbert} plugin realises this as a mono input mapped to an in-phase output and a quadrature output.
+The plugin belongs to the SEAM-LTM suite, whose purpose is to teach digital signal processing by reading clear C++ source alongside its mathematical specification.
+
+The suite documents the choices behind each plugin and also the alternatives it sets aside.
+Documenting a non-choice records the characteristic that made another path preferable, and it prepares study material for a reader who wants to understand the trade-off.
+The \texttt{hilbert} plugin ships two topologies, the RBJ biquad cascade and the polyphase first-order pair, and this document develops both.
+It then documents two non-choices, the elliptic half-band form and the FIR analytic-signal form, and it explains what each one offers and what it costs.
+
+\section{The Quadrature Property}
+
+The plugin forms two filtered versions of the input, $y_R = H_R\{x\}$ on the in-phase path and $y_I = H_I\{x\}$ on the quadrature path.
+Both $H_R$ and $H_I$ are all-pass networks, so each output preserves the magnitude spectrum of the input and changes only its phase.
+The design constrains the difference of the two phase responses to hold \ang{-90} across \SIrange{20}{20000}{\hertz}:
+
+\begin{equation}
+\varphi_{H_I}(\omega) - \varphi_{H_R}(\omega) = -\frac{\pi}{2}, \qquad \omega \in [\omega_\text{lo}, \omega_\text{hi}] .
+\end{equation}
+
+The quadrature relationship is a property of the pair, because the design fixes the relative phase of the two branches and leaves the absolute phase of each branch free.
+Both outputs therefore differ from the dry input, and the in-phase output is itself an all-pass-filtered signal rather than the original.
+This structural fact distinguishes the phase-difference family, which the plugin implements, from the analytic-signal form of Section~\ref{sec:fir}, which returns the delayed input on its real branch.
+
+\section{RBJ Topology: A Matched Biquad Cascade}
+
+The first topology realises each path as a cascade of second-order all-pass sections parameterised by a centre frequency and a quality factor.
+The analog second-order all-pass prototype and its phase response are:
+
+\begin{equation}
+H_a(s) = \frac{s^2 - (\omega_0/Q)\,s + \omega_0^2}{s^2 + (\omega_0/Q)\,s + \omega_0^2},
+\qquad \omega_0 = 2\pi f_0 ,
+\end{equation}
+
+\begin{equation}
+\varphi_a(\omega) = -2\arctan\!\frac{(\omega_0/Q)\,\omega}{\omega_0^2 - \omega^2} .
+\end{equation}
+
+The in-phase path $H_R$ and the quadrature path $H_I$ each use three sections.
+A phase fit optimises the six $(f_0, Q)$ pairs so that $\varphi_{H_I} - \varphi_{H_R} = -\ang{90}$ over the audio band~\cite{Lang1998Allpass,HarrisBerdahlAbel2010}.
+The RBJ bilinear realisation maps each analog section to a digital biquad all-pass~\cite{RBJCookbook}:
+
+\begin{equation}
+a_1 = \frac{-2\cos\omega}{1+\alpha},\quad a_2 = \frac{1-\alpha}{1+\alpha},\quad
+\alpha = \frac{\sin\omega}{2Q},\quad \omega = \frac{2\pi f_0}{f_s},
+\end{equation}
+
+with all-pass numerator $b = [a_2,\, a_1,\, 1]$.
+
+The bilinear transform maps a digital frequency $f$ to the analog frequency $F = (f_s/\pi)\tan(\pi f / f_s)$.
+A fixed $(f_0, Q)$ set therefore presents its broadband phase on a warped axis that depends on $f_s$, and the quadrature holds near the sample rate the set was designed for.
+Sample-rate independence belongs to the design procedure: the plugin re-runs the phase fit at the host sample rate, which restores the quadrature at that rate.
+This is the same live-design engine that the \texttt{x2uhj} encoder uses for its UHJ quadrature pair, and at \SI{48}{\kilo\hertz} the two share the same coefficients.
+The cascade costs four multiplies per section, so the matched pair of six sections costs \num{24} multiplies per sample.
+
+\section{Polyphase Topology: A First-Order Pair}
+
+The second topology realises each path as a cascade of first-order all-pass sections, with a one-sample relative delay on the quadrature path.
+Each section has a single coefficient $a$ and one multiply per sample:
+
+\begin{equation}
+H_\text{ap}(z) = \frac{a^2 - z^{-2}}{1 - a^2 z^{-2}} .
+\end{equation}
+
+The two paths $H_A$ and $H_B$ use four sections each, and the quadrature output applies a one-sample delay $z^{-1}$ to path $B$:
+
+\begin{equation}
+y_R = H_A\{x\}, \qquad y_I = z^{-1} H_B\{x\} .
+\end{equation}
+
+This polyphase pair is the classic audio realisation of the broadband \ang{90} difference~\cite{Ansari1987Hilbert,RegaliaMitraVaidyanathan1988,Niemitalo2003}.
+The plugin seeds the eight coefficients with Olli Niemitalo's published order-four set~\cite{Niemitalo2003} and re-optimises them at the host sample rate with the same phase fit used for the RBJ cascade.
+The structure rests on half-band and Hilbert transformer theory~\cite{SchusslerSteffen1998}, and the normalised-frequency design tradition reaches back to the analog phase-difference networks~\cite{Bedrosian1960}.
+The eight first-order sections cost \num{8} multiplies per sample, which is one third of the RBJ cost.
+
+\section{Cost and Accuracy}
+
+Table~\ref{tab:compare} states the trade-off the two topologies present at \SI{48}{\kilo\hertz}.
+The RBJ cascade reaches the smaller phase error, and the polyphase pair reaches a comparable error at one third of the multiply count.
+This contrast is the pedagogical payload of the plugin: a listener compares accuracy against cost on the same source by switching the topology live.
+
+\begin{table}[h]
+\centering
+\caption{Shipped topologies at \SI{48}{\kilo\hertz}. Order is sections per branch; cost is multiplies per sample for the matched pair.}
+\label{tab:compare}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Topology & Order & Max error @48k & Cost (mult/sample) \\
+\midrule
+RBJ biquad cascade        & 3 & \ang{1.36} & 24 \\
+Polyphase first-order     & 4 & \ang{1.67} & 8  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The live-design engine holds these errors across the standard rates.
+The in-plugin readout reports the achieved error at the host sample rate, and a goniometer confirms the relationship visually: a single tone through the I/Q pair traces a circle, because two sinusoids in constant \ang{-90} relation map the in-phase and quadrature outputs onto orthogonal axes.
+
+\section{Non-Choice: The Elliptic Half-Band Form}
+
+The elliptic half-band topology realises the quadrature pair through a half-band filter whose polyphase components are all-pass networks.
+Its Cauer synthesis places the poles and zeros by Jacobi elliptic functions, which produces an equiripple phase difference with few sections~\cite{SchusslerSteffen1998}.
+The synthesis is a self-contained numerical module, and its coefficients follow from a closed elliptic procedure that is independent of the sample rate.
+This independence places the elliptic form outside the live-design shape of the present iteration, which re-optimises every topology at the host rate, so the plugin documents it here and sets its implementation aside for a dedicated future iteration.
+
+\section{Non-Choice: The FIR Analytic-Signal Form}
+\label{sec:fir}
+
+The ideal Hilbert transform $\hat{x}(t)$ shifts every frequency component of $x(t)$ by \ang{-90}, and it forms the analytic signal $x_a(t) = x(t) + j\,\hat{x}(t)$ whose spectrum vanishes for negative frequencies~\cite{Bracewell2000,OppenheimSchafer2010}.
+The analytic signal supplies an instantaneous amplitude and an instantaneous phase, which makes it the textbook object behind single-sideband modulation, envelope following, and frequency shifting.
+
+A finite impulse response realises the transform with a fixed tap set and a known group delay.
+The real branch delays the input by that group delay, and the imaginary branch applies the FIR Hilbert kernel, so the real output equals the delayed input and the pair realises the analytic signal directly.
+The realisation fixes the kernel to one length, and its accuracy at the band edges follows from the window and the tap count, so it carries a latency that the all-pass forms avoid.
+
+\subsection{Puckette's \texttt{hilbert\textasciitilde} as the Bridge}
+
+Miller Puckette's Pure~Data ships a \texttt{hilbert\textasciitilde} object, and its patch builds the output from a pair of fourth-order all-pass filters realised with \texttt{biquad\textasciitilde}~\cite{Puckette2007}.
+The two branches are all-pass filtered and differ by \ang{90}, and neither branch equals the input, so the object belongs to the phase-difference family that the \texttt{hilbert} plugin implements.
+The companion all-pass examples in Pure~Data build the same primitive from a real one-pole \texttt{rpole\textasciitilde} and a real one-zero \texttt{rzero\_rev\textasciitilde}, which exposes the all-pass section as a pole-zero reflection pair.
+
+The contrast between Puckette's object and the FIR analytic-signal form makes the structural point concrete.
+The phase-difference network constrains only the relative phase of the two branches, so it returns two filtered signals and holds the quadrature with low latency.
+The analytic-signal FIR constrains the absolute phase of each branch, so it returns the delayed input on the real branch and realises $x_a(t)$ at the cost of latency.
+A reader who hears both forms on the same source hears why the all-pass pair never returns the dry signal, which is the distinction this section documents.
+
+\subsection{Why the Plugin Documents Rather Than Ships the FIR Form}
+
+The FIR form sits outside the suite's Faust specification path.
+The SEAM Faust libraries express the all-pass topologies as cascades of standard biquad and first-order sections, which the C++ plugin re-implements by hand.
+A FIR Hilbert kernel needs a convolution against an externally designed tap set, which calls for a new on-demand Faust primitive, so the Faust specification carries the all-pass pair and this document carries the FIR analysis.
+The plugin therefore documents the analytic-signal form for study and keeps the shipped topologies within the live-design engine.
+
+\section{C++ Core}
+
+The following listing is the runtime section that both topologies share: a first-order polyphase all-pass realised as a biquad in $z^{-2}$, with the coefficients of $H_\text{ap}(z) = (a^2 - z^{-2})/(1 - a^2 z^{-2})$.
+
+\begin{lstlisting}[language=C++,basicstyle=\small\ttfamily,frame=single]
+    // Polyphase first-order all-pass: H(z) = (a^2 - z^-2)/(1 - a^2 z^-2).
+    static Biquad makePolyphaseBiquad(double a) {
+        const double a2 = a * a;
+        Biquad bq; bq.b0 = a2; bq.b1 = 0.0; bq.b2 = -1.0;
+                   bq.a1 = 0.0; bq.a2 = -a2;
+        return bq;
+    }
+    // x -> (inPhase, quad); quad lags inPhase by 90 degrees across the band.
+    inline void process(double x, double& inPhase, double& quad) {
+        double a = x; for (int i = 0; i < nA_; ++i) a = pathA_[i].process(a);
+        double b = x; for (int i = 0; i < nB_; ++i) b = pathB_[i].process(b);
+        inPhase = a;
+        if (mode_ == Mode::Polyphase) { quad = delayB_; delayB_ = b; }
+        else                          { quad = b; }
+    }
+\end{lstlisting}
+
+\appendix
+
+\section{Coefficient Tables}
+
+Table~\ref{tab:rbj48} lists the RBJ $(f_0, Q)$ pairs the live engine produces at \SI{48}{\kilo\hertz}, and Table~\ref{tab:poly48} lists the polyphase coefficients at the same rate.
+
+\begin{table}[h]
+\centering
+\caption{RBJ $(f_0, Q)$ pairs at \SI{48}{\kilo\hertz}. Maximum phase error \ang{1.36}.}
+\label{tab:rbj48}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Path & $f_0$ (Hz) & $Q$ \\
+\midrule
+$H_R$ & 141.887   & 0.2019 \\
+$H_R$ & 671.746   & 0.2122 \\
+$H_R$ & 18654.238 & 0.3031 \\
+\addlinespace
+$H_I$ & 24.004    & 0.3090 \\
+$H_I$ & 2991.937  & 0.3848 \\
+$H_I$ & 3219.986  & 0.0963 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Polyphase coefficients $a$ at \SI{48}{\kilo\hertz}. Maximum phase error \ang{1.67}.}
+\label{tab:poly48}
+\begin{tabular}{@{}lc@{}}
+\toprule
+Path & $a$ \\
+\midrule
+$A$ & 0.397260394 \\
+$A$ & 0.853250636 \\
+$A$ & 0.971682572 \\
+$A$ & 0.995211876 \\
+\addlinespace
+$B$ & 0.687396697 \\
+$B$ & 0.934674128 \\
+$B$ & 0.987987539 \\
+$B$ & 0.998735492 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+\end{document}
