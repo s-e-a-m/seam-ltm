@@ -29,7 +29,7 @@ Nella suite \textsc{seam-ltm}, \emph{ltburst} occupa una posizione particolare s
 È il primo oggetto per cui la specifica Faust non preesiste, ma viene redatta come parte integrante di questo stesso lavoro di studio, e andrà a costituire la libreria \texttt{seam.linkwitz.lib} (prefisso \texttt{slw}), seguendo il modello già adottato per Gerzon, Moorer e Roads.
 È infine il primo plugin della suite costruito come diario di studio sistematico a partire dalla letteratura primaria, con l'obiettivo di rendere ogni passaggio — dalla matematica al codice C++ — leggibile e verificabile da uno studente.
 
-Un aspetto pedagogicamente rilevante riguarda il confronto tra la finestra di Hann continua e l'approssimazione a scalini quantizzati descritta da Linkwitz nel sistema hardware originale~\cite{linkwitz1980shaped}.
+Un aspetto pedagogicamente rilevante riguarda il confronto tra la finestra di Hann continua e l'approssimazione a scalini quantizzati che Linkwitz descrive nel sistema hardware originale~\cite{linkwitz1980shaped}.
 Nell'implementazione analogica, un attenuatore programmabile commuta il livello a ogni semiciclo della sinusoide, introducendo discontinuità di pendenza ai passaggi per lo zero.
 Queste discontinuità generano armoniche dispari che limitano la dinamica del sistema di misura, un effetto assente nella finestra matematicamente esatta.
 Il confronto tra le due varianti — la finestra ideale e l'approssimazione hardware — costituisce uno degli esercizi centrali di questo studio.
@@ -49,9 +49,9 @@ I due contributi descrivono sostanzialmente lo stesso metodo e devono essere let
 
 Il cuore concettuale dei due lavori è una lettura del problema nella prospettiva dell'analisi di reti.
 Una sinusoide continua $g(t)$ viene moltiplicata per una finestra $w(t)$ per ottenere il burst sagomato $x(t) = w(t) \cdot g(t)$, che viene poi applicato alla rete in esame~\cite{linkwitz1980shaped}.
-L'uscita $y(t)$ della rete, la cui risposta impulsiva è $h(t)$, è la convoluzione tra l'ingresso e quella risposta: $y(t) = x(t) * h(t)$.
+L'uscita $y(t)$ della rete, la cui risposta impulsiva è $h(t)$, è la convoluzione tra l'ingresso e quella risposta: $y(t) = x(t) \ast h(t)$.
 Nel dominio della frequenza questa operazione di convoluzione nel tempo corrisponde a una semplice moltiplicazione, per cui lo spettro di uscita vale $Y(f) = X(f) \cdot H(f)$, dove $X(f)$ è lo spettro del burst e $H(f)$ è la risposta in frequenza a regime della rete~\cite{linkwitz1980shaped}.
-La formulazione completa di questa relazione è sviluppata nella Sezione~\ref{sec:teoria}; qui basta osservare che l'equazione $Y(f) = X(f) H(f)$ stabilisce il fondamento teorico per ricavare la risposta in frequenza della rete dall'ampiezza del burst ricevuto.
+La formulazione completa di questa relazione è sviluppata nella Sezione~\ref{sec:teoria}; qui basta osservare che l'equazione $Y(f) = X(f) \cdot H(f)$ stabilisce il fondamento teorico per ricavare la risposta in frequenza della rete dall'ampiezza del burst ricevuto.
 
 La scelta della durata del burst richiede un compromesso esplicito tra due obiettivi tra loro in tensione.
 Se il burst è molto lungo, la sua larghezza spettrale si riduce e il picco di ampiezza in uscita converge alla risposta in frequenza a regime $H(f)$; l'informazione transitoria, però, va perduta perché la rete ha tutto il tempo per raggiungere il regime~\cite{linkwitz1980shaped}.
@@ -66,7 +66,7 @@ Questa finestra a scalini — nata da un vincolo pratico dell'elettronica discre
 
 \section{Teoria e matematica}\label{sec:teoria}
 
-Il burst sagomato si ottiene moltiplicando una sinusoide continua di frequenza $f_0$ per un inviluppo raised-cosine, secondo la formulazione completa anticipata nella Sezione~\ref{sec:fonti}.
+Il burst sagomato si ottiene moltiplicando una sinusoide continua di frequenza $f_0$ per un inviluppo raised-cosine, riprendendo in forma esplicita la struttura introdotta nella Sezione~\ref{sec:fonti}.
 \begin{equation}
 x(t) = w(t)\,\sin(2\pi f_0 t), \qquad
 w(t) = \tfrac{1}{2} - \tfrac{1}{2}\cos\!\frac{2\pi t}{T}, \qquad
@@ -157,7 +157,7 @@ le code laterali devono presentare il decadimento asimmetrico caratteristico di 
 le alte frequenze e \SI{6}{dB/oct} verso le basse frequenze, come evidenziato nella Fig.~3
 dell'articolo originale~\cite{linkwitz1980shaped}.
 La pendenza delle code è la conseguenza diretta delle proprietà analitiche della finestra di Hann,
-che è continua e differenziabile, e il confronto visivo deve mostrare che questi andamenti asintotico
+che è continua e differenziabile, e il confronto visivo deve mostrare che questi andamenti asintotici
 corrispondono alle code visibili nelle figure di riferimento.
 
 Il terzo elemento da verificare riguarda il confronto tra la variante con finestra di Hann esatta e
