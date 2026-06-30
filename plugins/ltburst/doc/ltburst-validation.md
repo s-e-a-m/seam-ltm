@@ -14,6 +14,14 @@ with `-double` it collapses to 6.456e-14, confirming the algorithms are identica
 No phase-convention difference was found: both Faust's `os.phasor` and the hand core's
 `u_` start at zero on the first sample and advance by `f0/fs` cycles per sample.
 
+**State convention (divergence from the spec pseudocode):** the spec keeps the normalized
+phasor `c` as state (`c += inc; u = P*c`); the C++ core keeps the carrier phase `u` in
+`[0, P)` as state instead. The two agree for static parameters, but differ on a runtime
+change of `P` (i.e. of `f0`/`dwell`): the `c`-as-state form rescales `u = P*c` and jumps the
+carrier, whereas tracking `u` directly keeps the carrier phase continuous. The `u` form is
+the intentional realization of the spec's stated goal ("no phase jump"), so the divergence
+from the written pseudocode is an improvement, not a defect.
+
 ## Level calibration (Task 2)
 
 `Reference` calibrates the active-window RMS (the N=5 burst cycles, excluding dwell).
