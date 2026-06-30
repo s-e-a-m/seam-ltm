@@ -89,6 +89,7 @@ add_subdirectory(plugins/multipink)
 add_subdirectory(plugins/x2uhj)
 add_subdirectory(plugins/abmodulex)
 add_subdirectory(plugins/hilbert)
+add_subdirectory(plugins/ltburst)
 
 if(SEAM_BUILD_TESTS)
     add_subdirectory(tests)
