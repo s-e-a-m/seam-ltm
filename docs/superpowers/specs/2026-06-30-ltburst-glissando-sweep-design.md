@@ -161,41 +161,57 @@ process = linkwitzglide(20000, 20, 1, 5, 0.3, 1, os.phasor(1, 1/4));
 
 ### B. Grain-domain (`ondemand`, Faust dev branch)
 
-Status: syntax fixed and de-risked — everything except the `ondemand` token
-compiles on stable Faust (projections, the 1→2 `decide` function, the ramp, the
-start pulse). The `ondemand` line itself awaits a dev-branch binary to compile.
-The original error came from binding two names with a tuple (`fg, Tg = ...`),
-which Faust rejects; the fix projects the two outputs of `decided` separately.
-
 `ondemand(circuit)` runs its circuit only while the clock signal is non-zero and
 holds the outputs otherwise.
-Clocked with the one-sample onset pulse, it computes the per-grain decisions
-(frequency and period) exactly once per grain and holds them — the explicit
-"once per grain" statement that the C++ port writes as `if (onset) { ... }`.
+Clocked with the one-sample onset pulse, it computes a per-grain value exactly
+once per grain and holds it — the explicit "once per grain" statement that the
+C++ port writes as `if (onset) { ... }`.
+
+Status: validated against the dev binary (`faust-od`), with a sharp finding about
+where `ondemand` fits.
+
+**`ondemand` fits the passo mode, not the gap mode.**
+In passo mode the grain period is fixed (`Tg = delta`), so the grain clock is
+**frequency-independent**: a plain fixed-rate ramp generates the onsets, and
+`ondemand` latches the per-grain frequency forward for the carrier.
+This compiles on `faust-od` and simulates cleanly (onset spacing constant at
+`delta`, frequency latched per grain, no NaN).
 
 ```faust
 import("stdfaust.lib");
 
-glissburst_od(N,delta,dmode,fsig) = sin(2*ma.PI*u) * win
+// passo mode: fixed-period clock + ondemand forward latch of the grain frequency
+glissburst_od_passo(N,delta,fsig) = sin(2*ma.PI*u) * win
 with {
+    inc      = 1.0/max(1.0, delta*ma.SR);        // fixed-rate clock, period = delta
     phase    = (+(inc) : frac1) ~ _;
     frac1(x) = x - floor(x);
-    onset    = (phase < phase') | (1 - 1');     // ramp wrap, plus a forced start latch
-    decide(f) = f, select2(dmode, max(delta, N/f), N/f + delta);
-    decided  = (onset, fsig) : ondemand(decide); // per-grain: compute once, hold between
-    fg       = decided : _,!;
-    Tg       = decided : !,_;
-    inc      = 1.0/max(1.0, Tg*ma.SR);
-    u        = fg * phase * Tg;
+    onset    = (phase < phase') | (1 - 1');      // ramp wrap, plus a forced start latch
+    fg       = (onset, fsig) : ondemand(_);      // latch frequency once per grain, hold
+    u        = fg * phase * delta;               // cycles since onset
     win      = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N));
 };
-
-process = glissburst_od(5, 0.3, 1, 20000*pow(20/20000.0, os.phasor(1,1/4)));
+process = glissburst_od_passo(5, 0.3, 20000*pow(20/20000.0, os.phasor(1,1/4)));
 ```
 
-The forced start latch `(1 - 1')` handles initialisation in both forms: it fires
-the first onset at sample 0 so `fg` and `Tg` take valid values immediately,
-instead of dividing by a held-zero frequency.
+The gap mode is different.
+There the period `Tg = N/fg + delta` depends on the latched frequency, so the
+clock is **self-referential**: `inc` needs `Tg`, `Tg` needs the latched `fg`,
+`fg` needs `onset`, `onset` needs the ramp, the ramp needs `inc`.
+Routing that loop through `ondemand` makes the box evaluator chase the cycle and
+fail (`endless evaluation cycle`); a one-sample delay on `Tg` does not help,
+because the cycle is at box-evaluation time, not at the signal level.
+Formulation A already resolves this loop correctly by carrying the frequency in
+an explicit structured feedback (`loop ~ (_,_)`), where each grain's period uses
+the **previous** grain's held frequency.
+In gap mode `ondemand` would therefore be redundant — the structured feedback
+already holds the frequency — so the canonical A engine is the right tool there.
+
+The pedagogical point for the diary: `ondemand` expresses a **forward** per-grain
+decision cleanly (passo), and a **self-referential** grain clock belongs in a
+structured `~` feedback (gap).
+The forced start latch `(1 - 1')` fires the first onset at sample 0 in both
+forms, so the first grain latches a valid frequency immediately.
 
 ## Study diary update (Section 5, Italian)
 
@@ -207,8 +223,9 @@ Fill Section 5 "Ricostruzione in Faust" of
   per-grain sample-and-hold, so each burst stays single-frequency;
 - explain the two timing modes (passo / gap) and the overlap guard;
 - show the canonical `glissburst` listing with commentary;
-- present the `ondemand` grain-domain formulation as the pedagogical centrepiece,
-  noting it expresses "decided once per grain" and maps to the C++ `if (onset)`;
+- present the `ondemand` finding as the pedagogical centrepiece: it expresses a
+  forward per-grain decision (passo, fixed clock) and maps to the C++ `if (onset)`,
+  while a self-referential grain clock (gap) belongs in a structured `~` feedback;
 - defer validation/comparison (spectra, staircase) to the C++ phase.
 
 No plots in this phase.
@@ -232,17 +249,16 @@ The two formulations split cleanly by who can run them:
   `/usr/local/bin/faust`, and runtime behaviour (NaN, onset timing, latched
   frequencies) is checked with a sample-accurate Python simulation of the
   recurrence. No round-trip needed.
-- **B (`ondemand`, dev branch):** needs a dev-branch Faust binary, which is not
-  built yet. Two ways to close this loop:
-  1. Giuseppe builds a dev `faust` from `/Users/giuseppe/Documents/github/faust`
-     and shares the binary path; Claude then compiles and tests B locally, same
-     as A.
-  2. Otherwise Giuseppe pastes B into FaustIDE (dev branch) and reports the exact
-     error line; Claude fixes against the dev grammar and the `tests/impulse-tests/od`
-     examples.
+- **B (`ondemand`, dev branch):** Claude owns the loop too. The dev binary is
+  wired up as `faust-od` (a `/usr/local/bin/faust-od` wrapper around
+  `/Users/giuseppe/Documents/github/faust/build/bin/faust` with the dev
+  `libraries` include path; mirrors Giuseppe's `~/.zshrc` alias for interactive
+  use). Claude compiles B with `faust-od` and checks runtime behaviour with the
+  same Python simulation.
 
 Reference material available to Claude: the SEAM `faust-libraries` (for `seam.lib`
-integration) and the Faust dev source tree (grammar + `od` test corpus).
+integration) and the Faust dev source tree (grammar + `tests/impulse-tests/od`
+corpus).
 
 ## Verification (gates)
 
@@ -250,8 +266,10 @@ integration) and the Faust dev source tree (grammar + `od` test corpus).
   `echo 'import("seam.lib"); process = slw.linkwitzglide(20000,20,1,5,0.3,1, os.phasor(1,1/4));' | faust -`
 - the `glissburst` inline test compiles when uncommented — confirmed.
 - runtime: no NaN/Inf and correct frequency latching — confirmed by simulation.
-- the `ondemand` formulation compiles on the **dev** Faust at
-  `/Users/giuseppe/Documents/github/faust` — pending a dev binary.
+- the `ondemand` passo formulation compiles on `faust-od` and simulates cleanly
+  (constant onset spacing, per-grain frequency latch, no NaN) — confirmed.
+- the `ondemand` gap formulation is documented as infeasible (box-evaluation
+  cycle); gap mode uses the structured A engine — confirmed.
 - the study diary rebuilds (`make` in `doc/study`).
 
 Giuseppe validates both formulations interactively in FaustIDE (the dev branch is
