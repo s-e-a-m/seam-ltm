@@ -159,3 +159,10 @@ The Faust spec must compile. Concrete gates:
 - Validation/plots, spectral comparison to Figs. 1/3/8, the staircase variant —
   all Phase 3 (C++) with the test toolkit (#6).
 - C++ port, plugin, GUI, formal math doc — later phases.
+
+## Follow-up: glissando extension (Phase 2b)
+
+The fixed-`f0` generator above is validated in FaustIDE.
+The glissando generalisation (sweep `f0 → f1` with per-grain sample-and-hold and
+two grain-timing modes) is specified separately in
+`docs/superpowers/specs/2026-06-30-ltburst-glissando-sweep-design.md`.
