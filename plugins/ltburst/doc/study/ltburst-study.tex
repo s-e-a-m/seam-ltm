@@ -3,6 +3,10 @@
 \usepackage[T1]{fontenc}
 \usepackage[italian]{babel}
 \usepackage{amsmath,amssymb,graphicx,booktabs,siunitx,hyperref}
+\usepackage{listings}
+\lstdefinestyle{faust}{basicstyle=\ttfamily\small,breaklines=true,
+  keepspaces=true,columns=fullflexible,frame=single,framesep=4pt}
+\lstset{style=faust}
 \usepackage[margin=2.5cm]{geometry}
 \graphicspath{{figures/}}
 
@@ -180,7 +184,75 @@ numerica esatta dei livelli assoluti, che dipendono dall'asse verticale e dalle 
 normalizzazione dei grafici originali.
 
 \section{Ricostruzione in Faust}\label{sec:faust}
-Sviluppata nella Fase 2.
+La specifica Faust del tone-burst vive nella libreria \texttt{seam.linkwitz.lib} (prefisso \texttt{slw}), seguendo il modello author-attributed di Gerzon, Moorer e Roads.
+Questa sezione documenta la ricostruzione; il file della libreria resta la fonte autorevole e non viene duplicato qui.
+
+\subsection{Dal tono fisso al glissando}
+Il modello matematico di Linkwitz (1980, \S2) descrive il grano come una sinusoide moltiplicata per una finestra a coseno rialzato su un numero costante di cicli $N=5$, da cui la propriet\`a a $Q$ costante.
+La generazione hardware (1980, \S4) ottiene lo stesso risultato modulando in ampiezza al 100\% la portante con una sinusoide a $f_0/5$, seguita da un intervallo di silenzio (\emph{dwell}) che lascia decadere gli echi della sala.
+Il generatore a frequenza fissa \texttt{shapedburst} riproduce questo schema con un singolo phasor, mantenendo la sincronia di ciclo.
+
+Il glissando generalizza il generatore facendo seguire alla portante uno sweep esterno da $f_0$ a $f_1$.
+Uno sweep esponenziale percorre ottave uguali nel tempo, uno lineare percorre hertz uguali; entrambi sono offerti da \texttt{sweepfreq} tramite un selettore.
+Ogni grano cattura una sola frequenza con un campionamento-e-tenuta al proprio inizio, cos\`i resta un tono singolo a $Q$ costante invece di diventare un chirp.
+
+\subsection{I due modi di spaziatura}
+Il modo \emph{passo} fa partire un grano ogni $\delta$ secondi misurati inizio-inizio, e il silenzio residuo si accorcia quando la frequenza scende.
+Il modo \emph{gap} mantiene $\delta$ secondi di silenzio misurati fine-inizio, e il passo tra gli inizi cresce quando la frequenza scende.
+Il modo passo protegge dalla sovrapposizione con \texttt{max(delta, N/fg)}, perch\'e a \SI{20}{\hertz} un grano di cinque cicli dura \SI{250}{\milli\second}.
+
+\subsection{Il motore canonico}
+Il generatore deriva la rampa di grano e la frequenza tenuta da un'unica retroazione a due segnali, cos\`i portante e finestra condividono lo stesso riferimento di fase.
+Azzerare la fase all'inizio del grano d\`a la partenza sullo zero-crossing in modo gratuito, perch\'e $\sin(0)=0$ e la finestra di Hann vale zero in quel punto.
+
+\begin{lstlisting}
+glissburst(N,delta,dmode,fsig) = sin(2*ma.PI*u) * win
+  with {
+    phase = grain : _,!;
+    fg    = grain : !,_;
+    grain = loop ~ (_,_)
+      with {
+        loop(pphase,pfg) = nphase, nfg
+          with {
+            den    = max(20.0, pfg);
+            Tg     = select2(dmode, max(delta, N/den), N/den + delta);
+            inc    = 1.0/max(1.0, Tg*ma.SR);
+            adv    = pphase + inc;
+            onset  = (adv >= 1.0) | (1 - 1');
+            nphase = adv - floor(adv);
+            nfg    = select2(onset, pfg, fsig);
+          };
+      };
+    den = max(20.0, fg);
+    Tg  = select2(dmode, max(delta, N/den), N/den + delta);
+    u   = fg * phase * Tg;
+    win = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N));
+  };
+\end{lstlisting}
+
+\subsection{Quando \texttt{ondemand} calza, e quando no}
+Il primitivo sperimentale \texttt{ondemand} valuta un sotto-circuito solo quando il suo clock \`e attivo e ne tiene le uscite tra un colpo e l'altro.
+In modo passo il periodo \`e fisso, quindi il clock del grano \`e indipendente dalla frequenza: un phasor a periodo fisso genera gli inizi e \texttt{ondemand} cattura in avanti la frequenza del grano.
+
+\begin{lstlisting}
+glissburst_od_passo(N,delta,fsig) = sin(2*ma.PI*u) * win
+  with {
+    inc      = 1.0/max(1.0, delta*ma.SR);
+    phase    = (+(inc) : frac1) ~ _;
+    frac1(x) = x - floor(x);
+    onset    = (phase < phase') | (1 - 1');
+    fg       = (onset, fsig) : ondemand(_);
+    u        = fg * phase * delta;
+    win      = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N));
+  };
+\end{lstlisting}
+
+In modo gap il periodo $N/f_g + \delta$ dipende dalla frequenza tenuta, quindi il clock del grano si auto-referenzia.
+Far passare quell'anello per \texttt{ondemand} fa inseguire il ciclo al valutatore dei box e fallisce, mentre la retroazione strutturata del motore canonico lo risolve usando la frequenza del grano precedente.
+La lezione di progetto \`e che \texttt{ondemand} esprime bene una decisione \emph{in avanti} per grano, mentre un clock auto-referenziale appartiene a una retroazione \texttt{\textasciitilde}; questa mappa corrisponde uno-a-uno al futuro \texttt{if (onset)} del porting in C++.
+
+\subsection{Rinvii}
+La validazione contro gli spettri pubblicati e la variante a gradini restano alla fase C++ con il toolkit di test.
 
 \section{Porting in C++}\label{sec:cpp}
 Sviluppata nella Fase 3.
