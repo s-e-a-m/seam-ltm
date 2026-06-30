@@ -5,7 +5,6 @@
 #include "ltburst_dsp.h"
 
 #include <atomic>
-#include <vector>
 
 // FAUST REFERENCE (seam.linkwitz.lib):
 //

@@ -19,6 +19,21 @@ using namespace Steinberg::Vst;
 
 namespace Seam {
 
+// Logarithmic frequency parameter: equal normalized travel spans equal
+// octaves, while toString still renders Hz (min/max stay 20..20000).
+class LogRangeParameter : public Steinberg::Vst::RangeParameter {
+public:
+    using RangeParameter::RangeParameter;
+    Steinberg::Vst::ParamValue toPlain(Steinberg::Vst::ParamValue norm) const SMTG_OVERRIDE {
+        const double lo = getMin(), hi = getMax();
+        return lo * std::pow(hi / lo, norm);
+    }
+    Steinberg::Vst::ParamValue toNormalized(Steinberg::Vst::ParamValue plain) const SMTG_OVERRIDE {
+        const double lo = getMin(), hi = getMax();
+        return std::log(plain / lo) / std::log(hi / lo);
+    }
+};
+
 LTBURSTProcessor::LTBURSTProcessor() {}
 
 tresult PLUGIN_API LTBURSTProcessor::initialize(FUnknown* context) {
@@ -40,7 +55,7 @@ tresult PLUGIN_API LTBURSTProcessor::initialize(FUnknown* context) {
         -6.0, 6.0, 0.0, 0,
         ParameterInfo::kCanAutomate));
 
-    parameters.addParameter(new RangeParameter(
+    parameters.addParameter(new LogRangeParameter(
         STR16("Frequency"), kParamFrequency, STR16("Hz"),
         kFreqMinHz, kFreqMaxHz, 1000.0, 0,
         ParameterInfo::kCanAutomate));
@@ -100,7 +115,7 @@ tresult PLUGIN_API LTBURSTProcessor::canProcessSampleSize(int32 s) {
 tresult PLUGIN_API LTBURSTProcessor::setBusArrangements(
     SpeakerArrangement* ins, int32 numIns,
     SpeakerArrangement* outs, int32 numOuts) {
-    if (numOuts != 1) return kResultFalse;
+    if (numIns != 0 || numOuts != 1) return kResultFalse;
     int channels = SpeakerArr::getChannelCount(outs[0]);
     if (channels < 1) return kResultFalse;
     return SingleComponentEffect::setBusArrangements(ins, numIns, outs, numOuts);
