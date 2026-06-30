@@ -110,9 +110,16 @@ fixed repeated burst).
 
 ### A. Canonical (stable Faust, mergeable into faust-libraries)
 
+Status: verified — compiles on stable Faust 2.85.5; a sample-accurate simulation
+of the recurrence produces no NaN/Inf and latches the swept frequency correctly
+(20000 → 11908 → 7088 → … → 100 → 54 Hz in gap mode).
+
 The grain engine uses a two-signal feedback (`loop ~ (_,_)`) carrying the ramp
 phase and the held frequency.
-The exact recursive wiring (channel count, projection) is the compile gate.
+Two guards make it safe at startup: `max(20.0, pfg)` floors the frequency in the
+period division (`N/pfg` would otherwise diverge while the held frequency is
+still zero), and a one-sample start pulse `1 - 1'` forces the first onset so the
+sweep is latched immediately instead of after a stale first period.
 
 ```faust
 import("stdfaust.lib");
@@ -122,21 +129,24 @@ sweepfreq(f0,f1,smode,p) = select2(smode, f0 + (f1-f0)*p, f0*pow(f1/f0, p));
 glissburst(N,delta,dmode,fsig) = sin(2*ma.PI*u) * win
 with {
     // recursive grain engine: ramp phase + held frequency fg
-    phase  = grain : _,!;
-    fg     = grain : !,_;
-    grain  = (loop ~ (_,_))
+    phase = grain : _,!;
+    fg    = grain : !,_;
+    grain = loop ~ (_,_)
     with {
         loop(pphase,pfg) = nphase, nfg
         with {
-            Tg     = select2(dmode, max(delta, N/pfg), N/pfg + delta);
+            den    = max(20.0, pfg);            // guard against div-by-zero on init
+            Tg     = select2(dmode, max(delta, N/den), N/den + delta);
             inc    = 1.0/max(1.0, Tg*ma.SR);
             adv    = pphase + inc;
-            onset  = adv >= 1.0;
+            start  = 1 - 1';                    // 1 only at the first sample
+            onset  = (adv >= 1.0) | start;      // force a latch at startup
             nphase = adv - floor(adv);
-            nfg    = ba.if(onset, fsig, pfg);
+            nfg    = select2(onset, pfg, fsig); // hold; latch fsig at onset
         };
     };
-    Tg  = select2(dmode, max(delta, N/fg), N/fg + delta);
+    den = max(20.0, fg);
+    Tg  = select2(dmode, max(delta, N/den), N/den + delta);
     u   = fg * phase * Tg;
     win = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N));
 };
@@ -151,6 +161,12 @@ process = linkwitzglide(20000, 20, 1, 5, 0.3, 1, os.phasor(1, 1/4));
 
 ### B. Grain-domain (`ondemand`, Faust dev branch)
 
+Status: syntax fixed and de-risked — everything except the `ondemand` token
+compiles on stable Faust (projections, the 1→2 `decide` function, the ramp, the
+start pulse). The `ondemand` line itself awaits a dev-branch binary to compile.
+The original error came from binding two names with a tuple (`fg, Tg = ...`),
+which Faust rejects; the fix projects the two outputs of `decided` separately.
+
 `ondemand(circuit)` runs its circuit only while the clock signal is non-zero and
 holds the outputs otherwise.
 Clocked with the one-sample onset pulse, it computes the per-grain decisions
@@ -162,23 +178,24 @@ import("stdfaust.lib");
 
 glissburst_od(N,delta,dmode,fsig) = sin(2*ma.PI*u) * win
 with {
-    phase   = (+(inc) : ma.frac) ~ _;
-    onset   = phase < phase';                 // 1 at the ramp wrap
-    // per-grain domain: decide frequency and period once per onset, hold between
-    fg, Tg  = (onset, fsig) : ondemand(decide)
-        with { decide(f) = f, select2(dmode, max(delta, N/f), N/f + delta); };
-    inc     = 1.0/max(1.0, Tg*ma.SR);
-    u       = fg * phase * Tg;
-    win     = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N));
+    phase    = (+(inc) : frac1) ~ _;
+    frac1(x) = x - floor(x);
+    onset    = (phase < phase') | (1 - 1');     // ramp wrap, plus a forced start latch
+    decide(f) = f, select2(dmode, max(delta, N/f), N/f + delta);
+    decided  = (onset, fsig) : ondemand(decide); // per-grain: compute once, hold between
+    fg       = decided : _,!;
+    Tg       = decided : !,_;
+    inc      = 1.0/max(1.0, Tg*ma.SR);
+    u        = fg * phase * Tg;
+    win      = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N));
 };
 
-process = glissburst_od(5, 0.3, 1,
-    seam_sweep with { seam_sweep = 20000*pow(20/20000.0, os.phasor(1,1/4)); });
+process = glissburst_od(5, 0.3, 1, 20000*pow(20/20000.0, os.phasor(1,1/4)));
 ```
 
-Initialisation detail to confirm at compile (both forms): seed the first onset so
-`fg` starts at a valid frequency instead of a held zero (which would make `N/fg`
-diverge); a forced onset at sample 0 is the simplest fix.
+The forced start latch `(1 - 1')` handles initialisation in both forms: it fires
+the first onset at sample 0 so `fg` and `Tg` take valid values immediately,
+instead of dividing by a held-zero frequency.
 
 ## Study diary update (Section 5, Italian)
 
@@ -207,13 +224,34 @@ Section 5 cites `seam.linkwitz.lib` as the spec source.
 `seam.linkwitz.lib` is created in Phase 2 and extended here, on the same
 `faust-libraries` branch.
 
+## Collaboration / verification workflow
+
+The two formulations split cleanly by who can run them:
+
+- **A (stable Faust):** Claude owns the loop. Stable Faust 2.85.5 is installed at
+  `/usr/local/bin/faust`, and runtime behaviour (NaN, onset timing, latched
+  frequencies) is checked with a sample-accurate Python simulation of the
+  recurrence. No round-trip needed.
+- **B (`ondemand`, dev branch):** needs a dev-branch Faust binary, which is not
+  built yet. Two ways to close this loop:
+  1. Giuseppe builds a dev `faust` from `/Users/giuseppe/Documents/github/faust`
+     and shares the binary path; Claude then compiles and tests B locally, same
+     as A.
+  2. Otherwise Giuseppe pastes B into FaustIDE (dev branch) and reports the exact
+     error line; Claude fixes against the dev grammar and the `tests/impulse-tests/od`
+     examples.
+
+Reference material available to Claude: the SEAM `faust-libraries` (for `seam.lib`
+integration) and the Faust dev source tree (grammar + `od` test corpus).
+
 ## Verification (gates)
 
-- canonical functions compile on **stable** Faust (Homebrew):
+- canonical functions compile on **stable** Faust (Homebrew) — confirmed:
   `echo 'import("seam.lib"); process = slw.linkwitzglide(20000,20,1,5,0.3,1, os.phasor(1,1/4));' | faust -`
-- the `glissburst` inline test compiles when uncommented.
+- the `glissburst` inline test compiles when uncommented — confirmed.
+- runtime: no NaN/Inf and correct frequency latching — confirmed by simulation.
 - the `ondemand` formulation compiles on the **dev** Faust at
-  `/Users/giuseppe/Documents/github/faust` — a separate, documented gate.
+  `/Users/giuseppe/Documents/github/faust` — pending a dev binary.
 - the study diary rebuilds (`make` in `doc/study`).
 
 Giuseppe validates both formulations interactively in FaustIDE (the dev branch is
@@ -228,3 +266,33 @@ wiring beyond a pure compile check.
   the test toolkit (issue #6).
 - The reference-microphone inverse-EQ calibration ("fase due") — a later project,
   revisited once the tone-burst generator and plugin are proven.
+
+# in libreria rimane valida l'idea di consolidare anche la versione statica semplice?
+
+```faust
+import("stdfaust.lib");
+ // raised-cosine N-cycle burst, repeated every P=N+M carrier cycles, cycle-synchronous
+freq = hslider("freq", 1000,10,20000,1);
+delta = hslider("delta", 0.3, 0.1, 1, 0.01);
+shapedburst(f0,N,dwell) = sin(2*ma.PI*P*c) * win
+with {
+  M = max(1, int(ceil(dwell*f0)));              // dwell quantizzato a cicli interi
+  P = N + M;                                    // cicli totali per periodo
+  c = os.phasor(1, f0/P);                       // 0..1 su P cicli di carrier
+  u = P*c;                                      // posizione in cicli: 0..P
+  win = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N)); // Hann sui primi N cicli, poi 0
+};
+shapedburst5(f0,dwell) = shapedburst(f0,5,dwell);   // wrapper canonico N=5
+process = shapedburst5(freq, delta);
+```
+
+# per aiutarmi a comprendere cosa fai ed essere utile nel debuggare faust
+
+```faust
+// cosa sono le variabili di funzione?
+sweepfreq(f0,f1,smode,p) = select2(smode, f0 + (f1-f0)*p, f0*pow(f1/f0, p));
+//process = sweepfreq(20000,20,1,5);
+```
+
+avrei bisogno di codice commentato con le variabili dichiarate e un esempio funzionante anche se commentato. 
+
