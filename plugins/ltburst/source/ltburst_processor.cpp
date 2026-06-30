@@ -23,12 +23,27 @@ namespace Seam {
 // octaves, while toString still renders Hz (min/max stay 20..20000).
 class LogRangeParameter : public Steinberg::Vst::RangeParameter {
 public:
-    using RangeParameter::RangeParameter;
-    Steinberg::Vst::ParamValue toPlain(Steinberg::Vst::ParamValue norm) const SMTG_OVERRIDE {
+    LogRangeParameter(const TChar* title, ParamID tag, const TChar* units,
+                      ParamValue minPlain, ParamValue maxPlain,
+                      ParamValue defaultValuePlain,
+                      int32 stepCount = 0,
+                      int32 flags = ParameterInfo::kCanAutomate)
+        : RangeParameter(title, tag, units, minPlain, maxPlain,
+                         defaultValuePlain, stepCount, flags)
+    {
+        // The base ctor stored the default normalized with the LINEAR taper
+        // (C++ virtual dispatch is frozen to the base type during base
+        // construction). Re-normalize with the log taper so host
+        // "reset to default" restores the intended Hz value.
+        const ParamValue n = LogRangeParameter::toNormalized(defaultValuePlain);
+        info.defaultNormalizedValue = n;
+        setNormalized(n);
+    }
+    ParamValue toPlain(ParamValue norm) const SMTG_OVERRIDE {
         const double lo = getMin(), hi = getMax();
         return lo * std::pow(hi / lo, norm);
     }
-    Steinberg::Vst::ParamValue toNormalized(Steinberg::Vst::ParamValue plain) const SMTG_OVERRIDE {
+    ParamValue toNormalized(ParamValue plain) const SMTG_OVERRIDE {
         const double lo = getMin(), hi = getMax();
         return std::log(plain / lo) / std::log(hi / lo);
     }
