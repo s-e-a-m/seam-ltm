@@ -49,3 +49,13 @@ target_include_directories(hilbert_dsp_test PRIVATE
 )
 target_compile_features(hilbert_dsp_test PRIVATE cxx_std_17)
 add_test(NAME hilbert_dsp_test COMMAND hilbert_dsp_test)
+
+add_executable(ltburst_dsp_test
+    ltburst_dsp_test.cpp
+)
+target_include_directories(ltburst_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/ltburst/source
+)
+target_compile_features(ltburst_dsp_test PRIVATE cxx_std_17)
+add_test(NAME ltburst_dsp_test COMMAND ltburst_dsp_test)
