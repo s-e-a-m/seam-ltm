@@ -1,2 +1,82 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<vstgui-ui-description version="1"></vstgui-ui-description>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 360"
+              minSize="300, 360" maxSize="300, 360"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM LTBURST" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="Linkwitz Shaped Tone-Burst" transparent="true"/>
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="N=5 cycles · RMS-calibrated" transparent="true"/>
+
+        <!-- Frequency -->
+        <view class="CTextLabel" origin="20, 96" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Frequency (Hz)" transparent="true"/>
+        <view class="CSlider" origin="20, 116" size="260, 20" control-tag="Frequency"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 138" size="260, 18" font="ValueFont" control-tag="Frequency"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- Dwell -->
+        <view class="CTextLabel" origin="20, 162" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Dwell (ms)" transparent="true"/>
+        <view class="CSlider" origin="20, 182" size="260, 20" control-tag="Dwell"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 204" size="260, 18" font="ValueFont" control-tag="Dwell"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="0" style-no-frame="true"/>
+
+        <!-- Reference (3-step list) -->
+        <view class="CTextLabel" origin="20, 230" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Reference (dBFS RMS)" transparent="true"/>
+        <view class="COptionMenu" origin="80, 250" size="140, 20" control-tag="Reference"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- Trim slider -->
+        <view class="CTextLabel" origin="20, 278" size="120, 16" font="InfoFont"
+              font-color="TextDim" text-alignment="left" title="Trim (dB)" transparent="true"/>
+        <view class="CTextEdit" origin="170, 278" size="110, 16" font="ValueFont" control-tag="Trim"
+              font-color="TextLight" text-alignment="right" transparent="true" value-precision="2" style-no-frame="true"/>
+        <view class="CSlider" origin="20, 296" size="260, 18" control-tag="Trim" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+
+        <!-- Logo at bottom (native aspect 240x77, scaled) -->
+        <view class="CView" origin="90, 322" size="120, 38" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Reference" tag="100"/>
+        <control-tag name="Trim"      tag="101"/>
+        <control-tag name="Frequency" tag="102"/>
+        <control-tag name="Dwell"     tag="103"/>
+    </control-tags>
+</vstgui-ui-description>
