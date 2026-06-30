@@ -247,6 +247,8 @@ glissburst_od_passo(N,delta,fsig) = sin(2*ma.PI*u) * win
   };
 \end{lstlisting}
 
+Questa illustrazione usa un periodo fisso $T_g = \delta$ e tralascia la protezione dalla sovrapposizione \texttt{max(delta, N/fg)} del modo passo canonico, per tenere l'esempio concentrato sul ruolo di \texttt{ondemand}.
+
 In modo gap il periodo $N/f_g + \delta$ dipende dalla frequenza tenuta, quindi il clock del grano si auto-referenzia.
 Far passare quell'anello per \texttt{ondemand} fa inseguire il ciclo al valutatore dei box e fallisce, mentre la retroazione strutturata del motore canonico lo risolve usando la frequenza del grano precedente.
 La lezione di progetto \`e che \texttt{ondemand} esprime bene una decisione \emph{in avanti} per grano, mentre un clock auto-referenziale appartiene a una retroazione \texttt{\textasciitilde}; questa mappa corrisponde uno-a-uno al futuro \texttt{if (onset)} del porting in C++.
