@@ -45,7 +45,7 @@ public:
 
 private:
     // Parameters (audio-thread-readable).
-    std::atomic<double> paramLevelDb_{-20.0};    // -60..0 dBFS
+    std::atomic<double> paramLevelDb_{kLevelDefaultDb};   // -60..0 dBFS
     std::atomic<double> paramFreqHz_{1000.0};    // 20..20000
     std::atomic<double> paramDwellMs_{300.0};    // 0..1000
 
