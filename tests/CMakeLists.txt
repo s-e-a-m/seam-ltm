@@ -59,3 +59,13 @@ target_include_directories(ltburst_dsp_test PRIVATE
 )
 target_compile_features(ltburst_dsp_test PRIVATE cxx_std_17)
 add_test(NAME ltburst_dsp_test COMMAND ltburst_dsp_test)
+
+add_executable(ltglide_dsp_test
+    ltglide_dsp_test.cpp
+)
+target_include_directories(ltglide_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/ltglide/source
+)
+target_compile_features(ltglide_dsp_test PRIVATE cxx_std_17)
+add_test(NAME ltglide_dsp_test COMMAND ltglide_dsp_test)
