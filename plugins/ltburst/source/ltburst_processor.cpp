@@ -55,30 +55,28 @@ tresult PLUGIN_API LTBURSTProcessor::initialize(FUnknown* context) {
     tresult r = SingleComponentEffect::initialize(context);
     if (r != kResultOk) return r;
 
-    addAudioOutput(STR16("Output"), SpeakerArr::kStereo);
+    addAudioOutput(STR16("Output"), SpeakerArr::kMono);
 
-    auto* refParam = new StringListParameter(
-        STR16("Reference"), kParamReference, STR16("dBFS RMS"),
-        ParameterInfo::kCanAutomate | ParameterInfo::kIsList);
-    refParam->appendString(STR16("-23"));
-    refParam->appendString(STR16("-20"));
-    refParam->appendString(STR16("-18"));
-    parameters.addParameter(refParam);
+    auto* lv = new RangeParameter(
+        STR16("Level"), kParamLevel, STR16("dBFS"),
+        kLevelMinDb, kLevelMaxDb, kLevelDefaultDb, 0,
+        ParameterInfo::kCanAutomate);
+    lv->setPrecision(1);
+    parameters.addParameter(lv);
 
-    parameters.addParameter(new RangeParameter(
-        STR16("Trim"), kParamTrim, STR16("dB"),
-        -6.0, 6.0, 0.0, 0,
-        ParameterInfo::kCanAutomate));
-
-    parameters.addParameter(new LogRangeParameter(
+    auto* fr = new LogRangeParameter(
         STR16("Frequency"), kParamFrequency, STR16("Hz"),
         kFreqMinHz, kFreqMaxHz, 1000.0, 0,
-        ParameterInfo::kCanAutomate));
+        ParameterInfo::kCanAutomate);
+    fr->setPrecision(0);
+    parameters.addParameter(fr);
 
-    parameters.addParameter(new RangeParameter(
+    auto* dw = new RangeParameter(
         STR16("Dwell"), kParamDwell, STR16("ms"),
         kDwellMinMs, kDwellMaxMs, 300.0, 0,
-        ParameterInfo::kCanAutomate));
+        ParameterInfo::kCanAutomate);
+    dw->setPrecision(0);
+    parameters.addParameter(dw);
 
     return kResultOk;
 }
@@ -131,29 +129,24 @@ tresult PLUGIN_API LTBURSTProcessor::setBusArrangements(
     SpeakerArrangement* ins, int32 numIns,
     SpeakerArrangement* outs, int32 numOuts) {
     if (numIns != 0 || numOuts != 1) return kResultFalse;
-    int channels = SpeakerArr::getChannelCount(outs[0]);
-    if (channels < 1) return kResultFalse;
+    if (SpeakerArr::getChannelCount(outs[0]) != 1) return kResultFalse;
     return SingleComponentEffect::setBusArrangements(ins, numIns, outs, numOuts);
 }
 
 tresult PLUGIN_API LTBURSTProcessor::setState(IBStream* state) {
     if (!state) return kResultFalse;
     IBStreamer s(state, kLittleEndian);
-    int32 refIdx = 0; double trim = 0.0; double freq = 1000.0; double dwell = 300.0;
-    if (!s.readInt32(refIdx))  return kResultFalse;
-    if (!s.readDouble(trim))   return kResultFalse;
-    if (!s.readDouble(freq))   return kResultFalse;
-    if (!s.readDouble(dwell))  return kResultFalse;
+    double level = kLevelDefaultDb; double freq = 1000.0; double dwell = 300.0;
+    if (!s.readDouble(level)) return kResultFalse;
+    if (!s.readDouble(freq))  return kResultFalse;
+    if (!s.readDouble(dwell)) return kResultFalse;
 
-    paramReferenceIdx_.store(std::clamp<int>(refIdx, 0, kReferenceStepCount - 1));
-    paramTrimDb_.store(std::clamp(trim, -6.0, 6.0));
-    paramFreqHz_.store(std::clamp(freq, kFreqMinHz, kFreqMaxHz));
+    paramLevelDb_.store(std::clamp(level, kLevelMinDb, kLevelMaxDb));
+    paramFreqHz_.store(std::clamp(freq,  kFreqMinHz,  kFreqMaxHz));
     paramDwellMs_.store(std::clamp(dwell, kDwellMinMs, kDwellMaxMs));
 
-    if (auto* p = parameters.getParameter(kParamReference))
-        p->setNormalized((double)paramReferenceIdx_.load() / (kReferenceStepCount - 1));
-    if (auto* p = parameters.getParameter(kParamTrim))
-        p->setNormalized((paramTrimDb_.load() + 6.0) / 12.0);
+    if (auto* p = parameters.getParameter(kParamLevel))
+        p->setNormalized((paramLevelDb_.load() - kLevelMinDb) / (kLevelMaxDb - kLevelMinDb));
     if (auto* p = parameters.getParameter(kParamFrequency)) {
         double norm = std::log(paramFreqHz_.load() / kFreqMinHz) / std::log(kFreqMaxHz / kFreqMinHz);
         p->setNormalized(std::clamp(norm, 0.0, 1.0));
@@ -167,12 +160,10 @@ tresult PLUGIN_API LTBURSTProcessor::setState(IBStream* state) {
 tresult PLUGIN_API LTBURSTProcessor::getState(IBStream* state) {
     if (!state) return kResultFalse;
     IBStreamer s(state, kLittleEndian);
-    int32 refIdx = paramReferenceIdx_.load();
-    double trim  = paramTrimDb_.load();
+    double level = paramLevelDb_.load();
     double freq  = paramFreqHz_.load();
     double dwell = paramDwellMs_.load();
-    if (!s.writeInt32(refIdx)) return kResultFalse;
-    if (!s.writeDouble(trim))  return kResultFalse;
+    if (!s.writeDouble(level)) return kResultFalse;
     if (!s.writeDouble(freq))  return kResultFalse;
     if (!s.writeDouble(dwell)) return kResultFalse;
     return kResultOk;
@@ -185,9 +176,9 @@ IPlugView* PLUGIN_API LTBURSTProcessor::createView(FIDString name) {
 }
 
 double LTBURSTProcessor::computeGainLin() const {
-    int idx = std::clamp(paramReferenceIdx_.load(), 0, kReferenceStepCount - 1);
-    double db = kReferenceLevelsDb[idx] + paramTrimDb_.load() + kCalibrationOffsetDb;
-    return std::pow(10.0, db / 20.0);
+    // Level is the carrier/peak amplitude in dBFS; the Hann window keeps
+    // the actual peak at or below this — a safe ceiling.
+    return std::pow(10.0, paramLevelDb_.load() / 20.0);
 }
 
 void LTBURSTProcessor::readParameterChanges(ProcessData& data) {
@@ -203,12 +194,9 @@ void LTBURSTProcessor::readParameterChanges(ProcessData& data) {
         ParamValue v; int32 off;
         if (q->getPoint(cnt - 1, off, v) != kResultOk) continue;
         switch (id) {
-            case kParamReference: {
-                int idx = (int)std::round(v * (kReferenceStepCount - 1));
-                paramReferenceIdx_.store(std::clamp(idx, 0, kReferenceStepCount - 1));
-            } break;
-            case kParamTrim:
-                paramTrimDb_.store(v * 12.0 - 6.0);
+            case kParamLevel:
+                paramLevelDb_.store(std::clamp(v * (kLevelMaxDb - kLevelMinDb) + kLevelMinDb,
+                                               kLevelMinDb, kLevelMaxDb));
                 break;
             case kParamFrequency: {
                 // Logarithmic de-normalisation: equal travel -> equal octaves.
@@ -233,7 +221,7 @@ void LTBURSTProcessor::processBlock(SampleType** outputs, int numChannels, int n
         double g = startGain + gainStep * s;          // per-block linear gain ramp
         SampleType y = (SampleType)(burst_.process() * g);
         for (int c = 0; c < numChannels; ++c)
-            outputs[c][s] = y;                          // mono duplicated to all channels
+            outputs[c][s] = y;                        // write to all channels (mono = 1)
     }
     prevGainLin_ = targetGain;
 }

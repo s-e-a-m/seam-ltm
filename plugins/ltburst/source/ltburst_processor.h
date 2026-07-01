@@ -17,7 +17,7 @@
 // This plugin re-implements the fixed-frequency generator by hand in C++
 // (project convention — see seam-ltm/CLAUDE.md). The DSP lives in the
 // SDK-free header ltburst_dsp.h; this processor wires it to VST3 parameters
-// (Reference/Trim level, Frequency, Dwell) and a stereo mono-duplicated bus.
+// (Level in dBFS, Frequency, Dwell) and a mono output bus.
 
 namespace Seam {
 
@@ -45,8 +45,7 @@ public:
 
 private:
     // Parameters (audio-thread-readable).
-    std::atomic<int>    paramReferenceIdx_{0};   // 0..2
-    std::atomic<double> paramTrimDb_{0.0};       // -6..+6
+    std::atomic<double> paramLevelDb_{-20.0};    // -60..0 dBFS
     std::atomic<double> paramFreqHz_{1000.0};    // 20..20000
     std::atomic<double> paramDwellMs_{300.0};    // 0..1000
 
