@@ -75,4 +75,68 @@ private:
     bool   started_ = false;
 };
 
+// Pass transport: owns the progress p and the Dirac-bracketed pass timeline.
+class GlideTransport {
+public:
+    enum class Kind { Silence, Dirac, Glide };
+    struct Tick { Kind kind; double p; };
+
+    static constexpr double kLeadSec = 5.0;
+    static constexpr double kTailSec = 5.0;
+    static constexpr double kWaitSec = 2.0;
+
+    void prepare(double fs) {
+        fs_ = (fs > 0.0) ? fs : 48000.0;
+        leadN_ = (long)std::llround(kLeadSec * fs_);
+        tailN_ = (long)std::llround(kTailSec * fs_);
+        waitN_ = (long)std::llround(kWaitSec * fs_);
+        recomputeGlide();
+        state_ = State::Idle; counter_ = 0;
+    }
+    void setSweepSeconds(double t) { tSec_ = (t > 0.0) ? t : 1.0; recomputeGlide(); }
+    void setLoop(bool on) { loop_ = on; }
+    void trigger() { if (state_ == State::Idle) beginPass(); }
+    bool running() const { return state_ != State::Idle; }
+
+    Tick process() {
+        switch (state_) {
+            case State::Idle:
+                if (loop_) beginPass();
+                else return { Kind::Silence, 0.0 };
+                return process();                 // fall into the fresh pass
+            case State::HeadDirac:
+                state_ = State::Lead; counter_ = 0;
+                return { Kind::Dirac, 0.0 };
+            case State::Lead:
+                if (++counter_ >= leadN_) { state_ = State::Glide; counter_ = 0; }
+                return { Kind::Silence, 0.0 };
+            case State::Glide: {
+                double p = (glideN_ > 0) ? (double)counter_ / (double)glideN_ : 0.0;
+                if (++counter_ >= glideN_) { state_ = State::Tail; counter_ = 0; }
+                return { Kind::Glide, p };
+            }
+            case State::Tail:
+                if (++counter_ >= tailN_) { state_ = State::TailDirac; counter_ = 0; }
+                return { Kind::Silence, 0.0 };
+            case State::TailDirac:
+                state_ = loop_ ? State::Wait : State::Idle; counter_ = 0;
+                return { Kind::Dirac, 0.0 };
+            case State::Wait:
+                if (++counter_ >= waitN_) { state_ = State::Idle; counter_ = 0; }
+                return { Kind::Silence, 0.0 };
+        }
+        return { Kind::Silence, 0.0 };
+    }
+
+private:
+    enum class State { Idle, HeadDirac, Lead, Glide, Tail, TailDirac, Wait };
+    void recomputeGlide() { glideN_ = (long)std::llround(tSec_ * fs_); if (glideN_ < 1) glideN_ = 1; }
+    void beginPass() { state_ = State::HeadDirac; counter_ = 0; }
+
+    double fs_ = 48000.0, tSec_ = 20.0;
+    long leadN_ = 0, tailN_ = 0, waitN_ = 0, glideN_ = 0, counter_ = 0;
+    bool loop_ = false;
+    State state_ = State::Idle;
+};
+
 }} // namespace Seam::ltglide

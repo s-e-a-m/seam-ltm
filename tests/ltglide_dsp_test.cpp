@@ -92,3 +92,72 @@ TEST_CASE("no NaN/Inf across a swept parameter range") {
         }
     }
 }
+
+TEST_CASE("transport is silent when idle and not looping") {
+    GlideTransport t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(1.0);
+    for (int n = 0; n < 1000; ++n) {
+        auto tick = t.process();
+        CHECK(tick.kind == GlideTransport::Kind::Silence);
+    }
+    CHECK(t.running() == false);
+}
+
+TEST_CASE("triggered pass has the exact Dirac/silence/glide timeline") {
+    const double fs = 48000.0;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);                 // glideN = 48000
+    t.trigger();
+
+    // Sample 0: head Dirac.
+    auto s0 = t.process();
+    CHECK(s0.kind == GlideTransport::Kind::Dirac);
+
+    // Next 5 s: silence (lead).
+    const long leadN = 5 * 48000;
+    for (long n = 0; n < leadN; ++n)
+        CHECK(t.process().kind == GlideTransport::Kind::Silence);
+
+    // Next 1 s: glide, p rising from 0 toward 1.
+    auto g0 = t.process();
+    CHECK(g0.kind == GlideTransport::Kind::Glide);
+    CHECK(g0.p == doctest::Approx(0.0));
+    const long glideN = 48000;
+    GlideTransport::Tick gLast = g0;
+    for (long n = 1; n < glideN; ++n) gLast = t.process();
+    CHECK(gLast.kind == GlideTransport::Kind::Glide);
+    CHECK(gLast.p < 1.0);
+    CHECK(gLast.p > 0.99);
+
+    // Next 5 s: silence (tail).
+    const long tailN = 5 * 48000;
+    for (long n = 0; n < tailN; ++n)
+        CHECK(t.process().kind == GlideTransport::Kind::Silence);
+
+    // Tail Dirac, then idle (no loop).
+    CHECK(t.process().kind == GlideTransport::Kind::Dirac);
+    CHECK(t.process().kind == GlideTransport::Kind::Silence);
+    CHECK(t.running() == false);
+}
+
+TEST_CASE("loop restarts automatically with a wait gap") {
+    const double fs = 48000.0;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);
+    t.setLoop(true);
+    // First tick from Idle+loop must be the head Dirac of pass 1.
+    CHECK(t.process().kind == GlideTransport::Kind::Dirac);
+    // Drain the pass: lead + glide + tail.
+    long body = 5 * 48000 + 48000 + 5 * 48000;
+    for (long n = 0; n < body; ++n) t.process();
+    // Tail Dirac.
+    CHECK(t.process().kind == GlideTransport::Kind::Dirac);
+    // Wait (2 s) then a new head Dirac.
+    long waitN = 2 * 48000;
+    for (long n = 0; n < waitN; ++n)
+        CHECK(t.process().kind == GlideTransport::Kind::Silence);
+    CHECK(t.process().kind == GlideTransport::Kind::Dirac);   // pass 2 begins
+}
