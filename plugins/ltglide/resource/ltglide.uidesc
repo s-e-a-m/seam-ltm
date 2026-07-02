@@ -15,15 +15,15 @@
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
     <gradients>
-        <!-- flat dark button, subtle top bevel, matching the panel -->
+        <!-- flat button face (no gradient): SliderTrack grey at rest -->
         <gradient name="ButtonNormal">
-            <color-stop rgba="#3a3e42ff" start="0"/>
-            <color-stop rgba="#25282bff" start="1"/>
+            <color-stop rgba="#444444ff" start="0"/>
+            <color-stop rgba="#444444ff" start="1"/>
         </gradient>
-        <!-- momentary press: SliderActive accent -->
+        <!-- momentary press: flat SliderActive (the active-slider colour) -->
         <gradient name="ButtonPressed">
             <color-stop rgba="#4a9ec8ff" start="0"/>
-            <color-stop rgba="#2f6e8cff" start="1"/>
+            <color-stop rgba="#4a9ec8ff" start="1"/>
         </gradient>
     </gradients>
 
@@ -120,7 +120,7 @@
               text-color="TextLight" text-color-highlighted="TextLight"
               gradient="ButtonNormal" gradient-highlighted="ButtonPressed"
               frame-color="TextDim" frame-color-highlighted="SliderActive"
-              frame-width="1" roundradius="2"/>
+              frame-width="1" roundradius="0"/>
         <view class="CCheckBox" origin="160, 606" size="110, 20" control-tag="Loop"
               title="LOOP" font="ValueFont" font-color="TextLight"
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"

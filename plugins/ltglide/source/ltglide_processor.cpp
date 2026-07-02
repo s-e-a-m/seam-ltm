@@ -244,6 +244,19 @@ void LTGLIDEProcessor::readParameterChanges(ProcessData& data) {
         int32 cnt = q->getPointCount();
         if (cnt <= 0) continue;
         ParamValue v; int32 off;
+
+        // Trigger is momentary: a click can deliver its whole 0->1->0 pulse
+        // within one block, so scan EVERY point for a rising edge rather than
+        // reading only the last one (which would be the 0 of the release).
+        if (id == kParamTrigger) {
+            for (int32 pt = 0; pt < cnt; ++pt) {
+                if (q->getPoint(pt, off, v) != kResultOk) continue;
+                if (prevTrigger_ < 0.5 && v >= 0.5) triggerPending_.store(true);
+                prevTrigger_ = v;
+            }
+            continue;
+        }
+
         if (q->getPoint(cnt - 1, off, v) != kResultOk) continue;
         switch (id) {
             case kParamLevel: paramLevelDb_.store(std::clamp(linNormToPlain(v, kLevelMinDb, kLevelMaxDb), kLevelMinDb, kLevelMaxDb)); break;
@@ -253,11 +266,6 @@ void LTGLIDEProcessor::readParameterChanges(ProcessData& data) {
             case kParamDmode: paramDmode_.store(v >= 0.5 ? 1 : 0); break;
             case kParamDelta: paramDeltaSec_.store(std::clamp(linNormToPlain(v, kDeltaMinSec, kDeltaMaxSec), kDeltaMinSec, kDeltaMaxSec)); break;
             case kParamT:     paramTSec_.store(std::clamp(linNormToPlain(v, kTMinSec, kTMaxSec), kTMinSec, kTMaxSec)); break;
-            case kParamTrigger: {
-                double now = v;
-                if (prevTrigger_ < 0.5 && now >= 0.5) triggerPending_.store(true);
-                prevTrigger_ = now;
-            } break;
             case kParamLoop:  paramLoop_.store(v >= 0.5); break;
         }
     }
