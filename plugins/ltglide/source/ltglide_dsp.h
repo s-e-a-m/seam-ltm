@@ -95,6 +95,9 @@ public:
     }
     void setSweepSeconds(double t) { tSec_ = (t > 0.0) ? t : 1.0; recomputeGlide(); }
     void setLoop(bool on) { loop_ = on; }
+    // Return to Idle without re-deriving the fs-dependent sample counts;
+    // used on (re)activation so a pass never resumes mid-way.
+    void reset() { state_ = State::Idle; counter_ = 0; }
     void trigger() { if (state_ == State::Idle) beginPass(); }
     bool running() const { return state_ != State::Idle; }
 

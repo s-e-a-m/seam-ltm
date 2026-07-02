@@ -192,3 +192,22 @@ TEST_CASE("loop restarts automatically with a wait gap") {
         CHECK(t.process().kind == GlideTransport::Kind::Silence);
     CHECK(t.process().kind == GlideTransport::Kind::Dirac);   // pass 2 begins
 }
+
+TEST_CASE("reset() returns to Idle without resuming a pass mid-way") {
+    const double fs = 48000.0;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);
+    t.setLoop(false);
+    t.trigger();
+    // Advance into the pass (head Dirac + part of the lead).
+    t.process();                                   // head Dirac
+    for (int n = 0; n < 1000; ++n) t.process();    // into Lead
+    CHECK(t.running() == true);
+
+    t.reset();
+    CHECK(t.running() == false);
+    // Not looping and back to Idle -> the next tick is Silence, not a resumed
+    // pass and not a fresh Dirac.
+    CHECK(t.process().kind == GlideTransport::Kind::Silence);
+}

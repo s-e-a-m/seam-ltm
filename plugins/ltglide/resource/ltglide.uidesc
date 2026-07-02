@@ -102,11 +102,12 @@
         <view class="CTextEdit" origin="20, 570" size="260, 18" font="ValueFont" control-tag="Time"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
 
-        <!-- Transport: Trigger / Loop -->
-        <view class="CCheckBox" origin="40, 606" size="110, 20" control-tag="Trigger"
-              title="TRIGGER" font="ValueFont" font-color="TextLight"
-              boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
-              frame-width="1" transparent="true" autosize-to-fit="false"/>
+        <!-- Transport: Trigger (momentary button) / Loop (toggle) -->
+        <view class="CTextButton" origin="40, 606" size="110, 20" control-tag="Trigger"
+              title="TRIGGER" font="ValueFont" kind="kKickStyle"
+              text-color="TextLight" text-color-highlighted="SliderActive"
+              frame-color="TextDim" frame-color-highlighted="SliderActive"
+              frame-width="1" roundradius="2"/>
         <view class="CCheckBox" origin="160, 606" size="110, 20" control-tag="Loop"
               title="LOOP" font="ValueFont" font-color="TextLight"
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"

@@ -74,13 +74,15 @@ tresult PLUGIN_API LTGLIDEProcessor::initialize(FUnknown* context) {
     auto* sm = new StringListParameter(STR16("Sweep"), kParamSmode);
     sm->appendString(STR16("linear"));
     sm->appendString(STR16("exponential"));
-    sm->setNormalized(1.0);   // exponential default
+    sm->getInfo().defaultNormalizedValue = 1.0;   // exponential is the default
+    sm->setNormalized(1.0);
     parameters.addParameter(sm);
 
     auto* dm = new StringListParameter(STR16("Timing"), kParamDmode);
     dm->appendString(STR16("passo"));
     dm->appendString(STR16("gap"));
-    dm->setNormalized(1.0);   // gap default
+    dm->getInfo().defaultNormalizedValue = 1.0;   // gap is the default
+    dm->setNormalized(1.0);
     parameters.addParameter(dm);
 
     auto* dl = new RangeParameter(STR16("Delta"), kParamDelta, STR16("s"),
@@ -115,6 +117,9 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         glide_.reset();
         transport_.setSweepSeconds(paramTSec_.load());
         transport_.setLoop(paramLoop_.load());
+        transport_.reset();               // never resume a pass mid-way on (re)activation
+        prevTrigger_ = 0.0;               // drop any stale trigger edge/pending fire
+        triggerPending_.store(false);
         prevGainLin_ = computeGainLin();
     }
     return SingleComponentEffect::setActive(state);
