@@ -142,6 +142,37 @@ TEST_CASE("triggered pass has the exact Dirac/silence/glide timeline") {
     CHECK(t.running() == false);
 }
 
+TEST_CASE("trigger() is ignored while a pass is already running") {
+    const double fs = 48000.0;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);                 // glideN = 48000
+    t.trigger();
+
+    // Sample 0: head Dirac.
+    CHECK(t.process().kind == GlideTransport::Kind::Dirac);
+
+    // Advance a handful of samples into the Lead (silence) phase.
+    const int intoLead = 100;
+    for (int n = 0; n < intoLead; ++n)
+        CHECK(t.process().kind == GlideTransport::Kind::Silence);
+
+    // Retrigger mid-pass: spec says trigger() is ignored while a pass is
+    // already running, so this must NOT reset state_/counter_.
+    t.trigger();
+
+    // The rest of the lead window must be undisturbed: no second Dirac, no
+    // restart -- just silence for the remainder of the original leadN.
+    const long leadN = 5 * 48000;
+    for (long n = intoLead; n < leadN; ++n)
+        CHECK(t.process().kind == GlideTransport::Kind::Silence);
+
+    // Glide begins right on schedule, with p == 0.0 at its first sample.
+    auto g0 = t.process();
+    CHECK(g0.kind == GlideTransport::Kind::Glide);
+    CHECK(g0.p == doctest::Approx(0.0));
+}
+
 TEST_CASE("loop restarts automatically with a wait gap") {
     const double fs = 48000.0;
     GlideTransport t;
