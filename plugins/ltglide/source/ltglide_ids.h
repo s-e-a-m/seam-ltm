@@ -17,8 +17,7 @@ enum LTGLIDEParams : Steinberg::Vst::ParamID {
     kParamDmode   = 104,   // 0 passo / 1 gap
     kParamDelta   = 105,   // grain spacing, seconds
     kParamT       = 106,   // sweep duration, seconds
-    kParamTrigger = 107,   // momentary: rising edge starts one pass
-    kParamLoop    = 108,   // toggle: continuous passes
+    kParamLoop    = 108,   // toggle: continuous passes (the sole transport control)
 };
 
 // Level (dBFS, linear taper — carrier/peak amplitude; also the Dirac ceiling).

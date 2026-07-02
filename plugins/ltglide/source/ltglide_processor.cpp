@@ -95,10 +95,6 @@ tresult PLUGIN_API LTGLIDEProcessor::initialize(FUnknown* context) {
     tt->setPrecision(1);
     parameters.addParameter(tt);
 
-    auto* tg = new RangeParameter(STR16("Trigger"), kParamTrigger, nullptr,
-        0, 1, 0, 1, ParameterInfo::kCanAutomate);
-    parameters.addParameter(tg);
-
     auto* lp = new RangeParameter(STR16("Loop"), kParamLoop, nullptr,
         0, 1, 0, 1, ParameterInfo::kCanAutomate);
     parameters.addParameter(lp);
@@ -118,8 +114,6 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         transport_.setSweepSeconds(paramTSec_.load());
         transport_.setLoop(paramLoop_.load());
         transport_.reset();               // never resume a pass mid-way on (re)activation
-        prevTrigger_ = 0.0;               // drop any stale trigger edge/pending fire
-        triggerPending_.store(false);
         prevGainLin_ = computeGainLin();
     }
     return SingleComponentEffect::setActive(state);
@@ -143,7 +137,6 @@ tresult PLUGIN_API LTGLIDEProcessor::process(ProcessData& data) {
     glide_.setDmode(paramDmode_.load());
     transport_.setSweepSeconds(paramTSec_.load());
     transport_.setLoop(paramLoop_.load());
-    if (triggerPending_.exchange(false)) transport_.trigger();
 
     int numChannels = data.outputs[0].numChannels;
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
@@ -244,19 +237,6 @@ void LTGLIDEProcessor::readParameterChanges(ProcessData& data) {
         int32 cnt = q->getPointCount();
         if (cnt <= 0) continue;
         ParamValue v; int32 off;
-
-        // Trigger is momentary: a click can deliver its whole 0->1->0 pulse
-        // within one block, so scan EVERY point for a rising edge rather than
-        // reading only the last one (which would be the 0 of the release).
-        if (id == kParamTrigger) {
-            for (int32 pt = 0; pt < cnt; ++pt) {
-                if (q->getPoint(pt, off, v) != kResultOk) continue;
-                if (prevTrigger_ < 0.5 && v >= 0.5) triggerPending_.store(true);
-                prevTrigger_ = v;
-            }
-            continue;
-        }
-
         if (q->getPoint(cnt - 1, off, v) != kResultOk) continue;
         switch (id) {
             case kParamLevel: paramLevelDb_.store(std::clamp(linNormToPlain(v, kLevelMinDb, kLevelMaxDb), kLevelMinDb, kLevelMaxDb)); break;

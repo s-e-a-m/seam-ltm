@@ -54,10 +54,6 @@ private:
     std::atomic<double> paramTSec_{kTDefaultSec};
     std::atomic<bool>   paramLoop_{false};
 
-    // Trigger edge detection (a rising edge on kParamTrigger begins one pass).
-    double prevTrigger_ = 0.0;
-    std::atomic<bool> triggerPending_{false};
-
     // DSP.
     ltglide::GlissBurst    glide_;
     ltglide::GlideTransport transport_;

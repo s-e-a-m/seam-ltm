@@ -14,18 +14,6 @@
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
-    <gradients>
-        <!-- flat button face (no gradient): SliderTrack grey at rest -->
-        <gradient name="ButtonNormal">
-            <color-stop rgba="#444444ff" start="0"/>
-            <color-stop rgba="#444444ff" start="1"/>
-        </gradient>
-        <!-- momentary press: flat SliderActive (the active-slider colour) -->
-        <gradient name="ButtonPressed">
-            <color-stop rgba="#4a9ec8ff" start="0"/>
-            <color-stop rgba="#4a9ec8ff" start="1"/>
-        </gradient>
-    </gradients>
 
     <template name="view" class="CViewContainer" origin="0, 0" size="300, 740"
               minSize="300, 740" maxSize="300, 740"
@@ -38,7 +26,7 @@
               font-color="TextDim" text-alignment="center" title="Linkwitz Glissando Tone-Burst" transparent="true"/>
         <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
               font-color="TextDim" text-alignment="center"
-              title="N=5 grains &#xB7; swept &#xB7; triggered / looped" transparent="true"/>
+              title="N=5 grains &#xB7; swept &#xB7; looped" transparent="true"/>
 
         <!-- Level -->
         <view class="CTextLabel" origin="20, 96" size="260, 16" font="KnobLabelFont"
@@ -114,14 +102,8 @@
         <view class="CTextEdit" origin="20, 570" size="260, 18" font="ValueFont" control-tag="Time"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
 
-        <!-- Transport: Trigger (momentary button) / Loop (toggle) -->
-        <view class="CTextButton" origin="40, 606" size="110, 20" control-tag="Trigger"
-              title="TRIGGER" font="ValueFont" kind="kKickStyle"
-              text-color="TextLight" text-color-highlighted="TextLight"
-              gradient="ButtonNormal" gradient-highlighted="ButtonPressed"
-              frame-color="TextDim" frame-color-highlighted="SliderActive"
-              frame-width="1" roundradius="0"/>
-        <view class="CCheckBox" origin="160, 606" size="110, 20" control-tag="Loop"
+        <!-- Transport: Loop (toggle) — passes run continuously while on -->
+        <view class="CCheckBox" origin="95, 606" size="110, 20" control-tag="Loop"
               title="LOOP" font="ValueFont" font-color="TextLight"
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
               frame-width="1" transparent="true" autosize-to-fit="false"/>
@@ -139,7 +121,6 @@
         <control-tag name="Timing"  tag="104"/>
         <control-tag name="Delta"   tag="105"/>
         <control-tag name="Time"    tag="106"/>
-        <control-tag name="Trigger" tag="107"/>
         <control-tag name="Loop"    tag="108"/>
     </control-tags>
 </vstgui-ui-description>
