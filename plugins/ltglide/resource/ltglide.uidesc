@@ -14,6 +14,18 @@
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
+    <gradients>
+        <!-- flat dark button, subtle top bevel, matching the panel -->
+        <gradient name="ButtonNormal">
+            <color-stop rgba="#3a3e42ff" start="0"/>
+            <color-stop rgba="#25282bff" start="1"/>
+        </gradient>
+        <!-- momentary press: SliderActive accent -->
+        <gradient name="ButtonPressed">
+            <color-stop rgba="#4a9ec8ff" start="0"/>
+            <color-stop rgba="#2f6e8cff" start="1"/>
+        </gradient>
+    </gradients>
 
     <template name="view" class="CViewContainer" origin="0, 0" size="300, 740"
               minSize="300, 740" maxSize="300, 740"
@@ -105,7 +117,8 @@
         <!-- Transport: Trigger (momentary button) / Loop (toggle) -->
         <view class="CTextButton" origin="40, 606" size="110, 20" control-tag="Trigger"
               title="TRIGGER" font="ValueFont" kind="kKickStyle"
-              text-color="TextLight" text-color-highlighted="SliderActive"
+              text-color="TextLight" text-color-highlighted="TextLight"
+              gradient="ButtonNormal" gradient-highlighted="ButtonPressed"
               frame-color="TextDim" frame-color-highlighted="SliderActive"
               frame-width="1" roundradius="2"/>
         <view class="CCheckBox" origin="160, 606" size="110, 20" control-tag="Loop"
