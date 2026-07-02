@@ -18,14 +18,14 @@
 \begin{abstract}
 Questo documento \`e il diario di studio di \emph{ltglide}, il generatore di glissando del tone-burst sagomato di Linkwitz.
 Racconta il porting in C\texttt{++} della specifica Faust \texttt{seam.linkwitz.lib} (prefisso \texttt{slw}), gi\`a discussa in dettaglio nel diario di \emph{ltburst}, e la costruzione del plugin che la ospita.
-La teoria del burst sagomato e la derivazione della specifica Faust restano nel diario di \emph{ltburst} (\texttt{plugins/ltburst/doc/study/ltburst-study.tex}), che questo documento richiama per riferimento invece di ripetere.
+La teoria del burst sagomato e la derivazione della specifica Faust restano nel diario di \emph{ltburst} (\texttt{plugins/ltburst/doc/study/ltburst-study.tex}), che questo documento richiama per riferimento.
 \end{abstract}
 \tableofcontents
 
 \section{Il glissando come generalizzazione del burst fisso}\label{sec:generalizzazione}
 
 Il tone-burst sagomato di Linkwitz~\cite{linkwitz1980shaped} fissa il numero di cicli $N=5$ e lascia libera la frequenza portante $f_0$, ottenendo un segnale a Q costante che \emph{ltburst} riproduce fedelmente a frequenza singola.
-\emph{ltglide} generalizza questo schema facendo scorrere la frequenza portante lungo una passata, cos\`i lo strumento diventa un rilievo continuo invece di una singola misura puntuale.
+\emph{ltglide} generalizza questo schema facendo scorrere la frequenza portante lungo una passata, cos\`i lo strumento diventa un rilievo continuo esteso su tutta la banda coperta dallo sweep.
 Uno sweep esterno, calcolato dalla funzione \texttt{sweepfreq} della libreria \texttt{seam.linkwitz.lib}, produce il progresso di frequenza in funzione del tempo di passata.
 Un motore a grana consuma quello sweep con un campionamento-e-tenuta a ogni proprio inizio, cos\`i ciascuna grana resta a frequenza singola per tutta la propria durata.
 Il risultato \`e una sequenza di burst di Linkwitz via via pi\`u acuti o pi\`u gravi, ciascuno internamente identico a un burst di \emph{ltburst} alla propria frequenza tenuta.
@@ -78,15 +78,15 @@ glissburst(N,delta,dmode,fsig) = sin(2*ma.PI*u) * win
   };
 \end{lstlisting}
 
-Il porting C\texttt{++} segue questa struttura ricorsiva senza scostamenti: \texttt{GlissBurst::process(fsig)} calcola prima la coppia successiva \texttt{(phase\_, fg\_)} a partire dai valori precedenti, esattamente come il blocco \texttt{loop} Faust, e solo dopo usa quella coppia aggiornata per sintetizzare portante e finestra nello stadio di uscita.
-Una conseguenza diretta di questa struttura riguarda il primissimo campione della passata: la rampa avanza di un incremento \emph{prima} di essere usata nello stadio di uscita dello stesso campione, cos\`i il primo campione della grana resta molto vicino allo zero-crossing ma non coincide con esso in modo esatto.
-Il test \texttt{doctest} verifica infatti che il primo campione resti entro $3.8 \times 10^{-6}$ dallo zero, con un confronto a tolleranza assoluta invece che relativa, perch\'e una tolleranza relativa attorno a un valore atteso esattamente nullo degenera a una tolleranza pressoch\'e nulla.
+Il porting C\texttt{++} riproduce questa struttura ricorsiva in modo identico: \texttt{GlissBurst::process(fsig)} calcola prima la coppia successiva \texttt{(phase\_, fg\_)} a partire dai valori precedenti, esattamente come il blocco \texttt{loop} Faust, e solo dopo usa quella coppia aggiornata per sintetizzare portante e finestra nello stadio di uscita.
+Una conseguenza diretta di questa struttura riguarda il primissimo campione della passata: la rampa avanza di un incremento \emph{prima} di essere usata nello stadio di uscita dello stesso campione, cos\`i il primo campione della grana resta a una piccola distanza misurabile dallo zero-crossing.
+Il test \texttt{doctest} verifica infatti che il primo campione resti entro $3.8 \times 10^{-6}$ dallo zero, con un confronto a tolleranza assoluta, perch\'e una tolleranza relativa attorno a un valore atteso esattamente nullo degenera a una tolleranza pressoch\'e nulla.
 Questa piccola distanza dallo zero \`e un'eredit\`a fedele della definizione ricorsiva Faust, e differisce dalla convenzione a contatore esatto (\texttt{c} come stato) usata da \emph{ltburst}, gi\`a discussa e motivata nel suo diario di studio.
 
 Una conseguenza numerica di questa costruzione lega \emph{ltglide} a \emph{ltburst} in modo verificabile.
 A frequenza costante il motore a grana retriggerata degenera a un generatore a periodo fisso, e il modo gap con $f=\SI{1000}{\hertz}$, $\delta=\SI{0.3}{\second}$ produce inizi di grana distanziati di $N/f+\delta = 0.305\,\mathrm{s}$, cio\`e $14640$ campioni a $\SI{48}{\kilo\hertz}$.
 Questo \`e esattamente il periodo del burst fisso di \emph{ltburst} a $f_0=\SI{1000}{\hertz}$ con \emph{dwell} $=\SI{0.3}{\second}$, gi\`a validato nel suo diario e nel suo record di validazione.
-Il numero coincide per costruzione, perch\'e entrambi i motori condividono la stessa formula di periodo quando la frequenza \`e costante, e questa coincidenza numerica costituisce un'ancora di verifica tra i due oggetti pur restando due implementazioni C\texttt{++} indipendenti, senza codice condiviso tra i due plugin.
+Il numero coincide per costruzione, perch\'e entrambi i motori condividono la stessa formula di periodo quando la frequenza \`e costante, e questa coincidenza numerica costituisce un'ancora di verifica tra i due oggetti pur restando due implementazioni C\texttt{++} indipendenti, ciascuna con codice proprio nel rispettivo plugin.
 
 \section{I due modi di temporizzazione e la guardia di sicurezza}\label{sec:timing}
 
@@ -102,7 +102,7 @@ Il plugin colloca il motore a grana dentro una passata delimitata da due impulsi
 Un trigger avvia la passata con un impulso di testa, seguito da un tratto di silenzio (\emph{lead}) di cinque secondi, che lascia assestare l'ambiente di misura prima che lo sweep abbia inizio.
 Segue la fase di glissando vera e propria, della durata impostata dal parametro \texttt{Sweep Time}, durante la quale il progresso $p$ cresce da zero a uno e alimenta \texttt{sweepfreq} e quindi il motore a grana.
 Al termine dello sweep un secondo tratto di silenzio (\emph{tail}) di cinque secondi precede l'impulso di coda, simmetrico all'impulso di testa e utile a delimitare la registrazione della passata.
-Il parametro \texttt{Loop}, se attivo, fa seguire all'impulso di coda un'attesa di due secondi e poi un nuovo impulso di testa, cos\`i la passata si ripete automaticamente senza intervento manuale.
+Il parametro \texttt{Loop}, se attivo, fa seguire all'impulso di coda un'attesa di due secondi e poi un nuovo impulso di testa, cos\`i la passata si ripete in modo automatico e deterministico.
 Un nuovo trigger \`e ignorato mentre una passata \`e gi\`a in corso, cos\`i il transport mantiene una passata alla volta e la sua struttura resta prevedibile per uno strumento di misura.
 
 Il loop serve principalmente alla fase di ricevitore, ancora da progettare (fase 3b-ii della suite), dove pi\`u passate consecutive verranno mediate per migliorare il rapporto segnale-rumore della misura.
@@ -112,7 +112,7 @@ Gli impulsi Dirac di testa e di coda offrono a quel ricevitore un riferimento te
 
 La misura degli spettri della passata, il confronto con le figure originali di Linkwitz e l'analisi delle risposte in frequenza ricavate dal glissando restano compiti della fase di ricevitore.
 Questo diario si ferma alla validazione del motore a grana e del transport come generatore standalone, gi\`a documentata nel record di validazione (\texttt{plugins/ltglide/doc/ltglide-validation.md}).
-La teoria del tone-burst sagomato, la derivazione della specifica Faust e la discussione della differenza tra le convenzioni di stato di \emph{ltburst} e di \emph{ltglide} restano nel diario di \emph{ltburst}, che questo documento richiama come fonte primaria invece di duplicare.
+La teoria del tone-burst sagomato, la derivazione della specifica Faust e la discussione della differenza tra le convenzioni di stato di \emph{ltburst} e di \emph{ltglide} restano nel diario di \emph{ltburst}, che questo documento richiama come fonte primaria.
 
 \bibliographystyle{plain}
 \bibliography{refs}
