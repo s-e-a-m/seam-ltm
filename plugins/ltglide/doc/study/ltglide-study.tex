@@ -1,0 +1,119 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{amsmath,amssymb,graphicx,booktabs,siunitx,hyperref}
+\usepackage{listings}
+\lstdefinestyle{faust}{basicstyle=\ttfamily\small,breaklines=true,
+  keepspaces=true,columns=fullflexible,frame=single,framesep=4pt}
+\lstset{style=faust}
+\usepackage[margin=2.5cm]{geometry}
+
+\title{ltglide: il glissando del tone-burst di Linkwitz\\\large Diario di studio --- porting C\texttt{++} e plugin per la suite SEAM-LTM}
+\author{Giuseppe Silvi --- SEAM}
+\date{2026}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+Questo documento \`e il diario di studio di \emph{ltglide}, il generatore di glissando del tone-burst sagomato di Linkwitz.
+Racconta il porting in C\texttt{++} della specifica Faust \texttt{seam.linkwitz.lib} (prefisso \texttt{slw}), gi\`a discussa in dettaglio nel diario di \emph{ltburst}, e la costruzione del plugin che la ospita.
+La teoria del burst sagomato e la derivazione della specifica Faust restano nel diario di \emph{ltburst} (\texttt{plugins/ltburst/doc/study/ltburst-study.tex}), che questo documento richiama per riferimento invece di ripetere.
+\end{abstract}
+\tableofcontents
+
+\section{Il glissando come generalizzazione del burst fisso}\label{sec:generalizzazione}
+
+Il tone-burst sagomato di Linkwitz~\cite{linkwitz1980shaped} fissa il numero di cicli $N=5$ e lascia libera la frequenza portante $f_0$, ottenendo un segnale a Q costante che \emph{ltburst} riproduce fedelmente a frequenza singola.
+\emph{ltglide} generalizza questo schema facendo scorrere la frequenza portante lungo una passata, cos\`i lo strumento diventa un rilievo continuo invece di una singola misura puntuale.
+Uno sweep esterno, calcolato dalla funzione \texttt{sweepfreq} della libreria \texttt{seam.linkwitz.lib}, produce il progresso di frequenza in funzione del tempo di passata.
+Un motore a grana consuma quello sweep con un campionamento-e-tenuta a ogni proprio inizio, cos\`i ciascuna grana resta a frequenza singola per tutta la propria durata.
+Il risultato \`e una sequenza di burst di Linkwitz via via pi\`u acuti o pi\`u gravi, ciascuno internamente identico a un burst di \emph{ltburst} alla propria frequenza tenuta.
+Questa costruzione rende \emph{ltglide} uno strumento di misura continuo: la stessa banda-costante di un singolo burst si ripete lungo tutto lo spettro coperto dalla passata.
+
+La funzione \texttt{sweepfreq} offre due leggi di percorrenza, gi\`a specificate in Faust e riportate fedelmente nel core C\texttt{++} (\texttt{ltglide\_dsp.h}):
+\begin{equation}
+\texttt{sweepfreq}(f_0,f_1,\mathrm{smode},p) =
+\begin{cases}
+f_0 + (f_1-f_0)\,p, & \mathrm{smode}=0 \ (\text{lineare}) \\
+f_0 \left(\dfrac{f_1}{f_0}\right)^{p}, & \mathrm{smode}=1 \ (\text{esponenziale})
+\end{cases}
+\end{equation}
+dove $p \in [0,1]$ \`e il progresso della passata.
+La legge lineare percorre hertz uguali per unit\`a di progresso, e il suo punto medio $p=0.5$ vale la media aritmetica $(f_0+f_1)/2$.
+La legge esponenziale percorre ottave uguali per unit\`a di progresso, e il suo punto medio vale la media geometrica $\sqrt{f_0 f_1}$.
+La suite sceglie l'esponenziale come modalit\`a predefinita, coerente con la percezione logaritmica dell'altezza e con la scala delle frequenze gi\`a usata dai controlli \texttt{F0}/\texttt{F1} del plugin.
+
+\section{Il motore a grana retriggerata (Approccio A)}\label{sec:motore}
+
+Il cuore di \emph{ltglide} \`e \texttt{GlissBurst}, il porting diretto della funzione Faust \texttt{glissburst} gi\`a derivata e discussa nel diario di \emph{ltburst}~(\S5.3, Approccio A).
+Il motore porta avanti due stati accoppiati campione per campione: una rampa di grana \texttt{phase\_} in $[0,1)$ e una frequenza tenuta \texttt{fg\_}.
+Ogni campione avanza la rampa di un incremento pari al reciproco del periodo di grana corrente, calcolato dalla frequenza tenuta del campione precedente.
+Quando la rampa supera l'unit\`a, oppure al primissimo campione della passata, il motore dichiara un nuovo inizio di grana.
+Proprio a ogni inizio di grana la frequenza tenuta \texttt{fg\_} si aggiorna al valore corrente dello sweep esterno \texttt{fsig}, e resta fissa a quel valore per tutta la durata della grana successiva: questo \`e il campionamento-e-tenuta descritto nella Sezione~\ref{sec:generalizzazione}.
+La portante e la finestra di Hann derivano entrambe dalla stessa coppia \texttt{(phase\_, fg\_)} appena aggiornata, cos\`i condividono un unico riferimento di fase e restano sincrone per costruzione.
+
+\begin{lstlisting}
+glissburst(N,delta,dmode,fsig) = sin(2*ma.PI*u) * win
+  with {
+    phase = grain : _,!;
+    fg    = grain : !,_;
+    grain = loop ~ (_,_)
+      with {
+        loop(pphase,pfg) = nphase, nfg
+          with {
+            den    = max(20.0, pfg);
+            Tg     = select2(dmode, max(delta, N/den), N/den + delta);
+            inc    = 1.0/max(1.0, Tg*ma.SR);
+            adv    = pphase + inc;
+            onset  = (adv >= 1.0) | (1 - 1');
+            nphase = adv - floor(adv);
+            nfg    = select2(onset, pfg, fsig);
+          };
+      };
+    den = max(20.0, fg);
+    Tg  = select2(dmode, max(delta, N/den), N/den + delta);
+    u   = fg * phase * Tg;
+    win = (u < N) * (0.5 - 0.5*cos(2*ma.PI*u/N));
+  };
+\end{lstlisting}
+
+Il porting C\texttt{++} segue questa struttura ricorsiva senza scostamenti: \texttt{GlissBurst::process(fsig)} calcola prima la coppia successiva \texttt{(phase\_, fg\_)} a partire dai valori precedenti, esattamente come il blocco \texttt{loop} Faust, e solo dopo usa quella coppia aggiornata per sintetizzare portante e finestra nello stadio di uscita.
+Una conseguenza diretta di questa struttura riguarda il primissimo campione della passata: la rampa avanza di un incremento \emph{prima} di essere usata nello stadio di uscita dello stesso campione, cos\`i il primo campione della grana resta molto vicino allo zero-crossing ma non coincide con esso in modo esatto.
+Il test \texttt{doctest} verifica infatti che il primo campione resti entro $3.8 \times 10^{-6}$ dallo zero, con un confronto a tolleranza assoluta invece che relativa, perch\'e una tolleranza relativa attorno a un valore atteso esattamente nullo degenera a una tolleranza pressoch\'e nulla.
+Questa piccola distanza dallo zero \`e un'eredit\`a fedele della definizione ricorsiva Faust, e differisce dalla convenzione a contatore esatto (\texttt{c} come stato) usata da \emph{ltburst}, gi\`a discussa e motivata nel suo diario di studio.
+
+Una conseguenza numerica di questa costruzione lega \emph{ltglide} a \emph{ltburst} in modo verificabile.
+A frequenza costante il motore a grana retriggerata degenera a un generatore a periodo fisso, e il modo gap con $f=\SI{1000}{\hertz}$, $\delta=\SI{0.3}{\second}$ produce inizi di grana distanziati di $N/f+\delta = 0.305\,\mathrm{s}$, cio\`e $14640$ campioni a $\SI{48}{\kilo\hertz}$.
+Questo \`e esattamente il periodo del burst fisso di \emph{ltburst} a $f_0=\SI{1000}{\hertz}$ con \emph{dwell} $=\SI{0.3}{\second}$, gi\`a validato nel suo diario e nel suo record di validazione.
+Il numero coincide per costruzione, perch\'e entrambi i motori condividono la stessa formula di periodo quando la frequenza \`e costante, e questa coincidenza numerica costituisce un'ancora di verifica tra i due oggetti pur restando due implementazioni C\texttt{++} indipendenti, senza codice condiviso tra i due plugin.
+
+\section{I due modi di temporizzazione e la guardia di sicurezza}\label{sec:timing}
+
+Il motore offre due leggi per il periodo di grana $T_g$, gi\`a specificate in Faust e riprodotte identiche nel porting C\texttt{++} tramite il parametro \texttt{Timing} del plugin.
+Il modo \emph{passo} fissa la distanza inizio-inizio a $T_g = \max(\delta, N/f_g)$, cos\`i il passo tra le grane resta costante e il silenzio residuo si accorcia quando la frequenza tenuta sale.
+Il modo \emph{gap} fissa il silenzio fine-inizio a $T_g = N/f_g + \delta$, cos\`i la distanza inizio-inizio cresce quando la frequenza tenuta scende, perch\'e la grana stessa dura pi\`u a lungo.
+Entrambe le leggi condividono la stessa guardia di sicurezza $\mathrm{den} = \max(20\,\mathrm{Hz}, f_g)$, che protegge il calcolo di $T_g$ quando la frequenza tenuta \`e ancora nulla, al primissimo inizio della passata, oppure quando lo sweep raggiunge il proprio estremo grave.
+Questa guardia rende il modo passo sicuro contro la sovrapposizione delle grane anche al limite inferiore dello sweep, perch\'e a $\SI{20}{\hertz}$ una grana di cinque cicli dura gi\`a $\SI{250}{\milli\second}$, un valore che il termine $\max(\delta, N/f_g)$ rispetta sempre per costruzione.
+
+\section{Il transport della passata}\label{sec:transport}
+
+Il plugin colloca il motore a grana dentro una passata delimitata da due impulsi Dirac, gestita dalla classe \texttt{GlideTransport} e indipendente dal motore stesso.
+Un trigger avvia la passata con un impulso di testa, seguito da un tratto di silenzio (\emph{lead}) di cinque secondi, che lascia assestare l'ambiente di misura prima che lo sweep abbia inizio.
+Segue la fase di glissando vera e propria, della durata impostata dal parametro \texttt{Sweep Time}, durante la quale il progresso $p$ cresce da zero a uno e alimenta \texttt{sweepfreq} e quindi il motore a grana.
+Al termine dello sweep un secondo tratto di silenzio (\emph{tail}) di cinque secondi precede l'impulso di coda, simmetrico all'impulso di testa e utile a delimitare la registrazione della passata.
+Il parametro \texttt{Loop}, se attivo, fa seguire all'impulso di coda un'attesa di due secondi e poi un nuovo impulso di testa, cos\`i la passata si ripete automaticamente senza intervento manuale.
+Un nuovo trigger \`e ignorato mentre una passata \`e gi\`a in corso, cos\`i il transport mantiene una passata alla volta e la sua struttura resta prevedibile per uno strumento di misura.
+
+Il loop serve principalmente alla fase di ricevitore, ancora da progettare (fase 3b-ii della suite), dove pi\`u passate consecutive verranno mediate per migliorare il rapporto segnale-rumore della misura.
+Gli impulsi Dirac di testa e di coda offrono a quel ricevitore un riferimento temporale netto per allineare e segmentare le passate prima della media, un ruolo analogo a quello che gli stessi impulsi svolgono gi\`a come marcatori di inizio e fine registrazione per un operatore umano.
+
+\section{Rinvii}\label{sec:rinvii}
+
+La misura degli spettri della passata, il confronto con le figure originali di Linkwitz e l'analisi delle risposte in frequenza ricavate dal glissando restano compiti della fase di ricevitore.
+Questo diario si ferma alla validazione del motore a grana e del transport come generatore standalone, gi\`a documentata nel record di validazione (\texttt{plugins/ltglide/doc/ltglide-validation.md}).
+La teoria del tone-burst sagomato, la derivazione della specifica Faust e la discussione della differenza tra le convenzioni di stato di \emph{ltburst} e di \emph{ltglide} restano nel diario di \emph{ltburst}, che questo documento richiama come fonte primaria invece di duplicare.
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}
