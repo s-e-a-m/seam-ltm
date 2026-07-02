@@ -1,6 +1,131 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <vstgui-ui-description version="1">
-  <template name="view" size="300, 420" background-color="~ BlackCColor" minSize="300, 420" maxSize="300, 420">
-    <view class="CTextLabel" origin="0, 0" size="300, 420" title="ltglide" font-color="~ WhiteCColor"/>
-  </template>
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 740"
+              minSize="300, 740" maxSize="300, 740"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- Title -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM LTGLIDE" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="Linkwitz Glissando Tone-Burst" transparent="true"/>
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
+              font-color="TextDim" text-alignment="center"
+              title="N=5 grains &#xB7; swept &#xB7; triggered / looped" transparent="true"/>
+
+        <!-- Level -->
+        <view class="CTextLabel" origin="20, 96" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Level (dBFS)" transparent="true"/>
+        <view class="CSlider" origin="20, 116" size="260, 20" control-tag="Level"
+              default-value="0.667"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 138" size="260, 18" font="ValueFont" control-tag="Level"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- F0 (sweep start) -->
+        <view class="CTextLabel" origin="20, 168" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="F0 (Hz)" transparent="true"/>
+        <view class="CSlider" origin="20, 188" size="260, 20" control-tag="F0"
+              default-value="1.0"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 210" size="260, 18" font="ValueFont" control-tag="F0"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="0" style-no-frame="true"/>
+
+        <!-- F1 (sweep end) -->
+        <view class="CTextLabel" origin="20, 240" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="F1 (Hz)" transparent="true"/>
+        <view class="CSlider" origin="20, 260" size="260, 20" control-tag="F1"
+              default-value="0.0"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 282" size="260, 18" font="ValueFont" control-tag="F1"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="0" style-no-frame="true"/>
+
+        <!-- Sweep shape (linear / exponential) -->
+        <view class="CTextLabel" origin="20, 312" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Sweep" transparent="true"/>
+        <view class="COptionMenu" origin="80, 332" size="140, 20" control-tag="Sweep"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- Timing (passo / gap) -->
+        <view class="CTextLabel" origin="20, 384" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Timing" transparent="true"/>
+        <view class="COptionMenu" origin="80, 404" size="140, 20" control-tag="Timing"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- Delta (grain spacing) -->
+        <view class="CTextLabel" origin="20, 456" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Delta (s)" transparent="true"/>
+        <view class="CSlider" origin="20, 476" size="260, 20" control-tag="Delta"
+              default-value="0.141"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 498" size="260, 18" font="ValueFont" control-tag="Delta"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="2" style-no-frame="true"/>
+
+        <!-- Sweep Time -->
+        <view class="CTextLabel" origin="20, 528" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Sweep Time (s)" transparent="true"/>
+        <view class="CSlider" origin="20, 548" size="260, 20" control-tag="Time"
+              default-value="0.153"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 570" size="260, 18" font="ValueFont" control-tag="Time"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- Transport: Trigger / Loop -->
+        <view class="CCheckBox" origin="40, 606" size="110, 20" control-tag="Trigger"
+              title="TRIGGER" font="ValueFont" font-color="TextLight"
+              boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
+              frame-width="1" transparent="true" autosize-to-fit="false"/>
+        <view class="CCheckBox" origin="160, 606" size="110, 20" control-tag="Loop"
+              title="LOOP" font="ValueFont" font-color="TextLight"
+              boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
+              frame-width="1" transparent="true" autosize-to-fit="false"/>
+
+        <!-- Logo at bottom (native aspect 240x77 — CView does not scale bitmaps) -->
+        <view class="CView" origin="30, 646" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Level"   tag="100"/>
+        <control-tag name="F0"      tag="101"/>
+        <control-tag name="F1"      tag="102"/>
+        <control-tag name="Sweep"   tag="103"/>
+        <control-tag name="Timing"  tag="104"/>
+        <control-tag name="Delta"   tag="105"/>
+        <control-tag name="Time"    tag="106"/>
+        <control-tag name="Trigger" tag="107"/>
+        <control-tag name="Loop"    tag="108"/>
+    </control-tags>
 </vstgui-ui-description>
