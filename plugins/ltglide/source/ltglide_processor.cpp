@@ -260,11 +260,38 @@ void LTGLIDEProcessor::readParameterChanges(ProcessData& data) {
 
 template <typename SampleType>
 void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int numSamples) {
-    // Scaffold: silence. Task 4 replaces this body with the DSP.
-    for (int s = 0; s < numSamples; ++s)
+    const double targetGain = computeGainLin();
+    const double startGain  = prevGainLin_;
+    const double gainStep   = (numSamples > 0) ? (targetGain - startGain) / numSamples : 0.0;
+
+    const double f0 = paramF0Hz_.load();
+    const double f1 = paramF1Hz_.load();
+    const int    sm = paramSmode_.load();
+
+    for (int s = 0; s < numSamples; ++s) {
+        const double g = startGain + gainStep * s;      // per-block gain ramp
+        double y = 0.0;
+        auto tick = transport_.process();
+        switch (tick.kind) {
+            case ltglide::GlideTransport::Kind::Dirac:
+                y = 1.0;                                 // unit impulse (scaled by g)
+                break;
+            case ltglide::GlideTransport::Kind::Glide: {
+                if (tick.p == 0.0) glide_.reset();       // deterministic per-pass start
+                const double f = ltglide::SweepFreq(f0, f1, sm, tick.p);
+                y = glide_.process(f);
+                break;
+            }
+            case ltglide::GlideTransport::Kind::Silence:
+            default:
+                y = 0.0;
+                break;
+        }
+        const SampleType out = (SampleType)(y * g);
         for (int c = 0; c < numChannels; ++c)
-            outputs[c][s] = (SampleType)0;
-    prevGainLin_ = computeGainLin();
+            outputs[c][s] = out;
+    }
+    prevGainLin_ = targetGain;
 }
 
 template void LTGLIDEProcessor::processBlock<float>(float**, int, int);
