@@ -120,7 +120,7 @@ Plugin enumerated correctly:
 - FUID `5E4D000D B2C3D4E5 4C54474C 49444500` confirmed
   ("LTGL"/"IDE\0", 13th plugin in the suite; distinct from `ltburst`'s
   `5E4D000C`).
-- 9 parameters (ids 100–108):
+- 8 parameters (ids 100–106, 108):
 
   | id | title | unit | type | default (plain) |
   |---|---|---|---|---|
@@ -131,8 +131,16 @@ Plugin enumerated correctly:
   | 104 | Timing | — | choice (passo/gap) | gap |
   | 105 | Delta | s | Float (linear) | 0.3 s |
   | 106 | Sweep Time | s | Float (linear) | 20.0 s |
-  | 107 | Trigger | — | Toggle (momentary) | 0 |
   | 108 | Loop | — | Toggle | 0 |
+
+  Loop is the sole transport control: while on, passes run continuously
+  (Dirac → lead → glide → tail → Dirac → wait → repeat); turning it off stops
+  at the next pass boundary. A manual Trigger parameter was prototyped and then
+  removed: a momentary GUI button delivers its whole press/release pulse as one
+  coalesced parameter point in some hosts (Reaper), so the rising edge never
+  reached the processor. `GlideTransport::trigger()` remains in the SDK-free
+  core (exercised by the doctest and reserved for the 3b-ii receiver) without a
+  bound parameter.
 
 - 1 mono output bus ("Output", Main-Default Active); 0 input buses
   (instrument, matching `ltburst`'s bus shape).

@@ -1,7 +1,15 @@
 # ltglide Phase 3b-i — Glissando Tone-Burst Generator — design
 
 Date: 2026-07-01
-Status: approved (brainstorming) — implementation plan next
+Status: implemented (3b-i) — see revision note below
+Revision 2026-07-02: implemented and shipped, with one transport change from
+host testing — the **manual Trigger is removed**; **Loop is the sole transport
+control**. A momentary GUI button's press/release pulse arrives coalesced as a
+single final-zero parameter point in some hosts (Reaper), so the rising edge
+never reaches the processor. `GlideTransport::trigger()` stays in the SDK-free
+core (doctest-verified, reserved for the 3b-ii receiver) without a bound
+parameter. The design body below is the original pre-implementation record;
+where it says "Trigger button / manual trigger", read "Loop only".
 Parent: docs/superpowers/specs/2026-06-30-ltburst-phase3-fixed-generator-design.md
 Faust spec: docs/superpowers/specs/2026-06-30-ltburst-glissando-sweep-design.md
 Project spec: docs/superpowers/specs/2026-06-18-ltburst-linkwitz-tone-burst-design.md

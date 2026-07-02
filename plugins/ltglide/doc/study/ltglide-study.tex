@@ -99,11 +99,14 @@ Questa guardia rende il modo passo sicuro contro la sovrapposizione delle grane 
 \section{Il transport della passata}\label{sec:transport}
 
 Il plugin colloca il motore a grana dentro una passata delimitata da due impulsi Dirac, gestita dalla classe \texttt{GlideTransport} e indipendente dal motore stesso.
-Un trigger avvia la passata con un impulso di testa, seguito da un tratto di silenzio (\emph{lead}) di cinque secondi, che lascia assestare l'ambiente di misura prima che lo sweep abbia inizio.
+Una passata inizia con un impulso di testa, seguito da un tratto di silenzio (\emph{lead}) di cinque secondi, che lascia assestare l'ambiente di misura prima che lo sweep abbia inizio.
 Segue la fase di glissando vera e propria, della durata impostata dal parametro \texttt{Sweep Time}, durante la quale il progresso $p$ cresce da zero a uno e alimenta \texttt{sweepfreq} e quindi il motore a grana.
 Al termine dello sweep un secondo tratto di silenzio (\emph{tail}) di cinque secondi precede l'impulso di coda, simmetrico all'impulso di testa e utile a delimitare la registrazione della passata.
 Il parametro \texttt{Loop}, se attivo, fa seguire all'impulso di coda un'attesa di due secondi e poi un nuovo impulso di testa, cos\`i la passata si ripete in modo automatico e deterministico.
-Un nuovo trigger \`e ignorato mentre una passata \`e gi\`a in corso, cos\`i il transport mantiene una passata alla volta e la sua struttura resta prevedibile per uno strumento di misura.
+Il metodo di avvio \texttt{trigger()} del transport ignora le richieste che arrivano mentre una passata \`e gi\`a in corso, cos\`i il transport mantiene una passata alla volta e la sua struttura resta prevedibile per uno strumento di misura.
+Il plugin espone \texttt{Loop} come unico comando di transport, e a esso affida l'avvio e la ripetizione delle passate.
+Un pulsante di avvio istantaneo, provato in fase di collaudo, consegna in alcuni host la propria pressione come un singolo valore, quello finale a zero, e per questo il comando \texttt{Loop} a valore stabile governa il transport in modo affidabile su ogni host.
+Il metodo \texttt{trigger()} resta nel motore SDK-free, dove il collaudo automatico lo verifica e la fase di ricevitore potr\`a riusarlo.
 
 Il loop serve principalmente alla fase di ricevitore, ancora da progettare (fase 3b-ii della suite), dove pi\`u passate consecutive verranno mediate per migliorare il rapporto segnale-rumore della misura.
 Gli impulsi Dirac di testa e di coda offrono a quel ricevitore un riferimento temporale netto per allineare e segmentare le passate prima della media, un ruolo analogo a quello che gli stessi impulsi svolgono gi\`a come marcatori di inizio e fine registrazione per un operatore umano.
