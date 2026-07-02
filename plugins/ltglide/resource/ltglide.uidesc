@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+  <template name="view" size="300, 420" background-color="~ BlackCColor" minSize="300, 420" maxSize="300, 420">
+    <view class="CTextLabel" origin="0, 0" size="300, 420" title="ltglide" font-color="~ WhiteCColor"/>
+  </template>
+</vstgui-ui-description>

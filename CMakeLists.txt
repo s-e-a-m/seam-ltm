@@ -90,6 +90,7 @@ add_subdirectory(plugins/x2uhj)
 add_subdirectory(plugins/abmodulex)
 add_subdirectory(plugins/hilbert)
 add_subdirectory(plugins/ltburst)
+add_subdirectory(plugins/ltglide)
 
 if(SEAM_BUILD_TESTS)
     add_subdirectory(tests)
