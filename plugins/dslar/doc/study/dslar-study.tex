@@ -248,10 +248,56 @@ La strategia si verifica con un test A/B comportamentale fra \SI{44.1}{\kilo\her
 Con la finestra ancorata nel tempo, le due frequenze devono produrre lo stesso inviluppo nel dominio del tempo e lo stesso periodo di ``respiro'' dell'anello; una divergenza segnala il rientro del letterale \texttt{2048} nel percorso di calcolo.
 
 \section{Mappa di decomposizione}\label{sec:decomposizione}
-Segnaposto: scritto in Task 5.
+La Tabella~\ref{tab:decomposizione} smista ogni blocco di \texttt{LAR.pd} verso una delle tre destinazioni previste dalla specifica di porting.
+Un blocco diventa un nuovo mattone \texttt{sds} quando incarna un idioma di Di Scipio ancora assente dalla libreria.
+Un blocco resta circuito locale di \texttt{dslar} quando è specifico di questa patch, in attesa che una seconda patch lo rivendichi.
+Un blocco si copre con uno standard Faust già disponibile quando realizza una funzione generica, come una rampa o un filtro.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{7.1cm}@{}}
+\toprule
+Blocco patch & Destino & Nota \\
+\midrule
+\texttt{env\textasciitilde{} 2048} (RMS$\to$dB) & mattone \texttt{sds} & Follower d'inviluppo; da riconciliare con \texttt{sds.integrator}, già usato da AE2 (\texttt{fc2003dsaae2}) \\[4pt]
+\texttt{dbtorms} $\to$ \texttt{- 1} $\to$ \texttt{abs} $\to$ \texttt{pow 40} & mattone \texttt{sds} & Legge omeostatica; idioma nuovo, cfr.~sezione~\ref{sec:controllo} \\[4pt]
+Dissolvenza \texttt{\$1 2000}$\to$\texttt{line}; rampa di controllo \texttt{\$1 200}$\to$\texttt{line} & Faust std & Levigatura; già coperta dagli standard Faust \\[4pt]
+\texttt{hip\textasciitilde{} 100} & Faust std & Passa-alto; coefficienti ridisegnati alla frequenza effettiva \\[4pt]
+\texttt{delwrite\textasciitilde{}}/\texttt{delread\textasciitilde{}} \texttt{tab1 50}, \texttt{tab2 20} & circuito LAR & Ritardi di decorrelazione; next-prime opzionale (\texttt{sff.np}/\texttt{ddelay}) \\[4pt]
+Pre-guadagno \texttt{1}/\texttt{2}/\texttt{4}, VCA finale & circuito LAR & Diventano parametri esposti dal plugin \\[4pt]
+\texttt{s\textasciitilde{}}/\texttt{r\textasciitilde{}} \texttt{audioLAR} & I/O del plugin & L'anello si chiude fuori dal plugin, nella stanza \\
+\bottomrule
+\end{tabular}
+\caption{Mappa di decomposizione di \texttt{LAR.pd}: destinazione di ogni blocco fra nuovo mattone \texttt{sds}, circuito locale di \texttt{dslar} e standard Faust esistente.}
+\label{tab:decomposizione}
+\end{table}
+
+Il confine fra plugin e stanza merita una nota a parte.
+Nella patch il bus \texttt{audioLAR} sembra un instradamento interno, ma fisicamente il segnale esce da \texttt{dac\textasciitilde{}}, eccita il Larsen acustico e rientra da \texttt{adc\textasciitilde{}}.
+\texttt{dslar} è quindi un plugin realmente ingresso$\to$uscita: l'anello di autoregolazione si chiude nell'aria della stanza, il vero percorso del segnale.
+Questo vincolo va documentato come condizione d'uso, insieme all'accortezza di posizionamento fra microfono e altoparlante che il Larsen richiede.
+Per permettere lo studio dell'ecosistema anche in cuffia, il plugin espone un anello interno opzionale, un sostituto digitale del Larsen acustico.
+Un interruttore nella GUI richiude il segnale dal ramo audio al ramo di analisi dentro al plugin stesso, sostituendo il percorso acustico con un percorso digitale equivalente.
 
 \section{Sintesi e ponte alla Fase 2}\label{sec:sintesi}
-Segnaposto: scritto in Task 5.
+Questo studio prepara il terreno per la Fase~2 del programma di porting Di Scipio $\to$ SEAM.
+La mappa di decomposizione della sezione~\ref{sec:decomposizione} fissa sette parametri da esporre nell'interfaccia di \texttt{dslar}.
+Il drive d'ingresso regola il pre-guadagno prima dell'anello.
+Il target fissa il riferimento di equilibrio della legge di controllo, il valore \texttt{-1} dell'equazione~\eqref{eq:controllo}.
+La steepness regola la pendenza della legge, l'esponente \texttt{40} della stessa equazione.
+Il tempo di levigatura del controllo corrisponde alla rampa di \SI{200}{\milli\second} che chiude l'anello.
+Il tempo di decorrelazione corrisponde ai ritardi di \SI{20}{\milli\second} e \SI{50}{\milli\second} dei due rami.
+L'uscita regola il livello finale verso l'host.
+L'anello interno, attivabile o disattivabile, abilita lo studio in cuffia descritto nella sezione~\ref{sec:decomposizione}.
+La Fase~2 estrae due nuovi mattoni \texttt{sds} dalla mappa di decomposizione.
+Il primo è il follower d'inviluppo che sostituisce \texttt{env\textasciitilde{} 2048}.
+Va riconciliato con la firma di \texttt{sds.integrator(s)}, già in uso in AE2 (\texttt{fc2003dsaae2}), che accetta una costante di tempo in secondi.
+Il secondo è la legge omeostatica dell'equazione~\eqref{eq:controllo}, con riferimento ed esponente come parametri espliciti.
+Entrambi i mattoni devono restare compatibili con le firme che AE2 già usa, a tutela del codice della composizione esistente.
+Restano aperte due domande per la Fase~2.
+Il nome e la firma esatti dei due mattoni si definiscono confrontandoli con l'uso reale in AE2.
+Se il ritardo di decorrelazione debba diventare un terzo mattone \texttt{sds} si decide solo quando una seconda patch lo rivendica, in coerenza con la politica di estrazione incrementale della libreria \texttt{sds}.
 
 \bibliographystyle{plain}
 \bibliography{refs}
