@@ -1,0 +1,52 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{amsmath,amssymb,graphicx,booktabs,siunitx,hyperref}
+\usepackage{listings}
+\lstdefinestyle{faust}{basicstyle=\ttfamily\small,breaklines=true,
+  keepspaces=true,columns=fullflexible,frame=single,framesep=4pt}
+\lstset{style=faust}
+\usepackage[margin=2.5cm]{geometry}
+\graphicspath{{figures/}}
+
+\title{dslar: l'ecosistema di Larsen autoregolato di Di Scipio\\\large Diario di studio e ricostruzione per la suite SEAM-LTM}
+\author{Giuseppe Silvi --- SEAM}
+\date{2026}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+Questo documento è un diario di studio passo passo.
+Analizza la patch \texttt{LAR.pd} di Agostino Di Scipio a partire dal suo sorgente e dalla letteratura primaria dell'autore.
+Ne ricostruisce il motore di autoregolazione del feedback acustico, la legge di controllo omeostatica e la strategia di indipendenza dalla frequenza di campionamento, preparando le fasi successive: libreria Faust \texttt{sds}, esempio compilabile e plugin.
+\end{abstract}
+\tableofcontents
+
+\section{Introduzione e motivazione}\label{sec:intro}
+Segnaposto: sostituito in Task 2.
+
+\section{Anatomia della patch}\label{sec:anatomia}
+Segnaposto: scritto in Task 2.
+
+\section{Contesto e fonti}\label{sec:contesto}
+Segnaposto: scritto in Task 3.
+
+\section{Analisi del segnale}\label{sec:segnale}
+Segnaposto: scritto in Task 4.
+
+\section{La legge di controllo omeostatica}\label{sec:controllo}
+Segnaposto: scritto in Task 4.
+
+\section{Compatibilità con la frequenza di campionamento}\label{sec:sr}
+Segnaposto: scritto in Task 4.
+
+\section{Mappa di decomposizione}\label{sec:decomposizione}
+Segnaposto: scritto in Task 5.
+
+\section{Sintesi e ponte alla Fase 2}\label{sec:sintesi}
+Segnaposto: scritto in Task 5.
+
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}
