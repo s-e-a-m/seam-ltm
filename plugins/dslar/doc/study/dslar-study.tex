@@ -24,10 +24,83 @@ Ne ricostruisce il motore di autoregolazione del feedback acustico, la legge di 
 \tableofcontents
 
 \section{Introduzione e motivazione}\label{sec:intro}
-Segnaposto: sostituito in Task 2.
+LAR è la porta d'ingresso al capitolo che la suite SEAM-LTM dedica ad Agostino Di Scipio.
+La patch realizza un solo anello di retroazione acustica (Larsen) e una sola legge di controllo che ne regola l'ampiezza.
+Questa economia di mezzi la rende interamente leggibile in un colpo d'occhio.
+Un microfono, un altoparlante, un guadagno ricalcolato istante per istante dall'inviluppo del segnale.
+Studiare LAR per prima fissa il vocabolario minimo (retroazione, inviluppo, legge omeostatica, rampe di levigatura) che le patch successive di Di Scipio estendono verso ecosistemi con più nodi interagenti.
+Il diario parte da qui per capire un anello e una legge prima di affrontare le architetture più ampie.
 
 \section{Anatomia della patch}\label{sec:anatomia}
-Segnaposto: scritto in Task 2.
+Questa sezione ricostruisce la struttura di \texttt{LAR.pd} leggendo direttamente i record \texttt{\#X obj}, \texttt{\#X msg} e \texttt{\#X connect} del sorgente.
+Al centro della patch un moltiplicatore \texttt{*\textasciitilde{}} riceve il segnale del microfono e ne fissa il guadagno d'ingresso.
+Da questo nodo condiviso partono due rami.
+Il ramo audio trasporta il suono lungo l'anello di Larsen fino agli altoparlanti (\texttt{\#X connect 11 0 33 0}).
+Il ramo di analisi misura lo stesso segnale e ne ricava il guadagno che l'anello deve assumere (\texttt{\#X connect 11 0 30 0}).
+
+\subsection{Il ramo audio}
+Il segnale d'ingresso arriva da \texttt{adc\textasciitilde{} 1}, un solo canale di microfono, e alimenta il moltiplicatore d'ingresso (\texttt{\#X connect 9 0 11 0}).
+Quel moltiplicatore scala l'ingresso con una rampa \texttt{line} pilotata dal messaggio \texttt{\$1 2000}, una dissolvenza di due secondi comandata da un interruttore \texttt{tgl}.
+Dal nodo d'ingresso il ramo audio attraversa il passa-alto \texttt{hip\textasciitilde{} 100}, il pre-guadagno \texttt{*\textasciitilde{} 1} selezionabile fra i valori \texttt{1}, \texttt{2} e \texttt{4}, e la linea di ritardo \texttt{tab1} di \SI{50}{\milli\second}.
+Il segnale ritardato entra nel moltiplicatore d'anello \texttt{*\textasciitilde{}}, dove viene scalato dal guadagno calcolato dal ramo di analisi (\texttt{\#X connect 28 0 5 0} e \texttt{\#X connect 7 0 5 1}).
+Due moltiplicatori d'uscita \texttt{*\textasciitilde{}} applicano l'interruttore di silenziamento \texttt{tgl} e portano il segnale a \texttt{dac\textasciitilde{}} e a \texttt{s\textasciitilde{} audioLAR}.
+
+\subsection{Il ramo di analisi}
+Il ramo di analisi preleva lo stesso segnale d'ingresso attraverso la linea di ritardo \texttt{tab2} di \SI{20}{\milli\second} (\texttt{\#X connect 11 0 30 0}).
+L'inviluppo \texttt{env\textasciitilde{} 2048} ne misura il livello su una finestra di 2048 campioni e lo restituisce in decibel (\texttt{\#X connect 31 0 20 0}).
+La catena \texttt{dbtorms}, \texttt{- 1}, \texttt{abs} e \texttt{pow 40} trasforma quel livello nel fattore di guadagno dell'anello.
+Il valore risultante viene formattato dal messaggio \texttt{\$1 200} e levigato da una rampa \texttt{line} di \SI{200}{\milli\second} prima di rientrare nel moltiplicatore d'anello (\texttt{\#X connect 17 0 7 0}).
+Questa rampa chiude l'anello: l'ampiezza misurata all'ingresso determina il guadagno applicato all'uscita.
+La legge di controllo che governa questa trasformazione è analizzata nella sezione~\ref{sec:controllo}.
+
+La patch contiene inoltre un sottopatch \texttt{pd input} con i filtri \texttt{hip\textasciitilde{} 200} e \texttt{lop\textasciitilde{} 15000}, che nel sorgente resta scollegato dal percorso del segnale.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+Oggetto & Argomenti & Ruolo & Ramo \\
+\midrule
+\texttt{adc\textasciitilde{}} & \texttt{1} & Ingresso microfono (mono) & Audio \\
+\texttt{*\textasciitilde{}} & --- & Guadagno d'ingresso & Audio \\
+\texttt{hip\textasciitilde{}} & \texttt{100} & Passa-alto d'anello & Audio \\
+\texttt{*\textasciitilde{}} & \texttt{1} & Pre-guadagno (1/2/4) & Audio \\
+\texttt{delwrite\textasciitilde{}} & \texttt{tab1 50} & Scrittura ritardo d'anello & Audio \\
+\texttt{delread\textasciitilde{}} & \texttt{tab1 50} & Lettura ritardo d'anello & Audio \\
+\texttt{*\textasciitilde{}} & --- & Moltiplicatore d'anello & Audio \\
+\texttt{*\textasciitilde{}} & --- & VCA d'uscita (L/R) & Audio \\
+\texttt{tgl} & --- & Silenziamento uscita & Audio \\
+\texttt{dac\textasciitilde{}} & --- & Uscita altoparlante & Audio \\
+\texttt{s\textasciitilde{}} & \texttt{audioLAR} & Diramazione uscita & Audio \\
+\texttt{delwrite\textasciitilde{}} & \texttt{tab2 20} & Scrittura tap di analisi & Analisi \\
+\texttt{delread\textasciitilde{}} & \texttt{tab2 20} & Lettura tap di analisi & Analisi \\
+\texttt{env\textasciitilde{}} & \texttt{2048} & Inviluppo del livello (dB) & Analisi \\
+\texttt{dbtorms} & --- & Conversione dB$\to$RMS & Analisi \\
+\texttt{-} & \texttt{1} & Scarto dal riferimento & Analisi \\
+\texttt{abs} & --- & Valore assoluto & Analisi \\
+\texttt{pow} & \texttt{40} & Non linearità di controllo & Analisi \\
+\texttt{line} & --- & Rampa di controllo (\SI{200}{\milli\second}) & Analisi \\
+\texttt{msg} & \texttt{\$1 200} & Formattazione rampa di controllo & Analisi \\
+\texttt{line} & --- & Rampa d'ingresso (\SI{2000}{\milli\second}) & Audio \\
+\texttt{msg} & \texttt{\$1 2000} & Formattazione rampa d'ingresso & Audio \\
+\texttt{r\textasciitilde{}} & \texttt{audioLAR} & Ripresa per monitor & Monitor \\
+\texttt{oscilloscope} & --- & Visualizzazione & Monitor \\
+\texttt{pd input} & --- & Pre-filtri scollegati & Dormiente \\
+\bottomrule
+\end{tabular}
+\caption{Inventario degli oggetti di \texttt{LAR.pd}, con i due rami del segnale. Ogni valore è trascritto verbatim dal sorgente.}
+\label{tab:inventario}
+\end{table}
+
+\subsection{Verdetto sull'I/O: mono}
+L'ingresso è mono: \texttt{adc\textasciitilde{} 1} dichiara un solo canale e alimenta un unico moltiplicatore d'ingresso (\texttt{\#X connect 9 0 11 0}).
+Anche l'uscita è mono, replicata sui due canali di \texttt{dac\textasciitilde{}}.
+I due moltiplicatori d'uscita ricevono la stessa coppia di sorgenti: il moltiplicatore d'anello \texttt{*\textasciitilde{}} (\texttt{\#X connect 5 0 12 0} e \texttt{\#X connect 5 0 13 0}) e l'interruttore \texttt{tgl} (\texttt{\#X connect 10 0 12 1} e \texttt{\#X connect 10 0 13 1}).
+Il primo va al canale sinistro di \texttt{dac\textasciitilde{}} (\texttt{\#X connect 12 0 0 0}), il secondo al canale destro (\texttt{\#X connect 13 0 0 1}).
+I due canali calcolano quindi lo stesso prodotto a partire dalle stesse sorgenti, così l'uscita è un mono duplicato.
+Il verdetto è netto: \texttt{dslar} è un plugin mono, un ingresso e un'uscita.
+Per la porta in SEAM-LTM questo fissa la normalizzazione a un canale d'ingresso e un canale d'uscita, con l'eventuale duplicazione lasciata all'host.
 
 \section{Contesto e fonti}\label{sec:contesto}
 Segnaposto: scritto in Task 3.
