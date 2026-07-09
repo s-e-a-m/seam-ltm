@@ -103,7 +103,31 @@ Il verdetto è netto: \texttt{dslar} è un plugin mono, un ingresso e un'uscita.
 Per la porta in SEAM-LTM questo fissa la normalizzazione a un canale d'ingresso e un canale d'uscita, con l'eventuale duplicazione lasciata all'host.
 
 \section{Contesto e fonti}\label{sec:contesto}
-Segnaposto: scritto in Task 3.
+La poetica ecosistemica di Agostino Di Scipio tratta la sala come una risorsa e la retroazione come materiale sonoro.
+Un sistema di elaborazione entra in contatto con l'ambiente che lo ospita e ne trae l'energia per sostenersi, secondo i principi di ``system\,/\,ambience coupling'' e ``self-organisation'' che l'autore espone in \cite{discipio2003ecosystemics}.
+In questa prospettiva la risonanza della stanza e il rumore di fondo sono la ``basic resource'' da cui nasce qualcosa che chiamiamo musica \cite{discipio2011background}.
+L'ecosistema si compie quando la rete di interazioni include il proprio \emph{oikos}, lo spazio risonante in cui il sistema trova le risorse per vivere \cite{discipio2011background}.
+LAR mette in scena esattamente questo ascolto: la stanza ascolta se stessa mentre suona, e il guadagno d'anello è la risposta del sistema a ciò che sente.
+
+Le prime opere ecosistemiche di Di Scipio nascono come patch di segnale in KYMA5.2, come l'autore dichiara descrivendo l'Audible Eco-Systemic Interface \cite{discipio2003ecosystemics}.
+L'opera realizzata interamente in Pure Data è \emph{Modes of Interference}, il sistema di retroazione audio per tromba ed elettronica documentato in \cite{discipio2006pd}.
+\texttt{LAR.pd} è una patch di Pure Data, e questo la colloca nella linea di \emph{Modes of Interference}, in accordo con il nome delle patch sorelle (\texttt{LAR MOI1}).
+
+Il testo del 2006 descrive la funzione della patch con parole che ricalcano la struttura di \texttt{LAR.pd}.
+Il compito è ``implement a nonlinear coupling between a microphone and a pair of loudspeakers, such that a self-regulating feedback dynamics is established'' (\cite{discipio2006pd}, abstract).
+Il guadagno d'anello è ``an adaptive process, depending on the total sound level'', pensato per ``keep the system in equilibrium at all times'' (\cite{discipio2006pd}, p.~2, \S2.2.2).
+L'obiettivo omeostatico è tenere il guadagno ``high enough to result into Larsen tones and other artifacts, but not too high to cause clipping'' (\cite{discipio2006pd}, p.~3).
+
+Questa descrizione si sovrappone punto per punto all'anatomia ricostruita nella sezione~\ref{sec:anatomia}.
+L'inviluppo \texttt{env\textasciitilde{} 2048} misura il ``total sound level'' del segnale d'anello.
+La catena \texttt{dbtorms}, \texttt{- 1}, \texttt{abs} e \texttt{pow 40} realizza l'``adaptive process'' che scala il guadagno in senso inverso all'ampiezza misurata.
+La coppia \texttt{s\textasciitilde{} audioLAR} e \texttt{r\textasciitilde{} audioLAR} chiude l'anello attraverso la stanza, che diventa parte integrante del percorso del segnale.
+
+\texttt{LAR.pd} isola il cuore autoregolante di \emph{Modes of Interference} dagli strati di trasformazione granulare (le sotto-patch \texttt{pd gr8}, \texttt{pd gr4}, \texttt{pd gr2}) che il testo del 2006 presenta come estensioni del ``fundamental audio feedback loop'' \cite{discipio2006pd}.
+Restano l'anello fondamentale e la sola legge di controllo, la coppia minima che questo studio porta in SEAM-LTM.
+
+La stessa idea del Larsen acustico come sorgente e materiale attraversa il ciclo Audible Ecosystemics, in particolare \emph{Feedback Study}, dove la retroazione tra microfoni e altoparlanti è l'unico generatore sonoro \cite{discipio2003feedbackstudy}.
+LAR condivide con quelle opere l'omeostasi del livello di stanza, e la traduce nella forma più essenziale di un solo anello e di una sola rampa di controllo.
 
 \section{Analisi del segnale}\label{sec:segnale}
 Segnaposto: scritto in Task 4.
