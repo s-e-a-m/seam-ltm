@@ -130,13 +130,121 @@ La stessa idea del Larsen acustico come sorgente e materiale attraversa il ciclo
 LAR condivide con quelle opere l'omeostasi del livello di stanza, e la traduce nella forma più essenziale di un solo anello e di una sola rampa di controllo.
 
 \section{Analisi del segnale}\label{sec:segnale}
-Segnaposto: scritto in Task 4.
+Questa sezione segue il segnale campione per campione lungo i due rami che escono dal nodo d'ingresso condiviso.
+Il ramo audio porta il suono attraverso l'anello di Larsen; il ramo di analisi misura lo stesso suono e ne ricava il guadagno che l'anello deve assumere.
+
+\subsection{Il ramo audio}
+Il segnale nasce da \texttt{adc\textasciitilde{} 1}, un solo canale di microfono.
+Entra nel moltiplicatore d'ingresso, dove una dissolvenza in salita di \SI{2}{\second} (rampa \texttt{line} pilotata dal messaggio \texttt{\$1 2000}) porta il guadagno d'ingresso a regime senza transienti.
+Il passa-alto \texttt{hip\textasciitilde{} 100} rimuove la componente continua e il rombo di sala sotto \SI{100}{\hertz}.
+Il pre-guadagno \texttt{*\textasciitilde{} 1}, commutabile fra \texttt{1}, \texttt{2} e \texttt{4}, fissa l'energia che alimenta l'anello.
+La linea di ritardo \texttt{tab1} di \SI{50}{\milli\second} (\texttt{delwrite\textasciitilde{}}/\texttt{delread\textasciitilde{}}) impone lo sfasamento temporale che innesca il Larsen.
+Il segnale ritardato entra nel moltiplicatore d'anello, dove viene scalato dal guadagno omeostatico prodotto dal ramo di analisi.
+I due moltiplicatori d'uscita applicano l'interruttore di silenziamento \texttt{tgl} e inviano il segnale a \texttt{dac\textasciitilde{}} e a \texttt{s\textasciitilde{} audioLAR}.
+
+\subsection{Il ramo di analisi}
+Il ramo di analisi preleva lo stesso segnale d'ingresso attraverso la linea di ritardo \texttt{tab2} di \SI{20}{\milli\second}, che lo decorrela dal ramo audio prima della misura.
+L'inviluppo \texttt{env\textasciitilde{} 2048} calcola il livello RMS su una finestra di 2048 campioni e lo restituisce in decibel secondo la convenzione di Pd.
+La catena di controllo \texttt{dbtorms}, \texttt{- 1}, \texttt{abs} e \texttt{pow 40} converte quel livello nel fattore di guadagno dell'anello.
+Il valore risultante viene formattato dal messaggio \texttt{\$1 200} e levigato da una rampa \texttt{line} di \SI{200}{\milli\second}, che chiude l'anello riportando il guadagno al moltiplicatore d'anello.
+La legge di controllo che governa questa catena è derivata nella sezione~\ref{sec:controllo}.
+
+\subsection{Il bus \texttt{audioLAR} e il monitor}
+La coppia \texttt{s\textasciitilde{} audioLAR} e \texttt{r\textasciitilde{} audioLAR} non è un semplice instradamento interno.
+L'uscita di \texttt{dslar} passa per gli altoparlanti, attraversa la stanza, rientra dal microfono e ritorna al nodo d'ingresso: il bus \texttt{audioLAR} è la traccia software di questo anello acustico che si chiude nell'\emph{oikos}, lo spazio risonante che alimenta il sistema.
+Il monitor \texttt{r\textasciitilde{} audioLAR} $\to$ \texttt{oscilloscope} osserva la forma d'onda dell'anello senza intervenire sul segnale, ed è lo strumento con cui l'autore verifica a occhio la ``breathing'' dell'ecosistema.
+
+La Tabella~\ref{tab:flusso} riassume i due percorsi come catene di blocchi in serie.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Ramo & Catena del segnale \\
+\midrule
+Audio & \texttt{adc\textasciitilde{} 1} $\to$ dissolvenza (\SI{2}{\second}) $\to$ \texttt{hip\textasciitilde{} 100} $\to$ pre-guadagno (1/2/4) \\
+      & \quad $\to$ \texttt{tab1} (\SI{50}{\milli\second}) $\to$ moltiplicatore d'anello $\to$ VCA $\to$ \texttt{dac\textasciitilde{}}, \texttt{s\textasciitilde{} audioLAR} \\[2pt]
+Analisi & nodo d'ingresso $\to$ \texttt{tab2} (\SI{20}{\milli\second}) $\to$ \texttt{env\textasciitilde{} 2048} \\
+        & \quad $\to$ \texttt{dbtorms} $\to$ \texttt{- 1} $\to$ \texttt{abs} $\to$ \texttt{pow 40} $\to$ \texttt{line} (\SI{200}{\milli\second}) $\to$ moltiplicatore d'anello \\[2pt]
+Monitor & \texttt{r\textasciitilde{} audioLAR} $\to$ \texttt{oscilloscope} \\
+\bottomrule
+\end{tabular}
+\caption{I due rami di \texttt{LAR.pd} come catene di blocchi in serie, più il ramo di monitoraggio. Il moltiplicatore d'anello è il punto in cui il ramo di analisi agisce sul ramo audio.}
+\label{tab:flusso}
+\end{table}
 
 \section{La legge di controllo omeostatica}\label{sec:controllo}
-Segnaposto: scritto in Task 4.
+Il cuore autoregolante di \texttt{dslar} è la catena \texttt{env\textasciitilde{} 2048} $\to$ \texttt{dbtorms} $\to$ \texttt{- 1} $\to$ \texttt{abs} $\to$ \texttt{pow 40}.
+Per derivarla correttamente occorre fissare la semantica esatta degli oggetti di Pd coinvolti, evitando di trattare \texttt{env\textasciitilde{}} come un generico ``inviluppo''.
+
+\subsection{Semantica di \texttt{env\textasciitilde{}} e \texttt{dbtorms}}
+L'oggetto \texttt{env\textasciitilde{} N} emette il livello RMS del suo ingresso in decibel, secondo la convenzione di Pd per cui \SI{100}{\deci\bel} corrispondono a un'ampiezza RMS pari a \num{1.0}:
+\begin{equation}
+\text{env}(x) = 100 + 20\,\log_{10}\!\big(\mathrm{rms}(x)\big),
+\qquad N = 2048~\text{campioni}.
+\end{equation}
+L'oggetto \texttt{dbtorms} è l'inverso esatto di questa convenzione:
+\begin{equation}
+\mathrm{dbtorms}(\text{dB}) = 10^{(\text{dB} - 100)/20}.
+\end{equation}
+Componendo i due si recupera l'ampiezza RMS lineare del segnale d'anello, che indichiamo con $r$:
+\begin{equation}
+r = \mathrm{dbtorms}\big(\text{env}(x)\big) = \mathrm{rms}(x) \in [0, 1]\ \text{(circa)}.
+\end{equation}
+La legge di controllo va quindi ragionata sull'ampiezza RMS \emph{lineare} $r$, non sui decibel.
+
+\subsection{La legge e i suoi limiti}
+Applicando \texttt{- 1}, \texttt{abs} e \texttt{pow 40} all'ampiezza lineare $r$ si ottiene il guadagno d'anello:
+\begin{equation}
+g(t) = \big|\, r(t) - 1 \,\big|^{\,40},
+\qquad r(t) = \mathrm{dbtorms}\big(\text{env}(t)\big).
+\label{eq:controllo}
+\end{equation}
+I due limiti di~\eqref{eq:controllo} descrivono l'omeostasi.
+Stanza silenziosa: $r \to 0$, quindi $|r - 1| \to 1$ e $g \to 1$, il guadagno si apre e l'anello riprende a suonare.
+Stanza satura: $r \to 1$, quindi $|r - 1| \to 0$ e $g \to 0$, il guadagno si chiude e l'anello si spegne prima del clipping.
+Il sistema insegue perciò un equilibrio: ogni volta che l'anello cresce, il guadagno si riduce; ogni volta che tace, il guadagno risale.
+
+\subsection{Il ruolo dell'esponente 40}
+L'esponente \num{40} trasforma la mappa $|r-1|$ da rampa dolce in curva quasi a soglia.
+Per gran parte dell'intervallo $r \in [0,1)$ il termine $|r-1|$ resta vicino a $1$, ma elevarlo alla quarantesima potenza schiaccia rapidamente il guadagno verso $0$ non appena $r$ si avvicina all'unità.
+Con $r = 0.9$ si ha $|r-1|^{40} = 0.1^{40} \approx 10^{-40}$, un guadagno di fatto nullo; con $r = 0.98$ il guadagno è $0.02^{40}$, ancora più piccolo.
+La curva è dunque quasi piatta a guadagno alto per livelli bassi e crolla a ridosso della saturazione: l'anello ``respira'' attorno a un punto di equilibrio invece di assestarsi su un valore fisso.
+È questa non linearità pronunciata, più che la semplice sottrazione dal riferimento, a produrre la dinamica auto-oscillante che Di Scipio descrive come ``self-regulating feedback''.
+
+\subsection{Un nuovo mattone \texttt{sds}}
+Questo idioma, ampiezza lineare $\to$ scarto dal riferimento $\to$ valore assoluto $\to$ potenza elevata, non compare nella famiglia \texttt{sds.map*} esistente delle librerie SEAM.
+La legge~\eqref{eq:controllo} diventa perciò un nuovo mattone \texttt{sds} da introdurre nella Fase~2, con l'esponente e il riferimento come parametri, insieme alla conversione \texttt{env\textasciitilde{}}/\texttt{dbtorms} che la precede.
 
 \section{Compatibilità con la frequenza di campionamento}\label{sec:sr}
-Segnaposto: scritto in Task 4.
+Di Scipio scrive le sue patch alla frequenza di riferimento $\text{SR}_{\text{ref}} = \SI{44100}{\hertz}$, mentre la suite SEAM-LTM lavora a frequenza arbitraria.
+Un porting corretto deve mantenere \emph{invariante} il comportamento temporale al variare di SR.
+
+\subsection{L'unica costante relativa ai campioni}
+In tutta \texttt{LAR.pd} la sola costante espressa in campioni è la finestra di \texttt{env\textasciitilde{} 2048}.
+Ancorata nel tempo alla frequenza di riferimento, essa vale
+\begin{equation*}
+T_{\text{env}} = \frac{2048}{44100}\,\text{s} \approx \SI{46.4}{\milli\second},
+\qquad N(\text{SR}) = \mathrm{ba.sec2samp}(T_{\text{env}}) = \operatorname{round}\!\big(T_{\text{env}}\cdot \text{SR}\big).
+\end{equation*}
+Alla frequenza di riferimento $N(44100) = 2048$, mentre a \SI{96}{\kilo\hertz} si ottiene $N \approx 4458$ campioni, che è ancora una finestra di \SI{46.4}{\milli\second}.
+Mantenere il letterale \texttt{2048} a \SI{96}{\kilo\hertz} ridurrebbe la finestra a circa \SI{21}{\milli\second}, accelerando la misura RMS e alterando il ``respiro'' dell'ecosistema.
+Ancorare la finestra nel tempo e ricostruire i campioni alla frequenza effettiva mantiene invece il comportamento identico a ogni SR.
+
+\subsection{Costanti già indipendenti da SR}
+Le linee di ritardo \texttt{delread\textasciitilde{}}/\texttt{delwrite\textasciitilde{}} (\texttt{tab1} \SI{50}{\milli\second}, \texttt{tab2} \SI{20}{\milli\second}) e le rampe \texttt{line} (\SI{2000}{\milli\second} e \SI{200}{\milli\second}) hanno argomenti già in millisecondi, quindi sono intrinsecamente indipendenti da SR.
+Anche il passa-alto \texttt{hip\textasciitilde{} 100} è espresso in hertz e resta invariante, a patto che i coefficienti del filtro siano ridisegnati alla frequenza effettiva.
+
+\subsection{Ritardi di decorrelazione e numero primo successivo}
+I ritardi di decorrelazione da \SI{20}{\milli\second} e \SI{50}{\milli\second}, una volta convertiti in campioni alla frequenza effettiva, possono essere agganciati al numero primo successivo.
+La funzione esiste già: \texttt{sff.np} in Faust e il \texttt{nextPrime} scritto a mano di \texttt{ddelay} in C++.
+Snappare i ritardi a lunghezze prime rende coprimi i ritardi di più istanze di \texttt{dslar}, così che rinforzino risonanze a pettine diverse e si decorrelino invece di sovrapporsi.
+Resta una scelta caso per caso, coerente con la convenzione di porting di Di Scipio.
+
+\subsection{Piano di validazione}
+La strategia si verifica con un test A/B comportamentale fra \SI{44.1}{\kilo\hertz} e \SI{96}{\kilo\hertz}.
+Con la finestra ancorata nel tempo, le due frequenze devono produrre lo stesso inviluppo nel dominio del tempo e lo stesso periodo di ``respiro'' dell'anello; una divergenza segnala il rientro del letterale \texttt{2048} nel percorso di calcolo.
 
 \section{Mappa di decomposizione}\label{sec:decomposizione}
 Segnaposto: scritto in Task 5.
