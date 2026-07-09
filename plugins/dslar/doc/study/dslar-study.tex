@@ -194,6 +194,14 @@ r = \mathrm{dbtorms}\big(\text{env}(x)\big) = \mathrm{rms}(x) \in [0, 1]\ \text{
 \end{equation}
 La legge di controllo va quindi ragionata sull'ampiezza RMS \emph{lineare} $r$, non sui decibel.
 
+\paragraph{Verifica sul sorgente.}
+Questo comportamento è confermato leggendo il sorgente di Pure Data.
+L'oggetto \texttt{env\textasciitilde{}} (classe \texttt{sigenv} in \texttt{src/d\_ctl.c}) calcola la media dei quadrati del segnale pesata da una finestra di Hann normalizzata su $N$ campioni, e ne emette \texttt{powtodb}.
+La funzione \texttt{powtodb} (in \texttt{src/x\_acoustics.c}) vale $100 + 10\,\log_{10}(\text{potenza})$, così l'uscita di \texttt{env\textasciitilde{}} esprime la potenza in decibel con \SI{100}{\deci\bel} pari a potenza unitaria.
+La funzione \texttt{dbtorms} vale $10^{(\text{dB}-100)/20}$, e composta con \texttt{env\textasciitilde{}} restituisce $\langle x^2\rangle^{1/2}$, cioè l'RMS esatto.
+La riscrittura in Faust e in C++ riproduce perciò la media dei quadrati pesata Hann seguita da \texttt{powtodb}, e conserva lo stesso comportamento a ogni frequenza di campionamento.
+Questa annotazione è la traccia del controllo eseguito sul codice aperto, e sostiene una scrittura continua dal patch al plugin.
+
 \subsection{La legge e i suoi limiti}
 Applicando \texttt{- 1}, \texttt{abs} e \texttt{pow 40} all'ampiezza lineare $r$ si ottiene il guadagno d'anello:
 \begin{equation}
