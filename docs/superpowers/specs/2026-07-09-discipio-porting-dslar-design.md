@@ -56,6 +56,22 @@ Plugin family `ds*` (Di Scipio) parallels the library namespace `sds`.
 LAR → plugin `dslar`.
 Future works follow the same pattern (`dsae2`, …).
 
+### Library layering — `seam.pdclone.lib`
+
+The porting is organized in layers, mirroring how `seam.cyclone.lib` (`scy`)
+clones Max/gen~ objects.
+A new **`seam.pdclone.lib`** (proposed prefix `spd`) clones **Pure Data**
+objects faithfully against the Pd source (`env~`, `powtodb`/`dbtorms`, Pd's
+`hip~`, `line`, …), verified per `reference_external_source_checkouts`.
+`seam.discipio.lib` (`sds`) does not re-implement Pd primitives; it **composes**
+the pdclone objects — the homeostatic law is an `sds` brick built on
+`pdclone.env`.
+The check already done for LAR: Pd `env~` has no ready Faust equivalent (the
+`an.*` followers use rectangular/one-pole windows and a 0 dB reference, while
+`env~` uses a normalized Hann window and the 100 dB `powtodb` reference), so
+`pdclone.env` is written new.
+See memory `project_pdclone_library_architecture`.
+
 ### Cross-cutting rule — sample-rate independence
 
 Di Scipio authors at SR = 44100.
@@ -134,7 +150,7 @@ This idiom is new: it is not among the existing `sds.map*` functions.
 
 | Patch block | Destination | Note |
 |---|---|---|
-| `env~ 2048` (RMS→dB) | `sds` brick — envelope follower | reconcile with `sds.integrator` used by AE2 |
+| `env~ 2048` (RMS→dB) | `seam.pdclone.lib` clone — `pdclone.env` | Pd `env~` = Hann-weighted mean-square + `powtodb`; no ready Faust match (`an.*` followers are rectangular/one-pole with 0 dB ref); `sds` composes it. Distinct from AE2's `sds.integrator` (abs rectangular average). |
 | `dbtorms → −1 → abs → pow 40` | `sds` brick — the heart | homeostatic law; new idiom |
 | fade `$1 2000→line`, ctrl `$1 200→line` | Faust std (`si.smoo`/ramp) | smoothing; no new brick |
 | `hip~ 100` | Faust std (`fi.highpass`/`sfi`) | coefficients designed at runtime SR |

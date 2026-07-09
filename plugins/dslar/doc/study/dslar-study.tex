@@ -256,8 +256,9 @@ La strategia si verifica con un test A/B comportamentale fra \SI{44.1}{\kilo\her
 Con la finestra ancorata nel tempo, le due frequenze devono produrre lo stesso inviluppo nel dominio del tempo e lo stesso periodo di ``respiro'' dell'anello; una divergenza segnala il rientro del letterale \texttt{2048} nel percorso di calcolo.
 
 \section{Mappa di decomposizione}\label{sec:decomposizione}
-La Tabella~\ref{tab:decomposizione} smista ogni blocco di \texttt{LAR.pd} verso una delle tre destinazioni previste dalla specifica di porting.
-Un blocco diventa un nuovo mattone \texttt{sds} quando incarna un idioma di Di Scipio ancora assente dalla libreria.
+La Tabella~\ref{tab:decomposizione} smista ogni blocco di \texttt{LAR.pd} verso una delle quattro destinazioni previste dalla specifica di porting.
+Un blocco diventa un clone \texttt{pdclone} quando replica un oggetto di Pure Data la cui semantica esatta differisce dagli standard Faust, come \texttt{env\textasciitilde{}}: questi cloni vivono nella libreria \texttt{seam.pdclone.lib}, come \texttt{seam.cyclone.lib} raccoglie gli oggetti di Max.
+Un blocco diventa un nuovo mattone \texttt{sds} quando incarna un idioma di Di Scipio ancora assente dalla libreria, e compone i cloni \texttt{pdclone} invece di re-implementarli.
 Un blocco resta circuito locale di \texttt{dslar} quando è specifico di questa patch, in attesa che una seconda patch lo rivendichi.
 Un blocco si copre con uno standard Faust già disponibile quando realizza una funzione generica, come una rampa o un filtro.
 
@@ -268,7 +269,7 @@ Un blocco si copre con uno standard Faust già disponibile quando realizza una f
 \toprule
 Blocco patch & Destino & Nota \\
 \midrule
-\texttt{env\textasciitilde{} 2048} (RMS$\to$dB) & mattone \texttt{sds} & Follower d'inviluppo; da riconciliare con \texttt{sds.integrator}, già usato da AE2 (\texttt{fc2003dsaae2}) \\[4pt]
+\texttt{env\textasciitilde{} 2048} (RMS$\to$dB) & clone \texttt{pdclone} & Oggetto Pd \texttt{env\textasciitilde{}} da clonare come \texttt{pdclone.env} (media dei quadrati pesata Hann + \texttt{powtodb}); nessun equivalente pronto in Faust; \texttt{sds} lo compone \\[4pt]
 \texttt{dbtorms} $\to$ \texttt{- 1} $\to$ \texttt{abs} $\to$ \texttt{pow 40} & mattone \texttt{sds} & Legge omeostatica; idioma nuovo, cfr.~sezione~\ref{sec:controllo} \\[4pt]
 Dissolvenza \texttt{\$1 2000}$\to$\texttt{line}; rampa di controllo \texttt{\$1 200}$\to$\texttt{line} & Faust std & Levigatura; già coperta dagli standard Faust \\[4pt]
 \texttt{hip\textasciitilde{} 100} & Faust std & Passa-alto; coefficienti ridisegnati alla frequenza effettiva \\[4pt]
@@ -277,7 +278,7 @@ Pre-guadagno \texttt{1}/\texttt{2}/\texttt{4}, VCA finale & circuito LAR & Diven
 \texttt{s\textasciitilde{}}/\texttt{r\textasciitilde{}} \texttt{audioLAR} & I/O del plugin & L'anello si chiude fuori dal plugin, nella stanza \\
 \bottomrule
 \end{tabular}
-\caption{Mappa di decomposizione di \texttt{LAR.pd}: destinazione di ogni blocco fra nuovo mattone \texttt{sds}, circuito locale di \texttt{dslar} e standard Faust esistente.}
+\caption{Mappa di decomposizione di \texttt{LAR.pd}: destinazione di ogni blocco fra clone \texttt{pdclone} di un oggetto Pd, nuovo mattone \texttt{sds}, circuito locale di \texttt{dslar} e standard Faust esistente.}
 \label{tab:decomposizione}
 \end{table}
 
@@ -298,13 +299,14 @@ Il tempo di levigatura del controllo corrisponde alla rampa di \SI{200}{\milli\s
 Il tempo di decorrelazione corrisponde ai ritardi di \SI{20}{\milli\second} e \SI{50}{\milli\second} dei due rami.
 L'uscita regola il livello finale verso l'host.
 L'anello interno, attivabile o disattivabile, abilita lo studio in cuffia descritto nella sezione~\ref{sec:decomposizione}.
-La Fase~2 estrae due nuovi mattoni \texttt{sds} dalla mappa di decomposizione.
-Il primo è il follower d'inviluppo che sostituisce \texttt{env\textasciitilde{} 2048}.
-Va riconciliato con la firma di \texttt{sds.integrator(s)}, già in uso in AE2 (\texttt{fc2003dsaae2}), che accetta una costante di tempo in secondi.
-Il secondo è la legge omeostatica dell'equazione~\eqref{eq:controllo}, con riferimento ed esponente come parametri espliciti.
-Entrambi i mattoni devono restare compatibili con le firme che AE2 già usa, a tutela del codice della composizione esistente.
+La Fase~2 produce due oggetti, distribuiti su due librerie.
+Il primo è il clone \texttt{pdclone.env}, che replica \texttt{env\textasciitilde{} 2048} come media dei quadrati pesata Hann seguita da \texttt{powtodb}, poiché gli standard Faust non offrono un equivalente pronto.
+Questo clone vive nella nuova libreria \texttt{seam.pdclone.lib}, che raccoglie gli oggetti di Pure Data replicati in Faust, come \texttt{seam.cyclone.lib} fa con gli oggetti di Max.
+Il secondo è la legge omeostatica dell'equazione~\eqref{eq:controllo}, un mattone \texttt{sds} con riferimento ed esponente come parametri espliciti, che compone \texttt{pdclone.env} al suo ingresso.
+Il follower resta distinto da \texttt{sds.integrator(s)} che AE2 (\texttt{fc2003dsaae2}) già usa, una media rettangolare del valore assoluto con costante di tempo in secondi.
+Il mattone \texttt{sds} della legge omeostatica resta compatibile con le firme che AE2 già usa, a tutela del codice della composizione esistente.
 Restano aperte due domande per la Fase~2.
-Il nome e la firma esatti dei due mattoni si definiscono confrontandoli con l'uso reale in AE2.
+Il nome e la firma esatti dei due oggetti si definiscono confrontandoli con l'uso reale in AE2.
 Se il ritardo di decorrelazione debba diventare un terzo mattone \texttt{sds} si decide solo quando una seconda patch lo rivendica, in coerenza con la politica di estrazione incrementale della libreria \texttt{sds}.
 
 \bibliographystyle{plain}
