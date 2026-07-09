@@ -150,9 +150,9 @@ Il valore risultante viene formattato dal messaggio \texttt{\$1 200} e levigato 
 La legge di controllo che governa questa catena è derivata nella sezione~\ref{sec:controllo}.
 
 \subsection{Il bus \texttt{audioLAR} e il monitor}
-La coppia \texttt{s\textasciitilde{} audioLAR} e \texttt{r\textasciitilde{} audioLAR} non è un semplice instradamento interno.
+La coppia \texttt{s\textasciitilde{} audioLAR} e \texttt{r\textasciitilde{} audioLAR} costituisce un anello acustico reale, oltre il semplice instradamento interno.
 L'uscita di \texttt{dslar} passa per gli altoparlanti, attraversa la stanza, rientra dal microfono e ritorna al nodo d'ingresso: il bus \texttt{audioLAR} è la traccia software di questo anello acustico che si chiude nell'\emph{oikos}, lo spazio risonante che alimenta il sistema.
-Il monitor \texttt{r\textasciitilde{} audioLAR} $\to$ \texttt{oscilloscope} osserva la forma d'onda dell'anello senza intervenire sul segnale, ed è lo strumento con cui l'autore verifica a occhio la ``breathing'' dell'ecosistema.
+Il monitor \texttt{r\textasciitilde{} audioLAR} $\to$ \texttt{oscilloscope} osserva la forma d'onda dell'anello lasciando il segnale inalterato, ed è lo strumento con cui l'autore verifica a occhio la ``breathing'' dell'ecosistema.
 
 La Tabella~\ref{tab:flusso} riassume i due percorsi come catene di blocchi in serie.
 
@@ -208,13 +208,14 @@ Il sistema insegue perciò un equilibrio: ogni volta che l'anello cresce, il gua
 
 \subsection{Il ruolo dell'esponente 40}
 L'esponente \num{40} trasforma la mappa $|r-1|$ da rampa dolce in curva quasi a soglia.
-Per gran parte dell'intervallo $r \in [0,1)$ il termine $|r-1|$ resta vicino a $1$, ma elevarlo alla quarantesima potenza schiaccia rapidamente il guadagno verso $0$ non appena $r$ si avvicina all'unità.
-Con $r = 0.9$ si ha $|r-1|^{40} = 0.1^{40} \approx 10^{-40}$, un guadagno di fatto nullo; con $r = 0.98$ il guadagno è $0.02^{40}$, ancora più piccolo.
-La curva è dunque quasi piatta a guadagno alto per livelli bassi e crolla a ridosso della saturazione: l'anello ``respira'' attorno a un punto di equilibrio invece di assestarsi su un valore fisso.
-È questa non linearità pronunciata, più che la semplice sottrazione dal riferimento, a produrre la dinamica auto-oscillante che Di Scipio descrive come ``self-regulating feedback''.
+Sull'intervallo $r \in [0,1]$ vale $|r-1| = 1-r$, e questo termine resta vicino a $1$ solo per valori piccoli di $r$: elevato alla quarantesima potenza, precipita non appena $r$ supera circa $0.1$.
+Con $r = 0.11$ si ha $(1-r)^{40} = 0.89^{40} \approx 10^{-2}$, un guadagno già ridotto a un centesimo; con $r = 0.9$ il guadagno è $0.1^{40} \approx 10^{-40}$, di fatto nullo.
+L'anello si autoregola perciò a un livello RMS basso: il punto di equilibrio operativo si colloca all'incirca in $r \in [0, 0.12]$, un regime di Larsen a bassa ampiezza, ben lontano dalla saturazione.
+L'esponente \num{40} chiude il guadagno non appena $r$ supera circa $0.1$: il crollo avviene a basso livello di stanza, non a ridosso della saturazione.
+La sensibilità della legge, $\mathrm{d}g/\mathrm{d}r = -40\,(1-r)^{39}$, raggiunge il modulo massimo (\num{40}) proprio per $r \to 0$, cioè nel punto di equilibrio: questa risposta ripida, più che la semplice sottrazione dal riferimento, produce il ``respiro'' e il pulsare che Di Scipio descrive come ``self-regulating feedback''.
 
 \subsection{Un nuovo mattone \texttt{sds}}
-Questo idioma, ampiezza lineare $\to$ scarto dal riferimento $\to$ valore assoluto $\to$ potenza elevata, non compare nella famiglia \texttt{sds.map*} esistente delle librerie SEAM.
+Questo idioma, ampiezza lineare $\to$ scarto dal riferimento $\to$ valore assoluto $\to$ potenza elevata, è nuovo rispetto alla famiglia \texttt{sds.map*} esistente delle librerie SEAM.
 La legge~\eqref{eq:controllo} diventa perciò un nuovo mattone \texttt{sds} da introdurre nella Fase~2, con l'esponente e il riferimento come parametri, insieme alla conversione \texttt{env\textasciitilde{}}/\texttt{dbtorms} che la precede.
 
 \section{Compatibilità con la frequenza di campionamento}\label{sec:sr}
@@ -239,7 +240,7 @@ Anche il passa-alto \texttt{hip\textasciitilde{} 100} è espresso in hertz e res
 \subsection{Ritardi di decorrelazione e numero primo successivo}
 I ritardi di decorrelazione da \SI{20}{\milli\second} e \SI{50}{\milli\second}, una volta convertiti in campioni alla frequenza effettiva, possono essere agganciati al numero primo successivo.
 La funzione esiste già: \texttt{sff.np} in Faust e il \texttt{nextPrime} scritto a mano di \texttt{ddelay} in C++.
-Snappare i ritardi a lunghezze prime rende coprimi i ritardi di più istanze di \texttt{dslar}, così che rinforzino risonanze a pettine diverse e si decorrelino invece di sovrapporsi.
+Snappare i ritardi a lunghezze prime rende coprimi i ritardi di più istanze di \texttt{dslar}, così che rinforzino risonanze a pettine diverse e restino decorrelate tra loro.
 Resta una scelta caso per caso, coerente con la convenzione di porting di Di Scipio.
 
 \subsection{Piano di validazione}
