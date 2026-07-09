@@ -67,6 +67,28 @@ invariant across rates.
 See memory `project_discipio_sr_independence` and the UHJ precedent
 `project_uhj_quadrature_fs_dependence`.
 
+### Cross-cutting rule — mono I/O normalization
+
+When a Pd patch duplicates one signal onto two identical outputs (the same node
+on `dac~` channels 1 and 2), port it as a mono 1-in / 1-out plugin, without
+duplicating the output.
+If the two outputs genuinely differ (decorrelation, panning, independent
+processing), keep them distinct.
+See memory `feedback_porting_mono_io_normalization`.
+
+### Cross-cutting rule — next-prime delay lengths
+
+When a control function converts milliseconds → samples as a function of SR,
+evaluate case by case whether to snap the resulting sample count to the next
+prime, so multiple instances of the same object get coprime (decorrelated)
+delays instead of reinforcing the same comb resonances.
+The function already exists: Faust `sff.np` (ffunction `next_pr`,
+`seam.ffunctions.lib`); the C++ reference is `ddelay`'s hand-written `nextPrime`
+(`distance → samples → nextprime → delay`).
+It is a per-case choice; a single-instance or phase-critical delay may want the
+exact value.
+See memory `feedback_next_prime_delay_multiinstance`.
+
 ### Boundary with seam-ltm conventions
 
 Faust is the spec; C++ is hand-written (no `faust -lang cpp` in plugin DSP).
@@ -82,6 +104,10 @@ Documentation is generated with `tools/gen-faust-doc.sh` (SVG diagrams + faust2m
 A VST3 plugin encapsulating the self-regulating Larsen ecosystem of `LAR.pd`, with the
 `sds` library as its Faust specification, accompanied by a documented analysis of the
 patch and a compilable Faust example.
+
+`LAR.pd` feeds `dac~` with two branches that appear to be one duplicated signal.
+Confirm during phase 1; if identical, `dslar` is **mono 1-in / 1-out** (per the
+mono I/O normalization rule) and the GUI meter/scope shows that single channel.
 
 ### What `LAR.pd` does
 
@@ -123,6 +149,8 @@ Port it as `ba.sec2samp(2048/44100)` in Faust and compute the window in `prepare
 The others are already SR-independent: `delread~`/`line` are milliseconds, `hip~` is Hz.
 Record `SR_ref = 44100` and this conversion in `doc/study`.
 Verify with a 44.1 kHz vs 96 kHz behavioral A/B (same breathing period / envelope).
+For the 20/50 ms decorrelation delays, consider the next-prime snap (`sff.np` /
+`ddelay` reference) so several `dslar` instances in a session decorrelate.
 
 ### Plugin/room boundary
 
