@@ -99,6 +99,21 @@ keep when the gated subgraph is costly AND idle between ticks.
 2. **SR-adaptive window** natively (runtime N via `de.delay`), which the compile-time
    `sum` FIR cannot express — could fold SR-independence back into the Faust spec.
 
+### Prototype exists: `doc/sketch/env_oa.dsp` (WIP, promising)
+A first overlap-add skeleton is sketched and partly validated:
+- `env_oa(2048, 1024)` **compiles in ~0.16 s** (vs >2 min for the FIR) — on STABLE faust
+  (the sAndH form; the ondemand line is commented, optional).
+- DC=0.5 → 93.979 dB, **exactly** matches the verified `spd.env`.
+- 1 kHz sine → matches `spd.env` within **max 0.037 dB / mean 0.004 dB**.
+- Remaining: the ~0.04 dB residual is window PHASE ALIGNMENT (lane Hann orientation is
+  reversed vs the sliding FIR — Hann is symmetric so it nearly cancels; and the hop/tick
+  phase may be one sample off `ba.pulse(period)`). Reconcile the lane seed + capture
+  instant, verify to float precision against `oracle.py`, then decide: replace `spd.env`,
+  or add as `spd.envc` beside it. Keep any `ondemand` variant out of the shared lib.
+Structure: L = npoints/period staggered lanes, each a shared-counter phasor + reset-at-wrap
+Hann accumulator; one lane completes per hop, captured into the control-rate result. O(L)/sample,
+no npoints-tap unroll.
+
 ### The cost / tradeoff
 - Overlap-add-in-Faust is more code and needs its own numerical verification (against the
   same Pd oracle) — the phase indexing of `sumbuf` and the window clock are fiddly.
