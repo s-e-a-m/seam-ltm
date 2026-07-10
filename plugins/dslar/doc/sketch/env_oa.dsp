@@ -1,9 +1,9 @@
 //===================================================================
 // env_oa -- overlap-add Hann envelope follower  (ondemand path)
 //===================================================================
-// STATUS: VERIFIED PROTOTYPE, 2026-07-10. Drop-in-equivalent to spd.env, but
-// compiles at the full window. NOT yet promoted into seam.pdclone.lib -- that is
-// the Phase 3 decision (replace spd.env, or add beside it as spd.envc?).
+// STATUS: PROMOTED, 2026-07-10. This overlap-add is now the body of spd.env in
+// seam.pdclone.lib (faust-libraries@dslar 50c4902); this file is kept as the
+// standalone derivation + A/B harness. Float-exact vs the old FIR / the Pd oracle.
 //
 // WHY: spd.env is a sliding FIR -- sum(i, np, w(i)*(x@i)^2) -- that unrolls to `np`
 // taps and takes >2 min to compile at env(2048,1024). Pd itself does NOT do that:

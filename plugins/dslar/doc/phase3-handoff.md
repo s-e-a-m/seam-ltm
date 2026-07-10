@@ -112,14 +112,13 @@ phase d that reaches 0 at the capture instant (n ≡ off mod np, lanes union to 
 pd = `ba.pulse(pd)`), so at d==0 the Hann weight hann(k) sits on x(n-k) exactly like the
 FIR. O(L)/sample, no np-tap unroll. Constraint: np % pd == 0 (LAR 2048/1024 = 2 is fine).
 
-**So the Phase-3 decision is now just PROMOTION, not feasibility:** replace `spd.env`'s
-FIR body with the overlap-add (same output, compiles at full window, stable faust), OR
-keep both (FIR = clearest spec, overlap-add = compilable/efficient). `ondemand` is NOT
-required for the compile win — it turned out orthogonal (the overlap-add structure alone
-delivers it); it stays an optional idiom for the powtodb-at-hop, exercisable in the IDE.
-Recommended: fold the overlap-add in as the `spd.env` implementation and keep the FIR
-one-liner in a comment as the readable derivation. Watch the np%pd==0 constraint and the
-warm-up convention when promoting.
+**DONE — promoted.** `spd.env` now IS the overlap-add (faust-libraries@dslar `50c4902`);
+the sliding-FIR one-liner is kept in the header as the readable derivation. Re-verified:
+`spd.env(64,32)` vs the Pd oracle = max 4.16e-6 dB, DC exact; `env(2048,1024)` compiles;
+`sds.larsengain` (composes `spd.env`) re-verified end to end (DC=0.5 → 0.5^40). `ondemand`
+was NOT required — the compile win is the overlap-add structure, orthogonal to the rate
+primitive; it stays an optional idiom for the per-hop powtodb, exercisable in the IDE.
+Carry-forward: the `npoints % period == 0` constraint (LAR 2048/1024 = 2 is fine).
 
 ### The cost / tradeoff
 - Overlap-add-in-Faust is more code and needs its own numerical verification (against the
