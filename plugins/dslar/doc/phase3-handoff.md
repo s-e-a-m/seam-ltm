@@ -99,20 +99,27 @@ keep when the gated subgraph is costly AND idle between ticks.
 2. **SR-adaptive window** natively (runtime N via `de.delay`), which the compile-time
    `sum` FIR cannot express — could fold SR-independence back into the Faust spec.
 
-### Prototype exists: `doc/sketch/env_oa.dsp` (WIP, promising)
-A first overlap-add skeleton is sketched and partly validated:
+### Prototype exists and is VERIFIED: `doc/sketch/env_oa.dsp`
+The overlap-add env is now a float-exact drop-in for `spd.env` that compiles at the
+full window:
 - `env_oa(2048, 1024)` **compiles in ~0.16 s** (vs >2 min for the FIR) — on STABLE faust
   (the sAndH form; the ondemand line is commented, optional).
-- DC=0.5 → 93.979 dB, **exactly** matches the verified `spd.env`.
-- 1 kHz sine → matches `spd.env` within **max 0.037 dB / mean 0.004 dB**.
-- Remaining: the ~0.04 dB residual is window PHASE ALIGNMENT (lane Hann orientation is
-  reversed vs the sliding FIR — Hann is symmetric so it nearly cancels; and the hop/tick
-  phase may be one sample off `ba.pulse(period)`). Reconcile the lane seed + capture
-  instant, verify to float precision against `oracle.py`, then decide: replace `spd.env`,
-  or add as `spd.envc` beside it. Keep any `ondemand` variant out of the shared lib.
-Structure: L = npoints/period staggered lanes, each a shared-counter phasor + reset-at-wrap
-Hann accumulator; one lane completes per hop, captured into the control-rate result. O(L)/sample,
-no npoints-tap unroll.
+- vs `spd.env(64,32)`: max **7.6e-6 dB** (DC exact 93.979; 1 kHz sine).
+- vs the Pd oracle (env~ formula) over all samples incl. warm-up: max **4.2e-6 dB**.
+- Float32 precision — residual is summation-order rounding only.
+Structure: L = np/pd staggered lanes, each a shared up-counter driving a per-lane DOWN
+phase d that reaches 0 at the capture instant (n ≡ off mod np, lanes union to n ≡ 0 mod
+pd = `ba.pulse(pd)`), so at d==0 the Hann weight hann(k) sits on x(n-k) exactly like the
+FIR. O(L)/sample, no np-tap unroll. Constraint: np % pd == 0 (LAR 2048/1024 = 2 is fine).
+
+**So the Phase-3 decision is now just PROMOTION, not feasibility:** replace `spd.env`'s
+FIR body with the overlap-add (same output, compiles at full window, stable faust), OR
+keep both (FIR = clearest spec, overlap-add = compilable/efficient). `ondemand` is NOT
+required for the compile win — it turned out orthogonal (the overlap-add structure alone
+delivers it); it stays an optional idiom for the powtodb-at-hop, exercisable in the IDE.
+Recommended: fold the overlap-add in as the `spd.env` implementation and keep the FIR
+one-liner in a comment as the readable derivation. Watch the np%pd==0 constraint and the
+warm-up convention when promoting.
 
 ### The cost / tradeoff
 - Overlap-add-in-Faust is more code and needs its own numerical verification (against the

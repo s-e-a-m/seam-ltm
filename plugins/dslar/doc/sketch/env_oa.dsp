@@ -1,74 +1,73 @@
 //===================================================================
-// env_oa -- overlap-add Hann envelope follower  (ondemand PROTOTYPE)
+// env_oa -- overlap-add Hann envelope follower  (ondemand path)
 //===================================================================
-// STATUS: WIP SKELETON, sketched 2026-07-10. NOT in seam.pdclone.lib yet.
+// STATUS: VERIFIED PROTOTYPE, 2026-07-10. Drop-in-equivalent to spd.env, but
+// compiles at the full window. NOT yet promoted into seam.pdclone.lib -- that is
+// the Phase 3 decision (replace spd.env, or add beside it as spd.envc?).
 //
-// WHY: spd.env is a sliding FIR -- sum(i, npoints, w(i)*(x@i)^2) -- that unrolls
-// to `npoints` taps and takes >2 min to compile at env(2048,1024). Pd itself does
-// NOT do that: env_tilde_perform is OVERLAP-ADD (~L active Hann windows, O(L)/sample).
-// This prototype mirrors that structure so it compiles at the full window.
+// WHY: spd.env is a sliding FIR -- sum(i, np, w(i)*(x@i)^2) -- that unrolls to `np`
+// taps and takes >2 min to compile at env(2048,1024). Pd itself does NOT do that:
+// env_tilde_perform is OVERLAP-ADD (~L active Hann windows, O(L)/sample). This
+// mirrors that structure, so it compiles at the full window.
 //
-// RESULTS so far (scratch A/B vs the verified spd.env, small window 64/32):
-//   * env_oa(2048,1024) compiles in ~0.16 s (vs >2 min for the FIR), on STABLE faust.
-//   * DC=0.5 -> 93.979 dB, exactly matches spd.env (= powtodb(0.25)).
-//   * 1 kHz sine -> matches spd.env within max 0.037 dB / mean 0.004 dB.
+// VERIFICATION (scratch harness A/B, small window 64/32):
+//   * env_oa(2048,1024) compiles in ~0.16 s (vs >2 min FIR), on STABLE faust.
+//   * vs spd.env(64,32): max 7.6e-6 dB (DC exact 93.979; 1 kHz sine).
+//   * vs the Pd oracle (env~ formula) over all 400 samples incl. warm-up: max 4.2e-6 dB.
+//   -> matches to float32 precision; the residual is summation-order rounding only.
 //
-// REMAINING TUNING (next session, formal A/B vs oracle.py + Pd):
-//   * the ~0.04 dB residual is window PHASE ALIGNMENT: the overlap-add lane sweeps
-//     the Hann phase in the opposite orientation from the sliding FIR (a ~1-sample
-//     shift; Hann is symmetric so it nearly cancels) and the hop/tick phase may be
-//     one sample off from spd.env's ba.pulse(period). Reconcile the lane phase seed
-//     and the capture instant, then re-verify to float precision.
-//   * requires npoints % period == 0 (integer overlap L); Pd rounds realperiod to a
-//     block multiple -- decide the convention.
-//   * ba.time-free bounded counter used (good), but confirm behaviour across the
-//     first npoints samples (warm-up) matches spd.env's zero-fill.
+// HOW IT ALIGNS (the fix over the first sketch): each lane runs a DOWN phase d that
+// reaches 0 exactly at the capture instant n = n_cap (n_cap ≡ off mod np, so the L
+// lanes' captures union to n ≡ 0 mod pd, matching spd.env's ba.pulse(pd)). At d==0
+// the weight hann(k) has landed on x(n_cap - k) for k = 0..np-1 -- identical to the
+// FIR's sum(i, np, hann(i)*x(n-i)^2). No np-tap unroll: O(L)/sample.
+//
+// CONSTRAINT: np % pd == 0 (integer overlap L = np/pd). Pd rounds realperiod to a
+// block multiple; here require exact divisibility (LAR: 2048/1024 = 2 -- fine).
 //
 // ONDEMAND: the sAndH form below is stable faust. The ondemand form (commented)
 // computes powtodb only at the hop, mapping 1:1 to `if (onset)` in the C++ port
-// (ltburst idiom). For env, ondemand is optional (the accumulation is full-rate
-// regardless); its real value here is exercising the overlap-add clock in the IDE.
+// (ltburst idiom). For env, ondemand is optional -- the accumulation is full-rate
+// regardless; its value here is exercising the overlap-add clock in the IDE.
 //===================================================================
 import("seam.lib");
 
-env_oa(npoints, period, x) = level
+env_oa(np, pd, x) = level
 with {
-    L  = int(npoints / period);              // overlap factor (LAR: 2048/1024 = 2)
+    L  = int(np / pd);                           // overlap factor (LAR: 2048/1024 = 2)
     x2 = x * x;
+    wrapmod(a) = (a % np + np) % np;
 
-    // one shared bounded sample counter 0..npoints-1 (increments by 1/sample)...
-    tick = step ~ _ with { step(c) = (c + 1) % npoints; };
-    // ...and a per-lane phase = a one-time offset of that counter.
-    phase(off) = (tick + off) % npoints;
+    // shared bounded up-counter: up(n) = (n + 1) % np
+    up = step ~ _ with { step(c) = (c + 1) % np; };
 
-    // Hann weight at a phase position (Pd's literal 3.14159, matching spd.env).
-    hann(p) = (1.0 - cos((2.0 * 3.14159 * p) / npoints)) / npoints;
+    // per-lane DOWN phase: d(off) == 0 exactly at n ≡ off (mod np), counting np-1..0.
+    d(off)  = wrapmod(off + 1 - up);
+    hann(p) = (1.0 - cos((2.0 * 3.14159 * p) / np)) / np;   // Pd's literal 3.14159
 
-    // one overlap lane: running Hann-weighted sum of x2 over its window;
-    // resets when its phase wraps, capturing the just-completed window sum.
-    laneSum(off) = ba.sAndH(wrap, acc')
+    // one overlap lane: Hann-weighted running sum of x2; reset at the start of each
+    // window, so that at d==0 the accumulator holds sum_{k=0}^{np-1} hann(k)*x(n-k)^2.
+    lane(off) = acc
     with {
-        p    = phase(off);
-        wrap = p < p';                        // 1 at the wrap sample
-        w    = hann(p);
-        acc  = step ~ _;                      // reset-at-wrap accumulator
-        step(a) = select2(wrap, a + w*x2, w*x2);
+        dd     = d(off);
+        w      = hann(dd);
+        newwin = dd == (np - 1);                 // first sample of a fresh window
+        acc    = step ~ _ with { step(a) = select2(newwin, a + w*x2, w*x2); };
     };
-    laneWrap(off) = p < p' with { p = phase(off); };
+    cap(off) = d(off) == 0;                       // capture instant for this lane
 
-    // combine the L staggered lanes: exactly one wraps per `period`;
-    // grab that lane's freshest completed window sum.
-    anyWrap  = par(l, L, laneWrap(l*period)) :> _ > 0;
-    freshest = par(l, L, laneSum(l*period) * laneWrap(l*period)) :> _;
-    result   = ba.sAndH(anyWrap, freshest);
+    // exactly one lane captures per hop; grab that lane's completed window sum.
+    anyCap  = par(l, L, cap(l*pd)) :> _ > 0;
+    grabbed = par(l, L, lane(l*pd) * cap(l*pd)) :> _;
+    result  = ba.sAndH(anyCap, grabbed);
 
     // control-rate output -- stable-faust form:
     level = powtodb(result);
     // ondemand form (faust-od), compute powtodb only at the hop:
-    // level = (anyWrap, result) : ondemand(powtodb);
+    // level = (anyCap, result) : ondemand(powtodb);
 
     powtodb(pw) = select2(pw <= 0.0, max(0.0, 100.0 + 10.0*log10(pw)), 0.0);
 };
 
-process = env_oa(2048, 1024);   // the claim: compiles instantly at the full window
-// process = env_oa(64, 32);    // small window for A/B vs spd.env(64,32)
+process = env_oa(2048, 1024);   // compiles instantly at the full window
+// process = env_oa(64, 32);    // small window used for the A/B above
