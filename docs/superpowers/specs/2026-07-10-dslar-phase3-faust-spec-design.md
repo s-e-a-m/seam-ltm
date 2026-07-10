@@ -79,9 +79,12 @@ They still receive a documentation entry (D5) citing `d_delay.c` + `delay-tilde-
 Pd object we touch — whether re-implemented or mapped to standard Faust — carries its dual source.
 The Pd one-block minimum does not bind (50/20 ms ≫ 64 samples).
 
-### D3 — `sds.lar` feedforward brick in `temp/seam.discipio.lib`
+### D3 — `sds.lar` feedforward brick in `seam.discipio.lib`
 
-The reusable spec of the LAR processor, composing verified bricks only (no re-implemented math):
+The Di Scipio library is promoted `temp/` → `src/` and registered in `seam.lib` as part of this sub-project
+(decided mid-brainstorm — the library is under active curation, "it is the right moment to put it back in
+its place"), so `dslar.dsp` resolves `sds` via the standard `FAUST_LIB_PATH`.
+The reusable spec of the LAR processor composes verified bricks only (no re-implemented math):
 
 ```faust
 // tab1 = 50 ms loop delay, tab2 = 20 ms decorrelation tap; ref = 1, k = 40 (LAR values).
@@ -164,15 +167,14 @@ The formal `doc/math/` (English) stays reserved for the later mathematical docum
 - The C++ `plugins/dslar/source/` plugin (hand-written, overlap-add env, finished GUI) and its optional
   internal-loop toggle.
 - Formal English `doc/math/`.
-- Promotion of `temp/seam.discipio.lib` → `src/` and re-enabling `seam.lib` line 25 (charter step; done when
-  `sds` names are cross-checked against AE2 `fc2003dsaae2`).
 
 ## File / location map
 
 | Artifact | Location |
 |---|---|
 | `spd.line` + doc-convention backfill | `faust-libraries/src/seam.pdclone.lib` (branch `dslar`) |
-| `sds.lar` brick | `faust-libraries/temp/seam.discipio.lib` (branch `dslar`) |
+| `seam.discipio.lib` promotion (`temp`→`src`) + `seam.lib` registration | `faust-libraries/src/` (branch `dslar`) |
+| `sds.lar` brick | `faust-libraries/src/seam.discipio.lib` (branch `dslar`) |
 | `dslar.dsp` entry | `seam-ltm/plugins/dslar/doc/dslar.dsp` |
 | SVG + mathdoc | `seam-ltm/plugins/dslar/doc/dslar-svg/`, `dslar.pdf` (via `tools/gen-faust-doc.sh dslar`) |
 | Pd help patches (copied) | `seam-ltm/plugins/dslar/doc/references/pd-help/` |
