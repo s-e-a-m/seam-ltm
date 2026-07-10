@@ -336,6 +336,24 @@ Restano aperte due domande per la Fase~2.
 Il nome e la firma esatti dei due oggetti si definiscono confrontandoli con l'uso reale in AE2.
 Se il ritardo di decorrelazione debba diventare un terzo mattone \texttt{sds} si decide solo quando una seconda patch lo rivendica, in coerenza con la politica di estrazione incrementale della libreria \texttt{sds}.
 
+\section{Fase 3 — completamento della specifica Faust}\label{sec:fase3}
+La lettura connessione-per-connessione di \texttt{LAR.pd} corregge l'inquadramento dell'anello.
+Il patch non ha retroazione interna: l'unica sorgente è \texttt{adc\textasciitilde{}}, e \texttt{r\textasciitilde{} audioLAR} raggiunge solo l'oscilloscopio.
+La linea \texttt{tab1} di \SI{50}{\milli\second} è quindi un ritardo \emph{feedforward}, non una ricorsione: l'anello di Larsen è acustico (\texttt{dac\textasciitilde{}} $\to$ stanza $\to$ microfono $\to$ \texttt{adc\textasciitilde{}}), esterno al plugin, l'\emph{oikos} che alimenta il sistema.
+Di conseguenza \texttt{dslar} è una catena mono feedforward pura, senza \texttt{\textasciitilde} di retroazione.
+
+Il clone \texttt{spd.line} riproduce fedelmente il \texttt{line} control-rate di Pure Data.
+La rampa lineare segue la formula di \texttt{line\_tick} ($v = \mathit{setval} + \min(\mathit{elapsed}/R,1)\,(\mathit{target}-\mathit{setval})$, con ripartenza dal valore corrente) ed è campionata al passo di grain di \SI{20}{\milli\second} in una scala control-rate.
+La verifica contro un oracolo Python della formula Pd dà scarto massimo dell'ordine di \num{1e-8}, sia sul gradino sia sul cambio di target a metà rampa.
+La differenza di fase dei tick (Pd allinea al messaggio, Faust al campione zero) è il residuo documentato, rinviato alla validazione block-kernel.
+
+Ogni oggetto Pd replicato porta ora una doppia fonte: il sorgente C e l'help patch di Miller Puckette.
+Gli help patch sono copiati nel repository sotto \texttt{doc/references/pd-help} per non dipendere dal checkout esterno di Pure Data.
+La libreria \texttt{seam.discipio.lib} è stata rimessa in \texttt{src} e registrata in \texttt{seam.lib}: è in cura ed è il momento giusto per riportarla al suo posto.
+Il mattone \texttt{sds.lar} assembla i pezzi verificati nel processore feedforward, e \texttt{dslar.dsp} lo espone con i sette parametri più il gate.
+
+Questa documentazione è preparata per essere condivisa con Agostino Di Scipio, a validazione dell'intero processo di porting.
+
 \bibliographystyle{plain}
 \bibliography{refs}
 \end{document}
