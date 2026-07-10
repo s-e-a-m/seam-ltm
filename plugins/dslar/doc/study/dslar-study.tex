@@ -255,6 +255,11 @@ Resta una scelta caso per caso, coerente con la convenzione di porting di Di Sci
 La strategia si verifica con un test A/B comportamentale fra \SI{44.1}{\kilo\hertz} e \SI{96}{\kilo\hertz}.
 Con la finestra ancorata nel tempo, le due frequenze devono produrre lo stesso inviluppo nel dominio del tempo e lo stesso periodo di ``respiro'' dell'anello; una divergenza segnala il rientro del letterale \texttt{2048} nel percorso di calcolo.
 
+Un secondo test A/B confronta la patch originale in Pure Data con l'implementazione in Faust, a parità di ingresso.
+Pure Data elabora a blocchi di 64 campioni: l'inviluppo aggiorna al suo \texttt{period}, la rampa \texttt{line} aggiorna a control-rate, e l'anello di feedback porta un ritardo di un blocco, mentre Faust lavora per campione.
+Questo controllo verifica che il salto al calcolo per-campione conservi il comportamento dell'anello, in particolare la temporizzazione del feedback e il ritmo di aggiornamento del segnale di controllo.
+Una divergenza sostanziale indica quali oggetti Pd il porting deve emulare a control-rate o con il ritardo di un blocco per restare fedele.
+
 \section{Mappa di decomposizione}\label{sec:decomposizione}
 La Tabella~\ref{tab:decomposizione} smista ogni blocco di \texttt{LAR.pd} verso una delle quattro destinazioni previste dalla specifica di porting.
 Un blocco diventa un clone \texttt{pdclone} quando replica un oggetto di Pure Data la cui semantica esatta differisce dagli standard Faust, come \texttt{env\textasciitilde{}}: questi cloni vivono nella libreria \texttt{seam.pdclone.lib}, come \texttt{seam.cyclone.lib} raccoglie gli oggetti di Max.
@@ -280,6 +285,28 @@ Pre-guadagno \texttt{1}/\texttt{2}/\texttt{4}, VCA finale & circuito LAR & Diven
 \end{tabular}
 \caption{Mappa di decomposizione di \texttt{LAR.pd}: destinazione di ogni blocco fra clone \texttt{pdclone} di un oggetto Pd, nuovo mattone \texttt{sds}, circuito locale di \texttt{dslar} e standard Faust esistente.}
 \label{tab:decomposizione}
+\end{table}
+
+\subsection{Oggetti Pd da clonare e studio sul sorgente}
+I blocchi diretti in \texttt{seam.pdclone.lib} si replicano fedelmente leggendo il sorgente di Pure Data.
+La Tabella~\ref{tab:pdclone} elenca gli oggetti coinvolti e lo stato della verifica sul codice.
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{2.7cm}>{\raggedright\arraybackslash}p{8.9cm}@{}}
+\toprule
+Oggetto & Sorgente Pd & Esito della verifica \\
+\midrule
+\texttt{env\textasciitilde{}} & \texttt{d\_ctl.c} (\texttt{sigenv}) & Media dei quadrati pesata Hann su $N$ campioni, uscita \texttt{powtodb}; nessun equivalente Faust pronto \\[3pt]
+\texttt{dbtorms}, \texttt{powtodb} & \texttt{x\_acoustics.c} & Riferimento a \SI{100}{\deci\bel}: $\texttt{powtodb}=100+10\log_{10}(\text{pot})$, $\texttt{dbtorms}=10^{(\text{dB}-100)/20}$ \\[3pt]
+\texttt{hip\textasciitilde{}} & \texttt{d\_filter.c} (\texttt{sighip}) & Passa-alto a un polo e uno zero: $\texttt{coef}=1-2\pi f/\text{SR}$, $y=\tfrac{1+\texttt{coef}}{2}(w-w_{-1})$ con $w=x+\texttt{coef}\,w_{-1}$; diverso dal Butterworth di \texttt{fi.highpass}, va clonato \\[3pt]
+\texttt{line} & \texttt{x\_time.c} & Da studiare: rampa a control-rate, legata al kernel a blocchi (sezione~\ref{sec:sr}) \\[3pt]
+\texttt{delread\textasciitilde{}}, \texttt{delwrite\textasciitilde{}} & \texttt{d\_delay.c} & Da confermare rispetto a \texttt{de.delay} \\
+\bottomrule
+\end{tabular}
+\caption{Oggetti di Pure Data che \texttt{dslar} replica, con la fonte nel codice di Pd e lo stato della verifica. Gli oggetti aritmetici (\texttt{*\textasciitilde{}}, \texttt{-}, \texttt{abs}, \texttt{pow}) coincidono con gli standard Faust e non richiedono un clone.}
+\label{tab:pdclone}
 \end{table}
 
 Il confine fra plugin e stanza merita una nota a parte.

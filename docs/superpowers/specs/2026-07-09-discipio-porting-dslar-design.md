@@ -83,6 +83,18 @@ invariant across rates.
 See memory `project_discipio_sr_independence` and the UHJ precedent
 `project_uhj_quadrature_fs_dependence`.
 
+### Cross-cutting rule — Pd↔Faust block-kernel validation
+
+Pure Data runs a 64-sample block kernel (`DEFDACBLKSIZE 64`): control values
+update at block/control rate (`env~` at its period, `line` and messages at
+control rate) and feedback loops carry a one-block delay, while Faust is
+per-sample.
+Beyond the SR A/B, every porting needs a final Pd↔Faust behavioral A/B on the
+same input, confirming the per-sample jump does not substantially change
+behavior (feedback timing, control-update rate); if it does, decide per case
+whether to emulate the block-rate control update or the one-block loop delay.
+See memory `project_pd_vs_faust_block_validation`.
+
 ### Cross-cutting rule — mono I/O normalization
 
 When a Pd patch duplicates one signal onto two identical outputs (the same node
