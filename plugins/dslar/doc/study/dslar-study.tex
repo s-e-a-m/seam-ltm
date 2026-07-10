@@ -300,7 +300,7 @@ Oggetto & Sorgente Pd & Esito della verifica \\
 \midrule
 \texttt{env\textasciitilde{}} & \texttt{d\_ctl.c} (\texttt{sigenv}) & Media dei quadrati pesata Hann su $N$ campioni, uscita \texttt{powtodb}; nessun equivalente Faust pronto \\[3pt]
 \texttt{dbtorms}, \texttt{powtodb} & \texttt{x\_acoustics.c} & Riferimento a \SI{100}{\deci\bel}: $\texttt{powtodb}=100+10\log_{10}(\text{pot})$, $\texttt{dbtorms}=10^{(\text{dB}-100)/20}$ \\[3pt]
-\texttt{hip\textasciitilde{}} & \texttt{d\_filter.c} (\texttt{sighip}) & Passa-alto a un polo e uno zero: $\texttt{coef}=1-2\pi f/\text{SR}$, $y=\tfrac{1+\texttt{coef}}{2}(w-w_{-1})$ con $w=x+\texttt{coef}\,w_{-1}$; diverso dal Butterworth di \texttt{fi.highpass}, va clonato \\[3pt]
+\texttt{hip\textasciitilde{}} & \texttt{d\_filter.c} (\texttt{sighip}) & Passa-alto a un polo e uno zero: $\texttt{coef}=1-2\pi f/\text{SR}$ (limitato a $[0,1]$), $y=\tfrac{1+\texttt{coef}}{2}(w-w_{-1})$ con $w=x+\texttt{coef}\,w_{-1}$; diverso dal Butterworth di \texttt{fi.highpass}. Si realizza con elementi minimi Faust: \texttt{fi.pole(coef) : fi.zero(1) : *((1+coef)/2)} \\[3pt]
 \texttt{line} & \texttt{x\_time.c} & Da studiare: rampa a control-rate, legata al kernel a blocchi (sezione~\ref{sec:sr}) \\[3pt]
 \texttt{delread\textasciitilde{}}, \texttt{delwrite\textasciitilde{}} & \texttt{d\_delay.c} & Da confermare rispetto a \texttt{de.delay} \\
 \bottomrule
