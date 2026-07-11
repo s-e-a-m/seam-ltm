@@ -86,7 +86,12 @@ Two read-only meters, both driven through the three-layer facility of `seam_mete
 - **`g` — Gain** — the loop gain at the `spd.line(tsmooth)` output, faithful to the slider Di Scipio uses in `LAR.pd` to show the attenuation at the line output.
 
 Measure in `dslar_dsp.h` (the getters), transport via the `multipink` idiom in `dslar_processor.cpp` (two `kIsReadOnly` params pushed from `process()`), render in `dslar.uidesc` as two read-only slider bars with dB labels.
+Because the dB→normalized conversion happens in transport, these read-only slider bars are already dB-scaled, which matters because `g` spans a very wide dB range.
 This is the suite's first graphical bar meter.
+
+**Deferred render (todo).**
+A VSTGUI reconnaissance (recorded in the metering roadmap) confirmed the SDK's `CVuMeter` is bitmap-based and off-style for the suite; the richer render is a reusable custom `CView` meter (dB scale, ticks, peak-hold, `MeterFill`) plus a transfer-curve view plotting the homeostat law `g = |r − ref|^k` with a live operating point.
+Phase A ships the baseline read-only slider render; the custom meter and the transfer curve are a later cycle and do not gate this plugin.
 
 ## GUI
 

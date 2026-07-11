@@ -54,12 +54,32 @@ A dedicated module, deliberately outside `seam_meter.h`.
 R128 is a substantial DSP block; keeping it separate keeps `seam_meter.h` header-only and light, which is all `dslar` needs today.
 It is built when a plugin genuinely needs loudness (an output/mastering stage, or a suite-wide output meter), each with its own design→plan→implement cycle.
 
+## Render layer — VSTGUI reconnaissance and roadmap
+
+The render choice is independent of the transport: the read-only parameter path is unchanged whatever the widget draws.
+A reconnaissance of VSTGUI (`vstgui4/.../lib/controls/`) in the bundled SDK found these options for a level widget.
+
+- `CSlider` read-only — a filled bar in house colors, no assets; reads a bit like a control and offers only a fill (no ticks, no peak-hold).
+- `CParamDisplay` — an exact numeric dB readout (the `multipink` idiom); a companion to a bar, not a replacement.
+- `CVuMeter` — the SDK's dedicated LED-ladder meter with built-in peak-hold (`setDecreaseStepValue`), but bitmap-based (on/off image strips); rejected because it needs an asset pipeline the suite avoids and its LED look clashes with the vector uidesc style.
+- `CXYPad` / a custom `CView` — free vector drawing, no bitmaps; the basis for a dB scale with ticks and peak-hold, or for a transfer-curve view.
+
+Because `db2norm` scales to dB in the transport, even the plain read-only slider shows a dB-scaled bar — which matters for `dslar`, whose loop gain spans a very wide dB range.
+
+**Render decision.**
+Phase A ships the baseline render: a read-only `CSlider` bar plus a `CParamDisplay` dB label, with the `MeterFill` color.
+
+**Deferred render (todo, from this reconnaissance).**
+Build one reusable custom `CView` meter — dB scale with ticks, peak-hold marker, `MeterFill` theming, no bitmaps — as the canonical render of the metering convention, replacing the repurposed read-only slider across the suite.
+Add, as the richer pedagogical option, a transfer-curve view that plots the homeostat law `g = |r − ref|^k` with a live operating point at `(r, g)`, so the GUI shows the control law itself rather than only a level.
+This lands in a later cycle; it does not gate Phase A.
+
 ## Phased delivery
 
 | Phase | Content | When |
 |---|---|---|
 | **A** | `seam_meter.h` core (dB helpers + `LevelFollower`) with **Level** and **Gain**; the GUI convention (`MeterFill` color, read-only slider bar + dB label); the suite's first graphical bar meter | now, with `dslar` (r = Level dBFS, g = Gain) |
-| **B** | **Gain reduction** and **Generic `[0..1]`** formalized as first-class helpers; `multipink`'s numeric read-outs may migrate to bars | at the first real need |
+| **B** | **Gain reduction** and **Generic `[0..1]`** formalized as first-class helpers; the reusable custom `CView` meter (dB scale + ticks + peak-hold) and the `dslar` transfer-curve view; `multipink`'s numeric read-outs may migrate to bars | at the first real need |
 | **C** | `seam_loudness.h` EBU R128 module | dedicated effort, when loudness is required |
 
 ## Retrofit policy
