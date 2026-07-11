@@ -40,4 +40,29 @@ namespace pd {
     }
 }
 
+// --- Pd d_filter.c sighip: one-pole/one-zero highpass -------------------------
+// coef = clip(1 - f*2pi/SR, 0, 1); w[n] = x[n] + coef*w[n-1];
+// y[n] = normal*(w[n] - w[n-1]); normal = (1+coef)/2. Pd literal pi 3.14159.
+// DIFFERS from a Butterworth biquad; this is Pd's exact topology.
+class OnePoleHip {
+public:
+    void prepare(double fs) { fs_ = (fs > 0.0) ? fs : 48000.0; setCutoff(cutoff_); reset(); }
+    void reset() { w1_ = 0.0; }
+    void setCutoff(double hz) {
+        cutoff_ = hz;
+        double c = 1.0 - hz * (2.0 * 3.14159) / fs_;
+        c = c < 0.0 ? 0.0 : (c > 1.0 ? 1.0 : c);
+        coef_   = c;
+        normal_ = (1.0 + c) / 2.0;
+    }
+    double process(double x) {
+        const double w = x + coef_ * w1_;      // fi.pole(coef)
+        const double y = normal_ * (w - w1_);  // fi.zero(1) * normal
+        w1_ = w;
+        return y;
+    }
+private:
+    double fs_ = 48000.0, cutoff_ = 100.0, coef_ = 0.0, normal_ = 0.0, w1_ = 0.0;
+};
+
 }} // namespace Seam::dslar

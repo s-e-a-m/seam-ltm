@@ -19,3 +19,23 @@ TEST_CASE("pd::dbtorms — inverse converter, clamped") {
     // dbtorms(powtodb(0.25)) == sqrt(0.25) == 0.5 (the dB round-trip cancels)
     CHECK(pd::dbtorms(pd::powtodb(0.25)) == doctest::Approx(0.5));
 }
+
+TEST_CASE("OnePoleHip: coef follows Pd 1-f*2*3.14159/SR; blocks DC") {
+    OnePoleHip hp;
+    hp.prepare(44100.0);
+    hp.setCutoff(100.0);
+    // Feed DC 1.0; a highpass settles its output toward 0.
+    double y = 0.0;
+    for (int n = 0; n < 44100; ++n) y = hp.process(1.0);
+    CHECK(std::fabs(y) < 1e-3);
+}
+
+TEST_CASE("OnePoleHip: first sample of a unit step equals normal") {
+    OnePoleHip hp;
+    hp.prepare(44100.0);
+    hp.setCutoff(100.0);
+    const double coef   = std::min(1.0, std::max(0.0, 1.0 - 100.0*(2.0*3.14159)/44100.0));
+    const double normal = (1.0 + coef) / 2.0;
+    // w0 = 1 + coef*0 = 1 ; y0 = normal*(w0 - 0) = normal.
+    CHECK(hp.process(1.0) == doctest::Approx(normal));
+}
