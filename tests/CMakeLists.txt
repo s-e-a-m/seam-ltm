@@ -79,3 +79,13 @@ target_include_directories(seam_meter_test PRIVATE
 )
 target_compile_features(seam_meter_test PRIVATE cxx_std_17)
 add_test(NAME seam_meter_test COMMAND seam_meter_test)
+
+add_executable(dslar_dsp_test
+    dslar_dsp_test.cpp
+)
+target_include_directories(dslar_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/dslar/source
+)
+target_compile_features(dslar_dsp_test PRIVATE cxx_std_17)
+add_test(NAME dslar_dsp_test COMMAND dslar_dsp_test)
