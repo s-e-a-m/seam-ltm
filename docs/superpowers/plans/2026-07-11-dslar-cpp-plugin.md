@@ -21,6 +21,7 @@
 - Doc/prose lines: one sentence per line (clean diffs).
 - Every commit ends with the trailer `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 - DSP-core tests compile header-only with a direct `c++` invocation (fast TDD loop, no SDK needed) and are ALSO registered in `tests/CMakeLists.txt` for `ctest`.
+- Sample-rate-dependent tests sweep the common studio rates `{44100, 48000, 96000, 192000}` Hz (SR-independence must hold across the whole range, up to 192 kHz).
 
 ## File Structure
 
@@ -595,13 +596,15 @@ Append to `tests/dslar_dsp_test.cpp`:
 ```cpp
 TEST_CASE("HannRms: window is SR-adaptive round(fs*2048/44100)") {
     HannRms e44; e44.prepare(44100.0);
-    CHECK(e44.window() == 2048);
-    HannRms e96; e96.prepare(96000.0);
-    CHECK(e96.window() == (int)std::lround(96000.0*2048.0/44100.0));  // 4459
+    CHECK(e44.window() == 2048);                          // exact at the design SR
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
+        HannRms e; e.prepare(fs);
+        CHECK(e.window() == (int)std::lround(fs*2048.0/44100.0));
+    }
 }
 
 TEST_CASE("HannRms of DC 0.5 settles to 0.5 (Hann-normalized RMS)") {
-    for (double fs : {44100.0, 96000.0}) {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
         HannRms e; e.prepare(fs);
         double r = 0.0;
         for (int n = 0; n < 3*e.window(); ++n) r = e.process(0.5);
@@ -834,7 +837,7 @@ static Larsen makeLar(double fs) {
 }
 
 TEST_CASE("Larsen: DC 0.5 settles the loop gain g to 0.5^40 (homeostat), any SR") {
-    for (double fs : {44100.0, 96000.0}) {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
         Larsen L = makeLar(fs);
         // Feed long enough for the 2000 ms input fade + window + 200 ms smoothing.
         const int N = (int)(fs * 3.0);           // 3 s
@@ -854,7 +857,7 @@ TEST_CASE("Larsen: power off mutes the input fade (fx -> 0)") {
 }
 
 TEST_CASE("Larsen: no NaN/Inf across parameter extremes") {
-    for (double fs : {44100.0, 48000.0, 96000.0}) {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
         Larsen L; L.prepare(fs);
         L.setPower(true); L.setDrive(4.0); L.setTarget(0.0);
         L.setSteepness(80.0); L.setSmoothingMs(1.0);
