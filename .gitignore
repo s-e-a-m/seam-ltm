@@ -13,3 +13,6 @@ __pycache__/
 
 # x2uhj scratch (reference material relocated; remainder kept local)
 plugins/x2uhj/_temp/
+
+# Claude Code worktrees (isolated workspaces)
+.claude/worktrees/
