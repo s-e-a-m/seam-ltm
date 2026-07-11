@@ -177,4 +177,59 @@ private:
     std::vector<double> buf_;
 };
 
+// --- LAR assembly: feedforward mono homeostatic processor --------------------
+// fx = x * inputFade(power)                 (2000 ms anti-click fade)
+// audio  = delay(tab1, drive * hip100(fx))
+// r      = HannRms(delay(tab2, fx))         (control-rate Hann RMS)
+// g      = smooth_tsmooth( |r - ref|^k )    (homeostat, then 20 ms staircase)
+// y      = audio * g * output
+// No internal feedback: the Larsen loop is acoustic and external.
+class Larsen {
+public:
+    void prepare(double fs) {
+        inputFade_.prepare(fs); inputFade_.setRampMs(2000.0);
+        smooth_.prepare(fs);    smooth_.setRampMs(200.0);
+        hip_.prepare(fs);       hip_.setCutoff(100.0);
+        delayAudio_.prepare(fs);
+        delayAnalysis_.prepare(fs);
+        env_.prepare(fs);
+        reset();
+    }
+    void reset() {
+        inputFade_.reset(); smooth_.reset(); hip_.reset();
+        delayAudio_.reset(); delayAnalysis_.reset(); env_.reset();
+        rMeter_ = 0.0; gMeter_ = 0.0;
+    }
+    void setPower(bool on)            { power_ = on ? 1.0 : 0.0; }
+    void setDrive(double d)           { drive_ = d; }
+    void setTarget(double r)          { ref_ = r; }
+    void setSteepness(double k)       { k_ = k; }
+    void setSmoothingMs(double ms)    { smooth_.setRampMs(ms); }
+    void setLoopDelayMs(double ms)    { delayAudio_.setDelayMs(ms); }
+    void setDecorrelationMs(double ms){ delayAnalysis_.setDelayMs(ms); }
+    void setOutput(double o)          { output_ = o; }
+
+    double process(double x) {
+        const double fade = inputFade_.process(power_);
+        const double fx   = x * fade;
+        double a = hip_.process(fx) * drive_;      // audio branch
+        a = delayAudio_.process(a);
+        const double sIn = delayAnalysis_.process(fx);
+        const double r   = env_.process(sIn);      // Hann RMS (control rate)
+        const double gRaw = std::pow(std::fabs(r - ref_), k_);
+        const double g   = smooth_.process(gRaw);  // line(tsmooth)
+        rMeter_ = r; gMeter_ = g;
+        return a * g * output_;
+    }
+    double measuredRms()  const { return rMeter_; }
+    double analysisGain() const { return gMeter_; }
+private:
+    ControlLine inputFade_, smooth_;
+    OnePoleHip  hip_;
+    DelayLine   delayAudio_, delayAnalysis_;
+    HannRms     env_;
+    double power_ = 0.0, drive_ = 1.0, ref_ = 1.0, k_ = 40.0, output_ = 1.0;
+    double rMeter_ = 0.0, gMeter_ = 0.0;
+};
+
 }} // namespace Seam::dslar

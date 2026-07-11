@@ -117,3 +117,49 @@ TEST_CASE("DelayLine: zero delay is a pass-through") {
     dl.setDelayMs(0.0);
     CHECK(dl.process(0.7) == doctest::Approx(0.7));
 }
+
+static Larsen makeLar(double fs) {
+    Larsen L; L.prepare(fs);
+    L.setPower(true);
+    L.setDrive(1.0);
+    L.setTarget(1.0);
+    L.setSteepness(40.0);
+    L.setSmoothingMs(200.0);
+    L.setLoopDelayMs(50.0);
+    L.setDecorrelationMs(20.0);
+    L.setOutput(1.0);
+    return L;
+}
+
+TEST_CASE("Larsen: DC 0.5 settles the loop gain g to 0.5^40 (homeostat), any SR") {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
+        Larsen L = makeLar(fs);
+        // Feed long enough for the 2000 ms input fade + window + 200 ms smoothing.
+        const int N = (int)(fs * 3.0);           // 3 s
+        for (int n = 0; n < N; ++n) L.process(0.5);
+        CHECK(L.measuredRms()   == doctest::Approx(0.5).epsilon(1e-3));
+        CHECK(L.analysisGain()  == doctest::Approx(std::pow(0.5, 40.0)).epsilon(1e-2));
+    }
+}
+
+TEST_CASE("Larsen: power off mutes the input fade (fx -> 0)") {
+    Larsen L = makeLar(44100.0);
+    L.setPower(false);
+    double y = 0.0;
+    for (int n = 0; n < 44100*3; ++n) y = L.process(0.5);
+    CHECK(std::fabs(y) < 1e-9);
+    CHECK(L.measuredRms() == doctest::Approx(0.0).epsilon(1e-6));
+}
+
+TEST_CASE("Larsen: no NaN/Inf across parameter extremes") {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
+        Larsen L; L.prepare(fs);
+        L.setPower(true); L.setDrive(4.0); L.setTarget(0.0);
+        L.setSteepness(80.0); L.setSmoothingMs(1.0);
+        L.setLoopDelayMs(200.0); L.setDecorrelationMs(200.0); L.setOutput(1.0);
+        for (int n = 0; n < 20000; ++n) {
+            double y = L.process(std::sin(0.01 * n));
+            REQUIRE(std::isfinite(y));
+        }
+    }
+}
