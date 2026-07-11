@@ -364,9 +364,12 @@ L'indipendenza dalla frequenza di campionamento vive nel deliverable: la finestr
 
 L'assemblaggio \texttt{Larsen} è una catena feedforward pura, senza retroazione interna, perché l'anello di Larsen è acustico ed esterno.
 La verifica end-to-end mostra che una continua a \num{0.5} porta il guadagno d'anello \(g\) a \(0.5^{40}\) a \SI{44.1}{\kilo\hertz}, \SI{48}{\kilo\hertz}, \SI{96}{\kilo\hertz} e \SI{192}{\kilo\hertz}, confermando insieme l'omeostato e l'indipendenza da \(f_s\).
+I contatori a control-rate della rampa e dell'inviluppo avvolgono la loro fase invece di crescere senza limite, così il comportamento resta identico ma privo di overflow anche nelle esecuzioni prolungate di molte ore, native del contesto sostenuto di questa musica.
 
 Il plugin nasce col sistema di metering condiviso della suite (\texttt{\_common/seam\_meter.h}), di cui \texttt{dslar} è il primo consumatore.
 Due barre in sola lettura mostrano \(r\) (RMS Hann, ingresso dell'omeostato) e \(g\) (guadagno d'anello all'uscita del \texttt{line}, fedele allo slider di Di Scipio), trasportate col meccanismo dei parametri read-only e normalizzate in dB a fondo scala \SI{-60}{\deci\bel FS}.
+Il plugin è un VST3 mono a un ingresso e un'uscita con otto parametri (potenza, drive, riferimento, ripidità, smoothing di controllo, ritardo d'anello, decorrelazione, uscita), e supera senza errori il validator dell'SDK.
+Il meter \(g\) rende visibile la controintuitività della legge: è pieno nel silenzio (\(g=|0-1|^{40}=1\), l'anello spinge verso il Larsen) e collassa verso lo zero all'equilibrio, dove il sistema si autoattenua.
 La resa ricca (una vista custom con scala in dB e la curva di trasferimento \(g=|r-1|^k\) col punto di lavoro vivo) è annotata come lavoro successivo.
 
 \bibliographystyle{plain}
