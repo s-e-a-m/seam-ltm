@@ -82,3 +82,21 @@ TEST_CASE("ControlLine reaches the target and holds it") {
     for (int n = 0; n < 44100; ++n) y = ln.process(1.0);   // 1 s >> 100 ms ramp
     CHECK(y == doctest::Approx(1.0));
 }
+
+TEST_CASE("HannRms: window is SR-adaptive round(fs*2048/44100)") {
+    HannRms e44; e44.prepare(44100.0);
+    CHECK(e44.window() == 2048);                          // exact at the design SR
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
+        HannRms e; e.prepare(fs);
+        CHECK(e.window() == (int)std::lround(fs*2048.0/44100.0));
+    }
+}
+
+TEST_CASE("HannRms of DC 0.5 settles to 0.5 (Hann-normalized RMS)") {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
+        HannRms e; e.prepare(fs);
+        double r = 0.0;
+        for (int n = 0; n < 3*e.window(); ++n) r = e.process(0.5);
+        CHECK(r == doctest::Approx(0.5).epsilon(1e-4));   // sum(hann)=1 -> RMS = |DC|
+    }
+}

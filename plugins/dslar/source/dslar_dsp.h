@@ -96,4 +96,52 @@ private:
     int grain_ = 882, n_ = 0;
 };
 
+// --- Pd d_ctl.c env~: Hann-weighted RMS-power envelope, control-rate hold -----
+// result = sum_i hann[i] * x[n-i]^2, hann[i] = (1-cos(2*3.14159*i/np))/np
+// (normalized, sum = 1). Emitted every `period` samples (Pd default np/2) and
+// held between ticks; then powtodb -> dbtorms gives the Hann-weighted RMS.
+// Ported as a ring buffer with the Hann sum computed at each capture and held:
+// O(np/period) amortized per sample, float-identical to the overlap-add spec.
+// SR-independence: np = round(fs*2048/44100), period = np/2, computed here.
+class HannRms {
+public:
+    void prepare(double fs) {
+        fs_      = (fs > 0.0) ? fs : 48000.0;
+        npoints_ = (int)std::lround(fs_ * 2048.0 / 44100.0);
+        if (npoints_ < 2) npoints_ = 2;
+        period_  = npoints_ / 2;
+        if (period_ < 1) period_ = 1;
+        hann_.resize(npoints_);
+        for (int i = 0; i < npoints_; ++i)
+            hann_[i] = (1.0 - std::cos((2.0 * 3.14159 * i) / npoints_)) / npoints_;
+        ring_.assign(npoints_, 0.0);
+        reset();
+    }
+    void reset() {
+        std::fill(ring_.begin(), ring_.end(), 0.0);
+        pos_ = 0; n_ = 0; heldDb_ = 0.0;
+    }
+    double process(double x) {
+        ring_[pos_] = x;
+        pos_ = (pos_ + 1) % npoints_;
+        if (n_ % period_ == 0) {                 // capture instant (control rate)
+            double acc = 0.0;
+            int idx = (pos_ - 1 + npoints_) % npoints_;   // most recent sample = x[n-0]
+            for (int i = 0; i < npoints_; ++i) {
+                const double s = ring_[idx];
+                acc += hann_[i] * s * s;                  // hann[i] weights x[n-i]
+                idx = (idx - 1 + npoints_) % npoints_;
+            }
+            heldDb_ = pd::powtodb(acc);
+        }
+        ++n_;
+        return pd::dbtorms(heldDb_);
+    }
+    int window() const { return npoints_; }
+private:
+    double fs_ = 48000.0; int npoints_ = 2048, period_ = 1024, pos_ = 0, n_ = 0;
+    double heldDb_ = 0.0;
+    std::vector<double> ring_, hann_;
+};
+
 }} // namespace Seam::dslar
