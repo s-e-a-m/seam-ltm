@@ -20,6 +20,12 @@ TEST_CASE("db2norm maps [floor,0] to [0,1] and clamps") {
     CHECK(db2norm(-90.0)  == doctest::Approx(0.0));      // below floor clamps to 0
 }
 
+TEST_CASE("db2norm: degenerate floor (floorDb>=0) returns defined 0/1, not NaN") {
+    CHECK(db2norm(-30.0, 0.0) == doctest::Approx(0.0));
+    CHECK(db2norm(6.0, 0.0)   == doctest::Approx(1.0));
+    CHECK(std::isfinite(db2norm(-30.0, 0.0)));
+}
+
 TEST_CASE("lin2norm composes lin2db and db2norm; norm2db inverts") {
     CHECK(lin2norm(1.0) == doctest::Approx(1.0));
     CHECK(lin2norm(0.0) == doctest::Approx(0.0));

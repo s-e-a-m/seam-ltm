@@ -17,9 +17,12 @@ inline double lin2db(double x, double floorDb = -60.0) {
     return db < floorDb ? floorDb : db;
 }
 
-// dB -> normalized [0,1] over [floorDb, 0], clamped.
+// dB -> normalized [0,1] over [floorDb, 0], clamped. A degenerate floor
+// (floorDb >= 0) has an empty range; return a defined 0/1 instead of NaN.
 inline double db2norm(double db, double floorDb = -60.0) {
-    const double n = (db - floorDb) / (0.0 - floorDb);
+    const double span = 0.0 - floorDb;
+    if (span <= 0.0) return db >= 0.0 ? 1.0 : 0.0;
+    const double n = (db - floorDb) / span;
     return n < 0.0 ? 0.0 : (n > 1.0 ? 1.0 : n);
 }
 

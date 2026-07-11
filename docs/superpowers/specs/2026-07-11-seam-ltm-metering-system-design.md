@@ -31,7 +31,7 @@ Plugins already include `_common` via `target_include_directories(<target> PRIVA
 The everyday meter facility, kept pure so it is usable inside the SDK-free `_dsp.h`.
 
 - dB helpers: `lin2db(x, floorDb)`, `db2norm(db, floorDb)` returning `[0,1]`, `norm2db(...)` for label formatting.
-- `LevelFollower` — a small follower with a mode (`Peak` / `Rms`) and ballistics (instantaneous/control-rate, VU ≈ 300 ms, peak-hold); `prepare(fs, mode, windowMs)`, `feed(x)`, `db()`.
+- `LevelFollower` — a small one-pole follower with a mode (`Peak` / `Rms`) and a time-constant window; `prepare(fs, mode, windowMs)`, `feed(x)`, `value()` (linear amplitude; take dB via `lin2db(value())`). True peak-hold ballistics are deferred to the first consumer that needs them.
 - Meter-type vocabulary expressed through these primitives:
   - **Level (dBFS)** — RMS or peak of an audio signal, floor default −60 dBFS.
   - **Gain** — a linear control multiplier `[0..1]` (or beyond) shown in dB; `dslar`'s `analysisGain` is this.
