@@ -144,4 +144,37 @@ private:
     std::vector<double> ring_, hann_;
 };
 
+// --- de.delay-equivalent feedforward integer delay ---------------------------
+// LAR's named lines are single-writer/single-reader (tab1 loop, tab2 analysis
+// tap). Buffer sized once for the worst case DELMAXMS @ SRMAX; the read offset
+// adapts to fs at runtime. y = x @ round(ms*fs/1000).
+class DelayLine {
+public:
+    static constexpr double kDelMaxMs = 200.0;
+    static constexpr double kSrMax    = 192000.0;
+    void prepare(double fs) {
+        fs_   = (fs > 0.0) ? fs : 48000.0;
+        size_ = (int)(kDelMaxMs * kSrMax / 1000.0) + 1;   // 38401
+        buf_.assign(size_, 0.0);
+        reset();
+    }
+    void reset() { std::fill(buf_.begin(), buf_.end(), 0.0); pos_ = 0; }
+    void setDelayMs(double ms) {
+        int d = (int)(ms * fs_ / 1000.0 + 0.5);
+        if (d < 0) d = 0;
+        if (d >= size_) d = size_ - 1;
+        delay_ = d;
+    }
+    double process(double x) {
+        buf_[pos_] = x;
+        const int r = (pos_ - delay_ + size_) % size_;
+        const double y = buf_[r];
+        pos_ = (pos_ + 1) % size_;
+        return y;
+    }
+private:
+    double fs_ = 48000.0; int size_ = 0, pos_ = 0, delay_ = 0;
+    std::vector<double> buf_;
+};
+
 }} // namespace Seam::dslar

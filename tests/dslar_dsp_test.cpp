@@ -100,3 +100,20 @@ TEST_CASE("HannRms of DC 0.5 settles to 0.5 (Hann-normalized RMS)") {
         CHECK(r == doctest::Approx(0.5).epsilon(1e-4));   // sum(hann)=1 -> RMS = |DC|
     }
 }
+
+TEST_CASE("DelayLine: integer-sample delay of an impulse") {
+    DelayLine dl; dl.prepare(44100.0);
+    dl.setDelayMs(1.0);                          // round(1*44.1) = 44 samples
+    const int D = (int)(1.0 * 44100.0 / 1000.0 + 0.5);
+    std::vector<double> out;
+    out.push_back(dl.process(1.0));              // impulse at n=0
+    for (int n = 1; n < 128; ++n) out.push_back(dl.process(0.0));
+    CHECK(out[0] == doctest::Approx(0.0));
+    CHECK(out[D] == doctest::Approx(1.0));       // impulse reappears at n = D
+}
+
+TEST_CASE("DelayLine: zero delay is a pass-through") {
+    DelayLine dl; dl.prepare(44100.0);
+    dl.setDelayMs(0.0);
+    CHECK(dl.process(0.7) == doctest::Approx(0.7));
+}
