@@ -184,13 +184,13 @@ void DSLARProcessor::readParameterChanges(ProcessData& data) {
         if (q->getPoint(cnt - 1, off, v) != kResultOk) continue;
         switch (q->getParameterId()) {
             case kParamPower:     paramPower_.store(v >= 0.5 ? 1.0 : 0.0); break;
-            case kParamDrive:     paramDrive_.store(denorm(v, kDriveMin, kDriveMax)); break;
-            case kParamTarget:    paramTarget_.store(denorm(v, kTargetMin, kTargetMax)); break;
-            case kParamSteepness: paramSteep_.store(denorm(v, kSteepMin, kSteepMax)); break;
-            case kParamSmoothing: paramSmooth_.store(denorm(v, kSmoothMin, kSmoothMax)); break;
-            case kParamLoopDelay: paramTab1_.store(denorm(v, kTab1Min, kTab1Max)); break;
-            case kParamDecorr:    paramTab2_.store(denorm(v, kTab2Min, kTab2Max)); break;
-            case kParamOutput:    paramOutput_.store(denorm(v, kOutMin, kOutMax)); break;
+            case kParamDrive:     paramDrive_.store(std::clamp(denorm(v, kDriveMin, kDriveMax), kDriveMin, kDriveMax)); break;
+            case kParamTarget:    paramTarget_.store(std::clamp(denorm(v, kTargetMin, kTargetMax), kTargetMin, kTargetMax)); break;
+            case kParamSteepness: paramSteep_.store(std::clamp(denorm(v, kSteepMin, kSteepMax), kSteepMin, kSteepMax)); break;
+            case kParamSmoothing: paramSmooth_.store(std::clamp(denorm(v, kSmoothMin, kSmoothMax), kSmoothMin, kSmoothMax)); break;
+            case kParamLoopDelay: paramTab1_.store(std::clamp(denorm(v, kTab1Min, kTab1Max), kTab1Min, kTab1Max)); break;
+            case kParamDecorr:    paramTab2_.store(std::clamp(denorm(v, kTab2Min, kTab2Max), kTab2Min, kTab2Max)); break;
+            case kParamOutput:    paramOutput_.store(std::clamp(denorm(v, kOutMin, kOutMax), kOutMin, kOutMax)); break;
             default: break;
         }
     }
