@@ -16,8 +16,8 @@
         <color name="MeterFill" rgba="#c8a24aff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="460, 400"
-              minSize="460, 400" maxSize="460, 400"
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 570"
+              minSize="460, 570" maxSize="460, 570"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Header -->
@@ -26,101 +26,107 @@
         <view class="CTextLabel" origin="0, 42" size="460, 18" font="SubtitleFont"
               font-color="TextDim" text-alignment="center" title="Agostino Di Scipio · LAR" transparent="true"/>
         <view class="CTextLabel" origin="0, 60" size="460, 14" font="InfoFont"
-              font-color="TextDim" text-alignment="center" title="feedforward homeostatic loop" transparent="true"/>
+              font-color="TextDim" text-alignment="center" title="homeostatic loop" transparent="true"/>
 
-        <!-- Power -->
-        <view class="CTextLabel" origin="40, 84" size="120, 18" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="left" title="Power" transparent="true"/>
-        <view class="CCheckBox" origin="150, 82" size="60, 20" control-tag="Power"
+        <!-- Top block: Power over Output (stacked, centered) -->
+        <view class="CTextLabel" origin="170, 92" size="90, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="right" title="Power" transparent="true"/>
+        <view class="CCheckBox" origin="268, 90" size="22, 20" control-tag="Power"
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
               title="" transparent="true"/>
 
-        <!-- Column headers -->
-        <view class="CTextLabel" origin="30, 112" size="200, 16" font="InfoFont"
+        <view class="CTextLabel" origin="0, 120" size="460, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Output" transparent="true"/>
+        <view class="CSlider" origin="80, 136" size="300, 18" control-tag="Output"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CTextEdit" origin="80, 156" size="300, 16" font="ValueFont" control-tag="Output"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="3" style-no-frame="true"/>
+
+        <!-- Column headers (40 px gutter between the two 180 px columns) -->
+        <view class="CTextLabel" origin="30, 190" size="180, 16" font="InfoFont"
               font-color="TextDim" text-alignment="center" title="— AUDIO PATH —" transparent="true"/>
-        <view class="CTextLabel" origin="230, 112" size="200, 16" font="InfoFont"
+        <view class="CTextLabel" origin="250, 190" size="180, 16" font="InfoFont"
               font-color="TextDim" text-alignment="center" title="— ANALYSIS —" transparent="true"/>
 
         <!-- Left column: Drive / Loop delay / Decorrelation -->
-        <view class="CTextLabel" origin="30, 134" size="200, 14" font="KnobLabelFont"
+        <view class="CTextLabel" origin="30, 212" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Drive" transparent="true"/>
-        <view class="CSlider" origin="30, 150" size="200, 18" control-tag="Drive"
+        <view class="CSlider" origin="30, 228" size="180, 18" control-tag="Drive"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextEdit" origin="30, 170" size="200, 16" font="ValueFont" control-tag="Drive"
+        <view class="CTextEdit" origin="30, 248" size="180, 16" font="ValueFont" control-tag="Drive"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="2" style-no-frame="true"/>
 
-        <view class="CTextLabel" origin="30, 192" size="200, 14" font="KnobLabelFont"
+        <view class="CTextLabel" origin="30, 270" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Loop delay (ms)" transparent="true"/>
-        <view class="CSlider" origin="30, 208" size="200, 18" control-tag="Loop delay"
+        <view class="CSlider" origin="30, 286" size="180, 18" control-tag="Loop delay"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextEdit" origin="30, 228" size="200, 16" font="ValueFont" control-tag="Loop delay"
+        <view class="CTextEdit" origin="30, 306" size="180, 16" font="ValueFont" control-tag="Loop delay"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
 
-        <view class="CTextLabel" origin="30, 250" size="200, 14" font="KnobLabelFont"
+        <view class="CTextLabel" origin="30, 328" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Decorrelation (ms)" transparent="true"/>
-        <view class="CSlider" origin="30, 266" size="200, 18" control-tag="Decorrelation"
+        <view class="CSlider" origin="30, 344" size="180, 18" control-tag="Decorrelation"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextEdit" origin="30, 286" size="200, 16" font="ValueFont" control-tag="Decorrelation"
+        <view class="CTextEdit" origin="30, 364" size="180, 16" font="ValueFont" control-tag="Decorrelation"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
 
-        <!-- Right column: Target / Steepness / Control smoothing / Output -->
-        <view class="CTextLabel" origin="230, 134" size="200, 14" font="KnobLabelFont"
+        <!-- Right column: Target / Steepness / Control smoothing -->
+        <view class="CTextLabel" origin="250, 212" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Target" transparent="true"/>
-        <view class="CSlider" origin="230, 150" size="200, 18" control-tag="Target"
+        <view class="CSlider" origin="250, 228" size="180, 18" control-tag="Target"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextEdit" origin="230, 170" size="200, 16" font="ValueFont" control-tag="Target"
+        <view class="CTextEdit" origin="250, 248" size="180, 16" font="ValueFont" control-tag="Target"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="3" style-no-frame="true"/>
 
-        <view class="CTextLabel" origin="230, 192" size="200, 14" font="KnobLabelFont"
+        <view class="CTextLabel" origin="250, 270" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Steepness" transparent="true"/>
-        <view class="CSlider" origin="230, 208" size="200, 18" control-tag="Steepness"
+        <view class="CSlider" origin="250, 286" size="180, 18" control-tag="Steepness"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextEdit" origin="230, 228" size="200, 16" font="ValueFont" control-tag="Steepness"
+        <view class="CTextEdit" origin="250, 306" size="180, 16" font="ValueFont" control-tag="Steepness"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
 
-        <view class="CTextLabel" origin="230, 250" size="200, 14" font="KnobLabelFont"
+        <view class="CTextLabel" origin="250, 328" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Control smoothing (ms)" transparent="true"/>
-        <view class="CSlider" origin="230, 266" size="200, 18" control-tag="Control smoothing"
+        <view class="CSlider" origin="250, 344" size="180, 18" control-tag="Control smoothing"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextEdit" origin="230, 286" size="200, 16" font="ValueFont" control-tag="Control smoothing"
+        <view class="CTextEdit" origin="250, 364" size="180, 16" font="ValueFont" control-tag="Control smoothing"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="0" style-no-frame="true"/>
 
-        <view class="CTextLabel" origin="230, 308" size="200, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Output" transparent="true"/>
-        <view class="CSlider" origin="230, 324" size="200, 18" control-tag="Output"
-              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
-              draw-value="true" draw-value-color="SliderActive"
-              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextEdit" origin="230, 344" size="200, 16" font="ValueFont" control-tag="Output"
-              font-color="TextLight" text-alignment="center" transparent="true" value-precision="3" style-no-frame="true"/>
-
-        <!-- Meters (read-only bars, MeterFill) -->
-        <view class="CTextLabel" origin="30, 314" size="120, 14" font="InfoFont"
+        <!-- Meters (read-only bars, MeterFill) — full two-column width -->
+        <view class="CTextLabel" origin="30, 392" size="200, 14" font="InfoFont"
               font-color="TextDim" text-alignment="left" title="r  (Hann RMS)" transparent="true"/>
-        <view class="CSlider" origin="30, 330" size="200, 12" control-tag="Meter R"
+        <view class="CSlider" origin="30, 408" size="400, 12" control-tag="Meter R"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="MeterFill"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
-        <view class="CTextLabel" origin="30, 350" size="120, 14" font="InfoFont"
+        <view class="CTextLabel" origin="30, 428" size="200, 14" font="InfoFont"
               font-color="TextDim" text-alignment="left" title="g  (loop gain)" transparent="true"/>
-        <view class="CSlider" origin="30, 366" size="200, 12" control-tag="Meter G"
+        <view class="CSlider" origin="30, 444" size="400, 12" control-tag="Meter G"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="MeterFill"
               draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+
+        <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
+        <view class="CView" origin="110, 472" size="240, 77" bitmap="logo"/>
     </template>
 
+    <bitmaps>
+        <bitmap name="logo" path="seam_logo.png"/>
+    </bitmaps>
     <control-tags>
         <control-tag name="Power"             tag="100"/>
         <control-tag name="Drive"             tag="101"/>
