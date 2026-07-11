@@ -77,7 +77,7 @@ public:
         if (grain_ < 1) grain_ = 1;
         reset();
     }
-    void reset() { v_ = 0.0; sv_ = 0.0; e_ = 0.0; prevTarget_ = 0.0; held_ = 0.0; n_ = 0; }
+    void reset() { v_ = 0.0; sv_ = 0.0; e_ = 0.0; prevTarget_ = 0.0; held_ = 0.0; gphase_ = 0; }
     void setRampMs(double ms) { ms_ = ms; }
     double process(double target) {
         const double R = ms_ * fs_ / 1000.0;
@@ -86,14 +86,14 @@ public:
         const double frac = (R > 0.0) ? std::min(e_ / R, 1.0) : 1.0;
         v_ = sv_ + frac * (target - sv_);
         prevTarget_ = target;
-        if (n_ % grain_ == 0) held_ = v_;    // pulse at n = 0, grain, 2*grain, ...
-        ++n_;
+        if (gphase_ == 0) held_ = v_;        // grain pulse at 0, grain, 2*grain, ...
+        if (++gphase_ >= grain_) gphase_ = 0;
         return held_;
     }
 private:
     double fs_ = 48000.0, ms_ = 100.0, v_ = 0.0, sv_ = 0.0, e_ = 0.0,
            prevTarget_ = 0.0, held_ = 0.0;
-    int grain_ = 882, n_ = 0;
+    int grain_ = 882, gphase_ = 0;
 };
 
 // --- Pd d_ctl.c env~: Hann-weighted RMS-power envelope, control-rate hold -----
@@ -119,12 +119,12 @@ public:
     }
     void reset() {
         std::fill(ring_.begin(), ring_.end(), 0.0);
-        pos_ = 0; n_ = 0; heldDb_ = 0.0;
+        pos_ = 0; cphase_ = 0; heldDb_ = 0.0;
     }
     double process(double x) {
         ring_[pos_] = x;
         pos_ = (pos_ + 1) % npoints_;
-        if (n_ % period_ == 0) {                 // capture instant (control rate)
+        if (cphase_ == 0) {                      // capture instant (control rate)
             double acc = 0.0;
             int idx = (pos_ - 1 + npoints_) % npoints_;   // most recent sample = x[n-0]
             for (int i = 0; i < npoints_; ++i) {
@@ -134,12 +134,12 @@ public:
             }
             heldDb_ = pd::powtodb(acc);
         }
-        ++n_;
+        if (++cphase_ >= period_) cphase_ = 0;
         return pd::dbtorms(heldDb_);
     }
     int window() const { return npoints_; }
 private:
-    double fs_ = 48000.0; int npoints_ = 2048, period_ = 1024, pos_ = 0, n_ = 0;
+    double fs_ = 48000.0; int npoints_ = 2048, period_ = 1024, pos_ = 0, cphase_ = 0;
     double heldDb_ = 0.0;
     std::vector<double> ring_, hann_;
 };
