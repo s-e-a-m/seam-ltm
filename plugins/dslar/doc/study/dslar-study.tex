@@ -363,9 +363,9 @@ L'\texttt{env} è reso come somma Hann su ring buffer calcolata alla cattura ogn
 L'indipendenza dalla frequenza di campionamento vive nel deliverable: la finestra è dimensionata \texttt{round(fs*2048/44100)} in \texttt{prepare(fs)}, così il comportamento temporale resta invariante col variare di \(f_s\).
 
 L'assemblaggio \texttt{Larsen} è una catena feedforward pura, senza retroazione interna, perché l'anello di Larsen è acustico ed esterno.
-La verifica end-to-end mostra che una continua a \num{0.5} porta il guadagno d'anello \(g\) a \(0.5^{40}\) a \SI{44.1}{\kilo\hertz} e a \SI{96}{\kilo\hertz}, confermando insieme l'omeostato e l'indipendenza da \(f_s\).
+La verifica end-to-end mostra che una continua a \num{0.5} porta il guadagno d'anello \(g\) a \(0.5^{40}\) a \SI{44.1}{\kilo\hertz}, \SI{48}{\kilo\hertz}, \SI{96}{\kilo\hertz} e \SI{192}{\kilo\hertz}, confermando insieme l'omeostato e l'indipendenza da \(f_s\).
 
-Il plugin nasce col sistema di metering condiviso del suite (\texttt{\_common/seam\_meter.h}), di cui \texttt{dslar} è il primo consumatore.
+Il plugin nasce col sistema di metering condiviso della suite (\texttt{\_common/seam\_meter.h}), di cui \texttt{dslar} è il primo consumatore.
 Due barre in sola lettura mostrano \(r\) (RMS Hann, ingresso dell'omeostato) e \(g\) (guadagno d'anello all'uscita del \texttt{line}, fedele allo slider di Di Scipio), trasportate col meccanismo dei parametri read-only e normalizzate in dB a fondo scala \SI{-60}{\deci\bel FS}.
 La resa ricca (una vista custom con scala in dB e la curva di trasferimento \(g=|r-1|^k\) col punto di lavoro vivo) è annotata come lavoro successivo.
 
