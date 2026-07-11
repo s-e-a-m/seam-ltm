@@ -65,4 +65,35 @@ private:
     double fs_ = 48000.0, cutoff_ = 100.0, coef_ = 0.0, normal_ = 0.0, w1_ = 0.0;
 };
 
+// --- Pd x_time.c line: control-rate ramp, 20 ms grain staircase --------------
+// v = setval + min(elapsed/R, 1)*(target-setval), restart-from-current on a new
+// target (setval frozen to the current value at the change), sampled every 20 ms
+// (DEFAULTLINEGRAIN) into a staircase. Same idiom as spd.line.
+class ControlLine {
+public:
+    void prepare(double fs) {
+        fs_    = (fs > 0.0) ? fs : 48000.0;
+        grain_ = (int)(20.0 * fs_ / 1000.0);
+        if (grain_ < 1) grain_ = 1;
+        reset();
+    }
+    void reset() { v_ = 0.0; sv_ = 0.0; e_ = 0.0; prevTarget_ = 0.0; held_ = 0.0; n_ = 0; }
+    void setRampMs(double ms) { ms_ = ms; }
+    double process(double target) {
+        const double R = ms_ * fs_ / 1000.0;
+        const bool chg = (target != prevTarget_);
+        if (chg) { sv_ = v_; e_ = 0.0; } else { e_ += 1.0; }
+        const double frac = (R > 0.0) ? std::min(e_ / R, 1.0) : 1.0;
+        v_ = sv_ + frac * (target - sv_);
+        prevTarget_ = target;
+        if (n_ % grain_ == 0) held_ = v_;    // pulse at n = 0, grain, 2*grain, ...
+        ++n_;
+        return held_;
+    }
+private:
+    double fs_ = 48000.0, ms_ = 100.0, v_ = 0.0, sv_ = 0.0, e_ = 0.0,
+           prevTarget_ = 0.0, held_ = 0.0;
+    int grain_ = 882, n_ = 0;
+};
+
 }} // namespace Seam::dslar

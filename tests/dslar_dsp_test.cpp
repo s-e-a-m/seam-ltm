@@ -39,3 +39,46 @@ TEST_CASE("OnePoleHip: first sample of a unit step equals normal") {
     // w0 = 1 + coef*0 = 1 ; y0 = normal*(w0 - 0) = normal.
     CHECK(hp.process(1.0) == doctest::Approx(normal));
 }
+
+// Reference Pd line: continuous v = sv + min(e/R,1)*(target-sv), restart from
+// current on retarget, then a 20 ms grain staircase (sample-and-hold).
+static std::vector<double> pd_line_reference(const std::vector<double>& in,
+                                             double ms, double fs) {
+    const double R = ms * fs / 1000.0;
+    const int    G = (int)(20.0 * fs / 1000.0);
+    std::vector<double> cont(in.size());
+    double sv = 0.0, v = 0.0, prev = 0.0; int e = 0;
+    for (size_t n = 0; n < in.size(); ++n) {
+        const bool chg = (in[n] != prev);
+        if (chg) { sv = v; e = 0; } else { e += 1; }
+        v = sv + std::min((double)e / R, 1.0) * (in[n] - sv);
+        cont[n] = v; prev = in[n];
+    }
+    std::vector<double> out(in.size());
+    double held = 0.0;
+    for (size_t n = 0; n < in.size(); ++n) {
+        if ((int)(n % (size_t)G) == 0) held = cont[n];
+        out[n] = held;
+    }
+    return out;
+}
+
+TEST_CASE("ControlLine matches the Pd line reference (step + mid-ramp retarget)") {
+    const double fs = 44100.0, ms = 100.0;
+    std::vector<double> in;
+    for (int n = 0; n < 2000; ++n) in.push_back(1.0);   // step 0->1
+    for (int n = 0; n < 7000; ++n) in.push_back(0.3);   // retarget 1->0.3 mid-ramp
+    ControlLine ln; ln.prepare(fs); ln.setRampMs(ms); ln.reset();
+    std::vector<double> ref = pd_line_reference(in, ms, fs);
+    double md = 0.0;
+    for (size_t n = 0; n < in.size(); ++n)
+        md = std::max(md, std::fabs(ln.process(in[n]) - ref[n]));
+    CHECK(md < 1e-9);
+}
+
+TEST_CASE("ControlLine reaches the target and holds it") {
+    ControlLine ln; ln.prepare(44100.0); ln.setRampMs(100.0); ln.reset();
+    double y = 0.0;
+    for (int n = 0; n < 44100; ++n) y = ln.process(1.0);   // 1 s >> 100 ms ramp
+    CHECK(y == doctest::Approx(1.0));
+}
