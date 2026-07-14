@@ -1,6 +1,7 @@
 #pragma once
 
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
+#include "vstgui/plugin-bindings/vst3editor.h"
 #include "dslar_ids.h"
 #include "dslar_dsp.h"
 
@@ -14,7 +15,8 @@
 
 namespace Seam {
 
-class DSLARProcessor : public Steinberg::Vst::SingleComponentEffect {
+class DSLARProcessor : public Steinberg::Vst::SingleComponentEffect,
+                       public VSTGUI::VST3EditorDelegate {
 public:
     DSLARProcessor();
     ~DSLARProcessor() override = default;
@@ -35,6 +37,11 @@ public:
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream* state) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream* state) override;
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) override;
+
+    // VST3EditorDelegate — build the UI-only ramped reset button.
+    VSTGUI::CView* PLUGIN_API createCustomView(
+        VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& attributes,
+        const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* editor) override;
 
 private:
     // Parameters (audio-thread-readable).

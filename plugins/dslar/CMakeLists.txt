@@ -10,6 +10,7 @@ set(dslar_sources
     ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/vstsinglecomponenteffect.h
     source/dslar_ids.h
     source/dslar_dsp.h
+    source/dslar_reset_button.h
     source/dslar_processor.cpp
     source/dslar_processor.h
     source/version.h

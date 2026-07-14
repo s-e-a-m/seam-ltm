@@ -28,12 +28,20 @@
         <view class="CTextLabel" origin="0, 60" size="460, 14" font="InfoFont"
               font-color="TextDim" text-alignment="center" title="homeostatic loop" transparent="true"/>
 
-        <!-- Top block: Power over Output (stacked, centered) -->
-        <view class="CTextLabel" origin="170, 92" size="90, 18" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="right" title="Power" transparent="true"/>
-        <view class="CCheckBox" origin="268, 90" size="22, 20" control-tag="Power"
+        <!-- System row: Power over the AUDIO column, Reset over the ANALYSIS
+             column — symbol left, capitalised label right, each pair centred on
+             its column like the "— AUDIO PATH —" / "— ANALYSIS —" headers. -->
+        <view class="CCheckBox" origin="93, 88" size="14, 14" control-tag="Power"
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
               title="" transparent="true"/>
+        <view class="CTextLabel" origin="111, 86" size="46, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="Power" transparent="true"/>
+
+        <!-- Reset to Di Scipio defaults: UI-only, ramps character params over ~1 s -->
+        <view class="CView" origin="313, 88" size="14, 14" custom-view-name="DslarReset"
+              tooltip="reset character params to Di Scipio defaults (ramped)"/>
+        <view class="CTextLabel" origin="331, 86" size="46, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="Reset" transparent="true"/>
 
         <view class="CTextLabel" origin="0, 120" size="460, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Output" transparent="true"/>
@@ -89,7 +97,7 @@
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="3" style-no-frame="true"/>
 
         <view class="CTextLabel" origin="250, 270" size="180, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Steepness" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Steepness (^k)" transparent="true"/>
         <view class="CSlider" origin="250, 286" size="180, 18" control-tag="Steepness"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"

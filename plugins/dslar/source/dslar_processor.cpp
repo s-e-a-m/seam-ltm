@@ -1,5 +1,6 @@
 #include "dslar_processor.h"
 #include "dslar_ids.h"
+#include "dslar_reset_button.h"
 #include "version.h"
 #include "seam_meter.h"
 
@@ -13,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -168,6 +170,25 @@ tresult PLUGIN_API DSLARProcessor::getState(IBStream* state) {
 IPlugView* PLUGIN_API DSLARProcessor::createView(FIDString name) {
     if (FIDStringsEqual(name, ViewType::kEditor))
         return new VSTGUI::VST3Editor(this, "view", "dslar.uidesc");
+    return nullptr;
+}
+
+// UI-only ramped reset button, wired to the "DslarReset" placeholder in the
+// uidesc. Colours resolve from the same palette as the rest of the GUI.
+VSTGUI::CView* PLUGIN_API DSLARProcessor::createCustomView(
+    VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& /*attributes*/,
+    const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* /*editor*/) {
+    if (name && std::string(name) == "DslarReset") {
+        VSTGUI::CColor frame = VSTGUI::kGreyCColor;
+        VSTGUI::CColor idle  = VSTGUI::kBlackCColor;
+        VSTGUI::CColor azure(0x4a, 0x9e, 0xc8, 0xff);
+        if (description) {
+            description->getColor("TextDim", frame);
+            description->getColor("BgDark", idle);
+            description->getColor("SliderActive", azure);
+        }
+        return new DslarResetButton(VSTGUI::CRect(0, 0, 20, 20), this, frame, idle, azure);
+    }
     return nullptr;
 }
 
