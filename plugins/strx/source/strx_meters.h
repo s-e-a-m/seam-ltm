@@ -89,7 +89,7 @@ public:
             char valStr[16];
             if (i < 4) {
                 norm = seam::meter::db2norm(dbValues[i], kFloorDb);
-                std::snprintf(valStr, sizeof valStr, "%.0f", dbValues[i]);
+                std::snprintf(valStr, sizeof valStr, "%.1f", dbValues[i]);
             } else {
                 norm = frame.width; // already [0,1], 0 = mono
                 invTint = frame.correlation < 0.f;

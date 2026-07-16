@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25.0)
 
 project(seam-strx
     VERSION     ${CMAKE_PROJECT_VERSION}
-    DESCRIPTION "SEAM strx – STONE observation M/S analyzer"
+    DESCRIPTION "SEAM STRX – STEREO M/S Analyser"
 )
 
 set(strx_sources

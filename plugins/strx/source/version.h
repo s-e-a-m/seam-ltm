@@ -9,9 +9,9 @@
 
 #define stringOriginalFilename  "strx.vst3"
 #if SMTG_PLATFORM_64
-#define stringFileDescription   "SEAM strx – STONE observation M/S analyzer (64Bit)"
+#define stringFileDescription   "SEAM STRX – STEREO M/S Analyser (64Bit)"
 #else
-#define stringFileDescription   "SEAM strx – STONE observation M/S analyzer"
+#define stringFileDescription   "SEAM STRX – STEREO M/S Analyser"
 #endif
 #define stringCompanyWeb        "https://s-e-a-m.github.io"
 #define stringCompanyEmail      "mailto:seam@example.com"

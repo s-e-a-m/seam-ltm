@@ -31,9 +31,9 @@
               background-color="BgDark" background-color-draw-style="filled">
 
         <view class="CTextLabel" origin="0, 14" size="900, 26" font="TitleFont"
-              font-color="TextLight" text-alignment="center" title="SEAM strx" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="SEAM STRX" transparent="true"/>
         <view class="CTextLabel" origin="0, 42" size="900, 18" font="SubtitleFont"
-              font-color="TextDim" text-alignment="center" title="STONE observation M/S analyzer" transparent="true"/>
+              font-color="TextDim" text-alignment="center" title="STEREO M/S Analyser" transparent="true"/>
 
         <!-- Goniometer zone (left third): decaying L/R scatter + Angle/Panorama. -->
         <view class="CView" origin="20, 70" size="260, 260" custom-view-name="StrxGoniometer"

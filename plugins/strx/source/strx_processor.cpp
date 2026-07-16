@@ -166,7 +166,7 @@ template void StrxProcessor::processBlock<double>(double**, double**, int);
 BEGIN_FACTORY_DEF(stringCompanyName, stringCompanyWeb, stringCompanyEmail)
     DEF_CLASS2(INLINE_UID_FROM_FUID(Seam::StrxProcessorUID),
                PClassInfo::kManyInstances, kVstAudioEffectClass,
-               "SEAM strx", Vst::kDistributable,
+               "SEAM STRX", Vst::kDistributable,
                "Fx|Analyzer", FULL_VERSION_STR, kVstVersionString,
                Seam::StrxProcessor::createInstance)
 END_FACTORY

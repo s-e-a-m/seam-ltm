@@ -6,6 +6,7 @@
 #include "vstgui/lib/ccolor.h"
 #include "vstgui/lib/cvstguitimer.h"
 #include "strx_processor.h"
+#include "seam_meter.h"
 
 #include <algorithm>
 #include <array>
@@ -53,7 +54,11 @@ public:
     static constexpr double kMarginFrac   = 0.06;    // circle inset as a fraction of the view
     static constexpr double kPointHalfPx  = 1.3;     // scatter point half-size (px)
     static constexpr double kAxisFrac     = 0.98;     // diagonal axis length vs. circle radius
+    static constexpr double kLabelFrac    = 0.82;    // L/R label placement vs. circle radius (inset from the axis line)
     static constexpr double kReadoutH     = 16.0;    // bottom readout strip height (px)
+
+    // --- Radial scale (log-dB, floored) ---
+    static constexpr double kRadiusFloorDb = -48.0;  // signals at/below this floor sit at the circle's center
 
     StrxGoniometer(const VSTGUI::CRect& size, StrxProcessor* processor,
                    VSTGUI::CFontRef font,
@@ -103,6 +108,7 @@ public:
 
         // L/R diagonal axes: pure-L is gx==gy, pure-R is gx==-gy.
         const CCoord d = radius * kAxisFrac * 0.70710678; // projected onto each screen axis
+        const CCoord dLabel = radius * kLabelFrac * 0.70710678; // label placement, inset from the axis line
         c->setFrameColor(labelColor_);
         c->drawLine(CPoint(center.x - d, center.y + d), CPoint(center.x + d, center.y - d)); // L: bottom-left <-> top-right
         c->drawLine(CPoint(center.x - d, center.y - d), CPoint(center.x + d, center.y + d)); // R: top-left <-> bottom-right
@@ -111,9 +117,11 @@ public:
             c->setFontColor(labelColor_);
             // Pure L (l>0, r=0): gx=gy=+0.707l -> screen (cx+d, cy-d), top-right.
             // Pure R (r>0, l=0): gx=-0.707r, gy=+0.707r -> screen (cx-d, cy-d), top-left.
-            c->drawString("L", CRect(center.x + d - 8, center.y - d - 14, center.x + d + 8, center.y - d), kCenterText);
-            c->drawString("R", CRect(center.x - d - 8, center.y - d - 14, center.x - d + 8, center.y - d), kCenterText);
+            c->drawString("L", CRect(center.x + dLabel - 8, center.y - dLabel - 14, center.x + dLabel + 8, center.y - dLabel), kCenterText);
+            c->drawString("R", CRect(center.x - dLabel - 8, center.y - dLabel - 14, center.x - dLabel + 8, center.y - dLabel), kCenterText);
         }
+
+        const Generation& newest = history_[head_];
 
         // Decaying point cloud: oldest generation first so the newest paints on top.
         for (int age = kTrailFrames - 1; age >= 0; --age) {
@@ -129,15 +137,21 @@ public:
             CGraphicsPath* path = c->createGraphicsPath();
             if (!path) continue;
             for (int i = 0; i < gen.numPoints; ++i) {
-                // Clamp (S,M) to the unit range so |value|=1 lands on the circle
-                // edge: full-scale mono gives gy=√2 and anti-phase gives gx=√2,
-                // which would otherwise map ~41% past the radius and square off
-                // against the rectangular view bounds. (View-side only — the DSP
-                // in strx_dsp.h keeps the true unnormalized (S,M).)
-                const double gxc = std::clamp(double(gen.gx[i]), -1.0, 1.0);
-                const double gyc = std::clamp(double(gen.gy[i]), -1.0, 1.0);
-                const double sx = center.x + gxc * radius;
-                const double sy = center.y - gyc * radius; // y up
+                // Log-dB radial scale, floored at kRadiusFloorDb: the ANGLE
+                // (direction) of (gx,gy) is preserved exactly; only the
+                // radial distance is warped so attenuated signals stay near
+                // the edge instead of shrinking linearly toward the center.
+                // db2norm caps at 1.0, so points never exceed the circle —
+                // no per-axis clamp needed (replaces the old [-1,1] clamp).
+                const double gx = double(gen.gx[i]);      // raw S
+                const double gy = double(gen.gy[i]);      // raw M
+                const double rLin = std::hypot(gx, gy);
+                const double rNorm = (rLin > 1e-6)
+                    ? seam::meter::db2norm(seam::meter::lin2db(rLin, kRadiusFloorDb), kRadiusFloorDb)
+                    : 0.0;                                 // rNorm in [0,1]
+                const double scale = (rLin > 1e-6) ? (rNorm / rLin) : 0.0;
+                const double sx = center.x + gx * radius * scale;
+                const double sy = center.y - gy * radius * scale; // y up
                 path->addRect(CRect(sx - kPointHalfPx, sy - kPointHalfPx,
                                      sx + kPointHalfPx, sy + kPointHalfPx));
             }
@@ -146,9 +160,23 @@ public:
             path->forget();
         }
 
+        // Vector "needle": thin line through the center along the field's
+        // principal axis (san.vectorangle -> newest.angleRad). Drawn after
+        // the scatter so it stays legible against the decaying trail.
+        // Display angle in the goniometer's (S=x, M=y) plane is
+        // phi = angleRad + pi/4 (mono -> phi=90 deg = vertical,
+        // anti-phase -> phi=0 deg = horizontal, matching the scatter).
+        {
+            const double phi = double(newest.angleRad) + M_PI / 4.0;
+            const double nx = std::cos(phi) * radius;
+            const double ny = std::sin(phi) * radius;
+            c->setFrameColor(fillColor_);
+            c->setLineWidth(1.0);
+            c->drawLine(CPoint(center.x - nx, center.y + ny), CPoint(center.x + nx, center.y - ny));
+        }
+
         // Readout: ANGLE / PANORAMA from the newest generation's scalars.
         char buf[64];
-        const Generation& newest = history_[head_];
         std::snprintf(buf, sizeof buf, "ANGLE %+.0f\xC2\xB0   PANORAMA %+.0f%%",
                       newest.angleRad * (180.0 / M_PI), newest.panorama * 100.0);
         if (font_) c->setFont(font_);
