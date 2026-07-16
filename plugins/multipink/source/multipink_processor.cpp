@@ -47,6 +47,20 @@ tresult PLUGIN_API MULTIPINKProcessor::initialize(FUnknown* context) {
         0.0, 1.0, 0.0, 1,
         ParameterInfo::kCanAutomate | ParameterInfo::kIsList));
 
+    auto* stoneParam = new StringListParameter(
+        STR16("STONE"), kParamStoneId, STR16(""),
+        ParameterInfo::kCanAutomate | ParameterInfo::kIsList);
+    stoneParam->appendString(STR16("?"));
+    stoneParam->appendString(STR16("1"));
+    stoneParam->appendString(STR16("2"));
+    stoneParam->appendString(STR16("3"));
+    stoneParam->appendString(STR16("4"));
+    stoneParam->appendString(STR16("5"));
+    stoneParam->appendString(STR16("6"));
+    stoneParam->appendString(STR16("7"));
+    stoneParam->appendString(STR16("8"));
+    parameters.addParameter(stoneParam);
+
     // Read-only display parameters (pushed from process() via outputParameterChanges).
     parameters.addParameter(new RangeParameter(
         STR16("Slot Start"), kParamSlotStart, STR16(""),
@@ -88,6 +102,9 @@ tresult PLUGIN_API MULTIPINKProcessor::setActive(TBool state) {
         }
         seedLCGs();
         resetPinkFilters();
+
+        busHandle_ = CalbusClient::instance().registerSlot();
+        publishBusRecord();
     } else {
         if (claimedStart_ >= 0) {
             MultipinkPool::release(claimedStart_, claimedChannels_);
@@ -95,6 +112,9 @@ tresult PLUGIN_API MULTIPINKProcessor::setActive(TBool state) {
         claimedStart_    = -1;
         claimedChannels_ = 0;
         poolStatus_.store((int)PoolStatus::Unclaimed);
+
+        CalbusClient::instance().unregisterSlot(busHandle_);
+        busHandle_ = SEAM_CALBUS_NO_HANDLE;
     }
     return SingleComponentEffect::setActive(state);
 }
@@ -106,8 +126,31 @@ tresult PLUGIN_API MULTIPINKProcessor::setupProcessing(ProcessSetup& setup) {
     return SingleComponentEffect::setupProcessing(setup);
 }
 
+void MULTIPINKProcessor::publishBusRecord() {
+    if (busHandle_ == SEAM_CALBUS_NO_HANDLE) return;
+
+    SeamCalbusRecord r{};
+    r.kind    = kSeamCalbusPink;
+    r.stoneId = (uint32_t)paramStoneId_.load();
+    // "active" is the conjunction that exists nowhere else: the pool tracks
+    // ownership, so with four instances loaded it reports slots 0/4/8/12 all
+    // claimed and cannot say which one is sounding. Level stays a separate
+    // field — reference (-23/-20/-18) plus trim (±6) never reaches silence,
+    // so an "audible level" test would need a threshold nobody can justify.
+    r.active  = (claimedStart_ >= 0 && paramMute_.load() == 0) ? 1u : 0u;
+    r.levelDb = kReferenceLevelsDb[paramReferenceIdx_.load()] + paramTrimDb_.load();
+    r.sampleRate = processSetup.sampleRate;
+    r.u.pink.slotStart = claimedStart_;
+    r.u.pink.slotCount = claimedChannels_;
+
+    CalbusClient::instance().publish(busHandle_, r);
+}
+
 tresult PLUGIN_API MULTIPINKProcessor::process(ProcessData& data) {
     readParameterChanges(data);
+
+    // Parameter changes arrive here, on the audio thread — hence the seqlock.
+    publishBusRecord();
 
     // Push display state for the GUI (read-only parameters).
     if (auto* outChanges = data.outputParameterChanges) {
@@ -164,6 +207,12 @@ tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
     paramMute_.store(mute ? 1 : 0);
     preferredStart_ = (prefStart >= -1 && prefStart < kPoolSize) ? prefStart : -1;
 
+    // stoneId is read last and tolerates absence: presets saved before this
+    // parameter existed simply leave paramStoneId_ at its default (0 =
+    // undeclared) rather than failing the whole setState().
+    int32 stoneId = 0;
+    if (s.readInt32(stoneId)) paramStoneId_.store((stoneId >= 0 && stoneId <= 8) ? stoneId : 0);
+
     // Mirror normalized values into the parameter container so the host
     // and GUI see them on next refresh.
     if (auto* p = parameters.getParameter(kParamReference))
@@ -172,6 +221,8 @@ tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
         p->setNormalized((paramTrimDb_.load() + 6.0) / 12.0);
     if (auto* p = parameters.getParameter(kParamMute))
         p->setNormalized(paramMute_.load() ? 1.0 : 0.0);
+    if (auto* p = parameters.getParameter(kParamStoneId))
+        p->setNormalized((double)paramStoneId_.load() / (kStoneIdStepCount - 1));
 
     return kResultOk;
 }
@@ -187,6 +238,7 @@ tresult PLUGIN_API MULTIPINKProcessor::getState(IBStream* state) {
     if (!s.writeDouble(trim))      return kResultFalse;
     if (!s.writeInt32(mute))       return kResultFalse;
     if (!s.writeInt32(prefStart))  return kResultFalse;
+    if (!s.writeInt32(paramStoneId_.load())) return kResultFalse;
     return kResultOk;
 }
 
@@ -266,6 +318,9 @@ void MULTIPINKProcessor::readParameterChanges(ProcessData& data) {
                 break;
             case kParamMute:
                 paramMute_.store(v >= 0.5 ? 1 : 0);
+                break;
+            case kParamStoneId:
+                paramStoneId_.store((int)(v * (kStoneIdStepCount - 1) + 0.5));
                 break;
         }
     }

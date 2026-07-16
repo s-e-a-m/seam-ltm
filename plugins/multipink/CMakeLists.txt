@@ -22,6 +22,11 @@ set(target multipink)
 smtg_add_vst3plugin(${target} ${multipink_sources})
 smtg_target_configure_version_file(${target})
 
+target_include_directories(${target} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_common/calbus
+)
+add_dependencies(${target} seam_calbus)
+
 target_compile_features(${target} PUBLIC cxx_std_17)
 target_link_libraries(${target} PRIVATE sdk vstgui_support)
 

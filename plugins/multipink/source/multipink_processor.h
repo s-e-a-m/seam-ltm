@@ -2,6 +2,7 @@
 
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "multipink_ids.h"
+#include "seam_calbus_client.h"
 
 #include <algorithm>
 #include <atomic>
@@ -93,6 +94,16 @@ private:
     std::atomic<int>    paramReferenceIdx_{0};   // 0..2
     std::atomic<double> paramTrimDb_{0.0};       // -6..+6
     std::atomic<int>    paramMute_{0};           // 0 or 1
+    std::atomic<int>    paramStoneId_{0};        // 0 = undeclared, 1..8
+
+    // Calibration bus (Spec 2). The handle is claimed in setActive and
+    // released there; publishing happens from process() on the audio thread,
+    // which is why the bus uses a seqlock and not a mutex.
+    int32_t busHandle_ = SEAM_CALBUS_NO_HANDLE;
+
+    // Build and publish this instance's record. Safe to call from the audio
+    // thread; a no-op when the bus is unavailable or the slot is unclaimed.
+    void publishBusRecord();
 
     // DSP state — full pool always advanced.
     uint32_t lcgState_[kPoolSize] = {};

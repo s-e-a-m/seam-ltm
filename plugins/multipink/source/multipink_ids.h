@@ -14,11 +14,18 @@ enum MULTIPINKParams : Steinberg::Vst::ParamID {
     kParamReference   = 100,   // 0=-23, 1=-20, 2=-18 dBFS RMS  (stepped)
     kParamTrim        = 101,   // -6.0 … +6.0 dB                (continuous)
     kParamMute        = 102,   // 0 / 1                         (bool)
+    kParamStoneId     = 103,   // 0=undeclared, 1..8            (stepped)
     // Read-only display parameters, pushed from the audio thread:
     kParamSlotStart   = 200,   // -1..63 (sentinel -1 = unclaimed)
     kParamSlotCount   = 201,   // 0..64
     kParamPoolStatus  = 202,   // PoolStatus enum (0..3)
 };
+
+// STONE identity for the calibration bus (Spec 2). Declared by hand and never
+// inferred from the pool slot: with four STONEs in the room, an instance that
+// guesses is an instance that calibrates the wrong power amp. 0 = undeclared,
+// which strx renders as "STONE ?".
+static constexpr Steinberg::int32 kStoneIdStepCount = 9;   // "?" + 1..8
 
 // Number of stepped values for kParamReference. Used by the GUI and by the
 // processor to decode the normalized [0,1] parameter into an enum index.
