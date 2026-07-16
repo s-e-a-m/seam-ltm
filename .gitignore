@@ -1,5 +1,6 @@
 build/
 build-release/
+build-test/
 .DS_Store
 *.xcworkspace
 xcuserdata/

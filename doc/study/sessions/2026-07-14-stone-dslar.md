@@ -319,7 +319,11 @@ il precedente.
 - Comportamento M/S osservato nella stanza → conferma l'utilità dei descrittori di Spec 1.
 - Serve compensare la **TF del microfono stesso** (calibrazione del mic)? → possibile
   requisito trasversale a Spec 1/3.
-- Dove applicare la EQ correttiva (Spec 4).
+- [x] Dove applicare la EQ correttiva (Spec 4) — **risolto dal metodo** (2026-07-16):
+      il multipink non passa per encoder/decoder, quindi la curva che se ne ricava
+      descrive STONE + finale + stanza + posizione e nient'altro → è per costruzione
+      il dominio dei filtri integrati nel finale. La misura ltglide (catena completa)
+      si legge *sopra* finali già tarati: le due fasi sono in cascata, non alternative.
 
 ---
 
