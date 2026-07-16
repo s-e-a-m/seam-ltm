@@ -18,7 +18,8 @@ The plugin builds, loads in a host, passes the VST3 validator, and shows three l
 `strx` is a pure analyzer.
 Audio passes through unchanged (analysis only, no gain, no processing on the signal path).
 The input is a single fixed stereo bus (2 channels).
-One microphone feeds L and leaves R silent, so Side is zero and the Mid analysis still works; two microphones give Mid + Side, where Side reports the room's contribution to the STONE's sphericity.
+One microphone fed to both channels (`L=R`, e.g. a mono source duplicated onto the stereo bus) gives Side zero, so the Mid analysis reads pure; two microphones give Mid + Side, where Side reports the room's contribution to the STONE's sphericity.
+Note the M/S matrix is faithful to `sst.sdmx`: a single mic on L with R genuinely silent is *not* zero-Side (it gives `S=(L−0)/√2=M`, i.e. a hard-panned reading), so the one-mic case means the same mic on both channels.
 Analysis is always M/S internally, regardless of how many microphones are patched.
 
 The M/S frame is the single mental model for the whole plugin: the goniometer rotates the L/R scatter by 45° so mono (`L=R`, `S=0`) is a vertical line and anti-phase (`L=−R`, `M=0`) is horizontal, which is the same sum-and-difference geometry the meters read.
