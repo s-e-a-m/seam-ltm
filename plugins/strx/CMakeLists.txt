@@ -13,6 +13,7 @@ set(strx_sources
     source/strx_goniometer.h
     source/strx_meters.h
     source/strx_spectrum.h
+    source/strx_status.h
     source/strx_processor.cpp
     source/strx_processor.h
     source/version.h
@@ -24,7 +25,12 @@ set(target strx)
 smtg_add_vst3plugin(${target} ${strx_sources})
 smtg_target_configure_version_file(${target})
 
-target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../_common)
+target_include_directories(${target} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_common/calbus
+)
+add_dependencies(${target} seam_calbus)
+
 target_compile_features(${target} PUBLIC cxx_std_17)
 target_link_libraries(${target} PRIVATE sdk vstgui_support)
 

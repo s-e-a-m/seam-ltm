@@ -26,4 +26,9 @@ static const char* kViewGoniometer = "StrxGoniometer";
 static const char* kViewSpectrum   = "StrxSpectrum";
 static const char* kViewMeters     = "StrxMeters";
 
+// Calibration-bus status line (calbus Task 5, strx_status.h): the one
+// user-visible feature of the calibration bus and its own diagnostic. Not
+// one of the three analysis panes above; sits in the footer strip.
+static const char* kViewStatus = "StrxStatus";
+
 } // namespace Seam

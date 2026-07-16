@@ -3,6 +3,7 @@
 #include "strx_meters.h"
 #include "strx_goniometer.h"
 #include "strx_spectrum.h"
+#include "strx_status.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -136,6 +137,12 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
         }
         return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 310, 260), this, font,
                                        label, text, track, colorM, colorS);
+    }
+    if (name && std::string(name) == kViewStatus) {
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor text = VSTGUI::kGreyCColor;
+        if (description) description->getColor("TextDim", text);
+        return new Seam::StrxStatusLine(VSTGUI::CRect(0, 0, 300, 26), font, text);
     }
     return nullptr;
 }

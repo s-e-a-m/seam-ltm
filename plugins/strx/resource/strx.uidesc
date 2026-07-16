@@ -49,6 +49,12 @@
         <view class="CView" origin="610, 70" size="270, 260" custom-view-name="StrxMeters"
               tooltip="In L, In R, M, S levels (dBFS) and Width (correlation-tinted)"/>
 
+        <!-- Calibration-bus status line (calbus Task 5): names the sounding
+             emitter, or "calbus unavailable" when the bus dylib is absent.
+             Sits in the footer strip left of the logo, clear of both the
+             zone row (ends at y=330) and the logo (x 330-570). -->
+        <view class="CView" origin="20, 348" size="300, 26" custom-view-name="StrxStatus"/>
+
         <!-- SEAM logo footer strip (native 240x77 — CView does not scale
              bitmaps), centred below the zone row (zones end at y=330). -->
         <view class="CView" origin="330, 345" size="240, 77" bitmap="logo"/>
