@@ -64,3 +64,36 @@ TEST_CASE("Welch: silence sits at/below the dB floor") {
     const float* mag = w.magnitudeDb();
     for (int k = 0; k < w.numBins(); ++k) CHECK(mag[k] <= -90.0f);
 }
+
+// Calibration: a full-scale sine's peak bin must read ~0 dBFS (coherent-gain
+// normalization), not the raw PSD/noise-power normalization (which reads
+// ~+28 dB too high for N=4096-class windows). Half-scale must read ~-6 dB
+// (20*log10(0.5)), confirming the calibration is linear in amplitude, not
+// just a fixed offset.
+TEST_CASE("Welch: full-scale sine peak bin reads ~0 dBFS") {
+    const int N = 1024; const double fs = 48000.0;
+    seam::fft::Welch w;
+    w.prepare(N, 0.05, fs);
+    const double f = fs * 64 / N;                 // exactly bin 64
+    for (int i = 0; i < N*16; ++i)                 // let the EMA settle
+        w.push((float)(1.0 * std::sin(2.0*M_PI*f*i/fs)));
+    const float* mag = w.magnitudeDb();
+    int peak = 0;
+    for (int k = 1; k < w.numBins(); ++k) if (mag[k] > mag[peak]) peak = k;
+    CHECK(peak == 64);
+    CHECK(std::abs((double)mag[64] - 0.0) < 0.5);   // within 0.5 dB of 0 dBFS
+}
+
+TEST_CASE("Welch: half-scale sine peak bin reads ~-6 dBFS") {
+    const int N = 1024; const double fs = 48000.0;
+    seam::fft::Welch w;
+    w.prepare(N, 0.05, fs);
+    const double f = fs * 64 / N;                 // exactly bin 64
+    for (int i = 0; i < N*16; ++i)                 // let the EMA settle
+        w.push((float)(0.5 * std::sin(2.0*M_PI*f*i/fs)));
+    const float* mag = w.magnitudeDb();
+    int peak = 0;
+    for (int k = 1; k < w.numBins(); ++k) if (mag[k] > mag[peak]) peak = k;
+    CHECK(peak == 64);
+    CHECK(std::abs((double)mag[64] - (-6.0)) < 0.5); // within 0.5 dB of -6 dBFS
+}

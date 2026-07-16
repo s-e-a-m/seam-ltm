@@ -55,12 +55,16 @@ public:
         const double dt = double(hop_) / fs_;
         ema_ = (emaTau > 0.0) ? std::exp(-dt / emaTau) : 0.0;
         win_.assign(n_, 0.0f);
-        double wsum = 0.0;
+        double wcoh = 0.0;
         for (int i = 0; i < n_; ++i) {                 // Hann
             win_[i] = 0.5f * (1.0f - std::cos(2.0*M_PI*i/(n_-1)));
-            wsum += win_[i]*win_[i];
+            wcoh += win_[i];
         }
-        winNorm_ = 1.0 / (wsum > 0.0 ? wsum : 1.0);    // power normalization
+        // Coherent-gain (sine) calibration: a real tone of amplitude A has
+        // peak-bin magnitude |X_k| ~= (A/2)*wcoh, so recovered power
+        // = (2*|X_k|/wcoh)^2 = |X_k|^2 * (4/wcoh^2). A full-scale sine then
+        // reads ~0 dBFS at its peak bin.
+        winNorm_ = 4.0 / (wcoh*wcoh > 0.0 ? wcoh*wcoh : 1.0);
         ring_.assign(n_, 0.0f);
         scratch_.assign(2*n_, 0.0f);
         magDb_.assign(bins_, -120.0f);
