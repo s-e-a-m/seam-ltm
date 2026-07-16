@@ -31,10 +31,16 @@ namespace {
 //     the only thing that can reject a torn read — cannot fire, and the reader
 //     accepts a half-old/half-zeroed record as valid.
 //
-//   - `inUse` cannot detect ABA. A reader that checks inUse, copies, and
-//     re-checks inUse sees 1 both times when the slot was released AND
+//   - `inUse` alone cannot detect ABA. A reader that checks inUse, copies,
+//     and re-checks inUse sees 1 both times when the slot was released AND
 //     reclaimed during the copy, and would emit the previous owner's record
-//     attributed to the new owner. Hence `gen` below.
+//     attributed to the new owner. In THIS file that gap is already closed
+//     by the point above: register()'s memset runs through the same
+//     seqlock, so a release-and-reclaim during the copy necessarily moves
+//     `seq`, and the `s1 != s2` torn-read check below rejects it before
+//     `inUse` is ever consulted again. `gen` (below) is NOT what stops this
+//     — see the struct-level comment on `gen` and snapshot()'s reader-side
+//     re-check for what `gen` is actually for.
 //
 // NON-ATOMIC memcpy/memset ON `rec` UNDER A SEQLOCK IS FORMALLY UB IN THE
 // ISO C++ MEMORY MODEL: the fences order the surrounding atomic operations,
@@ -50,11 +56,26 @@ struct Slot {
 
     // Registration epoch. Bumped under regMutex on BOTH register and
     // unregister, so it changes on every ownership transition and never
-    // returns to an earlier value (within the 26-bit window). It is the ABA
-    // guard the seqlock cannot provide: the reader captures {gen, inUse}
-    // before and after the copy and only accepts the record when both are
-    // unchanged, which means one uninterrupted registration epoch spanned the
-    // whole copy.
+    // returns to an earlier value (within the 26-bit window).
+    //
+    // WHAT `gen` IS ACTUALLY FOR: the stale-token path. It is packed into the
+    // handle returned by register() (see encodeHandle() below), so publish()
+    // and unregister() can reject a handle from an epoch that has since
+    // closed with one relaxed load and a compare — no lock, wait-free. That
+    // is the load-bearing job, tested deterministically by "a stale handle
+    // cannot publish into or evict the slot's new owner".
+    //
+    // WHAT `gen` IS NOT: the thing that rejects ABA on the snapshot() read
+    // path. In the current code that job belongs to the seqlock's own `seq`
+    // check — register()'s memset runs inside the same odd/even dance
+    // publish() uses, so a release-and-reclaim during a reader's copy always
+    // moves `seq` by 2, and the `s1 != s2` torn-read check already rejects
+    // it. snapshot() does re-capture {gen, inUse} after the copy as a second
+    // check, but that is defence-in-depth for if a future change ever lets
+    // something touch `rec` without going through the seqlock (e.g. an
+    // optimisation that skips the memset when the slot is already zero) —
+    // not what makes ABA detection work today. See snapshot()'s comment on
+    // that re-check for the full argument.
     std::atomic<uint32_t> gen{0};
 
     SeamCalbusRecord      rec{};
@@ -193,13 +214,18 @@ void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
     // a few instructions, and an emitter stops publishing before it
     // unregisters; the point is that a *stale* handle stops writing forever.)
     //
-    // `g == 0` is rejected on top of the equality check: 0 is the slot's
-    // pre-registration sentinel value, never a value register() hands out
-    // (it always bumps gen to >= 1 first), so a forged/zero-initialised
-    // handle == 0 targeting a never-registered slot 0 would otherwise pass
-    // `0 == handleGen(0)` trivially. See SEAM_CALBUS_NO_HANDLE in the header.
+    // Parity invariant: `gen` bumps exactly once per successful register()
+    // and once per unregister(), strictly alternating under regMutex (see
+    // both functions above), so gen even <=> slot free, gen odd <=> slot
+    // live. A live slot's gen is therefore never 0 (0 is even = free), and
+    // the 26-bit wrap point (2^26, itself even) preserves parity, so the
+    // invariant holds across the wrap too. `(g & 1u) == 0` rejects any even
+    // gen in one instruction — the slot's pre-registration sentinel 0 and a
+    // forged handle carrying an even non-zero gen alike — at the same cost
+    // as the `g == 0` special case it replaces. See SEAM_CALBUS_NO_HANDLE in
+    // the header.
     const uint32_t g = s.gen.load(std::memory_order_relaxed);
-    if (g == 0 || g != handleGen(handle)) return;
+    if ((g & 1u) == 0 || g != handleGen(handle)) return;
 
     // `start | 1u` / `(start | 1u) + 1u` instead of `start + 1` / `start + 2`:
     // see the identical comment in register() for why the plain +1/+2 dance

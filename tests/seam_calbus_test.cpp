@@ -212,6 +212,18 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     // — a phantom.
     std::atomic<uint64_t> liveEpoch{0};
 
+    // Counts completed register->publish->unregister CYCLES only — not loop
+    // iterations. This matters because `epoch` above (and `liveEpoch`) advance
+    // once per LOOP ITERATION regardless of whether register() actually
+    // succeeded: `if (h < 0) continue;` skips straight to the next iteration
+    // without touching the bus at all. Against a pre-filled registry (every
+    // register() call fails), the loop still spins and `liveEpoch` still
+    // climbs — in fact it climbs FASTER, since the failed-register path is
+    // cheaper than a real cycle. So `liveEpoch`/`epoch` cannot be used to
+    // prove churn happened; only a counter incremented after a cycle actually
+    // completes can. See the assertion on `cycles` below.
+    std::atomic<uint64_t> cycles{0};
+
     std::thread churn([&] {
         for (uint64_t epoch = 1; !stop.load(std::memory_order_relaxed); ++epoch) {
             liveEpoch.store(epoch, std::memory_order_release);
@@ -225,6 +237,7 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
                 seam_calbus_v1_publish(bus, h, &r);
             }
             seam_calbus_v1_unregister(bus, h);
+            cycles.fetch_add(1, std::memory_order_relaxed);
         }
     });
 
@@ -248,9 +261,10 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     churn.join();
 
     const uint64_t finalEpoch = liveEpoch.load(std::memory_order_relaxed);
+    const uint64_t finalCycles = cycles.load(std::memory_order_relaxed);
     MESSAGE("churn: reads=" << reads << " fresh=" << fresh
             << " torn=" << torn << " phantom=" << phantom
-            << " finalEpoch=" << finalEpoch);
+            << " finalEpoch=" << finalEpoch << " cycles=" << finalCycles);
     CHECK(torn == 0);
     CHECK(phantom == 0);
     // Liveness: the churn thread is registered for the overwhelming majority of
@@ -265,7 +279,19 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     // yield()-throttled churn thread that made this test pass against
     // provably buggy code). Pin the precondition the two CHECKs above rest
     // on: churn actually happened, many times, during this run.
-    CHECK(finalEpoch > 1000);
+    //
+    // MUST be `cycles`, not `finalEpoch`/liveEpoch: `liveEpoch` is bumped at
+    // the TOP of every loop iteration, before register() is even attempted,
+    // and the `if (h < 0) continue;` failure path is cheaper than a full
+    // cycle — so against a pre-filled registry (every register() fails,
+    // real turnover == 0) `finalEpoch` climbs HIGHER than in a healthy run,
+    // and `CHECK(finalEpoch > 1000)` would pass hardest exactly when the
+    // test proves nothing. `cycles` only increments after unregister()
+    // actually completes a real register/publish/unregister cycle, so it is
+    // anti-correlated with the failure mode instead of correlated with it.
+    // Healthy runs land in the tens of thousands (~53k-119k observed); 1000
+    // is a floor with wide margin, not a target.
+    CHECK(finalCycles > 1000);
 }
 
 TEST_CASE("publish with an invalid handle is a silent no-op") {

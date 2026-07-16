@@ -37,9 +37,10 @@ extern "C" {
 // handle that has not registered yet: 0 is index 0 / gen 0, i.e. slot 0
 // before it has ever been claimed — a value publish()/unregister() will
 // happily accept. A handle that was actually returned by register() has
-// gen >= 1 (register() bumps gen before handing the handle out), so a
-// zero-initialised handle can never collide with a real one. See publish()'s
-// gen == 0 guard below.
+// gen >= 1 (register() bumps gen before handing the handle out) and, more
+// specifically, a live slot's gen is always ODD (gen alternates parity on
+// every register/unregister transition), so a zero-initialised handle can
+// never collide with a real one. See publish()'s parity guard below.
 #define SEAM_CALBUS_NO_HANDLE (-1)
 
 // Emitter kind. The kind IS the calibration stage: Pink measures power amp +
