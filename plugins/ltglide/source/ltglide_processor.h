@@ -59,6 +59,12 @@ private:
     // Calibration bus (Spec 2).
     int32_t  busHandle_ = SEAM_CALBUS_NO_HANDLE;
     uint64_t lastPublishedPass_ = 0;
+    // Anchor of the most recent pass (the head Dirac's continuousTimeSamples,
+    // or -1 if the host gave no valid clock for it). Reused by the run/idle
+    // edge publish so a completed pass keeps its anchor instead of the idle
+    // heartbeat overwriting it with -1 (see publishBusRecord's contract).
+    int64_t  lastPassStartSample_ = -1;
+    bool     wasRunning_ = false;
 
     // Publish this instance's record. Called from the audio thread.
     // hostStartSample is -1 when the host provides no valid continuous clock.

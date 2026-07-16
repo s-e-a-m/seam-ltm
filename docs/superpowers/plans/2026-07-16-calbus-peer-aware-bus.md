@@ -1364,21 +1364,24 @@ In `process()`, immediately after `readParameterChanges(data);` (line 110), add:
     publishBusRecord();
 ```
 
-In `readParameterChanges`, add a case beside the existing ones:
+In `readParameterChanges`, add a case beside the existing ones. Clamp the index like the neighbouring `kParamReference` case does — a non-conforming host sending `v > 1` must not yield `stoneId > 8`:
 
 ```cpp
-            case kParamStoneId:
-                paramStoneId_.store((int)(v * (kStoneIdStepCount - 1) + 0.5));
-                break;
+            case kParamStoneId: {
+                int idx = (int)(v * (kStoneIdStepCount - 1) + 0.5);
+                if (idx < 0) idx = 0;
+                if (idx > kStoneIdStepCount - 1) idx = kStoneIdStepCount - 1;
+                paramStoneId_.store(idx);
+            } break;
 ```
 
 - [ ] **Step 4: Persist the parameter**
 
-In `setState()`, after the existing reads, add:
+In `setState()`, after the existing reads, add. Store unconditionally, like every other parameter's local default above — if only the success branch stores, a pre-calbus preset loaded into an instance that already has a STONE id set leaves that stale id in place, attributing a calibration pass to a loudspeaker the preset never named:
 
 ```cpp
     int32 stoneId = 0;
-    if (s.readInt32(stoneId)) paramStoneId_.store((stoneId >= 0 && stoneId <= 8) ? stoneId : 0);
+    paramStoneId_.store(s.readInt32(stoneId) && stoneId >= 0 && stoneId <= 8 ? stoneId : 0);
 ```
 
 In `getState()`, after the existing writes, add:
@@ -1576,6 +1579,12 @@ add the members beside `paramLoop_`:
     // Calibration bus (Spec 2).
     int32_t  busHandle_ = -1;
     uint64_t lastPublishedPass_ = 0;
+    // Anchor of the most recent pass (the head Dirac's continuousTimeSamples,
+    // or -1 if the host gave no valid clock for it). Reused by the run/idle
+    // edge publish below so a completed pass keeps its anchor instead of the
+    // idle heartbeat overwriting it with -1.
+    int64_t  lastPassStartSample_ = -1;
+    bool     wasRunning_ = false;
 
     // Publish this instance's record. Called from the audio thread.
     // hostStartSample is -1 when the host provides no valid continuous clock.
@@ -1608,11 +1617,11 @@ In `plugins/ltglide/source/ltglide_processor.cpp`, add the STONE parameter in `i
     parameters.addParameter(stoneParam);
 ```
 
-add the case in `readParameterChanges` (beside `kParamLoop`, line ~249):
+add the case in `readParameterChanges` (beside `kParamLoop`, line ~249). Clamp, matching the `std::clamp` idiom this file's neighbouring cases already use — an unclamped index lets a non-conforming host push `stoneId` outside the stated 0–8 range:
 
 ```cpp
             case kParamStoneId:
-                paramStoneId_.store((int)(v * (kStoneIdStepCount - 1) + 0.5));
+                paramStoneId_.store(std::clamp((int)(v * (kStoneIdStepCount - 1) + 0.5), 0, kStoneIdStepCount - 1));
                 break;
 ```
 
@@ -1641,11 +1650,13 @@ void LTGLIDEProcessor::publishBusRecord(int64_t hostStartSample) {
 }
 ```
 
-in `setActive()`, inside the activation branch (after `transport_.setLoop(...)`, line ~115):
+in `setActive()`, inside the activation branch (after `transport_.setLoop(...)`, line ~115). (Re)activation always lands in Idle (`transport_.reset()` never resumes a pass mid-way), so there is no pass to anchor yet — reset the edge-detect state too, or a reactivated instance carries a stale anchor / stale running-idle edge from before:
 
 ```cpp
         busHandle_ = CalbusClient::instance().registerSlot();
         lastPublishedPass_ = transport_.passCount();
+        lastPassStartSample_ = -1;
+        wasRunning_ = false;
         publishBusRecord(-1);
 ```
 
@@ -1691,15 +1702,34 @@ In `processBlock` (line ~255), detect the pass start per sample and publish with
         const uint64_t pc = transport_.passCount();
         if (pc != lastPublishedPass_) {
             lastPublishedPass_ = pc;
-            publishBusRecord(blockStartSample >= 0 ? blockStartSample + i : -1);
+            lastPassStartSample_ = (blockStartSample >= 0) ? blockStartSample + i : -1;
+            publishBusRecord(lastPassStartSample_);
         }
 ```
 
-After the loop, publish once more so `active` follows the transport back to idle:
+After the loop, publish once more so `active` follows the transport — but do NOT do this by
+unconditionally calling `publishBusRecord(-1)` whenever the transport is idle. `-1` has exactly
+one contracted meaning (`seam_calbus.h`: "the host gave no valid continuous clock"). A per-block
+idle republish overwrites `passStartSample` with `-1` while `passCounter` stays at N, so a
+COMPLETED pass becomes indistinguishable from one that was never anchored — the receiver reads
+`passCounter=N, passStartSample=-1` at the exact moment (after the capture) it wants to compute
+Δt. It also causes a rare mid-loop flicker: if `Wait`→`Idle`→`beginPass` lands on the last sample
+of a block, `running()` reads false at the tail of that same block and a false unanchored record
+goes out mid-measurement.
+
+Edge-detect the run/idle transition instead, and republish the LAST anchor rather than `-1`:
 
 ```cpp
-    if (transport_.running() == false) publishBusRecord(-1);
+    const bool running = transport_.running();
+    if (running != wasRunning_) {
+        wasRunning_ = running;
+        publishBusRecord(lastPassStartSample_);
+    }
 ```
+
+This keeps `active` following the transport (that is what this post-loop publish is for), makes
+the per-block heartbeat disappear, and reserves `-1` for its one contracted meaning. The mid-loop
+flicker becomes harmless too: it republishes the same record twice instead of a false one.
 
 Update the explicit template instantiations at the bottom of the file (line ~290):
 
@@ -1710,11 +1740,14 @@ template void LTGLIDEProcessor::processBlock<double>(double**, int, int, int64_t
 
 - [ ] **Step 9: Persist the parameter**
 
-In `setState()`, after the existing reads:
+In `setState()`, after the existing reads. Store unconditionally, like every other parameter's
+local default above — if only the success branch stores, a pre-calbus preset loaded into an
+instance that already has a STONE id set leaves that stale id in place, attributing a calibration
+pass to a loudspeaker the preset never named:
 
 ```cpp
     int32 stoneId = 0;
-    if (s.readInt32(stoneId)) paramStoneId_.store((stoneId >= 0 && stoneId <= 8) ? stoneId : 0);
+    paramStoneId_.store(s.readInt32(stoneId) && stoneId >= 0 && stoneId <= 8 ? stoneId : 0);
 ```
 
 In `getState()`, after the existing writes:

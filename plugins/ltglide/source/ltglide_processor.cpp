@@ -132,6 +132,12 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
 
         busHandle_ = CalbusClient::instance().registerSlot();
         lastPublishedPass_ = transport_.passCount();
+        // (Re)activation always lands in Idle (see transport_.reset() above,
+        // which never resumes a pass mid-way), so there is no pass to anchor
+        // yet; reset the edge-detect state so a reactivated instance does not
+        // carry a stale anchor or a stale running/idle edge from before.
+        lastPassStartSample_ = -1;
+        wasRunning_ = false;
         publishBusRecord(-1);
     } else {
         CalbusClient::instance().unregisterSlot(busHandle_);
@@ -226,8 +232,13 @@ tresult PLUGIN_API LTGLIDEProcessor::setState(IBStream* state) {
     if (!s.readDouble(delta)) return kResultFalse;
     if (!s.readDouble(t))     return kResultFalse;
     if (!s.readInt32(loop))   return kResultFalse;
+    // stoneId gets a local default like every other parameter above: if the
+    // read fails (pre-calbus preset) or the range is invalid, this stores 0
+    // (undeclared) unconditionally, rather than leaving whatever stoneId the
+    // instance already had in place -- a stale STONE id would attribute a
+    // calibration pass to a loudspeaker the loaded preset never named.
     int32 stoneId = 0;
-    if (s.readInt32(stoneId)) paramStoneId_.store((stoneId >= 0 && stoneId <= 8) ? stoneId : 0);
+    paramStoneId_.store(s.readInt32(stoneId) && stoneId >= 0 && stoneId <= 8 ? stoneId : 0);
 
     paramLevelDb_.store(std::clamp(level, kLevelMinDb, kLevelMaxDb));
     paramF0Hz_.store(std::clamp(f0, kFreqMinHz, kFreqMaxHz));
@@ -307,7 +318,7 @@ void LTGLIDEProcessor::readParameterChanges(ProcessData& data) {
             case kParamT:     paramTSec_.store(std::clamp(linNormToPlain(v, kTMinSec, kTMaxSec), kTMinSec, kTMaxSec)); break;
             case kParamLoop:  paramLoop_.store(v >= 0.5); break;
             case kParamStoneId:
-                paramStoneId_.store((int)(v * (kStoneIdStepCount - 1) + 0.5));
+                paramStoneId_.store(std::clamp((int)(v * (kStoneIdStepCount - 1) + 0.5), 0, kStoneIdStepCount - 1));
                 break;
         }
     }
@@ -352,12 +363,28 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
         const uint64_t pc = transport_.passCount();
         if (pc != lastPublishedPass_) {
             lastPublishedPass_ = pc;
-            publishBusRecord(blockStartSample >= 0 ? blockStartSample + s : -1);
+            lastPassStartSample_ = (blockStartSample >= 0) ? blockStartSample + s : -1;
+            publishBusRecord(lastPassStartSample_);
         }
     }
     prevGainLin_ = targetGain;
 
-    if (!transport_.running()) publishBusRecord(-1);
+    // Edge-detect the run/idle transition instead of publishing every idle
+    // block. -1 has exactly one contracted meaning (seam_calbus.h: "the host
+    // gave no valid continuous clock"), so an idle heartbeat that republished
+    // passStartSample=-1 every block would make a COMPLETED pass (passCounter
+    // already at N) indistinguishable from a pass that was never anchored.
+    // Republishing lastPassStartSample_ here keeps `active` following the
+    // transport while the anchor of the pass that just finished survives
+    // into the idle record — which is exactly what Spec 3 reads after a
+    // capture ends. A mid-loop flicker (Wait->Idle->beginPass landing on the
+    // last sample of a block) now just republishes the same record twice
+    // instead of emitting a false unanchored one.
+    const bool running = transport_.running();
+    if (running != wasRunning_) {
+        wasRunning_ = running;
+        publishBusRecord(lastPassStartSample_);
+    }
 }
 
 template void LTGLIDEProcessor::processBlock<float>(float**, int, int, int64_t);

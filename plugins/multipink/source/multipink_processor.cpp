@@ -208,10 +208,14 @@ tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
     preferredStart_ = (prefStart >= -1 && prefStart < kPoolSize) ? prefStart : -1;
 
     // stoneId is read last and tolerates absence: presets saved before this
-    // parameter existed simply leave paramStoneId_ at its default (0 =
-    // undeclared) rather than failing the whole setState().
+    // parameter existed simply fail the read below. Store unconditionally
+    // (0 = undeclared on failure or out-of-range) like every other parameter
+    // above, rather than only inside the success branch -- otherwise loading
+    // a pre-calbus preset into an instance where the user had set a STONE id
+    // would leave that stale id in place, attributing a calibration pass to
+    // a loudspeaker the loaded preset never named.
     int32 stoneId = 0;
-    if (s.readInt32(stoneId)) paramStoneId_.store((stoneId >= 0 && stoneId <= 8) ? stoneId : 0);
+    paramStoneId_.store(s.readInt32(stoneId) && stoneId >= 0 && stoneId <= 8 ? stoneId : 0);
 
     // Mirror normalized values into the parameter container so the host
     // and GUI see them on next refresh.
@@ -319,9 +323,12 @@ void MULTIPINKProcessor::readParameterChanges(ProcessData& data) {
             case kParamMute:
                 paramMute_.store(v >= 0.5 ? 1 : 0);
                 break;
-            case kParamStoneId:
-                paramStoneId_.store((int)(v * (kStoneIdStepCount - 1) + 0.5));
-                break;
+            case kParamStoneId: {
+                int idx = (int)(v * (kStoneIdStepCount - 1) + 0.5);
+                if (idx < 0) idx = 0;
+                if (idx > kStoneIdStepCount - 1) idx = kStoneIdStepCount - 1;
+                paramStoneId_.store(idx);
+            } break;
         }
     }
 }

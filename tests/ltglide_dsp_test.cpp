@@ -248,3 +248,19 @@ TEST_CASE("reset() returns to Idle without resuming a pass mid-way") {
     // pass and not a fresh Dirac.
     CHECK(t.process().kind == GlideTransport::Kind::Silence);
 }
+
+TEST_CASE("passCount survives reset() and prepare()") {
+    // Load-bearing monotonicity invariant: a receiver must never see
+    // passCounter go backwards. reset() is called from setActive(true)
+    // (ltglide_processor.cpp), so a regression here would rewind the
+    // counter on every deactivate/activate cycle.
+    GlideTransport t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(2.0);
+    t.setLoop(true);
+    for (long i = 0; i < 48000L * 40; ++i) t.process();
+    const uint64_t n = t.passCount();
+    CHECK(n >= 1u);
+    t.reset();          CHECK(t.passCount() == n);
+    t.prepare(96000.0); CHECK(t.passCount() == n);
+}
