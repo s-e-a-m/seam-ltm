@@ -18,9 +18,9 @@
     </colors>
 
     <!-- Three-zone frame (Task 6 scaffold): goniometer left (Task 8, StrxGoniometer
-         below) / spectrum centre (Task 9, not yet built) / meters right (Task 7,
-         StrxMeters below), sized to fit the StrxGoniometer / StrxSpectrum /
-         StrxMeters custom views reserved in strx_ids.h. -->
+         below) / spectrum centre (Task 9, StrxSpectrum below) / meters right
+         (Task 7, StrxMeters below), sized to fit the StrxGoniometer /
+         StrxSpectrum / StrxMeters custom views reserved in strx_ids.h. -->
     <template name="editor" class="CViewContainer" origin="0, 0" size="900, 360"
               minSize="900, 360" maxSize="900, 360"
               background-color="BgDark" background-color-draw-style="filled">
@@ -33,6 +33,12 @@
         <!-- Goniometer zone (left third): decaying L/R scatter + Angle/Panorama. -->
         <view class="CView" origin="20, 70" size="260, 260" custom-view-name="StrxGoniometer"
               tooltip="Decaying M/S scatter (Lissajous) with Angle/Panorama readout"/>
+
+        <!-- Spectrum zone (centre third): overlaid M/S Welch curves, log-freq
+             20 Hz-20 kHz x-axis, -120..+6 dB y-axis. Kept above the logo
+             (origin 330,260) so the two views never overlap. -->
+        <view class="CView" origin="290, 70" size="310, 180" custom-view-name="StrxSpectrum"
+              tooltip="Overlaid M/S Welch spectra (log frequency, dB)"/>
 
         <!-- Meters zone (right third): In L / In R / M / S / Width bars. -->
         <view class="CView" origin="610, 70" size="270, 260" custom-view-name="StrxMeters"

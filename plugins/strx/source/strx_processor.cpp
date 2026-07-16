@@ -2,6 +2,7 @@
 #include "strx_ids.h"
 #include "strx_meters.h"
 #include "strx_goniometer.h"
+#include "strx_spectrum.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -39,6 +40,7 @@ tresult PLUGIN_API StrxProcessor::setActive(TBool state) {
 }
 
 tresult PLUGIN_API StrxProcessor::setupProcessing(ProcessSetup& setup) {
+    sampleRate_ = setup.sampleRate;
     analyzer_.prepare(setup.sampleRate);
     const size_t maxBlock = (size_t) std::max<int32>(setup.maxSamplesPerBlock, 0);
     convL_.resize(maxBlock);
@@ -117,6 +119,21 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
         }
         return new Seam::StrxGoniometer(VSTGUI::CRect(0, 0, 260, 260), this, font,
                                          label, text, track, fill);
+    }
+    if (name && std::string(name) == kViewSpectrum) {
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor label = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor track = VSTGUI::kBlackCColor;
+        VSTGUI::CColor colorM(0x4a, 0x9e, 0xc8, 0xff), colorS(0xc8, 0xa2, 0x4a, 0xff);
+        if (description) {
+            description->getColor("TextDim", label);
+            description->getColor("TextLight", text);
+            description->getColor("SliderTrack", track);
+            description->getColor("SliderActive", colorM);
+            description->getColor("MeterFill", colorS);
+        }
+        return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 310, 180), this, font,
+                                       label, text, track, colorM, colorS);
     }
     return nullptr;
 }

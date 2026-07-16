@@ -75,9 +75,16 @@ public:
         return frameCache_;
     }
 
+    // Sample rate passed to setupProcessing/analyzer_.prepare. This is config
+    // (fixed at prepare time), not per-frame data, so custom views may read it
+    // directly on the GUI thread — unlike AnalysisFrame contents, it needs no
+    // triple-buffer. StrxSpectrum (Task 9) uses it for the bin -> Hz mapping.
+    double sampleRate() const { return sampleRate_; }
+
 private:
     Seam::strx::Analyzer analyzer_;
     Seam::strx::AnalysisFrame frameCache_;
+    double sampleRate_ = 48000.0;
 
     // Analyzer::process() always takes float buffers. When the host processes
     // in kSample64 (double), the pass-through copy stays double-precision but

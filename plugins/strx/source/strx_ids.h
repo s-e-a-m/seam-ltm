@@ -18,9 +18,10 @@ static const Steinberg::FUID StrxProcessorUID(
     0x5E4D000F, 0xB2C3D4E5, 0x53545258, 0x00000000);   // "STRX"
 
 // Custom-view name tags (match resource/strx.uidesc custom-view-name
-// attrs). kViewMeters is wired (Task 7, strx_meters.h); the goniometer/
-// spectrum panes land in Tasks 8-9. Tags reserved together so the uidesc
-// and processor stay in sync as those views are added.
+// attrs). All three panes are wired: kViewMeters (Task 7, strx_meters.h),
+// kViewGoniometer (Task 8, strx_goniometer.h), kViewSpectrum (Task 9,
+// strx_spectrum.h). Tags reserved together so the uidesc and processor stay
+// in sync.
 static const char* kViewGoniometer = "StrxGoniometer";
 static const char* kViewSpectrum   = "StrxSpectrum";
 static const char* kViewMeters     = "StrxMeters";
