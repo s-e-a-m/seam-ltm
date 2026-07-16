@@ -193,6 +193,43 @@ TEST_CASE("loop restarts automatically with a wait gap") {
     CHECK(t.process().kind == GlideTransport::Kind::Dirac);   // pass 2 begins
 }
 
+TEST_CASE("GlideTransport counts passes") {
+    GlideTransport t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(2.0);
+    t.setLoop(false);
+
+    CHECK(t.passCount() == 0u);
+
+    t.trigger();
+    CHECK(t.passCount() == 1u);          // beginPass happened at trigger
+
+    // Run the whole pass out: head dirac + lead + glide + tail + tail dirac.
+    using GT = GlideTransport;
+    const long total = (long)((GT::kLeadSec + 2.0 + GT::kTailSec) * 48000.0) + 16;
+    for (long i = 0; i < total; ++i) t.process();
+    CHECK_FALSE(t.running());
+    CHECK(t.passCount() == 1u);          // one pass, counted once
+}
+
+TEST_CASE("GlideTransport increments the counter once per looped pass") {
+    GlideTransport t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(2.0);
+    t.setLoop(true);
+
+    using GT = GlideTransport;
+    const long onePass = (long)((GT::kLeadSec + 2.0 + GT::kTailSec + GT::kWaitSec) * 48000.0);
+    uint64_t seen = 0;
+    for (long i = 0; i < onePass * 3; ++i) {
+        const uint64_t before = t.passCount();
+        t.process();
+        if (t.passCount() != before) ++seen;
+    }
+    CHECK(seen >= 2u);                   // at least two passes started
+    CHECK(t.passCount() == seen);        // every increment is exactly +1
+}
+
 TEST_CASE("reset() returns to Idle without resuming a pass mid-way") {
     const double fs = 48000.0;
     GlideTransport t;

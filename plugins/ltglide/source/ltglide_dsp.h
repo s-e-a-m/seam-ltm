@@ -11,6 +11,7 @@
 #pragma once
 #include <cmath>
 #include <algorithm>
+#include <cstdint>
 
 namespace Seam { namespace ltglide {
 
@@ -101,6 +102,11 @@ public:
     void trigger() { if (state_ == State::Idle) beginPass(); }
     bool running() const { return state_ != State::Idle; }
 
+    // Monotone pass counter, +1 at each pass start. The receiver samples this
+    // at GUI rate and cannot otherwise distinguish a new pass from the
+    // previous one when the parameters are identical (calbus, Spec 2).
+    uint64_t passCount() const { return passCounter_; }
+
     Tick process() {
         switch (state_) {
             case State::Idle:
@@ -134,12 +140,13 @@ public:
 private:
     enum class State { Idle, HeadDirac, Lead, Glide, Tail, TailDirac, Wait };
     void recomputeGlide() { glideN_ = (long)std::llround(tSec_ * fs_); if (glideN_ < 1) glideN_ = 1; }
-    void beginPass() { state_ = State::HeadDirac; counter_ = 0; }
+    void beginPass() { state_ = State::HeadDirac; counter_ = 0; ++passCounter_; }
 
     double fs_ = 48000.0, tSec_ = 20.0;
     long leadN_ = 0, tailN_ = 0, waitN_ = 0, glideN_ = 0, counter_ = 0;
     bool loop_ = false;
     State state_ = State::Idle;
+    uint64_t passCounter_ = 0;
 };
 
 }} // namespace Seam::ltglide
