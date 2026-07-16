@@ -121,3 +121,38 @@ target_include_directories(seam_calbus_test PRIVATE
 target_link_libraries(seam_calbus_test PRIVATE seam_calbus)
 target_compile_features(seam_calbus_test PRIVATE cxx_std_17)
 add_test(NAME seam_calbus_test COMMAND seam_calbus_test)
+
+add_executable(seam_calbus_client_test
+    seam_calbus_client_test.cpp
+)
+target_include_directories(seam_calbus_client_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
+)
+# The client loads the dylib at runtime — it must exist before the test runs.
+add_dependencies(seam_calbus_client_test seam_calbus)
+target_compile_features(seam_calbus_client_test PRIVATE cxx_std_17)
+add_test(NAME seam_calbus_client_test COMMAND seam_calbus_client_test)
+set_tests_properties(seam_calbus_client_test PROPERTIES
+    ENVIRONMENT "SEAM_CALBUS_PATH=$<TARGET_FILE:seam_calbus>"
+)
+
+add_library(calbus_badversion_stub SHARED calbus_badversion_stub.cpp)
+target_include_directories(calbus_badversion_stub PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
+)
+target_compile_features(calbus_badversion_stub PRIVATE cxx_std_17)
+
+add_executable(seam_calbus_version_test
+    seam_calbus_version_test.cpp
+)
+target_include_directories(seam_calbus_version_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
+)
+add_dependencies(seam_calbus_version_test calbus_badversion_stub)
+target_compile_features(seam_calbus_version_test PRIVATE cxx_std_17)
+add_test(NAME seam_calbus_version_test COMMAND seam_calbus_version_test)
+set_tests_properties(seam_calbus_version_test PROPERTIES
+    ENVIRONMENT "SEAM_CALBUS_PATH=$<TARGET_FILE:calbus_badversion_stub>"
+)
