@@ -3,6 +3,7 @@
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "ltglide_ids.h"
 #include "ltglide_dsp.h"
+#include "seam_calbus_client.h"
 
 #include <atomic>
 
@@ -53,6 +54,15 @@ private:
     std::atomic<double> paramDeltaSec_{kDeltaDefaultSec};
     std::atomic<double> paramTSec_{kTDefaultSec};
     std::atomic<bool>   paramLoop_{false};
+    std::atomic<int>    paramStoneId_{0};      // 0 = undeclared, 1..8
+
+    // Calibration bus (Spec 2).
+    int32_t  busHandle_ = SEAM_CALBUS_NO_HANDLE;
+    uint64_t lastPublishedPass_ = 0;
+
+    // Publish this instance's record. Called from the audio thread.
+    // hostStartSample is -1 when the host provides no valid continuous clock.
+    void publishBusRecord(int64_t hostStartSample);
 
     // DSP.
     ltglide::GlissBurst    glide_;
@@ -63,7 +73,8 @@ private:
     void   readParameterChanges(Steinberg::Vst::ProcessData& data);
 
     template <typename SampleType>
-    void processBlock(SampleType** outputs, int numChannels, int numSamples);
+    void processBlock(SampleType** outputs, int numChannels, int numSamples,
+                      int64_t blockStartSample);
 };
 
 } // namespace Seam

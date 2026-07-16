@@ -18,7 +18,13 @@ enum LTGLIDEParams : Steinberg::Vst::ParamID {
     kParamDelta   = 105,   // grain spacing, seconds
     kParamT       = 106,   // sweep duration, seconds
     kParamLoop    = 108,   // toggle: continuous passes (the sole transport control)
+    kParamStoneId = 109,   // 0=undeclared, 1..8 (stepped) — calibration bus
 };
+
+// STONE identity for the calibration bus (Spec 2). ltglide has no slot to be
+// inferred from and its chain identity lives in the host routing, which the
+// receiver cannot read — so it is declared by hand. 0 = undeclared ("STONE ?").
+static constexpr Steinberg::int32 kStoneIdStepCount = 9;   // "?" + 1..8
 
 // Level (dBFS, linear taper — carrier/peak amplitude; also the Dirac ceiling).
 static constexpr double kLevelMinDb     = -60.0;

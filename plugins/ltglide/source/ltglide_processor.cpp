@@ -99,6 +99,20 @@ tresult PLUGIN_API LTGLIDEProcessor::initialize(FUnknown* context) {
         0, 1, 0, 1, ParameterInfo::kCanAutomate);
     parameters.addParameter(lp);
 
+    auto* stoneParam = new StringListParameter(
+        STR16("STONE"), kParamStoneId, STR16(""),
+        ParameterInfo::kCanAutomate | ParameterInfo::kIsList);
+    stoneParam->appendString(STR16("?"));
+    stoneParam->appendString(STR16("1"));
+    stoneParam->appendString(STR16("2"));
+    stoneParam->appendString(STR16("3"));
+    stoneParam->appendString(STR16("4"));
+    stoneParam->appendString(STR16("5"));
+    stoneParam->appendString(STR16("6"));
+    stoneParam->appendString(STR16("7"));
+    stoneParam->appendString(STR16("8"));
+    parameters.addParameter(stoneParam);
+
     return kResultOk;
 }
 
@@ -115,6 +129,13 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         transport_.setLoop(paramLoop_.load());
         transport_.reset();               // never resume a pass mid-way on (re)activation
         prevGainLin_ = computeGainLin();
+
+        busHandle_ = CalbusClient::instance().registerSlot();
+        lastPublishedPass_ = transport_.passCount();
+        publishBusRecord(-1);
+    } else {
+        CalbusClient::instance().unregisterSlot(busHandle_);
+        busHandle_ = SEAM_CALBUS_NO_HANDLE;
     }
     return SingleComponentEffect::setActive(state);
 }
@@ -129,6 +150,27 @@ tresult PLUGIN_API LTGLIDEProcessor::setupProcessing(ProcessSetup& setup) {
     return SingleComponentEffect::setupProcessing(setup);
 }
 
+void LTGLIDEProcessor::publishBusRecord(int64_t hostStartSample) {
+    if (busHandle_ == SEAM_CALBUS_NO_HANDLE) return;
+
+    SeamCalbusRecord r{};
+    r.kind    = kSeamCalbusGlide;
+    r.stoneId = (uint32_t)paramStoneId_.load();
+    r.active  = transport_.running() ? 1u : 0u;
+    r.levelDb = paramLevelDb_.load();
+    r.sampleRate = processSetup.sampleRate;
+    r.u.glide.passCounter     = transport_.passCount();
+    r.u.glide.passStartSample = hostStartSample;
+    r.u.glide.f0          = paramF0Hz_.load();
+    r.u.glide.f1          = paramF1Hz_.load();
+    r.u.glide.durationSec = paramTSec_.load();
+    r.u.glide.deltaSec    = paramDeltaSec_.load();
+    r.u.glide.sweepMode   = (uint32_t)paramSmode_.load();
+    r.u.glide.diracMode   = (uint32_t)paramDmode_.load();
+
+    CalbusClient::instance().publish(busHandle_, r);
+}
+
 tresult PLUGIN_API LTGLIDEProcessor::process(ProcessData& data) {
     readParameterChanges(data);
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
@@ -138,12 +180,24 @@ tresult PLUGIN_API LTGLIDEProcessor::process(ProcessData& data) {
     transport_.setSweepSeconds(paramTSec_.load());
     transport_.setLoop(paramLoop_.load());
 
+    // ProcessContext::continousTimeSamples [sic — the SDK header spells it
+    // without the second 'u'] is an OPTIONAL anchor: the host declares its
+    // validity with kContTimeValid, and processContext may be null outright.
+    // All of Spec 3's synchronisation rests on this field, so detect its
+    // absence and say so (-1 -> strx prints "no host clock") instead of
+    // silently anchoring passes to a fictional zero.
+    int64_t blockStart = -1;
+    if (data.processContext &&
+        (data.processContext->state & ProcessContext::kContTimeValid)) {
+        blockStart = (int64_t)data.processContext->continousTimeSamples;
+    }
+
     int numChannels = data.outputs[0].numChannels;
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
     if (data.symbolicSampleSize == kSample32)
-        processBlock<float>((float**)out, numChannels, data.numSamples);
+        processBlock<float>((float**)out, numChannels, data.numSamples, blockStart);
     else
-        processBlock<double>((double**)out, numChannels, data.numSamples);
+        processBlock<double>((double**)out, numChannels, data.numSamples, blockStart);
     return kResultOk;
 }
 
@@ -172,6 +226,8 @@ tresult PLUGIN_API LTGLIDEProcessor::setState(IBStream* state) {
     if (!s.readDouble(delta)) return kResultFalse;
     if (!s.readDouble(t))     return kResultFalse;
     if (!s.readInt32(loop))   return kResultFalse;
+    int32 stoneId = 0;
+    if (s.readInt32(stoneId)) paramStoneId_.store((stoneId >= 0 && stoneId <= 8) ? stoneId : 0);
 
     paramLevelDb_.store(std::clamp(level, kLevelMinDb, kLevelMaxDb));
     paramF0Hz_.store(std::clamp(f0, kFreqMinHz, kFreqMaxHz));
@@ -198,6 +254,8 @@ tresult PLUGIN_API LTGLIDEProcessor::setState(IBStream* state) {
         p->setNormalized(linPlainToNorm(paramTSec_.load(), kTMinSec, kTMaxSec));
     if (auto* p = parameters.getParameter(kParamLoop))
         p->setNormalized(paramLoop_.load() ? 1.0 : 0.0);
+    if (auto* p = parameters.getParameter(kParamStoneId))
+        p->setNormalized((double)paramStoneId_.load() / (kStoneIdStepCount - 1));
 
     return kResultOk;
 }
@@ -213,6 +271,7 @@ tresult PLUGIN_API LTGLIDEProcessor::getState(IBStream* state) {
     if (!s.writeDouble(paramDeltaSec_.load()))return kResultFalse;
     if (!s.writeDouble(paramTSec_.load()))    return kResultFalse;
     if (!s.writeInt32(paramLoop_.load() ? 1 : 0)) return kResultFalse;
+    if (!s.writeInt32(paramStoneId_.load())) return kResultFalse;
     return kResultOk;
 }
 
@@ -247,12 +306,16 @@ void LTGLIDEProcessor::readParameterChanges(ProcessData& data) {
             case kParamDelta: paramDeltaSec_.store(std::clamp(linNormToPlain(v, kDeltaMinSec, kDeltaMaxSec), kDeltaMinSec, kDeltaMaxSec)); break;
             case kParamT:     paramTSec_.store(std::clamp(linNormToPlain(v, kTMinSec, kTMaxSec), kTMinSec, kTMaxSec)); break;
             case kParamLoop:  paramLoop_.store(v >= 0.5); break;
+            case kParamStoneId:
+                paramStoneId_.store((int)(v * (kStoneIdStepCount - 1) + 0.5));
+                break;
         }
     }
 }
 
 template <typename SampleType>
-void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int numSamples) {
+void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int numSamples,
+                                    int64_t blockStartSample) {
     const double targetGain = computeGainLin();
     const double startGain  = prevGainLin_;
     const double gainStep   = (numSamples > 0) ? (targetGain - startGain) / numSamples : 0.0;
@@ -283,12 +346,22 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
         const SampleType out = (SampleType)(y * g);
         for (int c = 0; c < numChannels; ++c)
             outputs[c][s] = out;
+
+        // The tick that opens a pass is the head Dirac itself, so `s` is the
+        // pass's exact sample offset within this block.
+        const uint64_t pc = transport_.passCount();
+        if (pc != lastPublishedPass_) {
+            lastPublishedPass_ = pc;
+            publishBusRecord(blockStartSample >= 0 ? blockStartSample + s : -1);
+        }
     }
     prevGainLin_ = targetGain;
+
+    if (!transport_.running()) publishBusRecord(-1);
 }
 
-template void LTGLIDEProcessor::processBlock<float>(float**, int, int);
-template void LTGLIDEProcessor::processBlock<double>(double**, int, int);
+template void LTGLIDEProcessor::processBlock<float>(float**, int, int, int64_t);
+template void LTGLIDEProcessor::processBlock<double>(double**, int, int, int64_t);
 
 } // namespace Seam
 
