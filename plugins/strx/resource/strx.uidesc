@@ -17,10 +17,10 @@
         <color name="MeterInv" rgba="#c04040ff"/>
     </colors>
 
-    <!-- Three-zone frame (Task 6 scaffold): goniometer left / spectrum centre
-         (Tasks 8-9, not yet built) / meters right (Task 7, StrxMeters below),
-         sized to fit the StrxGoniometer / StrxSpectrum / StrxMeters custom
-         views reserved in strx_ids.h. -->
+    <!-- Three-zone frame (Task 6 scaffold): goniometer left (Task 8, StrxGoniometer
+         below) / spectrum centre (Task 9, not yet built) / meters right (Task 7,
+         StrxMeters below), sized to fit the StrxGoniometer / StrxSpectrum /
+         StrxMeters custom views reserved in strx_ids.h. -->
     <template name="editor" class="CViewContainer" origin="0, 0" size="900, 360"
               minSize="900, 360" maxSize="900, 360"
               background-color="BgDark" background-color-draw-style="filled">
@@ -29,6 +29,10 @@
               font-color="TextLight" text-alignment="center" title="SEAM strx" transparent="true"/>
         <view class="CTextLabel" origin="0, 42" size="900, 18" font="SubtitleFont"
               font-color="TextDim" text-alignment="center" title="STONE observation M/S analyzer" transparent="true"/>
+
+        <!-- Goniometer zone (left third): decaying L/R scatter + Angle/Panorama. -->
+        <view class="CView" origin="20, 70" size="260, 260" custom-view-name="StrxGoniometer"
+              tooltip="Decaying M/S scatter (Lissajous) with Angle/Panorama readout"/>
 
         <!-- Meters zone (right third): In L / In R / M / S / Width bars. -->
         <view class="CView" origin="610, 70" size="270, 260" custom-view-name="StrxMeters"

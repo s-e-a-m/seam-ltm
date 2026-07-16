@@ -1,6 +1,7 @@
 #include "strx_processor.h"
 #include "strx_ids.h"
 #include "strx_meters.h"
+#include "strx_goniometer.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -103,6 +104,19 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
         }
         return new Seam::StrxMeters(VSTGUI::CRect(0, 0, 270, 260), this, font,
                                      label, text, track, fill, inv);
+    }
+    if (name && std::string(name) == kViewGoniometer) {
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor label = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor track = VSTGUI::kBlackCColor, fill(0xc8, 0xa2, 0x4a, 0xff);
+        if (description) {
+            description->getColor("TextDim", label);
+            description->getColor("TextLight", text);
+            description->getColor("SliderTrack", track);
+            description->getColor("MeterFill", fill);
+        }
+        return new Seam::StrxGoniometer(VSTGUI::CRect(0, 0, 260, 260), this, font,
+                                         label, text, track, fill);
     }
     return nullptr;
 }
