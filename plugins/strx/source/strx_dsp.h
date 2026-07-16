@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 
 namespace Seam { namespace strx {
 
@@ -52,13 +53,13 @@ public:
         mLR_ = mLL_ = mRR_ = 0.0;
         welchM_.reset(); welchS_.reset();
         for (auto& s : slots_) s = AnalysisFrame{};
-        writeSlot_ = 0;
-        ready_.store(-1, std::memory_order_relaxed);
-        reading_.store(-1, std::memory_order_relaxed);
-        lastRead_ = -1;
+        // SPSC triple-buffer to distinct init indices (runs single-threaded here).
+        back_.store(0, std::memory_order_relaxed);  // index 0, not dirty
+        writeBuf_ = 1;
+        front_    = 2;
     }
     void analyzeScalars(const float* L, const float* R, int n) {
-        AnalysisFrame& fr = slots_[writeSlot_];
+        AnalysisFrame& fr = slots_[writeBuf_];
         double rmsL=0, rmsR=0, rmsM=0, rmsS=0;
         for (int i = 0; i < n; ++i) {
             const double l = L[i], r = R[i];
@@ -83,7 +84,7 @@ public:
 
     void analyze(const float* L, const float* R, int n) {
         analyzeScalars(L, R, n);
-        AnalysisFrame& fr = slots_[writeSlot_];   // same slot analyzeScalars() just filled
+        AnalysisFrame& fr = slots_[writeBuf_];   // same slot analyzeScalars() just filled
         // Goniometer: (x=S, y=M), decimate by stride to <= kMaxPoints.
         const int stride = (n + AnalysisFrame::kMaxPoints - 1) / AnalysisFrame::kMaxPoints;
         int p = 0;
@@ -105,63 +106,57 @@ public:
         for (int k = 0; k < fr.numBins; ++k) { fr.specM[k] = mM[k]; fr.specS[k] = mS[k]; }
     }
 
-    // Audio thread: analyze into the current write slot, then publish it with
-    // a release store so the GUI thread's acquire load in tryReadFrame() sees
-    // a fully-written AnalysisFrame (no torn reads). Then choose the next
-    // write slot, EXCLUDING both (a) the slot just published and (b) the slot
-    // the reader has claimed (reading_). With 3 slots and 2 excluded indices
-    // there is always exactly one safe slot left — so the writer can never
-    // overwrite the slot the GUI thread is mid-copy of.
-    //
-    // Correctness note (fixes a tearing bug in the original design): the
-    // reader publishes its claim (reading_) with a release store BEFORE it
-    // starts copying, and this loop reads that claim with an acquire load
-    // AFTER republishing `ready_`. So once tryReadFrame() has claimed slot r,
-    // every subsequent process() call sees the claim and excludes r until the
-    // reader claims a different slot. The earlier "skip lastRead_" scheme was
-    // broken because lastRead_ was only set AFTER the copy finished — the
-    // writer could circle back and overwrite the slot being copied.
+    // Audio thread (producer): fill the working buffer, then publish it by
+    // atomically swapping it into `back_` (setting the dirty bit) and reclaiming
+    // whatever buffer was there as the next working buffer. The exchange is a
+    // SINGLE atomic op — ownership of a whole AnalysisFrame transfers with no
+    // load-then-store gap, so the writer and reader can never touch the same
+    // buffer regardless of thread interleaving.
     void process(const float* L, const float* R, int n) {
-        analyze(L, R, n);                              // fills slots_[writeSlot_]
-        ready_.store(writeSlot_, std::memory_order_release);
-        const int rd = reading_.load(std::memory_order_acquire);  // slot reader currently holds
-        for (int s = 0; s < 3; ++s)                    // next slot excludes published + reader-held
-            if (s != writeSlot_ && s != rd) { writeSlot_ = s; break; }
+        analyze(L, R, n);                                  // fills slots_[writeBuf_]
+        const uint8_t old = back_.exchange(uint8_t(writeBuf_ | kDirty), std::memory_order_acq_rel);
+        writeBuf_ = old & kIdxMask;                        // reclaim the old back as our next write buffer
     }
-    // GUI thread: copy the latest published slot. Returns false if nothing
-    // new has been published since the last successful read. Claims the slot
-    // (reading_) with a release store BEFORE copying so the audio thread
-    // excludes it from being overwritten while the copy is in flight.
+    // GUI thread (consumer): if a new frame has been published, swap our
+    // front buffer into `back_` (clearing the dirty bit) and take the freshly
+    // published buffer as our new front, then copy it out. Returns false when
+    // nothing new has been published since the last read. The exchange again
+    // transfers buffer ownership atomically — no gap for the writer to race in.
     bool tryReadFrame(AnalysisFrame& out) {
-        const int r = ready_.load(std::memory_order_acquire);
-        if (r < 0 || r == lastRead_) return false;
-        reading_.store(r, std::memory_order_release);  // CLAIM before copying
-        out = slots_[r];                               // writer now excludes r
-        lastRead_ = r;                                 // GUI-thread-only bookkeeping
+        if ((back_.load(std::memory_order_acquire) & kDirty) == 0) return false;  // nothing new
+        const uint8_t old = back_.exchange(front_, std::memory_order_acq_rel);    // front_ carries no dirty bit
+        front_ = old & kIdxMask;                           // take the freshly published buffer
+        out = slots_[front_];
         return true;
     }
 
     // NOTE (deviation from task-5-brief.md step 3): the brief's suggested
-    // `frame()` returns slots_[(write_+2)%3] — the "previously completed"
-    // slot. That is only correct once process() has advanced writeSlot_ past
-    // the slot analyze() just filled. Tasks 3/4 tests call analyzeScalars()/
-    // analyze() DIRECTLY (never process()), so writeSlot_ stays 0 and that
-    // formula would read an untouched slot (slots_[2]), breaking every
-    // existing test. frame() instead returns the *working* slot
-    // slots_[writeSlot_] — exactly the slot analyze() just wrote — which
-    // matches pre-Task-5 behaviour whether or not process()/publish has run.
-    const AnalysisFrame& frame() const { return slots_[writeSlot_]; }
+    // `frame()` returns the "previously completed" slot, which is only correct
+    // after a process() publish has advanced the working index. Tasks 3/4 tests
+    // call analyzeScalars()/analyze() DIRECTLY (never process()), so writeBuf_
+    // stays at its init value (1). frame() therefore returns the *working*
+    // buffer slots_[writeBuf_] — exactly the buffer analyze() just wrote — so
+    // those tests read the frame they just filled whether or not process() ran.
+    const AnalysisFrame& frame() const { return slots_[writeBuf_]; }
 private:
     static constexpr int kFftSize = 4096;   // kNumBins = 2049 in AnalysisFrame
     double fs_ = 48000.0, coef_ = 0.0;
     double mLR_ = 0, mLL_ = 0, mRR_ = 0;
     seam::meter::LevelFollower lvlL_, lvlR_, lvlM_, lvlS_;
     seam::fft::Welch welchM_, welchS_;
+
+    // --- SPSC triple-buffer: producer = audio thread (process), consumer =
+    // GUI thread (tryReadFrame). One atomic packs the "back" buffer index
+    // (bits 0-1) + a dirty flag (bit 2). Writer and reader each privately own
+    // one buffer index; ownership transfers atomically, so the two threads
+    // never touch the same buffer regardless of interleaving. The three indices
+    // {front_, writeBuf_, back_&mask} are always a permutation of {0,1,2}.
+    static constexpr uint8_t kIdxMask = 0x03;
+    static constexpr uint8_t kDirty   = 0x04;
     AnalysisFrame slots_[3];
-    int writeSlot_ = 0;              // audio-thread only
-    std::atomic<int> ready_{-1};     // last published slot (writer->reader), -1 = none
-    std::atomic<int> reading_{-1};   // slot the reader is copying (reader->writer), -1 = none
-    int lastRead_ = -1;              // GUI-thread only (no cross-thread access)
+    std::atomic<uint8_t> back_{0};   // back buffer index + dirty bit (init: index 0, not dirty)
+    uint8_t writeBuf_ = 1;           // writer-owned buffer index (audio thread only)
+    uint8_t front_    = 2;           // reader-owned buffer index (GUI thread only)
 };
 
 }} // namespace Seam::strx
