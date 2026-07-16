@@ -33,6 +33,15 @@ extern "C" {
 #define SEAM_CALBUS_VERSION   1u
 #define SEAM_CALBUS_MAX_SLOTS 32
 
+// The explicit "no slot" sentinel. Use this, never a bare 0, to initialise a
+// handle that has not registered yet: 0 is index 0 / gen 0, i.e. slot 0
+// before it has ever been claimed — a value publish()/unregister() will
+// happily accept. A handle that was actually returned by register() has
+// gen >= 1 (register() bumps gen before handing the handle out), so a
+// zero-initialised handle can never collide with a real one. See publish()'s
+// gen == 0 guard below.
+#define SEAM_CALBUS_NO_HANDLE (-1)
+
 // Emitter kind. The kind IS the calibration stage: Pink measures power amp +
 // STONE + room (it bypasses the encoder/decoder chain), Glide measures the
 // full chain above already-calibrated amps. A separate "stage" field would be
@@ -103,8 +112,23 @@ SEAM_CALBUS_API int32_t seam_calbus_v1_register(SeamCalbus* bus);
 SEAM_CALBUS_API void seam_calbus_v1_unregister(SeamCalbus* bus, int32_t handle);
 
 // Overwrite a slot's record. RT-SAFE: wait-free, no allocation, no lock.
-// Safe to call from the audio thread. Invalid or stale handles are silent
-// no-ops, so publishing after unregistering cannot corrupt the next owner.
+// Safe to call from the audio thread.
+//
+// PRECONDITION THIS API DOES NOT ENFORCE: for a given handle, calls to
+// publish() and the matching unregister() must never overlap. The VST3
+// contract is what supplies this in practice — process() (where publish()
+// lives) and setActive(false) (where unregister() lives) never run
+// concurrently on the same plugin instance — but that contract is external
+// to this bus and worth stating here explicitly.
+//
+// What the epoch check below actually buys: it stops an ALREADY-STALE
+// handle from writing AGAIN, forever, once its slot has been reclaimed. It
+// does NOT serialise a publish() that is already past the check when the
+// epoch closes — that call still writes. So "invalid or stale handles are
+// silent no-ops" is true only for handles that were already stale before
+// the call started; it is not a substitute for the non-overlap precondition
+// above, and it never turns two genuinely concurrent writers on one slot
+// into a safe interleaving.
 SEAM_CALBUS_API void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
                                             const SeamCalbusRecord* rec);
 

@@ -51,6 +51,15 @@ static bool probeIsConsistent(const SeamCalbusRecord& r) {
         && r.levelDb == -(double)(n % 100);
 }
 
+// isFresh() below memcmps the whole struct, which assumes it is padding-free
+// (any padding byte is indeterminate and would make an otherwise-fresh
+// record compare unequal to `zero{}` nondeterministically). True today at 88
+// bytes; pin it so a future field reorder that introduces padding fails loud
+// here instead of making this test flaky.
+static_assert(sizeof(SeamCalbusRecord) == 88,
+              "isFresh()'s memcmp assumes SeamCalbusRecord has no padding; "
+              "re-verify padding-freeness if this size ever changes");
+
 // A slot that is registered but has not published yet legitimately reads back
 // all-zero. That is the ONLY all-zero record a correct reader may return; a
 // record that is part zero and part probe is a tear.
@@ -238,13 +247,25 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     stop.store(true);
     churn.join();
 
+    const uint64_t finalEpoch = liveEpoch.load(std::memory_order_relaxed);
     MESSAGE("churn: reads=" << reads << " fresh=" << fresh
-            << " torn=" << torn << " phantom=" << phantom);
+            << " torn=" << torn << " phantom=" << phantom
+            << " finalEpoch=" << finalEpoch);
     CHECK(torn == 0);
     CHECK(phantom == 0);
     // Liveness: the churn thread is registered for the overwhelming majority of
     // its cycle, so a reader that almost never returns a record is broken.
     CHECK(reads > kIterations / 10);
+    // Validity of the test itself: `torn == 0` and `phantom == 0` pass
+    // VACUOUSLY if epoch turnover collapses to near-zero — a reader that
+    // reads a slot that never actually changes owner proves nothing about
+    // ABA detection. A slower machine, or any future change that makes
+    // register()/unregister() more expensive, could silently re-create the
+    // exact configuration a previous fix deliberately avoided (a paced,
+    // yield()-throttled churn thread that made this test pass against
+    // provably buggy code). Pin the precondition the two CHECKs above rest
+    // on: churn actually happened, many times, during this run.
+    CHECK(finalEpoch > 1000);
 }
 
 TEST_CASE("publish with an invalid handle is a silent no-op") {

@@ -106,6 +106,15 @@ static bool probeIsConsistent(const SeamCalbusRecord& r) {
         && r.levelDb == -(double)(n % 100);
 }
 
+// isFresh() below memcmps the whole struct, which assumes it is padding-free
+// (any padding byte is indeterminate and would make an otherwise-fresh
+// record compare unequal to `zero{}` nondeterministically). True today at 88
+// bytes; pin it so a future field reorder that introduces padding fails loud
+// here instead of making this test flaky.
+static_assert(sizeof(SeamCalbusRecord) == 88,
+              "isFresh()'s memcmp assumes SeamCalbusRecord has no padding; "
+              "re-verify padding-freeness if this size ever changes");
+
 // A slot that is registered but has not published yet legitimately reads back
 // all-zero. That is the ONLY all-zero record a correct reader may return; a
 // record that is part zero and part probe is a tear.
@@ -293,13 +302,25 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     stop.store(true);
     churn.join();
 
+    const uint64_t finalEpoch = liveEpoch.load(std::memory_order_relaxed);
     MESSAGE("churn: reads=" << reads << " fresh=" << fresh
-            << " torn=" << torn << " phantom=" << phantom);
+            << " torn=" << torn << " phantom=" << phantom
+            << " finalEpoch=" << finalEpoch);
     CHECK(torn == 0);
     CHECK(phantom == 0);
     // Liveness: the churn thread is registered for the overwhelming majority of
     // its cycle, so a reader that almost never returns a record is broken.
     CHECK(reads > kIterations / 10);
+    // Validity of the test itself: `torn == 0` and `phantom == 0` pass
+    // VACUOUSLY if epoch turnover collapses to near-zero — a reader that
+    // reads a slot that never actually changes owner proves nothing about
+    // ABA detection. A slower machine, or any future change that makes
+    // register()/unregister() more expensive, could silently re-create the
+    // exact configuration a previous fix deliberately avoided (a paced,
+    // yield()-throttled churn thread that made this test pass against
+    // provably buggy code). Pin the precondition the two CHECKs above rest
+    // on: churn actually happened, many times, during this run.
+    CHECK(finalEpoch > 1000);
 }
 
 TEST_CASE("publish with an invalid handle is a silent no-op") {
@@ -315,6 +336,7 @@ TEST_CASE("publish with an invalid handle is a silent no-op") {
     SeamCalbusRecord out[SEAM_CALBUS_MAX_SLOTS];
     CHECK(seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS) == 0);
 }
+
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -365,6 +387,15 @@ extern "C" {
 
 #define SEAM_CALBUS_VERSION   1u
 #define SEAM_CALBUS_MAX_SLOTS 32
+
+// The explicit "no slot" sentinel. Use this, never a bare 0, to initialise a
+// handle that has not registered yet: 0 is index 0 / gen 0, i.e. slot 0
+// before it has ever been claimed — a value publish()/unregister() will
+// happily accept. A handle that was actually returned by register() has
+// gen >= 1 (register() bumps gen before handing the handle out), so a
+// zero-initialised handle can never collide with a real one. See publish()'s
+// gen == 0 guard below.
+#define SEAM_CALBUS_NO_HANDLE (-1)
 
 // Emitter kind. The kind IS the calibration stage: Pink measures power amp +
 // STONE + room (it bypasses the encoder/decoder chain), Glide measures the
@@ -436,8 +467,23 @@ SEAM_CALBUS_API int32_t seam_calbus_v1_register(SeamCalbus* bus);
 SEAM_CALBUS_API void seam_calbus_v1_unregister(SeamCalbus* bus, int32_t handle);
 
 // Overwrite a slot's record. RT-SAFE: wait-free, no allocation, no lock.
-// Safe to call from the audio thread. Invalid or stale handles are silent
-// no-ops, so publishing after unregistering cannot corrupt the next owner.
+// Safe to call from the audio thread.
+//
+// PRECONDITION THIS API DOES NOT ENFORCE: for a given handle, calls to
+// publish() and the matching unregister() must never overlap. The VST3
+// contract is what supplies this in practice — process() (where publish()
+// lives) and setActive(false) (where unregister() lives) never run
+// concurrently on the same plugin instance — but that contract is external
+// to this bus and worth stating here explicitly.
+//
+// What the epoch check below actually buys: it stops an ALREADY-STALE
+// handle from writing AGAIN, forever, once its slot has been reclaimed. It
+// does NOT serialise a publish() that is already past the check when the
+// epoch closes — that call still writes. So "invalid or stale handles are
+// silent no-ops" is true only for handles that were already stale before
+// the call started; it is not a substitute for the non-overlap precondition
+// above, and it never turns two genuinely concurrent writers on one slot
+// into a safe interleaving.
 SEAM_CALBUS_API void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
                                             const SeamCalbusRecord* rec);
 
@@ -454,6 +500,7 @@ SEAM_CALBUS_API int32_t seam_calbus_v1_snapshot(SeamCalbus* bus,
 #ifdef __cplusplus
 }
 #endif
+
 ```
 
 - [ ] **Step 4: Write the registry implementation**
@@ -498,6 +545,15 @@ namespace {
 //     re-checks inUse sees 1 both times when the slot was released AND
 //     reclaimed during the copy, and would emit the previous owner's record
 //     attributed to the new owner. Hence `gen` below.
+//
+// NON-ATOMIC memcpy/memset ON `rec` UNDER A SEQLOCK IS FORMALLY UB IN THE
+// ISO C++ MEMORY MODEL: the fences order the surrounding atomic operations,
+// they do not make the plain read/write of `rec` itself a data-race-free
+// access when a writer and a retrying reader overlap. This is universal
+// seqlock practice anyway (same trick as the Linux kernel's), it is
+// deliberate here, and it is exactly why ThreadSanitizer stays silent on
+// this file even when the invariant genuinely breaks — a considered choice,
+// not an oversight.
 struct Slot {
     std::atomic<uint32_t> seq{0};     // odd = write in progress, even = stable
     std::atomic<uint32_t> inUse{0};
@@ -526,9 +582,10 @@ constexpr int kMaxReadAttempts = 8;
 // after unregistering silently corrupts whichever plugin now owns that slot.
 //
 // 5 bits of index (32 slots) + 26 bits of gen = 31 bits, so a handle is always
-// non-negative and -1 stays the unambiguous "no slot" value. gen wraps after
-// 2^26 registrations of the SAME slot; an ABA collision would need exactly
-// that many register/unregister cycles inside one snapshot() call.
+// non-negative and -1 stays the unambiguous "no slot" value. `gen` bumps once
+// on EACH transition (register AND unregister), so it wraps after 2^26
+// transitions of the SAME slot, i.e. 2^25 register/unregister CYCLES; an ABA
+// collision would need exactly that many cycles inside one snapshot() call.
 constexpr int32_t  kIndexBits = 5;
 constexpr int32_t  kIndexMask = (1 << kIndexBits) - 1;
 constexpr uint32_t kGenMask   = 0x03FFFFFFu;
@@ -579,12 +636,30 @@ int32_t seam_calbus_v1_register(SeamCalbus* bus) {
         // take regMutex (it must not: the GUI would then be able to stall on
         // a registering plugin), so regMutex does nothing to protect this
         // memset from a concurrent reader. Only the odd/even dance does.
+        //
+        // `start | 1u` instead of `start + 1`: the VST3 contract guarantees
+        // this memset and any in-flight publish() on the same slot never
+        // overlap in INTENDED use (see seam_calbus.h on publish()), but if
+        // that contract is ever violated, a plain `+1`/`+2` dance can leave
+        // `seq` PERMANENTLY ODD — two interleaved writers both compute their
+        // final store as start+2 from their own snapshot of `start`, and
+        // parity is preserved by construction, so an odd intermediate value
+        // can become the last write. Once `seq` is stuck odd, the reader's
+        // `s1 & 1u` check rejects the slot on every future attempt and no
+        // amount of unregister+register heals it. Forcing the intermediate
+        // value odd via `| 1u` and the final value to exactly one more than
+        // that makes every writer's OWN final store even, regardless of what
+        // it read, so the slot can never brick — it only recovers to "one of
+        // the writers' data, chosen arbitrarily" instead. This does NOT make
+        // concurrent writers safe: tearing can still be accepted by a reader
+        // that races a genuinely overlapping pair. It only removes the
+        // unrecoverable outcome.
         const uint32_t start = s.seq.load(std::memory_order_relaxed);
-        s.seq.store(start + 1, std::memory_order_relaxed);        // -> odd
+        s.seq.store(start | 1u, std::memory_order_relaxed);        // -> odd
         std::atomic_thread_fence(std::memory_order_release);
         std::memset(&s.rec, 0, sizeof(SeamCalbusRecord));
         std::atomic_thread_fence(std::memory_order_release);
-        s.seq.store(start + 2, std::memory_order_relaxed);        // -> even
+        s.seq.store((start | 1u) + 1u, std::memory_order_relaxed); // -> even
 
         // Open the new epoch, then advertise the slot. Both are release
         // stores, so a reader that observes them also observes the cleared
@@ -627,14 +702,26 @@ void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
     // this check when the epoch closes still writes. That window is bounded by
     // a few instructions, and an emitter stops publishing before it
     // unregisters; the point is that a *stale* handle stops writing forever.)
-    if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return;
+    //
+    // `g == 0` is rejected on top of the equality check: 0 is the slot's
+    // pre-registration sentinel value, never a value register() hands out
+    // (it always bumps gen to >= 1 first), so a forged/zero-initialised
+    // handle == 0 targeting a never-registered slot 0 would otherwise pass
+    // `0 == handleGen(0)` trivially. See SEAM_CALBUS_NO_HANDLE in the header.
+    const uint32_t g = s.gen.load(std::memory_order_relaxed);
+    if (g == 0 || g != handleGen(handle)) return;
 
+    // `start | 1u` / `(start | 1u) + 1u` instead of `start + 1` / `start + 2`:
+    // see the identical comment in register() for why the plain +1/+2 dance
+    // can leave `seq` permanently odd if this call and a register() reusing
+    // the same slot ever genuinely overlap, and why OR-ing in the odd bit
+    // instead makes that outcome recoverable rather than permanent.
     const uint32_t start = s.seq.load(std::memory_order_relaxed);
-    s.seq.store(start + 1, std::memory_order_relaxed);        // -> odd
+    s.seq.store(start | 1u, std::memory_order_relaxed);        // -> odd
     std::atomic_thread_fence(std::memory_order_release);
     std::memcpy(&s.rec, rec, sizeof(SeamCalbusRecord));
     std::atomic_thread_fence(std::memory_order_release);
-    s.seq.store(start + 2, std::memory_order_relaxed);        // -> even
+    s.seq.store((start | 1u) + 1u, std::memory_order_relaxed); // -> even
 }
 
 int32_t seam_calbus_v1_snapshot(SeamCalbus* bus, SeamCalbusRecord* out,
@@ -670,6 +757,20 @@ int32_t seam_calbus_v1_snapshot(SeamCalbus* bus, SeamCalbusRecord* out,
             // released-and-reclaimed (gen would move twice — it never returns
             // to an earlier value). gen alone would do; inUse is kept because
             // the pair is what the invariant is stated in terms of.
+            //
+            // HONEST NOTE ON WHAT THIS ACTUALLY REJECTS TODAY: with register()'s
+            // memset now inside the seqlock (see the struct-level comment
+            // above), every ownership transition necessarily moves `seq` by 2,
+            // so the `s1 != s2` check a few lines up already rejects every
+            // ABA'd copy on its own — there is no reachable state where `seq`
+            // is stable, the record changed, and ownership also changed. This
+            // gen/inUse re-check is therefore DEFENCE-IN-DEPTH, not the thing
+            // that is load-bearing today: it is what would catch an ABA if a
+            // future change ever let something touch `rec` (or otherwise moved
+            // `seq`) without also touching the seqlock — e.g. "skip the memset
+            // when the slot is already zero". Keep it for that reason, but
+            // don't credit it with preventing ABA in the current code; the seq
+            // check does that.
             const uint32_t u2 = s.inUse.load(std::memory_order_acquire);
             const uint32_t g2 = s.gen.load(std::memory_order_acquire);
             if (u2 != u1 || g2 != g1) continue;               // churned
@@ -680,6 +781,7 @@ int32_t seam_calbus_v1_snapshot(SeamCalbus* bus, SeamCalbusRecord* out,
     }
     return n;
 }
+
 ```
 
 - [ ] **Step 5: Write the dylib CMake target**
