@@ -12,6 +12,10 @@
 #include <cmath>
 #include <cstdio>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 // FAUST REFERENCE (seam.analyzers.lib): renders the san.vectorangle/panorama
 // scalars and the sst.sdmx (seam.stereophony.lib) M/S pair that
 // Seam::strx::Analyzer already computes (see strx_dsp.h AnalysisFrame::gx/gy,
@@ -125,8 +129,15 @@ public:
             CGraphicsPath* path = c->createGraphicsPath();
             if (!path) continue;
             for (int i = 0; i < gen.numPoints; ++i) {
-                const double sx = center.x + double(gen.gx[i]) * radius;
-                const double sy = center.y - double(gen.gy[i]) * radius; // y up
+                // Clamp (S,M) to the unit range so |value|=1 lands on the circle
+                // edge: full-scale mono gives gy=√2 and anti-phase gives gx=√2,
+                // which would otherwise map ~41% past the radius and square off
+                // against the rectangular view bounds. (View-side only — the DSP
+                // in strx_dsp.h keeps the true unnormalized (S,M).)
+                const double gxc = std::clamp(double(gen.gx[i]), -1.0, 1.0);
+                const double gyc = std::clamp(double(gen.gy[i]), -1.0, 1.0);
+                const double sx = center.x + gxc * radius;
+                const double sy = center.y - gyc * radius; // y up
                 path->addRect(CRect(sx - kPointHalfPx, sy - kPointHalfPx,
                                      sx + kPointHalfPx, sy + kPointHalfPx));
             }
