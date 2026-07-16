@@ -7,6 +7,7 @@
 // The spectral curve here uses a Welch FFT (seam_fft.h) for a finer display,
 // citing the filterbank analyzer as the SR-independent Faust equivalent.
 #pragma once
+#include "seam_fft.h"
 #include "seam_meter.h"
 #include <algorithm>
 #include <cmath>
@@ -19,6 +20,16 @@ struct AnalysisFrame {
     float width       = 0.f;   // [0,1], 0 = mono
     float panorama    = 0.f;   // [-1,1]
     float angleRad    = 0.f;
+
+    static constexpr int kMaxPoints = 1024;
+    int numPoints = 0;
+    float gx[kMaxPoints] = {};  // goniometer x = S, normalized ~[-1,1]
+    float gy[kMaxPoints] = {};  // goniometer y = M, normalized ~[-1,1]
+
+    static constexpr int kNumBins = 2049;  // kFftSize/2 + 1, kFftSize = 4096
+    float specM[kNumBins] = {};  // dB
+    float specS[kNumBins] = {};  // dB
+    int numBins = 0;
 };
 
 class Analyzer {
@@ -31,11 +42,14 @@ public:
         lvlS_.prepare(fs_, seam::meter::LevelFollower::Mode::Rms, 300.0);
         // one-pole for the covariance means (0.3 s, matching san sfa_tau)
         coef_ = std::exp(-1.0 / (0.3 * fs_));
+        welchM_.prepare(kFftSize, 2.0, fs_);   // τ = 2 s live EMA
+        welchS_.prepare(kFftSize, 2.0, fs_);
         reset();
     }
     void reset() {
         lvlL_.reset(); lvlR_.reset(); lvlM_.reset(); lvlS_.reset();
         mLR_ = mLL_ = mRR_ = 0.0;
+        welchM_.reset(); welchS_.reset();
         frame_ = AnalysisFrame{};
     }
     void analyzeScalars(const float* L, const float* R, int n) {
@@ -59,11 +73,38 @@ public:
         frame_.panorama = float((mRR_ - mLL_) / std::max(eps, mRR_ + mLL_)); // san.panorama
         frame_.angleRad = float(0.5 * std::atan2(2.0*mLR_, mLL_ - mRR_));     // san.vectorangle
     }
+    int fftSize() const { return kFftSize; }
+
+    void analyze(const float* L, const float* R, int n) {
+        analyzeScalars(L, R, n);
+        // Goniometer: (x=S, y=M), decimate by stride to <= kMaxPoints.
+        const int stride = (n + AnalysisFrame::kMaxPoints - 1) / AnalysisFrame::kMaxPoints;
+        int p = 0;
+        for (int i = 0; i < n && p < AnalysisFrame::kMaxPoints; i += (stride > 0 ? stride : 1)) {
+            const float s = (L[i] - R[i]) * 0.70710678f;
+            const float m = (L[i] + R[i]) * 0.70710678f;
+            frame_.gx[p] = s; frame_.gy[p] = m; ++p;
+        }
+        frame_.numPoints = p;
+        // Spectra: feed both Welch analyzers per sample.
+        for (int i = 0; i < n; ++i) {
+            const float m = (L[i] + R[i]) * 0.70710678f;
+            const float s = (L[i] - R[i]) * 0.70710678f;
+            welchM_.push(m); welchS_.push(s);
+        }
+        frame_.numBins = welchM_.numBins();
+        const float* mM = welchM_.magnitudeDb();
+        const float* mS = welchS_.magnitudeDb();
+        for (int k = 0; k < frame_.numBins; ++k) { frame_.specM[k] = mM[k]; frame_.specS[k] = mS[k]; }
+    }
+
     const AnalysisFrame& frame() const { return frame_; }
-protected:
+private:
+    static constexpr int kFftSize = 4096;   // kNumBins = 2049 in AnalysisFrame
     double fs_ = 48000.0, coef_ = 0.0;
     double mLR_ = 0, mLL_ = 0, mRR_ = 0;
     seam::meter::LevelFollower lvlL_, lvlR_, lvlM_, lvlS_;
+    seam::fft::Welch welchM_, welchS_;
     AnalysisFrame frame_;
 };
 

@@ -40,3 +40,34 @@ TEST_CASE("left only: panorama fully left (~-1)") {
         l = 0.5f*std::sin(2.0*M_PI*1000.0*n/48000.0); r = 0.0f; });
     CHECK(f.panorama == doctest::Approx(-1.0).epsilon(0.05));
 }
+
+TEST_CASE("goniometer: mono maps to the vertical axis (x~0, y!=0)") {
+    Analyzer a; a.prepare(48000.0);
+    std::vector<float> L(1024), R(1024);
+    for (int i = 0; i < 1024; ++i)
+        L[i] = R[i] = 0.5f*std::sin(2.0*M_PI*1000.0*i/48000.0);
+    a.analyze(L.data(), R.data(), 1024);
+    const auto& f = a.frame();
+    REQUIRE(f.numPoints > 0);
+    float maxAbsX = 0, maxAbsY = 0;
+    for (int i = 0; i < f.numPoints; ++i) {
+        maxAbsX = std::max(maxAbsX, std::fabs(f.gx[i]));
+        maxAbsY = std::max(maxAbsY, std::fabs(f.gy[i]));
+    }
+    CHECK(maxAbsX < 1e-3f);      // S = 0 on the horizontal axis
+    CHECK(maxAbsY > 0.1f);       // M carries the energy (vertical)
+}
+
+TEST_CASE("spectrum: a 1 kHz mid tone peaks near the 1 kHz bin") {
+    Analyzer a; a.prepare(48000.0);
+    const int N = a.fftSize();
+    std::vector<float> L(N), R(N);
+    for (int i = 0; i < N; ++i)
+        L[i] = R[i] = 0.5f*std::sin(2.0*M_PI*1000.0*i/48000.0);
+    for (int b = 0; b < 8; ++b) a.analyze(L.data(), R.data(), N);
+    const auto& f = a.frame();
+    const int expBin = int(std::lround(1000.0 * N / 48000.0));
+    int peak = 1;
+    for (int k = 2; k < f.numBins; ++k) if (f.specM[k] > f.specM[peak]) peak = k;
+    CHECK(std::abs(peak - expBin) <= 2);
+}
