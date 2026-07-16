@@ -42,3 +42,25 @@ TEST_CASE("forward then inverse (with 1/N) recovers the signal") {
     for (int n = 0; n < N; ++n)
         CHECK(d[2*n]/N == doctest::Approx(re[n]).epsilon(1e-4));
 }
+
+#include <cstdio>
+TEST_CASE("Welch: a steady sine peaks at the expected bin") {
+    const int N = 1024; const double fs = 48000.0;
+    seam::fft::Welch w;
+    w.prepare(N, 0.05, fs);
+    const double f = fs * 64 / N;                 // exactly bin 64
+    for (int i = 0; i < N*8; ++i)
+        w.push((float)std::sin(2.0*M_PI*f*i/fs));
+    const float* mag = w.magnitudeDb();
+    int peak = 0;
+    for (int k = 1; k < w.numBins(); ++k) if (mag[k] > mag[peak]) peak = k;
+    CHECK(peak == 64);
+}
+
+TEST_CASE("Welch: silence sits at/below the dB floor") {
+    seam::fft::Welch w;
+    w.prepare(256, 0.05, 48000.0);
+    for (int i = 0; i < 256*8; ++i) w.push(0.0f);
+    const float* mag = w.magnitudeDb();
+    for (int k = 0; k < w.numBins(); ++k) CHECK(mag[k] <= -90.0f);
+}

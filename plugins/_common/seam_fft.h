@@ -4,7 +4,9 @@
 // GS's the-accountant/src/analysis/fft.hpp. Reused by strx (Welch spectrum) and,
 // later, the STONE transfer-function measurement (Spec 3).
 #pragma once
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace seam { namespace fft {
 
@@ -41,5 +43,66 @@ inline void transform(float* data, int n, bool forward) {
         }
     }
 }
+
+// Streaming Welch power-spectrum accumulator: Hann window, 50% overlap, live
+// EMA time average. Allocation-free after prepare().
+class Welch {
+public:
+    void prepare(int fftSize, double emaTau, double fs) {
+        n_ = fftSize; bins_ = fftSize/2 + 1; hop_ = fftSize/2;
+        fs_ = (fs > 0.0) ? fs : 48000.0;
+        // EMA coefficient over the hop rate (one hop = hop_ samples).
+        const double dt = double(hop_) / fs_;
+        ema_ = (emaTau > 0.0) ? std::exp(-dt / emaTau) : 0.0;
+        win_.assign(n_, 0.0f);
+        double wsum = 0.0;
+        for (int i = 0; i < n_; ++i) {                 // Hann
+            win_[i] = 0.5f * (1.0f - std::cos(2.0*M_PI*i/(n_-1)));
+            wsum += win_[i]*win_[i];
+        }
+        winNorm_ = 1.0 / (wsum > 0.0 ? wsum : 1.0);    // power normalization
+        ring_.assign(n_, 0.0f);
+        scratch_.assign(2*n_, 0.0f);
+        magDb_.assign(bins_, -120.0f);
+        magLin_.assign(bins_, 0.0f);
+        reset();
+    }
+    void reset() {
+        pos_ = 0; sinceHop_ = 0; primed_ = false; newFrame_ = false;
+        std::fill(ring_.begin(), ring_.end(), 0.0f);
+        std::fill(magLin_.begin(), magLin_.end(), 0.0f);
+        std::fill(magDb_.begin(), magDb_.end(), -120.0f);
+    }
+    void push(float x) {
+        ring_[pos_] = x;
+        pos_ = (pos_ + 1) % n_;
+        if (++sinceHop_ >= hop_) { sinceHop_ = 0; runFrame(); }
+    }
+    bool hasNewFrame() { bool f = newFrame_; newFrame_ = false; return f; }
+    const float* magnitudeDb() const { return magDb_.data(); }
+    int numBins() const { return bins_; }
+private:
+    void runFrame() {
+        // windowed frame from the ring (oldest sample = current pos_)
+        for (int i = 0; i < n_; ++i) {
+            const float s = ring_[(pos_ + i) % n_];
+            scratch_[2*i]   = s * win_[i];
+            scratch_[2*i+1] = 0.0f;
+        }
+        transform(scratch_.data(), n_, true);
+        for (int k = 0; k < bins_; ++k) {
+            const double re = scratch_[2*k], im = scratch_[2*k+1];
+            const double p = (re*re + im*im) * winNorm_;   // power
+            magLin_[k] = float(p + ema_ * (magLin_[k] - p)); // EMA on power
+            const double db = 10.0 * std::log10(magLin_[k] > 1e-12 ? magLin_[k] : 1e-12);
+            magDb_[k] = float(db < -120.0 ? -120.0 : db);
+        }
+        newFrame_ = true;
+    }
+    int n_=0, bins_=0, hop_=0, pos_=0, sinceHop_=0;
+    double fs_=48000.0, ema_=0.0, winNorm_=1.0;
+    bool primed_=false, newFrame_=false;
+    std::vector<float> win_, ring_, scratch_, magLin_, magDb_;
+};
 
 }} // namespace seam::fft
