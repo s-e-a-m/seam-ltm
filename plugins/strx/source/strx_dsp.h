@@ -52,12 +52,13 @@ public:
         mLR_ = mLL_ = mRR_ = 0.0;
         welchM_.reset(); welchS_.reset();
         for (auto& s : slots_) s = AnalysisFrame{};
-        write_ = 0;
+        writeSlot_ = 0;
         ready_.store(-1, std::memory_order_relaxed);
+        reading_.store(-1, std::memory_order_relaxed);
         lastRead_ = -1;
     }
     void analyzeScalars(const float* L, const float* R, int n) {
-        AnalysisFrame& fr = slots_[write_];
+        AnalysisFrame& fr = slots_[writeSlot_];
         double rmsL=0, rmsR=0, rmsM=0, rmsS=0;
         for (int i = 0; i < n; ++i) {
             const double l = L[i], r = R[i];
@@ -82,7 +83,7 @@ public:
 
     void analyze(const float* L, const float* R, int n) {
         analyzeScalars(L, R, n);
-        AnalysisFrame& fr = slots_[write_];   // same slot analyzeScalars() just filled
+        AnalysisFrame& fr = slots_[writeSlot_];   // same slot analyzeScalars() just filled
         // Goniometer: (x=S, y=M), decimate by stride to <= kMaxPoints.
         const int stride = (n + AnalysisFrame::kMaxPoints - 1) / AnalysisFrame::kMaxPoints;
         int p = 0;
@@ -106,36 +107,50 @@ public:
 
     // Audio thread: analyze into the current write slot, then publish it with
     // a release store so the GUI thread's acquire load in tryReadFrame() sees
-    // a fully-written AnalysisFrame (no torn reads). Advances to the next
-    // slot, skipping whichever one the GUI thread currently holds a copy from
-    // (lastRead_) so the audio thread never overwrites data that hasn't been
-    // published yet relative to a slot the GUI might still be mid-copy of.
+    // a fully-written AnalysisFrame (no torn reads). Then choose the next
+    // write slot, EXCLUDING both (a) the slot just published and (b) the slot
+    // the reader has claimed (reading_). With 3 slots and 2 excluded indices
+    // there is always exactly one safe slot left — so the writer can never
+    // overwrite the slot the GUI thread is mid-copy of.
+    //
+    // Correctness note (fixes a tearing bug in the original design): the
+    // reader publishes its claim (reading_) with a release store BEFORE it
+    // starts copying, and this loop reads that claim with an acquire load
+    // AFTER republishing `ready_`. So once tryReadFrame() has claimed slot r,
+    // every subsequent process() call sees the claim and excludes r until the
+    // reader claims a different slot. The earlier "skip lastRead_" scheme was
+    // broken because lastRead_ was only set AFTER the copy finished — the
+    // writer could circle back and overwrite the slot being copied.
     void process(const float* L, const float* R, int n) {
-        analyze(L, R, n);                 // fills slots_[write_]
-        ready_.store(write_, std::memory_order_release);
-        write_ = (write_ + 1) % 3;
-        if (write_ == lastRead_) write_ = (write_ + 1) % 3;  // skip the slot GUI holds
+        analyze(L, R, n);                              // fills slots_[writeSlot_]
+        ready_.store(writeSlot_, std::memory_order_release);
+        const int rd = reading_.load(std::memory_order_acquire);  // slot reader currently holds
+        for (int s = 0; s < 3; ++s)                    // next slot excludes published + reader-held
+            if (s != writeSlot_ && s != rd) { writeSlot_ = s; break; }
     }
     // GUI thread: copy the latest published slot. Returns false if nothing
-    // new has been published since the last successful read.
+    // new has been published since the last successful read. Claims the slot
+    // (reading_) with a release store BEFORE copying so the audio thread
+    // excludes it from being overwritten while the copy is in flight.
     bool tryReadFrame(AnalysisFrame& out) {
         const int r = ready_.load(std::memory_order_acquire);
         if (r < 0 || r == lastRead_) return false;
-        out = slots_[r];
-        lastRead_ = r;
+        reading_.store(r, std::memory_order_release);  // CLAIM before copying
+        out = slots_[r];                               // writer now excludes r
+        lastRead_ = r;                                 // GUI-thread-only bookkeeping
         return true;
     }
 
     // NOTE (deviation from task-5-brief.md step 3): the brief's suggested
     // `frame()` returns slots_[(write_+2)%3] — the "previously completed"
-    // slot. That is only correct once process() has advanced write_ past the
-    // slot analyze() just filled. Tasks 3/4 tests call analyzeScalars()/
-    // analyze() DIRECTLY (never process()), so write_ stays 0 and that
+    // slot. That is only correct once process() has advanced writeSlot_ past
+    // the slot analyze() just filled. Tasks 3/4 tests call analyzeScalars()/
+    // analyze() DIRECTLY (never process()), so writeSlot_ stays 0 and that
     // formula would read an untouched slot (slots_[2]), breaking every
-    // existing test. frame() instead returns the *working* slot slots_[write_]
-    // — exactly the slot analyze() just wrote — which matches pre-Task-5
-    // behaviour whether or not process()/publish has ever run.
-    const AnalysisFrame& frame() const { return slots_[write_]; }
+    // existing test. frame() instead returns the *working* slot
+    // slots_[writeSlot_] — exactly the slot analyze() just wrote — which
+    // matches pre-Task-5 behaviour whether or not process()/publish has run.
+    const AnalysisFrame& frame() const { return slots_[writeSlot_]; }
 private:
     static constexpr int kFftSize = 4096;   // kNumBins = 2049 in AnalysisFrame
     double fs_ = 48000.0, coef_ = 0.0;
@@ -143,9 +158,10 @@ private:
     seam::meter::LevelFollower lvlL_, lvlR_, lvlM_, lvlS_;
     seam::fft::Welch welchM_, welchS_;
     AnalysisFrame slots_[3];
-    int write_ = 0;
-    std::atomic<int> ready_{-1};     // last published slot, -1 = none
-    int lastRead_ = -1;
+    int writeSlot_ = 0;              // audio-thread only
+    std::atomic<int> ready_{-1};     // last published slot (writer->reader), -1 = none
+    std::atomic<int> reading_{-1};   // slot the reader is copying (reader->writer), -1 = none
+    int lastRead_ = -1;              // GUI-thread only (no cross-thread access)
 };
 
 }} // namespace Seam::strx

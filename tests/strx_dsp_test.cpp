@@ -82,3 +82,29 @@ TEST_CASE("triple-buffer: read after process returns the latest frame") {
     CHECK(out.panorama == doctest::Approx(-1.0).epsilon(0.1));
     CHECK_FALSE(a.tryReadFrame(out));    // nothing new since last read
 }
+
+TEST_CASE("triple-buffer: publish/read cycles, coalescing, and no-new") {
+    Analyzer a; a.prepare(48000.0);
+    std::vector<float> L(1024), R(1024);
+    auto fillLeftOnly = [&]{ for (int i = 0; i < 1024; ++i) { L[i] = 0.5f; R[i] = 0.0f; } };
+    fillLeftOnly();
+    AnalysisFrame out;
+
+    // Several publish->read cycles: each read sees a fresh frame, then reports
+    // "nothing new" until the next publish.
+    for (int cycle = 0; cycle < 4; ++cycle) {
+        a.process(L.data(), R.data(), 1024);
+        REQUIRE(a.tryReadFrame(out));
+        CHECK(out.panorama == doctest::Approx(-1.0).epsilon(0.1));  // left-only stays panorama ~ -1
+        CHECK_FALSE(a.tryReadFrame(out));   // nothing new since this read
+    }
+
+    // Two back-to-back publishes then ONE read: returns the latest only, and
+    // the immediately-following read reports nothing new (the intermediate
+    // frame was coalesced, never observed).
+    a.process(L.data(), R.data(), 1024);
+    a.process(L.data(), R.data(), 1024);
+    REQUIRE(a.tryReadFrame(out));
+    CHECK(out.panorama == doctest::Approx(-1.0).epsilon(0.1));
+    CHECK_FALSE(a.tryReadFrame(out));   // only the latest was delivered; nothing more pending
+}
