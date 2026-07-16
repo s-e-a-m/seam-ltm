@@ -55,7 +55,7 @@ public:
     static constexpr double kMarginFrac   = 0.06;    // circle inset as a fraction of the view
     static constexpr double kPointHalfPx  = 1.3;     // scatter point half-size (px)
     static constexpr double kAxisFrac     = 0.98;     // diagonal axis length vs. circle radius
-    static constexpr double kLabelFrac    = 0.82;    // L/R label placement vs. circle radius (inset from the axis line)
+    static constexpr double kLabelFrac    = 1.10;    // L/R label placement vs. circle radius (>1 = outside the circle, in the corners)
     static constexpr double kReadoutH     = 16.0;    // bottom readout strip height (px)
 
     // --- Radial scale (log-dB, floored) ---
