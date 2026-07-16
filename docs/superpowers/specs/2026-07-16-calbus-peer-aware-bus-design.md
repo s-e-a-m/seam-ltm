@@ -60,8 +60,13 @@ It sits beside `seam_meter.h` and `seam_quadrature.h`, which stay header-only; t
 No `std::` types, no classes, no exceptions cross it, because C++ has no stable ABI and the three plugins may one day be built with different compilers or flags.
 
 **`seam_calbus_client.h`** — header-only C++ RAII wrapper included by each plugin.
-It loads the dylib on first instance via `FDynLibrary` (`base/source/fdynlib.h`, the SDK's own dynamic-loading wrapper, which already handles refcounting and portability), resolves the symbols, and exposes a decent API to plugin code.
+It loads the dylib on first use, resolves the symbols, and exposes a decent API to plugin code.
 When loading fails it enters null mode: every call becomes a silent no-op.
+
+Loading uses POSIX `dlopen`/`dlsym` directly.
+The SDK's own `FDynLibrary` (`base/source/fdynlib.h`) was considered and rejected on a fact: `UNICODE` is defined by default (`pluginterfaces/base/ftypes.h:30`), so `tchar` resolves to `char16_t` (`ftypes.h:91`) and `FDynLibrary::init` demands a UTF-16 path.
+Converting a filesystem path built from `$HOME` into UTF-16 to hand it back to a function that converts it down again buys nothing.
+`dlopen` covers both platforms the suite builds for (macmain.cpp and linuxmain.cpp), and the client owns its handle in a function-local static, so the refcounting FDynLibrary would have offered is unnecessary.
 
 **Search order.** `SEAM_CALBUS_PATH` (tests) → `~/Library/Application Support/SEAM/` → `/Library/Application Support/SEAM/`.
 User domain first means installation needs no `sudo`, consistent with VST3 bundles already installing to `~/Library/Audio/Plug-Ins/VST3`.
