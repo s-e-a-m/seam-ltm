@@ -89,3 +89,13 @@ target_include_directories(dslar_dsp_test PRIVATE
 )
 target_compile_features(dslar_dsp_test PRIVATE cxx_std_17)
 add_test(NAME dslar_dsp_test COMMAND dslar_dsp_test)
+
+add_executable(seam_fft_test
+    seam_fft_test.cpp
+)
+target_include_directories(seam_fft_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_fft_test PRIVATE cxx_std_17)
+add_test(NAME seam_fft_test COMMAND seam_fft_test)
