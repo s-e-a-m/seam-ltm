@@ -9,10 +9,13 @@
 
 namespace Seam {
 
-// Generated once (uuidgen: ac17e4c3-f367-4b1b-b361-5184b55b3603), never
-// change. Each of the four words is a 32-bit value (exactly 8 hex digits).
+// FUID — 15th plugin in the SEAM-LTM suite.
+// Pattern: 0x5E4D + sequential index (ltburst=000C, ltglide=000D,
+// dslar=000E, strx=000F), then the recent-plugin salt word, then the
+// uppercase-ASCII short name in the tail words. "STRX" fits entirely in
+// word 3, so word 4 is zero-padded (cf. dslar "DSLA","R\0\0\0").
 static const Steinberg::FUID StrxProcessorUID(
-    0xAC17E4C3, 0xF3674B1B, 0xB3615184, 0xB55B3603);
+    0x5E4D000F, 0xB2C3D4E5, 0x53545258, 0x00000000);   // "STRX"
 
 // Custom-view name tags (match resource/strx.uidesc custom-view "name"
 // attrs). No custom views are built yet — the goniometer/spectrum/meters
