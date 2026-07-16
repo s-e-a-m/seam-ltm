@@ -111,14 +111,16 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
         VSTGUI::CColor label = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
         VSTGUI::CColor track = VSTGUI::kBlackCColor, fill(0xc8, 0xa2, 0x4a, 0xff);
+        VSTGUI::CColor needle(0x4a, 0x9e, 0xc8, 0xff);   // SliderActive azure (the M colour)
         if (description) {
             description->getColor("TextDim", label);
             description->getColor("TextLight", text);
             description->getColor("SliderTrack", track);
             description->getColor("MeterFill", fill);
+            description->getColor("SliderActive", needle);
         }
         return new Seam::StrxGoniometer(VSTGUI::CRect(0, 0, 260, 260), this, font,
-                                         label, text, track, fill);
+                                         label, text, track, fill, needle);
     }
     if (name && std::string(name) == kViewSpectrum) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;

@@ -67,10 +67,11 @@ public:
     StrxGoniometer(const VSTGUI::CRect& size, StrxProcessor* processor,
                    VSTGUI::CFontRef font,
                    const VSTGUI::CColor& labelColor, const VSTGUI::CColor& textColor,
-                   const VSTGUI::CColor& trackColor, const VSTGUI::CColor& fillColor)
+                   const VSTGUI::CColor& trackColor, const VSTGUI::CColor& fillColor,
+                   const VSTGUI::CColor& needleColor)
         : VSTGUI::CView(size), processor_(processor), font_(font),
           labelColor_(labelColor), textColor_(textColor),
-          trackColor_(trackColor), fillColor_(fillColor) {
+          trackColor_(trackColor), fillColor_(fillColor), needleColor_(needleColor) {
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
             [this](VSTGUI::CVSTGUITimer*) { pushGeneration(); invalid(); }, kTimerMs, /*doStart*/true);
@@ -182,7 +183,7 @@ public:
             const double phiS = 0.5 * std::atan2(needleSin2_, needleCos2_);
             const double nx = std::cos(phiS) * radius;
             const double ny = std::sin(phiS) * radius;
-            c->setFrameColor(fillColor_);
+            c->setFrameColor(needleColor_);
             c->setLineWidth(1.0);
             // Mirrored endpoints (matches the flipped scatter mapping).
             c->drawLine(CPoint(center.x + nx, center.y + ny), CPoint(center.x - nx, center.y - ny));
@@ -224,7 +225,7 @@ private:
 
     StrxProcessor* processor_ = nullptr;
     VSTGUI::CFontRef font_ = nullptr;
-    VSTGUI::CColor labelColor_, textColor_, trackColor_, fillColor_;
+    VSTGUI::CColor labelColor_, textColor_, trackColor_, fillColor_, needleColor_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
 
     std::array<Generation, kTrailFrames> history_{};
