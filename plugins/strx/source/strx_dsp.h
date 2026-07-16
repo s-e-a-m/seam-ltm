@@ -10,6 +10,7 @@
 #include "seam_fft.h"
 #include "seam_meter.h"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 
 namespace Seam { namespace strx {
@@ -50,9 +51,13 @@ public:
         lvlL_.reset(); lvlR_.reset(); lvlM_.reset(); lvlS_.reset();
         mLR_ = mLL_ = mRR_ = 0.0;
         welchM_.reset(); welchS_.reset();
-        frame_ = AnalysisFrame{};
+        for (auto& s : slots_) s = AnalysisFrame{};
+        write_ = 0;
+        ready_.store(-1, std::memory_order_relaxed);
+        lastRead_ = -1;
     }
     void analyzeScalars(const float* L, const float* R, int n) {
+        AnalysisFrame& fr = slots_[write_];
         double rmsL=0, rmsR=0, rmsM=0, rmsS=0;
         for (int i = 0; i < n; ++i) {
             const double l = L[i], r = R[i];
@@ -64,48 +69,83 @@ public:
             mRR_ = r*r + coef_*(mRR_ - r*r);
         }
         const double eps = 1e-12;
-        frame_.inL = float(seam::meter::lin2db(rmsL));
-        frame_.inR = float(seam::meter::lin2db(rmsR));
-        frame_.mid = float(seam::meter::lin2db(rmsM));
-        frame_.side = float(seam::meter::lin2db(rmsS));
-        frame_.correlation = float(mLR_ / std::sqrt(std::max(eps, mLL_*mRR_)));
-        frame_.width = float(rmsS / std::max(eps, rmsM + rmsS));    // san.width
-        frame_.panorama = float((mRR_ - mLL_) / std::max(eps, mRR_ + mLL_)); // san.panorama
-        frame_.angleRad = float(0.5 * std::atan2(2.0*mLR_, mLL_ - mRR_));     // san.vectorangle
+        fr.inL = float(seam::meter::lin2db(rmsL));
+        fr.inR = float(seam::meter::lin2db(rmsR));
+        fr.mid = float(seam::meter::lin2db(rmsM));
+        fr.side = float(seam::meter::lin2db(rmsS));
+        fr.correlation = float(mLR_ / std::sqrt(std::max(eps, mLL_*mRR_)));
+        fr.width = float(rmsS / std::max(eps, rmsM + rmsS));    // san.width
+        fr.panorama = float((mRR_ - mLL_) / std::max(eps, mRR_ + mLL_)); // san.panorama
+        fr.angleRad = float(0.5 * std::atan2(2.0*mLR_, mLL_ - mRR_));     // san.vectorangle
     }
     int fftSize() const { return kFftSize; }
 
     void analyze(const float* L, const float* R, int n) {
         analyzeScalars(L, R, n);
+        AnalysisFrame& fr = slots_[write_];   // same slot analyzeScalars() just filled
         // Goniometer: (x=S, y=M), decimate by stride to <= kMaxPoints.
         const int stride = (n + AnalysisFrame::kMaxPoints - 1) / AnalysisFrame::kMaxPoints;
         int p = 0;
         for (int i = 0; i < n && p < AnalysisFrame::kMaxPoints; i += (stride > 0 ? stride : 1)) {
             const float s = (L[i] - R[i]) * 0.70710678f;
             const float m = (L[i] + R[i]) * 0.70710678f;
-            frame_.gx[p] = s; frame_.gy[p] = m; ++p;
+            fr.gx[p] = s; fr.gy[p] = m; ++p;
         }
-        frame_.numPoints = p;
+        fr.numPoints = p;
         // Spectra: feed both Welch analyzers per sample.
         for (int i = 0; i < n; ++i) {
             const float m = (L[i] + R[i]) * 0.70710678f;
             const float s = (L[i] - R[i]) * 0.70710678f;
             welchM_.push(m); welchS_.push(s);
         }
-        frame_.numBins = welchM_.numBins();
+        fr.numBins = welchM_.numBins();
         const float* mM = welchM_.magnitudeDb();
         const float* mS = welchS_.magnitudeDb();
-        for (int k = 0; k < frame_.numBins; ++k) { frame_.specM[k] = mM[k]; frame_.specS[k] = mS[k]; }
+        for (int k = 0; k < fr.numBins; ++k) { fr.specM[k] = mM[k]; fr.specS[k] = mS[k]; }
     }
 
-    const AnalysisFrame& frame() const { return frame_; }
+    // Audio thread: analyze into the current write slot, then publish it with
+    // a release store so the GUI thread's acquire load in tryReadFrame() sees
+    // a fully-written AnalysisFrame (no torn reads). Advances to the next
+    // slot, skipping whichever one the GUI thread currently holds a copy from
+    // (lastRead_) so the audio thread never overwrites data that hasn't been
+    // published yet relative to a slot the GUI might still be mid-copy of.
+    void process(const float* L, const float* R, int n) {
+        analyze(L, R, n);                 // fills slots_[write_]
+        ready_.store(write_, std::memory_order_release);
+        write_ = (write_ + 1) % 3;
+        if (write_ == lastRead_) write_ = (write_ + 1) % 3;  // skip the slot GUI holds
+    }
+    // GUI thread: copy the latest published slot. Returns false if nothing
+    // new has been published since the last successful read.
+    bool tryReadFrame(AnalysisFrame& out) {
+        const int r = ready_.load(std::memory_order_acquire);
+        if (r < 0 || r == lastRead_) return false;
+        out = slots_[r];
+        lastRead_ = r;
+        return true;
+    }
+
+    // NOTE (deviation from task-5-brief.md step 3): the brief's suggested
+    // `frame()` returns slots_[(write_+2)%3] — the "previously completed"
+    // slot. That is only correct once process() has advanced write_ past the
+    // slot analyze() just filled. Tasks 3/4 tests call analyzeScalars()/
+    // analyze() DIRECTLY (never process()), so write_ stays 0 and that
+    // formula would read an untouched slot (slots_[2]), breaking every
+    // existing test. frame() instead returns the *working* slot slots_[write_]
+    // — exactly the slot analyze() just wrote — which matches pre-Task-5
+    // behaviour whether or not process()/publish has ever run.
+    const AnalysisFrame& frame() const { return slots_[write_]; }
 private:
     static constexpr int kFftSize = 4096;   // kNumBins = 2049 in AnalysisFrame
     double fs_ = 48000.0, coef_ = 0.0;
     double mLR_ = 0, mLL_ = 0, mRR_ = 0;
     seam::meter::LevelFollower lvlL_, lvlR_, lvlM_, lvlS_;
     seam::fft::Welch welchM_, welchS_;
-    AnalysisFrame frame_;
+    AnalysisFrame slots_[3];
+    int write_ = 0;
+    std::atomic<int> ready_{-1};     // last published slot, -1 = none
+    int lastRead_ = -1;
 };
 
 }} // namespace Seam::strx

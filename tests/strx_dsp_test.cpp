@@ -71,3 +71,14 @@ TEST_CASE("spectrum: a 1 kHz mid tone peaks near the 1 kHz bin") {
     for (int k = 2; k < f.numBins; ++k) if (f.specM[k] > f.specM[peak]) peak = k;
     CHECK(std::abs(peak - expBin) <= 2);
 }
+
+TEST_CASE("triple-buffer: read after process returns the latest frame") {
+    Analyzer a; a.prepare(48000.0);
+    std::vector<float> L(1024), R(1024);
+    for (int i = 0; i < 1024; ++i) { L[i] = 0.5f; R[i] = 0.0f; }  // left only
+    a.process(L.data(), R.data(), 1024);
+    AnalysisFrame out;
+    REQUIRE(a.tryReadFrame(out));
+    CHECK(out.panorama == doctest::Approx(-1.0).epsilon(0.1));
+    CHECK_FALSE(a.tryReadFrame(out));    // nothing new since last read
+}
