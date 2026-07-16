@@ -5,6 +5,7 @@
 #include "vstgui/lib/ccolor.h"
 #include "vstgui/lib/cvstguitimer.h"
 #include "strx_processor.h"
+#include "seam_meter.h"
 
 #include <algorithm>
 #include <cstdio>

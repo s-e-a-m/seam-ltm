@@ -50,8 +50,11 @@ public:
         VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& attributes,
         const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* editor) override;
 
-    // The analyzer core, read by the GUI thread via tryReadFrame() once the
-    // custom views (Tasks 7-9) exist.
+    // The analyzer core. This accessor is for the AUDIO-thread lifecycle
+    // (prepare/reset/process) only. GUI custom views MUST read frames via
+    // latestFrame() (a single shared cached consumer); never call
+    // analyzer().tryReadFrame() directly — the triple-buffer is
+    // single-consumer and direct reads would starve the other views.
     Seam::strx::Analyzer& analyzer() { return analyzer_; }
 
     // GUI-thread-only cached accessor for the latest published AnalysisFrame.
