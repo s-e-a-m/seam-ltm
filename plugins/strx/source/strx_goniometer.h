@@ -28,9 +28,10 @@ namespace Seam {
 // Second of strx's three custom views (Task 8 of 9): a Melda-style decaying
 // L/R scatter (Lissajous/goniometer). AnalysisFrame::gx/gy already carry
 // (S,M) = ((L-R)/sqrt2, (L+R)/sqrt2) — see strx_dsp.h. This view maps that
-// pair DIRECTLY to (screenX, screenY) with the view center as origin and y
-// flipped (VSTGUI y grows downward): screenX = cx + gx*scale (S, horizontal),
-// screenY = cy - gy*scale (M, vertical). No 45-degree rotation is needed to
+// pair DIRECTLY to (screenX, screenY) with the view center as origin, x
+// mirrored (so a LEFT-panned signal reads upper-left, the standard/Melda
+// convention) and y flipped (VSTGUI y grows downward): screenX = cx - gx*scale
+// (S, horizontal), screenY = cy - gy*scale (M, vertical). No 45-degree rotation is needed to
 // get the classic goniometer look: because the DSP already outputs the M/S
 // rotation, a mono signal (S=0, all gx==0) collapses to a perfectly vertical
 // line, and an anti-phase signal (M=0, all gy==0) collapses to a perfectly
@@ -59,6 +60,9 @@ public:
 
     // --- Radial scale (log-dB, floored) ---
     static constexpr double kRadiusFloorDb = -48.0;  // signals at/below this floor sit at the circle's center
+
+    // --- Needle smoothing (view-side EMA on the doubled angle) ---
+    static constexpr double kNeedleSmooth = 0.05;    // per-repaint EMA coeff at ~30 Hz ~= ~0.5 s time constant
 
     StrxGoniometer(const VSTGUI::CRect& size, StrxProcessor* processor,
                    VSTGUI::CFontRef font,
@@ -110,15 +114,16 @@ public:
         const CCoord d = radius * kAxisFrac * 0.70710678; // projected onto each screen axis
         const CCoord dLabel = radius * kLabelFrac * 0.70710678; // label placement, inset from the axis line
         c->setFrameColor(labelColor_);
-        c->drawLine(CPoint(center.x - d, center.y + d), CPoint(center.x + d, center.y - d)); // L: bottom-left <-> top-right
-        c->drawLine(CPoint(center.x - d, center.y - d), CPoint(center.x + d, center.y + d)); // R: top-left <-> bottom-right
+        c->drawLine(CPoint(center.x - d, center.y + d), CPoint(center.x + d, center.y - d)); // R: bottom-left <-> top-right
+        c->drawLine(CPoint(center.x - d, center.y - d), CPoint(center.x + d, center.y + d)); // L: top-left <-> bottom-right
         if (font_) {
             c->setFont(font_);
             c->setFontColor(labelColor_);
-            // Pure L (l>0, r=0): gx=gy=+0.707l -> screen (cx+d, cy-d), top-right.
-            // Pure R (r>0, l=0): gx=-0.707r, gy=+0.707r -> screen (cx-d, cy-d), top-left.
-            c->drawString("L", CRect(center.x + dLabel - 8, center.y - dLabel - 14, center.x + dLabel + 8, center.y - dLabel), kCenterText);
-            c->drawString("R", CRect(center.x - dLabel - 8, center.y - dLabel - 14, center.x - dLabel + 8, center.y - dLabel), kCenterText);
+            // Mirrored screen mapping (sx = cx - gx*scale): pure L (l>0, r=0):
+            // gx=gy=+0.707l -> screen (cx-d, cy-d), top-left.
+            // Pure R (r>0, l=0): gx=-0.707r, gy=+0.707r -> screen (cx+d, cy-d), top-right.
+            c->drawString("L", CRect(center.x - dLabel - 8, center.y - dLabel - 14, center.x - dLabel + 8, center.y - dLabel), kCenterText);
+            c->drawString("R", CRect(center.x + dLabel - 8, center.y - dLabel - 14, center.x + dLabel + 8, center.y - dLabel), kCenterText);
         }
 
         const Generation& newest = history_[head_];
@@ -150,7 +155,7 @@ public:
                     ? seam::meter::db2norm(seam::meter::lin2db(rLin, kRadiusFloorDb), kRadiusFloorDb)
                     : 0.0;                                 // rNorm in [0,1]
                 const double scale = (rLin > 1e-6) ? (rNorm / rLin) : 0.0;
-                const double sx = center.x + gx * radius * scale;
+                const double sx = center.x - gx * radius * scale; // mirrored: L -> left
                 const double sy = center.y - gy * radius * scale; // y up
                 path->addRect(CRect(sx - kPointHalfPx, sy - kPointHalfPx,
                                      sx + kPointHalfPx, sy + kPointHalfPx));
@@ -168,11 +173,19 @@ public:
         // anti-phase -> phi=0 deg = horizontal, matching the scatter).
         {
             const double phi = double(newest.angleRad) + M_PI / 4.0;
-            const double nx = std::cos(phi) * radius;
-            const double ny = std::sin(phi) * radius;
+            // Smooth the DOUBLED angle as a unit vector (the needle is an
+            // axis, angle mod pi) so the EMA never fights a 180-degree flip.
+            const double c2 = std::cos(2.0 * phi);
+            const double s2 = std::sin(2.0 * phi);
+            needleCos2_ += kNeedleSmooth * (c2 - needleCos2_);
+            needleSin2_ += kNeedleSmooth * (s2 - needleSin2_);
+            const double phiS = 0.5 * std::atan2(needleSin2_, needleCos2_);
+            const double nx = std::cos(phiS) * radius;
+            const double ny = std::sin(phiS) * radius;
             c->setFrameColor(fillColor_);
             c->setLineWidth(1.0);
-            c->drawLine(CPoint(center.x - nx, center.y + ny), CPoint(center.x + nx, center.y - ny));
+            // Mirrored endpoints (matches the flipped scatter mapping).
+            c->drawLine(CPoint(center.x + nx, center.y + ny), CPoint(center.x - nx, center.y - ny));
         }
 
         // Readout: ANGLE / PANORAMA from the newest generation's scalars.
@@ -216,6 +229,10 @@ private:
 
     std::array<Generation, kTrailFrames> history_{};
     int head_ = 0; // history_[head_] is the newest generation
+
+    // Needle smoothing state (doubled-angle unit vector), default phi = pi/4.
+    double needleCos2_ = 0.0;
+    double needleSin2_ = 1.0;
 };
 
 } // namespace Seam
