@@ -58,13 +58,11 @@ private:
 
     // Calibration bus (Spec 2).
     int32_t  busHandle_ = SEAM_CALBUS_NO_HANDLE;
-    uint64_t lastPublishedPass_ = 0;
-    // Anchor of the most recent pass (the head Dirac's continuousTimeSamples,
-    // or -1 if the host gave no valid clock for it). Reused by the run/idle
-    // edge publish so a completed pass keeps its anchor instead of the idle
-    // heartbeat overwriting it with -1 (see publishBusRecord's contract).
-    int64_t  lastPassStartSample_ = -1;
-    bool     wasRunning_ = false;
+    // Publish-policy bookkeeping (pass-start detect, running/idle edge
+    // detect, anchor latch) -- extracted to the SDK-free ltglide::BusAnchor
+    // so it is unit-tested (tests/ltglide_dsp_test.cpp) without depending on
+    // the VST3 SDK. See ltglide_dsp.h for the -1 contract this exists for.
+    ltglide::BusAnchor busAnchor_;
 
     // Publish this instance's record. Called from the audio thread.
     // hostStartSample is -1 when the host provides no valid continuous clock.

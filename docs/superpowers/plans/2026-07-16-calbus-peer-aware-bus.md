@@ -1578,17 +1578,65 @@ add the members beside `paramLoop_`:
 
     // Calibration bus (Spec 2).
     int32_t  busHandle_ = -1;
-    uint64_t lastPublishedPass_ = 0;
-    // Anchor of the most recent pass (the head Dirac's continuousTimeSamples,
-    // or -1 if the host gave no valid clock for it). Reused by the run/idle
-    // edge publish below so a completed pass keeps its anchor instead of the
-    // idle heartbeat overwriting it with -1.
-    int64_t  lastPassStartSample_ = -1;
-    bool     wasRunning_ = false;
+    // Publish-policy bookkeeping (pass-start detect, running/idle edge
+    // detect, anchor latch) -- lives in the SDK-free ltglide::BusAnchor
+    // (ltglide_dsp.h) so it is unit-tested (tests/ltglide_dsp_test.cpp)
+    // without depending on the VST3 SDK.
+    ltglide::BusAnchor busAnchor_;
 
     // Publish this instance's record. Called from the audio thread.
     // hostStartSample is -1 when the host provides no valid continuous clock.
     void publishBusRecord(int64_t hostStartSample);
+```
+
+`BusAnchor` itself lives in `plugins/ltglide/source/ltglide_dsp.h`, next to
+`GlideTransport`: it is pure logic over `uint64_t`/`int64_t`/`bool` (no VST3
+dependency), so it belongs with the rest of the SDK-free DSP core rather than
+in the processor. It OWNS the pass-start/edge decisions; the processor still
+owns the actual `CalbusClient::publish()` call and record construction (see
+Step 8):
+
+```cpp
+class BusAnchor {
+public:
+    // Clears edge-detect state to what a fresh (re)activation looks like: no
+    // anchor carried over from a previous activation, no stale running/idle
+    // edge. lastPublishedPassCount seeds the pass-start detector so the
+    // first pass the transport reports AFTER this reset (whatever its value)
+    // is recognised as new, rather than compared against a stale baseline.
+    void reset(uint64_t lastPublishedPassCount) {
+        lastPublishedPass_ = lastPublishedPassCount;
+        lastPassStartSample_ = -1;
+        wasRunning_ = false;
+    }
+
+    // Per-sample pass-start detection. Returns true and sets *anchor exactly
+    // on the sample a new pass begins.
+    bool onSample(uint64_t passCount, int64_t blockStartSample, int sampleOffset, int64_t* anchor) {
+        if (passCount == lastPublishedPass_) return false;
+        lastPublishedPass_ = passCount;
+        lastPassStartSample_ = (blockStartSample >= 0) ? blockStartSample + sampleOffset : -1;
+        *anchor = lastPassStartSample_;
+        return true;
+    }
+
+    // Per-block running/idle edge detection. Returns true and sets *anchor to
+    // the LATCHED pass anchor (never -1 merely because running == false)
+    // exactly on the block where `running` differs from the previous call.
+    bool onRunningChanged(bool running, int64_t* anchor) {
+        if (running == wasRunning_) return false;
+        wasRunning_ = running;
+        *anchor = lastPassStartSample_;
+        return true;
+    }
+
+    int64_t lastPassStartSample() const { return lastPassStartSample_; }
+
+private:
+    uint64_t lastPublishedPass_ = 0;
+    int64_t  lastPassStartSample_ = -1;
+    bool     wasRunning_ = false;
+};
 ```
 
 and change the `processBlock` declaration (line ~63 area) to carry the host clock:
@@ -1650,13 +1698,18 @@ void LTGLIDEProcessor::publishBusRecord(int64_t hostStartSample) {
 }
 ```
 
-in `setActive()`, inside the activation branch (after `transport_.setLoop(...)`, line ~115). (Re)activation always lands in Idle (`transport_.reset()` never resumes a pass mid-way), so there is no pass to anchor yet — reset the edge-detect state too, or a reactivated instance carries a stale anchor / stale running-idle edge from before:
+in `setActive()`, inside the activation branch (after `transport_.setLoop(...)`, line ~115). (Re)activation always lands in Idle (`transport_.reset()` never resumes a pass mid-way), so there is no pass to anchor yet — reset the edge-detect state too (via `BusAnchor::reset()`), or a reactivated instance carries a stale anchor / stale running-idle edge from before:
 
 ```cpp
         busHandle_ = CalbusClient::instance().registerSlot();
-        lastPublishedPass_ = transport_.passCount();
-        lastPassStartSample_ = -1;
-        wasRunning_ = false;
+        busAnchor_.reset(transport_.passCount());
+        // NOTE (Spec 3 receiver): passCounter is monotone by design and is
+        // NOT reset above, so on a second-or-later activation this call pairs
+        // a carried-over passCounter (>0) with passStartSample=-1. That is
+        // only harmless if the receiver acts on passCounter INCREASES rather
+        // than its absolute value -- which is the documented reason the
+        // counter is monotone in the first place. Behaviour unchanged;
+        // flagged here for whoever implements that receiver.
         publishBusRecord(-1);
 ```
 
@@ -1694,17 +1747,17 @@ and pass it through both dispatch calls, e.g.:
     }
 ```
 
-In `processBlock` (line ~255), detect the pass start per sample and publish with the exact anchor. Inside the per-sample loop, after the `transport_.process()` tick, add:
+In `processBlock` (line ~255), detect the pass start per sample and publish with the exact anchor,
+via `BusAnchor::onSample()`. Inside the per-sample loop, after the `transport_.process()` tick, add:
 
 ```cpp
         // The tick that opens a pass is the head Dirac itself, so `i` is the
-        // pass's exact sample offset within this block.
-        const uint64_t pc = transport_.passCount();
-        if (pc != lastPublishedPass_) {
-            lastPublishedPass_ = pc;
-            lastPassStartSample_ = (blockStartSample >= 0) ? blockStartSample + i : -1;
-            publishBusRecord(lastPassStartSample_);
-        }
+        // pass's exact sample offset within this block. BusAnchor owns the
+        // pass-start detection and the anchor latch (see ltglide_dsp.h;
+        // unit-tested in tests/ltglide_dsp_test.cpp).
+        int64_t anchor = -1;
+        if (busAnchor_.onSample(transport_.passCount(), blockStartSample, i, &anchor))
+            publishBusRecord(anchor);
 ```
 
 After the loop, publish once more so `active` follows the transport — but do NOT do this by
@@ -1717,19 +1770,28 @@ COMPLETED pass becomes indistinguishable from one that was never anchored — th
 of a block, `running()` reads false at the tail of that same block and a false unanchored record
 goes out mid-measurement.
 
-Edge-detect the run/idle transition instead, and republish the LAST anchor rather than `-1`:
+Edge-detect the run/idle transition instead, via `BusAnchor::onRunningChanged()`, which republishes
+the LATCHED anchor rather than `-1`:
 
 ```cpp
-    const bool running = transport_.running();
-    if (running != wasRunning_) {
-        wasRunning_ = running;
-        publishBusRecord(lastPassStartSample_);
-    }
+    // Edge-detect the run/idle transition instead of publishing every idle
+    // block -- see BusAnchor's contract comment (ltglide_dsp.h) for why -1
+    // must never overwrite a completed pass's anchor, and why republishing
+    // that anchor also makes the mid-loop flicker (Wait->Idle landing on a
+    // block's last sample) harmless instead of a false unanchored record.
+    int64_t anchor = -1;
+    if (busAnchor_.onRunningChanged(transport_.running(), &anchor))
+        publishBusRecord(anchor);
 ```
 
 This keeps `active` following the transport (that is what this post-loop publish is for), makes
 the per-block heartbeat disappear, and reserves `-1` for its one contracted meaning. The mid-loop
 flicker becomes harmless too: it republishes the same record twice instead of a false one.
+
+`BusAnchor` (defined once, above, in Step 7) is the single source of truth for this bookkeeping —
+`processBlock` and `setActive` both drive it rather than keeping a parallel copy of the same
+decisions, which is what makes the pass-start detect, the edge detect, and the anchor latch
+unit-testable in isolation (`tests/ltglide_dsp_test.cpp`, `BusAnchor: ...` test cases).
 
 Update the explicit template instantiations at the bottom of the file (line ~290):
 

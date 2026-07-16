@@ -131,13 +131,18 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         prevGainLin_ = computeGainLin();
 
         busHandle_ = CalbusClient::instance().registerSlot();
-        lastPublishedPass_ = transport_.passCount();
         // (Re)activation always lands in Idle (see transport_.reset() above,
         // which never resumes a pass mid-way), so there is no pass to anchor
         // yet; reset the edge-detect state so a reactivated instance does not
         // carry a stale anchor or a stale running/idle edge from before.
-        lastPassStartSample_ = -1;
-        wasRunning_ = false;
+        busAnchor_.reset(transport_.passCount());
+        // NOTE (Spec 3 receiver): passCounter is monotone by design and is
+        // NOT reset above, so on a second-or-later activation this call pairs
+        // a carried-over passCounter (>0) with passStartSample=-1. That is
+        // only harmless if the receiver acts on passCounter INCREASES rather
+        // than its absolute value -- which is the documented reason the
+        // counter is monotone in the first place. Left as-is (behaviour
+        // unchanged); flagging here for whoever implements that receiver.
         publishBusRecord(-1);
     } else {
         CalbusClient::instance().unregisterSlot(busHandle_);
@@ -359,13 +364,12 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
             outputs[c][s] = out;
 
         // The tick that opens a pass is the head Dirac itself, so `s` is the
-        // pass's exact sample offset within this block.
-        const uint64_t pc = transport_.passCount();
-        if (pc != lastPublishedPass_) {
-            lastPublishedPass_ = pc;
-            lastPassStartSample_ = (blockStartSample >= 0) ? blockStartSample + s : -1;
-            publishBusRecord(lastPassStartSample_);
-        }
+        // pass's exact sample offset within this block. BusAnchor owns the
+        // pass-start detection and the anchor latch (see ltglide_dsp.h;
+        // unit-tested in tests/ltglide_dsp_test.cpp).
+        int64_t anchor = -1;
+        if (busAnchor_.onSample(transport_.passCount(), blockStartSample, s, &anchor))
+            publishBusRecord(anchor);
     }
     prevGainLin_ = targetGain;
 
@@ -374,17 +378,14 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
     // gave no valid continuous clock"), so an idle heartbeat that republished
     // passStartSample=-1 every block would make a COMPLETED pass (passCounter
     // already at N) indistinguishable from a pass that was never anchored.
-    // Republishing lastPassStartSample_ here keeps `active` following the
-    // transport while the anchor of the pass that just finished survives
-    // into the idle record — which is exactly what Spec 3 reads after a
-    // capture ends. A mid-loop flicker (Wait->Idle->beginPass landing on the
-    // last sample of a block) now just republishes the same record twice
-    // instead of emitting a false unanchored one.
-    const bool running = transport_.running();
-    if (running != wasRunning_) {
-        wasRunning_ = running;
-        publishBusRecord(lastPassStartSample_);
-    }
+    // BusAnchor::onRunningChanged republishes the LATCHED anchor of the pass
+    // that just finished instead of -1 — which is exactly what Spec 3 reads
+    // after a capture ends. A mid-loop flicker (Wait->Idle->beginPass landing
+    // on the last sample of a block) now just republishes the same record
+    // twice instead of emitting a false unanchored one.
+    int64_t anchor = -1;
+    if (busAnchor_.onRunningChanged(transport_.running(), &anchor))
+        publishBusRecord(anchor);
 }
 
 template void LTGLIDEProcessor::processBlock<float>(float**, int, int, int64_t);

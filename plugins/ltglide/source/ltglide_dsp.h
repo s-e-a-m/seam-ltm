@@ -149,4 +149,68 @@ private:
     uint64_t passCounter_ = 0;
 };
 
+// Bus-publish bookkeeping (calbus, Spec 2): decides WHEN to publish and WHAT
+// anchor to publish, without touching the bus itself. SDK-free and pure
+// logic over primitives (uint64_t/int64_t/bool), so the processor's publish
+// policy is unit-testable even though CalbusClient/SeamCalbusRecord are not
+// (see ltglide_processor.h/.cpp, which own the actual publish() calls).
+//
+// Two independent edges feed the calibration bus:
+//   - a NEW PASS starting mid-block (per-sample, via onSample());
+//   - the transport's running/idle state CHANGING across a block boundary
+//     (per-block, via onRunningChanged()).
+//
+// The load-bearing rule (seam_calbus.h's passStartSample contract): -1 means
+// exactly one thing, "no valid host clock for this pass's anchor" -- never
+// "the transport happens to be idle right now". A completed pass's anchor
+// must therefore survive the run->idle transition instead of being
+// overwritten by an unconditional -1 heartbeat. lastPassStartSample() latches
+// that anchor, and onRunningChanged() republishes it -- not -1.
+class BusAnchor {
+public:
+    // Clears edge-detect state to what a fresh (re)activation looks like: no
+    // anchor carried over from a previous activation, no stale running/idle
+    // edge. lastPublishedPassCount seeds the pass-start detector so the
+    // first pass the transport reports AFTER this reset (whatever its value)
+    // is recognised as new, rather than compared against a stale baseline.
+    void reset(uint64_t lastPublishedPassCount) {
+        lastPublishedPass_ = lastPublishedPassCount;
+        lastPassStartSample_ = -1;
+        wasRunning_ = false;
+    }
+
+    // Per-sample pass-start detection. `passCount` is the transport's
+    // monotone counter as of the CURRENT sample; `blockStartSample` is the
+    // host's continuousTimeSamples anchor for sample 0 of this block (-1 if
+    // the host clock is invalid this block); `sampleOffset` is this sample's
+    // index within the block -- the reviewed-and-unchanged head-Dirac
+    // arithmetic (blockStartSample + sampleOffset), just relocated here.
+    // Returns true and sets *anchor exactly on the sample a new pass begins.
+    bool onSample(uint64_t passCount, int64_t blockStartSample, int sampleOffset, int64_t* anchor) {
+        if (passCount == lastPublishedPass_) return false;
+        lastPublishedPass_ = passCount;
+        lastPassStartSample_ = (blockStartSample >= 0) ? blockStartSample + sampleOffset : -1;
+        *anchor = lastPassStartSample_;
+        return true;
+    }
+
+    // Per-block running/idle edge detection. Returns true and sets *anchor to
+    // the LATCHED pass anchor (never -1 merely because running == false)
+    // exactly on the block where `running` differs from the previous call
+    // (or from the post-reset baseline of false).
+    bool onRunningChanged(bool running, int64_t* anchor) {
+        if (running == wasRunning_) return false;
+        wasRunning_ = running;
+        *anchor = lastPassStartSample_;
+        return true;
+    }
+
+    int64_t lastPassStartSample() const { return lastPassStartSample_; }
+
+private:
+    uint64_t lastPublishedPass_ = 0;
+    int64_t  lastPassStartSample_ = -1;
+    bool     wasRunning_ = false;
+};
+
 }} // namespace Seam::ltglide

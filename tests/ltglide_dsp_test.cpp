@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 #include "ltglide_dsp.h"
+#include <algorithm>
 #include <cmath>
 
 using namespace Seam::ltglide;
@@ -263,4 +264,229 @@ TEST_CASE("passCount survives reset() and prepare()") {
     CHECK(n >= 1u);
     t.reset();          CHECK(t.passCount() == n);
     t.prepare(96000.0); CHECK(t.passCount() == n);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// BusAnchor -- the calbus publish-policy bookkeeping extracted from
+// LTGLIDEProcessor (ltglide_processor.cpp). SDK-free, pure logic over
+// uint64_t/int64_t/bool, so it is exercised here exactly as it runs in the
+// processor: per-sample onSample() calls inside a block's loop, then one
+// onRunningChanged() call after the loop -- mirroring
+// LTGLIDEProcessor::processBlock's own structure.
+// ─────────────────────────────────────────────────────────────────────────
+
+static constexpr int64_t kNoPublish = -999999;
+
+// Drives `numSamples` samples of `t` through `anchor`, exactly mirroring
+// LTGLIDEProcessor::processBlock's bookkeeping: per-sample pass-start
+// detection via onSample(), then one post-loop onRunningChanged() check --
+// i.e. one simulated host audio block. `blockStartSample` is the host clock
+// anchor for sample 0 of this block (-1 = invalid host clock this block).
+// Returns the LAST anchor published during this block (by either onSample()
+// or onRunningChanged()), or kNoPublish if nothing was published.
+// `runningEdgeFired`, if non-null, reports whether onRunningChanged() itself
+// fired this block (distinct from a pass-start firing).
+static int64_t driveBlock(GlideTransport& t, BusAnchor& anchor,
+                           int64_t blockStartSample, int numSamples,
+                           bool* runningEdgeFired = nullptr) {
+    int64_t last = kNoPublish;
+    for (int s = 0; s < numSamples; ++s) {
+        t.process();
+        int64_t a;
+        if (anchor.onSample(t.passCount(), blockStartSample, s, &a)) last = a;
+    }
+    int64_t a;
+    const bool fired = anchor.onRunningChanged(t.running(), &a);
+    if (fired) last = a;
+    if (runningEdgeFired) *runningEdgeFired = fired;
+    return last;
+}
+
+TEST_CASE("BusAnchor: a pass's anchor survives the transport going idle") {
+    const double fs = 48000.0;
+    using GT = GlideTransport;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);
+    t.setLoop(false);
+    BusAnchor anchor;
+    anchor.reset(t.passCount());
+    t.trigger();
+
+    const int64_t blockStart = 100000;
+
+    // Block A: just the head Dirac sample -- registers the idle->running
+    // edge and latches the pass's real anchor.
+    const int64_t blockAAnchor = driveBlock(t, anchor, blockStart, 1);
+    CHECK(t.running());
+    CHECK(blockAAnchor == blockStart);
+
+    // Block B: drain the rest of the pass (lead + glide + tail + tail Dirac)
+    // to completion, under a DIFFERENT (and irrelevant) block-start clock
+    // value, to prove the FINAL published anchor is the LATCHED pass
+    // anchor from Block A, not this block's own clock.
+    const long remaining = (long)((GT::kLeadSec + 1.0 + GT::kTailSec) * fs) + 16;
+    const int64_t blockBAnchor = driveBlock(t, anchor, /*blockStartSample=*/999999, (int)remaining);
+
+    CHECK_FALSE(t.running());                 // pass completed -> idle
+    // The running->idle edge publish must carry the ORIGINAL pass anchor,
+    // never this block's unrelated clock value and never -1.
+    CHECK(blockBAnchor == blockStart);
+    CHECK(blockBAnchor != -1);
+    CHECK(anchor.lastPassStartSample() == blockStart);
+}
+
+TEST_CASE("BusAnchor: -1 is published only when the host clock is invalid, never merely because the transport is idle") {
+    const double fs = 48000.0;
+    using GT = GlideTransport;
+    const long remaining = (long)((GT::kLeadSec + 1.0 + GT::kTailSec) * fs) + 16;
+
+    // Case A: valid host clock at pass start -> the running->idle edge that
+    // fires when the pass later completes must NOT be -1.
+    {
+        GlideTransport t;
+        t.prepare(fs); t.setSweepSeconds(1.0); t.setLoop(false);
+        BusAnchor anchor;
+        anchor.reset(t.passCount());
+        t.trigger();
+        driveBlock(t, anchor, /*blockStart=*/42, 1);       // head Dirac, valid clock
+        CHECK(t.running());
+        const int64_t idleAnchor = driveBlock(t, anchor, /*blockStart=*/-1, (int)remaining);
+        CHECK_FALSE(t.running());
+        CHECK(idleAnchor != -1);      // idling alone must not manufacture -1
+        CHECK(idleAnchor == 42);
+    }
+
+    // Case B: invalid host clock (-1) at pass start -> the pass genuinely
+    // has no anchor, so BOTH the pass-start publish and the later idle-edge
+    // publish are legitimately -1. This -1 means "no valid host clock", not
+    // "the transport is idle" -- distinguishing the two is the whole point.
+    {
+        GlideTransport t;
+        t.prepare(fs); t.setSweepSeconds(1.0); t.setLoop(false);
+        BusAnchor anchor;
+        anchor.reset(t.passCount());
+        t.trigger();
+        const int64_t startAnchor = driveBlock(t, anchor, /*blockStart=*/-1, 1);
+        CHECK(startAnchor == -1);
+        CHECK(t.running());
+        const int64_t idleAnchor = driveBlock(t, anchor, /*blockStart=*/12345, (int)remaining);
+        CHECK_FALSE(t.running());
+        CHECK(idleAnchor == -1);      // still -1: genuinely no clock, not "idle => -1"
+    }
+}
+
+TEST_CASE("BusAnchor: reactivation clears stale edge state (no spurious edge, no stale anchor)") {
+    const double fs = 48000.0;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);
+    t.setLoop(false);
+    BusAnchor anchor;
+    anchor.reset(t.passCount());
+
+    // First activation: trigger a pass and get partway into it -- still
+    // running, so wasRunning_ ends up true. This mirrors a host that
+    // deactivates the plugin mid-pass (setActive(false) can land anywhere).
+    t.trigger();
+    driveBlock(t, anchor, /*blockStart=*/7777, 1);       // head Dirac: idle->running edge
+    CHECK(t.running());
+    for (int i = 0; i < 100; ++i) t.process();           // still mid-pass, still running
+    CHECK(t.running());
+    CHECK(anchor.lastPassStartSample() == 7777);
+
+    // Simulate deactivate/reactivate, mirroring setActive(true): transport
+    // .reset() forces Idle without resuming mid-way, then anchor.reset()
+    // runs with the CARRIED-OVER (monotone) pass counter.
+    t.reset();
+    CHECK_FALSE(t.running());
+    anchor.reset(t.passCount());
+    CHECK(anchor.lastPassStartSample() == -1);    // stale anchor cleared
+
+    // The transport is Idle right after reactivation, exactly as it was
+    // before this check. If reset() failed to also clear wasRunning_ (it was
+    // true, from the mid-pass deactivation above), this call would spuriously
+    // report a running->idle edge that never actually happened this
+    // activation. It must NOT fire.
+    int64_t a;
+    CHECK_FALSE(anchor.onRunningChanged(t.running(), &a));
+
+    // Trigger a SECOND pass: its anchor must be fresh, never the stale 7777
+    // from the previous activation.
+    t.trigger();
+    const int64_t secondAnchor = driveBlock(t, anchor, /*blockStart=*/9999, 1);
+    CHECK(secondAnchor == 9999);
+    CHECK(anchor.lastPassStartSample() == 9999);
+    CHECK(anchor.lastPassStartSample() != 7777);
+}
+
+TEST_CASE("BusAnchor: running/idle edge fires exactly once per transition, not once per block") {
+    const double fs = 48000.0;
+    using GT = GlideTransport;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);
+    t.setLoop(false);
+    BusAnchor anchor;
+    anchor.reset(t.passCount());
+    t.trigger();
+
+    const long total = (long)((GT::kLeadSec + 1.0 + GT::kTailSec) * fs) + 16;
+    const int  blockSize = 64;        // many small blocks, like real audio callbacks
+    int  edgeCount = 0;
+    long done = 0;
+    while (done < total) {
+        const int n = (int)std::min<long>(blockSize, total - done);
+        bool fired = false;
+        driveBlock(t, anchor, 1000 + done, n, &fired);
+        if (fired) ++edgeCount;
+        done += n;
+    }
+    CHECK_FALSE(t.running());
+    // Two transitions happened across ~thousands of blocks: idle->running at
+    // the pass's start, running->idle when it completes. Each must fire its
+    // edge EXACTLY once, not once per block.
+    CHECK(edgeCount == 2);
+}
+
+TEST_CASE("BusAnchor: no false unanchored record when a running/idle transition lands on a block boundary (mid-loop flicker)") {
+    const double fs = 48000.0;
+    using GT = GlideTransport;
+    GlideTransport t;
+    t.prepare(fs);
+    t.setSweepSeconds(1.0);
+    t.setLoop(true);
+    BusAnchor anchor;
+    anchor.reset(t.passCount());
+
+    // Exact call count for ONE full looped pass cycle: head Dirac (1) + lead
+    // + glide + tail (body) + tail Dirac (1) + wait, ending on the exact
+    // call where Wait -> Idle happens -- the boundary the old unconditional
+    // "publish -1 while idle" code mishandled (Wait->Idle landing on a
+    // block's last sample used to publish active=0, passStartSample=-1 for
+    // a still-running pass sequence).
+    const long leadN  = (long)(GT::kLeadSec * fs);
+    const long tailN  = (long)(GT::kTailSec * fs);
+    const long waitN  = (long)(GT::kWaitSec * fs);
+    const long glideN = (long)(1.0 * fs);
+    const long cycleCalls = 1 + leadN + glideN + tailN + 1 + waitN;
+
+    // Block 1 spans exactly one cycle, so its LAST sample is the Wait->Idle
+    // transition.
+    const int64_t block1Start = 55555;
+    const int64_t block1Anchor = driveBlock(t, anchor, block1Start, (int)cycleCalls);
+    CHECK_FALSE(t.running());
+    // The running->idle edge at the block boundary must carry pass 1's REAL
+    // anchor -- not a false -1. This is the crux of this test.
+    CHECK(block1Anchor == block1Start);
+    CHECK(block1Anchor != -1);
+
+    // Block 2 begins on its very FIRST sample with pass 2 (Idle+loop
+    // triggers immediately inside GlideTransport::process()), and again
+    // spans one full cycle.
+    const int64_t block2Start = 66666;
+    const int64_t block2Anchor = driveBlock(t, anchor, block2Start, (int)cycleCalls);
+    CHECK_FALSE(t.running());
+    CHECK(block2Anchor == block2Start);       // fresh anchor, not leaked from pass 1
+    CHECK(block2Anchor != block1Start);
 }
