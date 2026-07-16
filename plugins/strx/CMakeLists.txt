@@ -10,7 +10,9 @@ set(strx_sources
     ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/vstsinglecomponenteffect.h
     source/strx_ids.h
     source/strx_dsp.h
+    source/strx_goniometer.h
     source/strx_meters.h
+    source/strx_spectrum.h
     source/strx_processor.cpp
     source/strx_processor.h
     source/version.h
