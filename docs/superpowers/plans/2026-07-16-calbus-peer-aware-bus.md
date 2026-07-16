@@ -4,7 +4,7 @@
 
 **Goal:** Emitter plugins (multipink, ltglide) publish what they are playing on a shared calibration bus, and strx displays which emitter it hears.
 
-**Architecture:** Static state does not cross `.vst3` module boundaries, so the shared registry lives in a separate `libseamcalbus.dylib` loaded at runtime via `dlopen` and reached through a pure C ABI. The registry is 32 fixed POD slots, each guarded by a seqlock so audio-thread writers never block on the GUI-thread reader. Every failure path degrades to a silent no-op: the bus is an observer and may never stop a plugin from making sound.
+**Architecture:** Static state does not cross `.vst3` module boundaries, so the shared registry lives in a separate `libseamcalbus.dylib` loaded at runtime via `dlopen` and reached through a pure C ABI. The registry is 32 fixed POD slots, each guarded by a seqlock so audio-thread writers never block on the GUI-thread reader, plus a per-slot registration epoch (`gen`) that makes registration churn — the normal case, since plugins are activated and deactivated constantly — visible to the reader. The seqlock alone cannot do this: it serialises record writes against record reads, but it cannot tell a reader that the slot changed owner mid-copy. Every failure path degrades to a silent no-op: the bus is an observer and may never stop a plugin from making sound.
 
 **Tech Stack:** C++17, VST3 SDK (`SingleComponentEffect`, `VST3EditorDelegate`), VSTGUI (`CView`, `CVSTGUITimer`), CMake, doctest.
 
@@ -40,7 +40,9 @@ Design doc: `docs/superpowers/specs/2026-07-16-calbus-peer-aware-bus-design.md`
 - Produces: the C ABI used by every later task —
   `uint32_t seam_calbus_v1_version(void)`;
   `SeamCalbus* seam_calbus_v1_get(void)`;
-  `int32_t seam_calbus_v1_register(SeamCalbus*)` → handle `0..31`, or `-1` when full;
+  `int32_t seam_calbus_v1_register(SeamCalbus*)` → an opaque non-negative handle
+  (registration epoch packed with the slot index — NOT a slot index, do not
+  index with it), or `-1` when full;
   `void seam_calbus_v1_unregister(SeamCalbus*, int32_t handle)`;
   `void seam_calbus_v1_publish(SeamCalbus*, int32_t handle, const SeamCalbusRecord*)` (RT-safe);
   `int32_t seam_calbus_v1_snapshot(SeamCalbus*, SeamCalbusRecord* out, int32_t maxCount)` → count written.
@@ -56,12 +58,20 @@ Create `tests/seam_calbus_test.cpp`:
 #include "seam_calbus.h"
 
 #include <atomic>
+#include <cstring>
 #include <thread>
 #include <vector>
 
+// Records are grouped into registration epochs: n = epoch * kEpochStride + i.
+// The epoch is recoverable from any single field, which is what lets the churn
+// test below tell "this emitter's record" from "the previous emitter's record".
+static constexpr uint64_t kEpochStride = 1000000ull;
+
 // The tearing probe: every field is derived from one counter n, so a torn
 // read (half of record n, half of record n+1) breaks the cross-field
-// invariant even though each individual field looks plausible.
+// invariant even though each individual field looks plausible. The derived
+// fields are spread across the whole struct — head, middle and union tail — so
+// a tear at any offset shows up.
 static SeamCalbusRecord makeProbe(uint64_t n) {
     SeamCalbusRecord r{};
     r.kind    = kSeamCalbusGlide;
@@ -70,17 +80,38 @@ static SeamCalbusRecord makeProbe(uint64_t n) {
     r.levelDb = -(double)(n % 100);
     r.sampleRate = 48000.0;
     r.u.glide.passCounter = n;
+    r.u.glide.passStartSample = (int64_t)n;
     r.u.glide.f0 = (double)n;
     r.u.glide.f1 = (double)n;
+    r.u.glide.durationSec = (double)(n % 37);
+    r.u.glide.deltaSec    = (double)(n % 53);
+    r.u.glide.sweepMode   = (uint32_t)(n & 1u);
+    r.u.glide.diracMode   = (uint32_t)((n >> 1) & 1u);
     return r;
 }
 
 static bool probeIsConsistent(const SeamCalbusRecord& r) {
     const uint64_t n = r.u.glide.passCounter;
-    return r.u.glide.f0 == (double)n
+    return r.kind    == (uint32_t)kSeamCalbusGlide
+        && r.active  == 1
+        && r.sampleRate == 48000.0
+        && r.u.glide.passStartSample == (int64_t)n
+        && r.u.glide.f0 == (double)n
         && r.u.glide.f1 == (double)n
+        && r.u.glide.durationSec == (double)(n % 37)
+        && r.u.glide.deltaSec    == (double)(n % 53)
+        && r.u.glide.sweepMode   == (uint32_t)(n & 1u)
+        && r.u.glide.diracMode   == (uint32_t)((n >> 1) & 1u)
         && r.stoneId == (uint32_t)(n % 9)
         && r.levelDb == -(double)(n % 100);
+}
+
+// A slot that is registered but has not published yet legitimately reads back
+// all-zero. That is the ONLY all-zero record a correct reader may return; a
+// record that is part zero and part probe is a tear.
+static bool isFresh(const SeamCalbusRecord& r) {
+    SeamCalbusRecord zero{};
+    return std::memcmp(&r, &zero, sizeof(SeamCalbusRecord)) == 0;
 }
 
 TEST_CASE("version reports 1") {
@@ -131,6 +162,44 @@ TEST_CASE("snapshot returns only registered slots and their last record") {
     CHECK(n == 0);
 }
 
+TEST_CASE("a reclaimed slot never exposes the previous owner's record") {
+    SeamCalbus* bus = seam_calbus_v1_get();
+    int32_t first = seam_calbus_v1_register(bus);
+    SeamCalbusRecord in = makeProbe(99);
+    seam_calbus_v1_publish(bus, first, &in);
+    seam_calbus_v1_unregister(bus, first);
+
+    int32_t second = seam_calbus_v1_register(bus);
+    SeamCalbusRecord out[SEAM_CALBUS_MAX_SLOTS];
+    CHECK(seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS) == 1);
+    CHECK(isFresh(out[0]));
+    seam_calbus_v1_unregister(bus, second);
+}
+
+TEST_CASE("a stale handle cannot publish into or evict the slot's new owner") {
+    SeamCalbus* bus = seam_calbus_v1_get();
+    int32_t stale = seam_calbus_v1_register(bus);
+    CHECK(stale >= 0);
+    seam_calbus_v1_unregister(bus, stale);
+
+    int32_t fresh = seam_calbus_v1_register(bus);   // reclaims the same slot
+    CHECK(fresh >= 0);
+    CHECK(fresh != stale);                          // the epoch moved
+
+    SeamCalbusRecord r = makeProbe(42);
+    seam_calbus_v1_publish(bus, stale, &r);         // must be dropped
+
+    SeamCalbusRecord out[SEAM_CALBUS_MAX_SLOTS];
+    CHECK(seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS) == 1);
+    CHECK(isFresh(out[0]));            // the new owner's record is untouched
+
+    seam_calbus_v1_unregister(bus, stale);          // must not evict `fresh`
+    CHECK(seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS) == 1);
+
+    seam_calbus_v1_unregister(bus, fresh);
+    CHECK(seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS) == 0);
+}
+
 TEST_CASE("seqlock: reader never observes a torn record under a hammering writer") {
     SeamCalbus* bus = seam_calbus_v1_get();
     int32_t h = seam_calbus_v1_register(bus);
@@ -140,14 +209,23 @@ TEST_CASE("seqlock: reader never observes a torn record under a hammering writer
         for (uint64_t n = 0; !stop.load(std::memory_order_relaxed); ++n) {
             SeamCalbusRecord r = makeProbe(n);
             seam_calbus_v1_publish(bus, h, &r);
+            // A real emitter publishes at most once per audio block. An
+            // unbroken tight loop is not a harder test, it is a different one:
+            // it just starves the reader into its retry limit, which proves
+            // nothing about tearing and makes any liveness assertion vacuous.
+            std::this_thread::yield();
         }
     });
 
-    int torn = 0, reads = 0;
-    for (int i = 0; i < 200000; ++i) {
+    constexpr int kIterations = 200000;
+    int torn = 0, fresh = 0, reads = 0;
+    for (int i = 0; i < kIterations; ++i) {
         SeamCalbusRecord out[SEAM_CALBUS_MAX_SLOTS];
         if (seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS) == 1) {
             ++reads;
+            // Registered but not published yet: the writer thread has not been
+            // scheduled for its first publish. Legitimately all-zero.
+            if (isFresh(out[0])) { ++fresh; continue; }
             if (!probeIsConsistent(out[0])) ++torn;
         }
     }
@@ -155,17 +233,85 @@ TEST_CASE("seqlock: reader never observes a torn record under a hammering writer
     writer.join();
     seam_calbus_v1_unregister(bus, h);
 
-    CHECK(reads > 0);     // the probe actually exercised the lock
+    MESSAGE("hammer: reads=" << reads << " fresh=" << fresh << " torn=" << torn);
     CHECK(torn == 0);
+    // The slot stays registered for the whole run and the writer never blocks,
+    // so the reader should succeed essentially always. "reads > 0" would let a
+    // reader that gives up 199999 times out of 200000 pass.
+    CHECK(reads > kIterations * 9 / 10);
+}
+
+// The test the two Critical bugs lived under. The hammer above exercises ONE
+// writer on ONE permanently-registered slot — the configuration that already
+// worked. Registration churn concurrent with snapshot() is the NORMAL case for
+// this bus (plugins are activated and deactivated constantly), and it is where
+// both bugs were: register()'s memset outside the seqlock, and inUse's
+// inability to see release-then-reclaim.
+TEST_CASE("churn: reader never observes a torn or phantom record while slots churn") {
+    SeamCalbus* bus = seam_calbus_v1_get();
+    std::atomic<bool> stop{false};
+
+    // Announced BEFORE the register that opens the epoch, so at any instant the
+    // bus's live epoch is <= liveEpoch. Hence a returned record whose epoch is
+    // strictly below the value read before snapshot() started is proof the
+    // reader emitted a record from an epoch that had already been unregistered
+    // — a phantom.
+    std::atomic<uint64_t> liveEpoch{0};
+
+    std::thread churn([&] {
+        for (uint64_t epoch = 1; !stop.load(std::memory_order_relaxed); ++epoch) {
+            liveEpoch.store(epoch, std::memory_order_release);
+            int32_t h = seam_calbus_v1_register(bus);
+            if (h < 0) continue;
+            // Few publishes per epoch, no pacing: what this test hunts is the
+            // register()/unregister() race against snapshot(), so the epoch
+            // turnover rate is the knob that matters, not the publish rate.
+            for (uint64_t i = 0; i < 2; ++i) {
+                SeamCalbusRecord r = makeProbe(epoch * kEpochStride + i);
+                seam_calbus_v1_publish(bus, h, &r);
+            }
+            seam_calbus_v1_unregister(bus, h);
+        }
+    });
+
+    constexpr int kIterations = 200000;
+    int torn = 0, phantom = 0, fresh = 0, reads = 0;
+    for (int i = 0; i < kIterations; ++i) {
+        SeamCalbusRecord out[SEAM_CALBUS_MAX_SLOTS];
+        const uint64_t e0 = liveEpoch.load(std::memory_order_acquire);
+        const int32_t n = seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS);
+        const uint64_t e1 = liveEpoch.load(std::memory_order_acquire);
+        if (n == 0) continue;
+        ++reads;
+        for (int32_t k = 0; k < n; ++k) {
+            if (isFresh(out[k])) { ++fresh; continue; }  // registered, unpublished
+            if (!probeIsConsistent(out[k])) { ++torn; continue; }
+            const uint64_t e = out[k].u.glide.passCounter / kEpochStride;
+            if (e < e0 || e > e1) ++phantom;
+        }
+    }
+    stop.store(true);
+    churn.join();
+
+    MESSAGE("churn: reads=" << reads << " fresh=" << fresh
+            << " torn=" << torn << " phantom=" << phantom);
+    CHECK(torn == 0);
+    CHECK(phantom == 0);
+    // Liveness: the churn thread is registered for the overwhelming majority of
+    // its cycle, so a reader that almost never returns a record is broken.
+    CHECK(reads > kIterations / 10);
 }
 
 TEST_CASE("publish with an invalid handle is a silent no-op") {
     SeamCalbus* bus = seam_calbus_v1_get();
     SeamCalbusRecord r = makeProbe(1);
     seam_calbus_v1_publish(bus, -1, &r);
-    seam_calbus_v1_publish(bus, SEAM_CALBUS_MAX_SLOTS, &r);
     seam_calbus_v1_publish(nullptr, 0, &r);
     seam_calbus_v1_publish(bus, 0, nullptr);
+    // Handles are opaque epoch+index tokens; a forged one belongs to no live
+    // epoch and is dropped.
+    seam_calbus_v1_publish(bus, 0x7FFFFFFF, &r);
+    seam_calbus_v1_unregister(bus, 0x7FFFFFFF);
     SeamCalbusRecord out[SEAM_CALBUS_MAX_SLOTS];
     CHECK(seam_calbus_v1_snapshot(bus, out, SEAM_CALBUS_MAX_SLOTS) == 0);
 }
@@ -274,19 +420,31 @@ SEAM_CALBUS_API uint32_t seam_calbus_v1_version(void);
 // The process-wide registry. Never null.
 SEAM_CALBUS_API SeamCalbus* seam_calbus_v1_get(void);
 
-// Claim a slot. Returns a handle in [0, SEAM_CALBUS_MAX_SLOTS), or -1 when the
+// Claim a slot. Returns an OPAQUE, non-negative handle, or -1 when the
 // registry is full. Takes a mutex — call from setActive, never from process().
+//
+// The handle is NOT a slot index: it packs the slot's registration epoch
+// alongside the index, which is what lets publish() and unregister() reject a
+// handle whose slot has since been reclaimed by another plugin. Store it,
+// compare it to -1, hand it back — never index anything with it, never assume
+// a range beyond "non-negative".
 SEAM_CALBUS_API int32_t seam_calbus_v1_register(SeamCalbus* bus);
 
-// Release a slot. Safe with handle == -1. Takes a mutex.
+// Release a slot. Safe with handle == -1. A stale handle (already released,
+// slot since reclaimed) is a no-op and cannot evict the current owner.
+// Takes a mutex.
 SEAM_CALBUS_API void seam_calbus_v1_unregister(SeamCalbus* bus, int32_t handle);
 
 // Overwrite a slot's record. RT-SAFE: wait-free, no allocation, no lock.
-// Safe to call from the audio thread. Invalid arguments are silent no-ops.
+// Safe to call from the audio thread. Invalid or stale handles are silent
+// no-ops, so publishing after unregistering cannot corrupt the next owner.
 SEAM_CALBUS_API void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
                                             const SeamCalbusRecord* rec);
 
 // Copy every registered slot's record into `out`. Returns the count written.
+// A record is only emitted when the slot stayed registered to one single
+// owner for the whole copy, so a snapshot never mixes two emitters' data and
+// never attributes a departed emitter's record to its successor.
 // The reader may retry on a torn read and gives up on a slot after a bounded
 // number of attempts, so a GUI timer can never spin forever.
 SEAM_CALBUS_API int32_t seam_calbus_v1_snapshot(SeamCalbus* bus,
@@ -324,14 +482,71 @@ namespace {
 // blocked (increment, write, increment — constant time), and only the reader
 // may have to retry. Producer = audio thread, consumer = GUI: the GUI is the
 // one that can afford to spin.
+//
+// THE SEQLOCK ALONE IS NOT ENOUGH. It serialises *record writes* against
+// *record reads*, but registration churn is the normal case here (plugins are
+// activated and deactivated constantly), and churn is a second, independent
+// axis of change:
+//
+//   - Anything that touches `rec` must go through the seqlock, publish() and
+//     register()'s memset alike. A memset outside the seqlock leaves `seq`
+//     even and unchanged for the whole race, so the reader's s1 == s2 check —
+//     the only thing that can reject a torn read — cannot fire, and the reader
+//     accepts a half-old/half-zeroed record as valid.
+//
+//   - `inUse` cannot detect ABA. A reader that checks inUse, copies, and
+//     re-checks inUse sees 1 both times when the slot was released AND
+//     reclaimed during the copy, and would emit the previous owner's record
+//     attributed to the new owner. Hence `gen` below.
 struct Slot {
     std::atomic<uint32_t> seq{0};     // odd = write in progress, even = stable
     std::atomic<uint32_t> inUse{0};
+
+    // Registration epoch. Bumped under regMutex on BOTH register and
+    // unregister, so it changes on every ownership transition and never
+    // returns to an earlier value (within the 26-bit window). It is the ABA
+    // guard the seqlock cannot provide: the reader captures {gen, inUse}
+    // before and after the copy and only accepts the record when both are
+    // unchanged, which means one uninterrupted registration epoch spanned the
+    // whole copy.
+    std::atomic<uint32_t> gen{0};
+
     SeamCalbusRecord      rec{};
 };
 
 // Bounded retries: a GUI timer must return, even against a pathological writer.
 constexpr int kMaxReadAttempts = 8;
+
+// Handle layout: gen in the high bits, slot index in the low bits.
+//
+// The handle is an opaque token, NOT a slot index. Packing the registration
+// epoch into it is what lets publish() reject a stale handle for free: one
+// relaxed load and a compare, no lock, no allocation, bounded time — still
+// wait-free and still audio-thread-safe. Without it, a plugin that publishes
+// after unregistering silently corrupts whichever plugin now owns that slot.
+//
+// 5 bits of index (32 slots) + 26 bits of gen = 31 bits, so a handle is always
+// non-negative and -1 stays the unambiguous "no slot" value. gen wraps after
+// 2^26 registrations of the SAME slot; an ABA collision would need exactly
+// that many register/unregister cycles inside one snapshot() call.
+constexpr int32_t  kIndexBits = 5;
+constexpr int32_t  kIndexMask = (1 << kIndexBits) - 1;
+constexpr uint32_t kGenMask   = 0x03FFFFFFu;
+
+static_assert(SEAM_CALBUS_MAX_SLOTS <= kIndexMask + 1,
+              "slot index must fit in kIndexBits");
+
+inline int32_t encodeHandle(int32_t index, uint32_t gen) {
+    return (int32_t)(((gen & kGenMask) << kIndexBits) | (uint32_t)index);
+}
+
+inline int32_t handleIndex(int32_t handle) {
+    return handle & kIndexMask;
+}
+
+inline uint32_t handleGen(int32_t handle) {
+    return ((uint32_t)handle >> kIndexBits) & kGenMask;
+}
 
 } // namespace
 
@@ -356,25 +571,63 @@ int32_t seam_calbus_v1_register(SeamCalbus* bus) {
     if (!bus) return -1;
     std::lock_guard<std::mutex> lock(bus->regMutex);
     for (int32_t i = 0; i < SEAM_CALBUS_MAX_SLOTS; ++i) {
-        if (bus->slots[i].inUse.load(std::memory_order_relaxed) == 0) {
-            std::memset(&bus->slots[i].rec, 0, sizeof(SeamCalbusRecord));
-            bus->slots[i].inUse.store(1, std::memory_order_release);
-            return i;
-        }
+        Slot& s = bus->slots[i];
+        if (s.inUse.load(std::memory_order_relaxed) != 0) continue;
+
+        // Clear the previous owner's record — a fresh slot must never expose
+        // it — through the SAME seqlock publish() uses. snapshot() does not
+        // take regMutex (it must not: the GUI would then be able to stall on
+        // a registering plugin), so regMutex does nothing to protect this
+        // memset from a concurrent reader. Only the odd/even dance does.
+        const uint32_t start = s.seq.load(std::memory_order_relaxed);
+        s.seq.store(start + 1, std::memory_order_relaxed);        // -> odd
+        std::atomic_thread_fence(std::memory_order_release);
+        std::memset(&s.rec, 0, sizeof(SeamCalbusRecord));
+        std::atomic_thread_fence(std::memory_order_release);
+        s.seq.store(start + 2, std::memory_order_relaxed);        // -> even
+
+        // Open the new epoch, then advertise the slot. Both are release
+        // stores, so a reader that observes them also observes the cleared
+        // record and the seq bumps that precede them.
+        const uint32_t g =
+            (s.gen.load(std::memory_order_relaxed) + 1u) & kGenMask;
+        s.gen.store(g, std::memory_order_release);
+        s.inUse.store(1, std::memory_order_release);
+        return encodeHandle(i, g);
     }
     return -1;
 }
 
 void seam_calbus_v1_unregister(SeamCalbus* bus, int32_t handle) {
-    if (!bus || handle < 0 || handle >= SEAM_CALBUS_MAX_SLOTS) return;
+    if (!bus || handle < 0) return;
+    Slot& s = bus->slots[handleIndex(handle)];
     std::lock_guard<std::mutex> lock(bus->regMutex);
-    bus->slots[handle].inUse.store(0, std::memory_order_release);
+
+    // A stale handle must not evict the slot's current owner. Checked under
+    // regMutex, so gen cannot move under us.
+    if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return;
+    if (s.inUse.load(std::memory_order_relaxed) == 0) return;
+
+    // Close the epoch before retiring the slot: a reader that captured the old
+    // gen sees it change and rejects whatever it copied.
+    s.gen.store((s.gen.load(std::memory_order_relaxed) + 1u) & kGenMask,
+                std::memory_order_release);
+    s.inUse.store(0, std::memory_order_release);
 }
 
 void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
                             const SeamCalbusRecord* rec) {
-    if (!bus || !rec || handle < 0 || handle >= SEAM_CALBUS_MAX_SLOTS) return;
-    Slot& s = bus->slots[handle];
+    if (!bus || !rec || handle < 0) return;
+    Slot& s = bus->slots[handleIndex(handle)];
+
+    // Stale-handle guard: one relaxed load, no lock — publish() stays
+    // wait-free. gen only ever advances, so a handle whose epoch is closed can
+    // never match again and its writes are dropped. (This does not make
+    // publish() and register() mutually exclusive — a publish already past
+    // this check when the epoch closes still writes. That window is bounded by
+    // a few instructions, and an emitter stops publishing before it
+    // unregisters; the point is that a *stale* handle stops writing forever.)
+    if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return;
 
     const uint32_t start = s.seq.load(std::memory_order_relaxed);
     s.seq.store(start + 1, std::memory_order_relaxed);        // -> odd
@@ -390,17 +643,38 @@ int32_t seam_calbus_v1_snapshot(SeamCalbus* bus, SeamCalbusRecord* out,
     int32_t n = 0;
     for (int32_t i = 0; i < SEAM_CALBUS_MAX_SLOTS && n < maxCount; ++i) {
         Slot& s = bus->slots[i];
-        if (s.inUse.load(std::memory_order_acquire) == 0) continue;
 
         SeamCalbusRecord tmp;
         for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
+            // Capture the ownership epoch BEFORE the copy. Acquire, so the
+            // record loads below cannot be hoisted above it.
+            const uint32_t g1 = s.gen.load(std::memory_order_acquire);
+            const uint32_t u1 = s.inUse.load(std::memory_order_acquire);
+            if (u1 == 0) break;                               // slot is free
+
             const uint32_t s1 = s.seq.load(std::memory_order_acquire);
             if (s1 & 1u) continue;                            // writer inside
+
             std::memcpy(&tmp, &s.rec, sizeof(SeamCalbusRecord));
+
+            // Acquire fence: the record loads above may not be reordered after
+            // the validation loads below, so what follows really is a check on
+            // a completed copy.
             std::atomic_thread_fence(std::memory_order_acquire);
+
             if (s.seq.load(std::memory_order_relaxed) != s1) continue;  // torn
-            // Re-check: the slot may have been released while we copied.
-            if (s.inUse.load(std::memory_order_acquire) != 0) out[n++] = tmp;
+
+            // Re-capture the epoch. Unchanged {gen, inUse} means one single
+            // uninterrupted registration epoch spanned the whole copy: the
+            // slot was neither released (inUse would drop, gen would move) nor
+            // released-and-reclaimed (gen would move twice — it never returns
+            // to an earlier value). gen alone would do; inUse is kept because
+            // the pair is what the invariant is stated in terms of.
+            const uint32_t u2 = s.inUse.load(std::memory_order_acquire);
+            const uint32_t g2 = s.gen.load(std::memory_order_acquire);
+            if (u2 != u1 || g2 != g1) continue;               // churned
+
+            out[n++] = tmp;
             break;
         }
     }
@@ -474,7 +748,16 @@ cmake --build build-test --target seam_calbus_test --config Release
 ./build-test/tests/Release/seam_calbus_test
 ```
 
-Expected: all test cases pass, `torn == 0` and `reads > 0` in the seqlock case.
+Expected: all test cases pass, with `torn == 0` in the hammer case and
+`torn == 0 && phantom == 0` in the churn case. Both are concurrency tests, so
+run the binary several times — one green run proves little. Note that the
+liveness assertions are a large fraction of the iterations, not `reads > 0`:
+a reader that gives up on almost every attempt is a broken reader, and
+`reads > 0` would pass it.
+
+Do NOT lean on ThreadSanitizer here. It reports no data race against code that
+provably corrupts records, because it models the fences and stays silent. The
+behavioural cross-field probe is what catches this class of bug.
 
 - [ ] **Step 8: Commit**
 

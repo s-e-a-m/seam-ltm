@@ -87,19 +87,31 @@ SEAM_CALBUS_API uint32_t seam_calbus_v1_version(void);
 // The process-wide registry. Never null.
 SEAM_CALBUS_API SeamCalbus* seam_calbus_v1_get(void);
 
-// Claim a slot. Returns a handle in [0, SEAM_CALBUS_MAX_SLOTS), or -1 when the
+// Claim a slot. Returns an OPAQUE, non-negative handle, or -1 when the
 // registry is full. Takes a mutex — call from setActive, never from process().
+//
+// The handle is NOT a slot index: it packs the slot's registration epoch
+// alongside the index, which is what lets publish() and unregister() reject a
+// handle whose slot has since been reclaimed by another plugin. Store it,
+// compare it to -1, hand it back — never index anything with it, never assume
+// a range beyond "non-negative".
 SEAM_CALBUS_API int32_t seam_calbus_v1_register(SeamCalbus* bus);
 
-// Release a slot. Safe with handle == -1. Takes a mutex.
+// Release a slot. Safe with handle == -1. A stale handle (already released,
+// slot since reclaimed) is a no-op and cannot evict the current owner.
+// Takes a mutex.
 SEAM_CALBUS_API void seam_calbus_v1_unregister(SeamCalbus* bus, int32_t handle);
 
 // Overwrite a slot's record. RT-SAFE: wait-free, no allocation, no lock.
-// Safe to call from the audio thread. Invalid arguments are silent no-ops.
+// Safe to call from the audio thread. Invalid or stale handles are silent
+// no-ops, so publishing after unregistering cannot corrupt the next owner.
 SEAM_CALBUS_API void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
                                             const SeamCalbusRecord* rec);
 
 // Copy every registered slot's record into `out`. Returns the count written.
+// A record is only emitted when the slot stayed registered to one single
+// owner for the whole copy, so a snapshot never mixes two emitters' data and
+// never attributes a departed emitter's record to its successor.
 // The reader may retry on a torn read and gives up on a slot after a bounded
 // number of attempts, so a GUI timer can never spin forever.
 SEAM_CALBUS_API int32_t seam_calbus_v1_snapshot(SeamCalbus* bus,

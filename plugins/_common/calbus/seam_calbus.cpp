@@ -19,14 +19,71 @@ namespace {
 // blocked (increment, write, increment — constant time), and only the reader
 // may have to retry. Producer = audio thread, consumer = GUI: the GUI is the
 // one that can afford to spin.
+//
+// THE SEQLOCK ALONE IS NOT ENOUGH. It serialises *record writes* against
+// *record reads*, but registration churn is the normal case here (plugins are
+// activated and deactivated constantly), and churn is a second, independent
+// axis of change:
+//
+//   - Anything that touches `rec` must go through the seqlock, publish() and
+//     register()'s memset alike. A memset outside the seqlock leaves `seq`
+//     even and unchanged for the whole race, so the reader's s1 == s2 check —
+//     the only thing that can reject a torn read — cannot fire, and the reader
+//     accepts a half-old/half-zeroed record as valid.
+//
+//   - `inUse` cannot detect ABA. A reader that checks inUse, copies, and
+//     re-checks inUse sees 1 both times when the slot was released AND
+//     reclaimed during the copy, and would emit the previous owner's record
+//     attributed to the new owner. Hence `gen` below.
 struct Slot {
     std::atomic<uint32_t> seq{0};     // odd = write in progress, even = stable
     std::atomic<uint32_t> inUse{0};
+
+    // Registration epoch. Bumped under regMutex on BOTH register and
+    // unregister, so it changes on every ownership transition and never
+    // returns to an earlier value (within the 26-bit window). It is the ABA
+    // guard the seqlock cannot provide: the reader captures {gen, inUse}
+    // before and after the copy and only accepts the record when both are
+    // unchanged, which means one uninterrupted registration epoch spanned the
+    // whole copy.
+    std::atomic<uint32_t> gen{0};
+
     SeamCalbusRecord      rec{};
 };
 
 // Bounded retries: a GUI timer must return, even against a pathological writer.
 constexpr int kMaxReadAttempts = 8;
+
+// Handle layout: gen in the high bits, slot index in the low bits.
+//
+// The handle is an opaque token, NOT a slot index. Packing the registration
+// epoch into it is what lets publish() reject a stale handle for free: one
+// relaxed load and a compare, no lock, no allocation, bounded time — still
+// wait-free and still audio-thread-safe. Without it, a plugin that publishes
+// after unregistering silently corrupts whichever plugin now owns that slot.
+//
+// 5 bits of index (32 slots) + 26 bits of gen = 31 bits, so a handle is always
+// non-negative and -1 stays the unambiguous "no slot" value. gen wraps after
+// 2^26 registrations of the SAME slot; an ABA collision would need exactly
+// that many register/unregister cycles inside one snapshot() call.
+constexpr int32_t  kIndexBits = 5;
+constexpr int32_t  kIndexMask = (1 << kIndexBits) - 1;
+constexpr uint32_t kGenMask   = 0x03FFFFFFu;
+
+static_assert(SEAM_CALBUS_MAX_SLOTS <= kIndexMask + 1,
+              "slot index must fit in kIndexBits");
+
+inline int32_t encodeHandle(int32_t index, uint32_t gen) {
+    return (int32_t)(((gen & kGenMask) << kIndexBits) | (uint32_t)index);
+}
+
+inline int32_t handleIndex(int32_t handle) {
+    return handle & kIndexMask;
+}
+
+inline uint32_t handleGen(int32_t handle) {
+    return ((uint32_t)handle >> kIndexBits) & kGenMask;
+}
 
 } // namespace
 
@@ -51,25 +108,63 @@ int32_t seam_calbus_v1_register(SeamCalbus* bus) {
     if (!bus) return -1;
     std::lock_guard<std::mutex> lock(bus->regMutex);
     for (int32_t i = 0; i < SEAM_CALBUS_MAX_SLOTS; ++i) {
-        if (bus->slots[i].inUse.load(std::memory_order_relaxed) == 0) {
-            std::memset(&bus->slots[i].rec, 0, sizeof(SeamCalbusRecord));
-            bus->slots[i].inUse.store(1, std::memory_order_release);
-            return i;
-        }
+        Slot& s = bus->slots[i];
+        if (s.inUse.load(std::memory_order_relaxed) != 0) continue;
+
+        // Clear the previous owner's record — a fresh slot must never expose
+        // it — through the SAME seqlock publish() uses. snapshot() does not
+        // take regMutex (it must not: the GUI would then be able to stall on
+        // a registering plugin), so regMutex does nothing to protect this
+        // memset from a concurrent reader. Only the odd/even dance does.
+        const uint32_t start = s.seq.load(std::memory_order_relaxed);
+        s.seq.store(start + 1, std::memory_order_relaxed);        // -> odd
+        std::atomic_thread_fence(std::memory_order_release);
+        std::memset(&s.rec, 0, sizeof(SeamCalbusRecord));
+        std::atomic_thread_fence(std::memory_order_release);
+        s.seq.store(start + 2, std::memory_order_relaxed);        // -> even
+
+        // Open the new epoch, then advertise the slot. Both are release
+        // stores, so a reader that observes them also observes the cleared
+        // record and the seq bumps that precede them.
+        const uint32_t g =
+            (s.gen.load(std::memory_order_relaxed) + 1u) & kGenMask;
+        s.gen.store(g, std::memory_order_release);
+        s.inUse.store(1, std::memory_order_release);
+        return encodeHandle(i, g);
     }
     return -1;
 }
 
 void seam_calbus_v1_unregister(SeamCalbus* bus, int32_t handle) {
-    if (!bus || handle < 0 || handle >= SEAM_CALBUS_MAX_SLOTS) return;
+    if (!bus || handle < 0) return;
+    Slot& s = bus->slots[handleIndex(handle)];
     std::lock_guard<std::mutex> lock(bus->regMutex);
-    bus->slots[handle].inUse.store(0, std::memory_order_release);
+
+    // A stale handle must not evict the slot's current owner. Checked under
+    // regMutex, so gen cannot move under us.
+    if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return;
+    if (s.inUse.load(std::memory_order_relaxed) == 0) return;
+
+    // Close the epoch before retiring the slot: a reader that captured the old
+    // gen sees it change and rejects whatever it copied.
+    s.gen.store((s.gen.load(std::memory_order_relaxed) + 1u) & kGenMask,
+                std::memory_order_release);
+    s.inUse.store(0, std::memory_order_release);
 }
 
 void seam_calbus_v1_publish(SeamCalbus* bus, int32_t handle,
                             const SeamCalbusRecord* rec) {
-    if (!bus || !rec || handle < 0 || handle >= SEAM_CALBUS_MAX_SLOTS) return;
-    Slot& s = bus->slots[handle];
+    if (!bus || !rec || handle < 0) return;
+    Slot& s = bus->slots[handleIndex(handle)];
+
+    // Stale-handle guard: one relaxed load, no lock — publish() stays
+    // wait-free. gen only ever advances, so a handle whose epoch is closed can
+    // never match again and its writes are dropped. (This does not make
+    // publish() and register() mutually exclusive — a publish already past
+    // this check when the epoch closes still writes. That window is bounded by
+    // a few instructions, and an emitter stops publishing before it
+    // unregisters; the point is that a *stale* handle stops writing forever.)
+    if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return;
 
     const uint32_t start = s.seq.load(std::memory_order_relaxed);
     s.seq.store(start + 1, std::memory_order_relaxed);        // -> odd
@@ -85,17 +180,38 @@ int32_t seam_calbus_v1_snapshot(SeamCalbus* bus, SeamCalbusRecord* out,
     int32_t n = 0;
     for (int32_t i = 0; i < SEAM_CALBUS_MAX_SLOTS && n < maxCount; ++i) {
         Slot& s = bus->slots[i];
-        if (s.inUse.load(std::memory_order_acquire) == 0) continue;
 
         SeamCalbusRecord tmp;
         for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
+            // Capture the ownership epoch BEFORE the copy. Acquire, so the
+            // record loads below cannot be hoisted above it.
+            const uint32_t g1 = s.gen.load(std::memory_order_acquire);
+            const uint32_t u1 = s.inUse.load(std::memory_order_acquire);
+            if (u1 == 0) break;                               // slot is free
+
             const uint32_t s1 = s.seq.load(std::memory_order_acquire);
             if (s1 & 1u) continue;                            // writer inside
+
             std::memcpy(&tmp, &s.rec, sizeof(SeamCalbusRecord));
+
+            // Acquire fence: the record loads above may not be reordered after
+            // the validation loads below, so what follows really is a check on
+            // a completed copy.
             std::atomic_thread_fence(std::memory_order_acquire);
+
             if (s.seq.load(std::memory_order_relaxed) != s1) continue;  // torn
-            // Re-check: the slot may have been released while we copied.
-            if (s.inUse.load(std::memory_order_acquire) != 0) out[n++] = tmp;
+
+            // Re-capture the epoch. Unchanged {gen, inUse} means one single
+            // uninterrupted registration epoch spanned the whole copy: the
+            // slot was neither released (inUse would drop, gen would move) nor
+            // released-and-reclaimed (gen would move twice — it never returns
+            // to an earlier value). gen alone would do; inUse is kept because
+            // the pair is what the invariant is stated in terms of.
+            const uint32_t u2 = s.inUse.load(std::memory_order_acquire);
+            const uint32_t g2 = s.gen.load(std::memory_order_acquire);
+            if (u2 != u1 || g2 != g1) continue;               // churned
+
+            out[n++] = tmp;
             break;
         }
     }
