@@ -77,6 +77,9 @@ add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
 # editor while Debug builds keep it for design work. Defining the macro on our
 # plugin targets here had no effect (they never test it), so it is omitted.
 
+# ─── Shared compiled libraries ───────────────────────────────────────────────
+add_subdirectory(plugins/_common/calbus)
+
 # ─── Plugins ─────────────────────────────────────────────────────────────────
 add_subdirectory(plugins/sdmx)
 add_subdirectory(plugins/xyprrot)

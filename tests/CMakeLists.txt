@@ -110,3 +110,14 @@ target_include_directories(strx_dsp_test PRIVATE
 )
 target_compile_features(strx_dsp_test PRIVATE cxx_std_17)
 add_test(NAME strx_dsp_test COMMAND strx_dsp_test)
+
+add_executable(seam_calbus_test
+    seam_calbus_test.cpp
+)
+target_include_directories(seam_calbus_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
+)
+target_link_libraries(seam_calbus_test PRIVATE seam_calbus)
+target_compile_features(seam_calbus_test PRIVATE cxx_std_17)
+add_test(NAME seam_calbus_test COMMAND seam_calbus_test)
