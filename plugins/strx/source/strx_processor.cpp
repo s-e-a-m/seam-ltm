@@ -132,7 +132,7 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
             description->getColor("SliderActive", colorM);
             description->getColor("MeterFill", colorS);
         }
-        return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 310, 180), this, font,
+        return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 310, 260), this, font,
                                        label, text, track, colorM, colorS);
     }
     return nullptr;

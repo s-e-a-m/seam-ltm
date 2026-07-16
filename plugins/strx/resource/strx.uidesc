@@ -17,12 +17,17 @@
         <color name="MeterInv" rgba="#c04040ff"/>
     </colors>
 
-    <!-- Three-zone frame (Task 6 scaffold): goniometer left (Task 8, StrxGoniometer
-         below) / spectrum centre (Task 9, StrxSpectrum below) / meters right
-         (Task 7, StrxMeters below), sized to fit the StrxGoniometer /
-         StrxSpectrum / StrxMeters custom views reserved in strx_ids.h. -->
-    <template name="editor" class="CViewContainer" origin="0, 0" size="900, 360"
-              minSize="900, 360" maxSize="900, 360"
+    <!-- Three-zone frame (Task 6 scaffold, finalized Task 10): goniometer left
+         (Task 8, StrxGoniometer below) / spectrum centre (Task 9, StrxSpectrum
+         below) / meters right (Task 7, StrxMeters below). All three zones
+         share the SAME height (260 px, y 70..330) so the row reads as one
+         uniform strip; only the widths differ slightly to fit each view's
+         natural content (goniometer/meters are square-ish, spectrum is wider
+         for the log-frequency axis). The SEAM logo lives in its own footer
+         strip BELOW the zone row so it never steals height from a plot
+         (mirrors dslar.uidesc, which also parks the logo below the controls). -->
+    <template name="editor" class="CViewContainer" origin="0, 0" size="900, 440"
+              minSize="900, 440" maxSize="900, 440"
               background-color="BgDark" background-color-draw-style="filled">
 
         <view class="CTextLabel" origin="0, 14" size="900, 26" font="TitleFont"
@@ -35,17 +40,18 @@
               tooltip="Decaying M/S scatter (Lissajous) with Angle/Panorama readout"/>
 
         <!-- Spectrum zone (centre third): overlaid M/S Welch curves, log-freq
-             20 Hz-20 kHz x-axis, -120..+6 dB y-axis. Kept above the logo
-             (origin 330,260) so the two views never overlap. -->
-        <view class="CView" origin="290, 70" size="310, 180" custom-view-name="StrxSpectrum"
+             20 Hz-20 kHz x-axis, -120..+6 dB y-axis. Same 260 px height as the
+             goniometer/meters zones either side. -->
+        <view class="CView" origin="290, 70" size="310, 260" custom-view-name="StrxSpectrum"
               tooltip="Overlaid M/S Welch spectra (log frequency, dB)"/>
 
         <!-- Meters zone (right third): In L / In R / M / S / Width bars. -->
         <view class="CView" origin="610, 70" size="270, 260" custom-view-name="StrxMeters"
               tooltip="In L, In R, M, S levels (dBFS) and Width (correlation-tinted)"/>
 
-        <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
-        <view class="CView" origin="330, 260" size="240, 77" bitmap="logo"/>
+        <!-- SEAM logo footer strip (native 240x77 — CView does not scale
+             bitmaps), centred below the zone row (zones end at y=330). -->
+        <view class="CView" origin="330, 345" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps>
