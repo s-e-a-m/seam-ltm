@@ -92,6 +92,7 @@ add_subdirectory(plugins/hilbert)
 add_subdirectory(plugins/ltburst)
 add_subdirectory(plugins/ltglide)
 add_subdirectory(plugins/dslar)
+add_subdirectory(plugins/strx)
 
 if(SEAM_BUILD_TESTS)
     add_subdirectory(tests)

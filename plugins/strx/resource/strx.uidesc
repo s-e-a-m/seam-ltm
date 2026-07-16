@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="11"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="TextDim" rgba="#888888ff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="MeterFill" rgba="#c8a24aff"/>
+    </colors>
+
+    <!-- Minimal scaffold (Task 6): background + title only. The three-zone
+         frame (goniometer / spectrum / meters) lands in Tasks 7-9, sized to
+         fit the StrxGoniometer / StrxSpectrum / StrxMeters custom views
+         reserved in strx_ids.h. -->
+    <template name="editor" class="CViewContainer" origin="0, 0" size="900, 360"
+              minSize="900, 360" maxSize="900, 360"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <view class="CTextLabel" origin="0, 14" size="900, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM strx" transparent="true"/>
+        <view class="CTextLabel" origin="0, 42" size="900, 18" font="SubtitleFont"
+              font-color="TextDim" text-alignment="center" title="STONE observation M/S analyzer" transparent="true"/>
+
+        <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
+        <view class="CView" origin="330, 260" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps>
+        <bitmap name="logo" path="seam_logo.png"/>
+    </bitmaps>
+    <control-tags>
+    </control-tags>
+</vstgui-ui-description>
