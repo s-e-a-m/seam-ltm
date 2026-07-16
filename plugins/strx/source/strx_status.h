@@ -96,18 +96,36 @@ private:
         const int32_t n = client.snapshot(recs, SEAM_CALBUS_MAX_SLOTS);
         if (n == 0) return "calbus: no emitter";
 
-        // One emitter sounds at a time by method (see the design doc), so the
-        // first active record is the answer. Registered-but-silent emitters
-        // are reported as a count, which is how you notice that the multipink
-        // you meant to un-mute is still muted.
+        // One emitter sounds at a time BY METHOD (see the design doc), so the
+        // first active record is the headline answer. But "by method" is an
+        // operator discipline, not something the bus enforces, and the most
+        // likely slip in the room is un-muting one STONE while forgetting to
+        // mute another. Silently naming only the first active record would
+        // hide exactly that mistake during the session that depends on this
+        // line catching it — so count ALL active records, not just the idle
+        // ones, and flag it when more than one is sounding.
         int registered = 0;
+        int activeCount = 0;
+        int32_t firstActive = -1;
         for (int32_t i = 0; i < n; ++i) {
             if (!recs[i].active) { ++registered; continue; }
-            return describe(recs[i]);
+            if (firstActive < 0) firstActive = i;
+            ++activeCount;
         }
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "calbus: %d idle, none sounding", registered);
-        return buf;
+        if (firstActive < 0) {
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), "calbus: %d idle, none sounding", registered);
+            return buf;
+        }
+        std::string text = describe(recs[firstActive]);
+        if (activeCount > 1) {
+            // Compact by design: the view is 300px wide at 11px, so this can
+            // only afford a few characters, not a second emitter's name.
+            char extra[16];
+            std::snprintf(extra, sizeof(extra), " \xC2\xB7 +%d more", activeCount - 1);
+            text += extra;
+        }
+        return text;
     }
 
     VSTGUI::CVSTGUITimer* timer_ = nullptr;

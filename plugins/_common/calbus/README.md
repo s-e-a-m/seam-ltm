@@ -261,12 +261,14 @@ have to be relearned.
    `seam_calbus.h`, and a new arm in `SeamCalbusRecord`'s union if the new
    kind's data doesn't fit the existing `pink`/`glide` shapes. Keep the
    struct POD, fixed-layout, no implicit padding surprises — `seam_calbus.h`
-   already reserves `_pad` for exactly this reason, and
-   `tests/seam_calbus_test.cpp` pins `sizeof(SeamCalbusRecord)` with a
-   `static_assert` specifically so a field reorder that introduces new
-   padding fails loudly there instead of silently breaking the tearing
-   probe's whole-struct `memcmp`. Update that `static_assert`'s expected
-   size deliberately if you grow the struct.
+   already reserves `_pad` for exactly this reason, and pins
+   `sizeof(SeamCalbusRecord)` with a `static_assert` right after the struct
+   so a field reorder that introduces new padding is a compile error for
+   *every* consumer (not just when `SEAM_BUILD_TESTS` is on).
+   `tests/seam_calbus_test.cpp` carries a second, narrower copy of the same
+   assert, for `isFresh()`'s whole-struct `memcmp`. Update both
+   `static_assert`s' expected size deliberately, in the same change that
+   bumps `SEAM_CALBUS_VERSION`, if you grow the struct.
 2. In the emitting plugin: include `seam_calbus_client.h`, register a slot
    in `setActive(true)` (store the handle, `SEAM_CALBUS_NO_HANDLE`-initialised
    — never a bare `0`), unregister in `setActive(false)`, and publish from
@@ -421,20 +423,25 @@ In Reaper:
    `multipink · STONE 2 · slot 4-7 · -23.0 dB` (slot numbers follow the
    actual pool claim).
 4. Mute it, un-mute STONE 3. Expect the line to name STONE 3.
-5. Remove the multipinks, load `ltglide` with STONE = 2 and Loop on.
+5. Without muting STONE 3, also un-mute STONE 2 (the operator-error case: two
+   STONEs left sounding at once). Expect the line to still name one emitter
+   but append a count, e.g. `... · +1 more` — this is the diagnostic that
+   catches "un-muted the wrong one, forgot to mute the last one" in the
+   room. Mute one of the two again before continuing.
+6. Remove the multipinks, load `ltglide` with STONE = 2 and Loop on.
    Expect: `ltglide · STONE 2 · pass N · 20000→20 Hz · T=20s`, with `N`
    advancing once per pass.
-6. Confirm the line does **not** read `no host clock`. If it does, Reaper
+7. Confirm the line does **not** read `no host clock`. If it does, Reaper
    is not supplying `kContTimeValid` — that's a finding for Spec 3, to be
    recorded in the session doc rather than worked around here.
 
 Then confirm the degradation path — this is the other half of the proof,
 that a missing bus never touches audio:
 
-7. Quit Reaper, `mv ~/Library/Application\ Support/SEAM/libseamcalbus.dylib
+8. Quit Reaper, `mv ~/Library/Application\ Support/SEAM/libseamcalbus.dylib
    /tmp/`, reopen the project. Expect: `strx` reads `calbus unavailable`,
    and `multipink` and `ltglide` still make sound normally.
-8. Move the dylib back.
+9. Move the dylib back.
 
 ## Two hard-won tooling lessons
 

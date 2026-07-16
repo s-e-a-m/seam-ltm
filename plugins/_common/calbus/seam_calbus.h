@@ -88,6 +88,29 @@ typedef struct SeamCalbusRecord {
     } u;
 } SeamCalbusRecord;
 
+// This layout IS the ABI: SEAM_CALBUS_VERSION and the seam_calbus_v1_*
+// symbol names are the whole contract a client checks before trusting a
+// dylib's records (seam_calbus_v1_version(), above). That machinery only
+// works if the layout and the version change together — a client that sees
+// a matching version is trusting that SeamCalbusRecord means what it meant
+// when that version was cut. A field reorder or a new member that changes
+// sizeof/alignment without bumping SEAM_CALBUS_VERSION is exactly the bug
+// the version gate cannot catch, because the gate never inspects the layout
+// itself, only the number a (possibly stale) dylib chooses to report.
+//
+// Pinning the size here, in the header every consumer includes, turns that
+// mistake into a compile error for all of them — not only when
+// SEAM_BUILD_TESTS happens to be on. (tests/seam_calbus_test.cpp also pins
+// this, for a second, narrower reason: its isFresh() does a whole-struct
+// memcmp that assumes no padding.) Update this number deliberately, in the
+// same change that bumps SEAM_CALBUS_VERSION, if you ever grow or reorder
+// the struct.
+#ifdef __cplusplus
+static_assert(sizeof(SeamCalbusRecord) == 88,
+              "SeamCalbusRecord's layout is the calbus ABI; a size change "
+              "must come with a SEAM_CALBUS_VERSION bump (see comment above)");
+#endif
+
 typedef struct SeamCalbus SeamCalbus;
 
 // Returns SEAM_CALBUS_VERSION. Clients call this first and refuse to proceed

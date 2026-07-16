@@ -1,4 +1,12 @@
 # SEAM-LTM unit tests (doctest, SDK-free DSP cores)
+
+# seam_calbus_test spawns std::thread for its seqlock hammer/churn stress
+# tests. Links fine without this on macOS/libc++ (pthread is pulled in
+# transitively), but not on Linux, which this suite also targets
+# (linuxmain.cpp exists in the plugin CMake files) — find and link it
+# explicitly rather than relying on a platform-specific transitive link.
+find_package(Threads REQUIRED)
+
 add_executable(seam_tests
     smoke_test.cpp
 )
@@ -118,7 +126,7 @@ target_include_directories(seam_calbus_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
 )
-target_link_libraries(seam_calbus_test PRIVATE seam_calbus)
+target_link_libraries(seam_calbus_test PRIVATE seam_calbus Threads::Threads)
 target_compile_features(seam_calbus_test PRIVATE cxx_std_17)
 add_test(NAME seam_calbus_test COMMAND seam_calbus_test)
 

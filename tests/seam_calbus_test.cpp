@@ -56,6 +56,12 @@ static bool probeIsConsistent(const SeamCalbusRecord& r) {
 // record compare unequal to `zero{}` nondeterministically). True today at 88
 // bytes; pin it so a future field reorder that introduces padding fails loud
 // here instead of making this test flaky.
+//
+// This is a narrower, test-local echo of the ABI-layout static_assert in
+// seam_calbus.h (right after the struct) — that one is the real reason this
+// number matters (the layout IS the ABI, and SEAM_CALBUS_VERSION must bump
+// alongside it), and it fires for every consumer, not only when
+// SEAM_BUILD_TESTS is on. Keep both in sync if you ever grow the struct.
 static_assert(sizeof(SeamCalbusRecord) == 88,
               "isFresh()'s memcmp assumes SeamCalbusRecord has no padding; "
               "re-verify padding-freeness if this size ever changes");
