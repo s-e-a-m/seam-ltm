@@ -44,12 +44,37 @@ public:
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream* state) override;
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) override;
 
+    // VST3EditorDelegate — build the meters/goniometer/spectrum custom views
+    // (Tasks 7-9) by their kView* name tags (strx_ids.h).
+    VSTGUI::CView* PLUGIN_API createCustomView(
+        VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& attributes,
+        const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* editor) override;
+
     // The analyzer core, read by the GUI thread via tryReadFrame() once the
     // custom views (Tasks 7-9) exist.
     Seam::strx::Analyzer& analyzer() { return analyzer_; }
 
+    // GUI-thread-only cached accessor for the latest published AnalysisFrame.
+    //
+    // The triple-buffer (analyzer_.tryReadFrame) is a single-consumer SPSC
+    // reader: it hands back a new frame exactly ONCE per audio-thread publish
+    // (the dirty bit is consumed on read). Tasks 7-9 add THREE custom views
+    // (meters/goniometer/spectrum), each repainting off its own timer; if each
+    // called tryReadFrame() directly, only the first poller each tick would
+    // ever see fresh data and the other two would starve. Instead every view
+    // calls this single cached accessor: it drains tryReadFrame() into
+    // frameCache_ (a no-op when nothing new has published since the last
+    // call) and always returns the last-known frame. All view timers fire on
+    // the GUI thread, serialized, so there is no concurrent-access hazard on
+    // frameCache_ itself.
+    const Seam::strx::AnalysisFrame& latestFrame() {
+        analyzer_.tryReadFrame(frameCache_);
+        return frameCache_;
+    }
+
 private:
     Seam::strx::Analyzer analyzer_;
+    Seam::strx::AnalysisFrame frameCache_;
 
     // Analyzer::process() always takes float buffers. When the host processes
     // in kSample64 (double), the pass-through copy stays double-precision but

@@ -1,5 +1,6 @@
 #include "strx_processor.h"
 #include "strx_ids.h"
+#include "strx_meters.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -8,6 +9,7 @@
 #include "vstgui/plugin-bindings/vst3editor.h"
 
 #include <algorithm>
+#include <string>
 #include <type_traits>
 
 using namespace Steinberg;
@@ -81,6 +83,27 @@ tresult PLUGIN_API StrxProcessor::getState(IBStream* state) {
 IPlugView* PLUGIN_API StrxProcessor::createView(FIDString name) {
     if (FIDStringsEqual(name, ViewType::kEditor))
         return new VSTGUI::VST3Editor(this, "editor", "strx.uidesc");
+    return nullptr;
+}
+
+VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
+    VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& /*attributes*/,
+    const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* /*editor*/) {
+    if (name && std::string(name) == kViewMeters) {
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor label = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor track = VSTGUI::kBlackCColor, fill(0xc8, 0xa2, 0x4a, 0xff);
+        VSTGUI::CColor inv(0xc0, 0x40, 0x40, 0xff);
+        if (description) {
+            description->getColor("TextDim", label);
+            description->getColor("TextLight", text);
+            description->getColor("SliderTrack", track);
+            description->getColor("MeterFill", fill);
+            description->getColor("MeterInv", inv);
+        }
+        return new Seam::StrxMeters(VSTGUI::CRect(0, 0, 270, 260), this, font,
+                                     label, text, track, fill, inv);
+    }
     return nullptr;
 }
 

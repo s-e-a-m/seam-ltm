@@ -17,9 +17,9 @@ namespace Seam {
 static const Steinberg::FUID StrxProcessorUID(
     0x5E4D000F, 0xB2C3D4E5, 0x53545258, 0x00000000);   // "STRX"
 
-// Custom-view name tags (match resource/strx.uidesc custom-view "name"
-// attrs). No custom views are built yet — the goniometer/spectrum/meters
-// panes land in Tasks 7-9 — but the tags are reserved here so the uidesc
+// Custom-view name tags (match resource/strx.uidesc custom-view-name
+// attrs). kViewMeters is wired (Task 7, strx_meters.h); the goniometer/
+// spectrum panes land in Tasks 8-9. Tags reserved together so the uidesc
 // and processor stay in sync as those views are added.
 static const char* kViewGoniometer = "StrxGoniometer";
 static const char* kViewSpectrum   = "StrxSpectrum";

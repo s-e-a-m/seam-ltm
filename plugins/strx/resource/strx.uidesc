@@ -14,12 +14,13 @@
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
         <color name="MeterFill" rgba="#c8a24aff"/>
+        <color name="MeterInv" rgba="#c04040ff"/>
     </colors>
 
-    <!-- Minimal scaffold (Task 6): background + title only. The three-zone
-         frame (goniometer / spectrum / meters) lands in Tasks 7-9, sized to
-         fit the StrxGoniometer / StrxSpectrum / StrxMeters custom views
-         reserved in strx_ids.h. -->
+    <!-- Three-zone frame (Task 6 scaffold): goniometer left / spectrum centre
+         (Tasks 8-9, not yet built) / meters right (Task 7, StrxMeters below),
+         sized to fit the StrxGoniometer / StrxSpectrum / StrxMeters custom
+         views reserved in strx_ids.h. -->
     <template name="editor" class="CViewContainer" origin="0, 0" size="900, 360"
               minSize="900, 360" maxSize="900, 360"
               background-color="BgDark" background-color-draw-style="filled">
@@ -28,6 +29,10 @@
               font-color="TextLight" text-alignment="center" title="SEAM strx" transparent="true"/>
         <view class="CTextLabel" origin="0, 42" size="900, 18" font="SubtitleFont"
               font-color="TextDim" text-alignment="center" title="STONE observation M/S analyzer" transparent="true"/>
+
+        <!-- Meters zone (right third): In L / In R / M / S / Width bars. -->
+        <view class="CView" origin="610, 70" size="270, 260" custom-view-name="StrxMeters"
+              tooltip="In L, In R, M, S levels (dBFS) and Width (correlation-tinted)"/>
 
         <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
         <view class="CView" origin="330, 260" size="240, 77" bitmap="logo"/>
