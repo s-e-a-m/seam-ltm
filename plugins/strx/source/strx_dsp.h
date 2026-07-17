@@ -31,6 +31,12 @@ struct AnalysisFrame {
     static constexpr int kNumBins = 2049;  // kFftSize/2 + 1, kFftSize = 4096
     float specM[kNumBins] = {};  // dB
     float specS[kNumBins] = {};  // dB
+    // Per-bin max since the last resetHold(). Meaningful when a swept emitter
+    // is sounding: each bin is excited once as the sweep passes, so holding the
+    // maximum draws the response curve over one pass. Always published; the
+    // view decides whether to draw it.
+    float holdM[kNumBins] = {};  // dB
+    float holdS[kNumBins] = {};  // dB
     int numBins = 0;
 };
 
@@ -44,8 +50,9 @@ public:
         lvlS_.prepare(fs_, seam::meter::LevelFollower::Mode::Rms, 300.0);
         // one-pole for the covariance means (0.3 s, matching san sfa_tau)
         coef_ = std::exp(-1.0 / (0.3 * fs_));
-        welchM_.prepare(kFftSize, 2.0, fs_);   // τ = 2 s live EMA
-        welchS_.prepare(kFftSize, 2.0, fs_);
+        const double tau = glide_ ? kGlideTauSec : kPinkTauSec;
+        welchM_.prepare(kFftSize, tau, fs_);
+        welchS_.prepare(kFftSize, tau, fs_);
         reset();
     }
     void reset() {
@@ -58,6 +65,22 @@ public:
         writeBuf_ = 1;
         front_    = 2;
     }
+    // Switch the live average between the pink and glide time constants.
+    // Idempotent: repeated calls with the same value do nothing, so the
+    // processor can call this every block without disturbing the analysis.
+    void setGlideMode(bool on) {
+        if (on == glide_) return;
+        glide_ = on;
+        const double tau = on ? kGlideTauSec : kPinkTauSec;
+        welchM_.setEmaTau(tau);
+        welchS_.setEmaTau(tau);
+    }
+    bool glideMode() const { return glide_; }
+
+    // Clear the max-hold. Driven by the calibration bus: a new pass starts a
+    // new measurement, so the previous pass's curve must not linger.
+    void resetHold() { welchM_.resetHold(); welchS_.resetHold(); }
+
     void analyzeScalars(const float* L, const float* R, int n) {
         AnalysisFrame& fr = slots_[writeBuf_];
         double rmsL=0, rmsR=0, rmsM=0, rmsS=0;
@@ -103,7 +126,12 @@ public:
         fr.numBins = welchM_.numBins();
         const float* mM = welchM_.magnitudeDb();
         const float* mS = welchS_.magnitudeDb();
-        for (int k = 0; k < fr.numBins; ++k) { fr.specM[k] = mM[k]; fr.specS[k] = mS[k]; }
+        const float* hM = welchM_.holdDb();
+        const float* hS = welchS_.holdDb();
+        for (int k = 0; k < fr.numBins; ++k) {
+            fr.specM[k] = mM[k]; fr.specS[k] = mS[k];
+            fr.holdM[k] = hM[k]; fr.holdS[k] = hS[k];
+        }
     }
 
     // Audio thread (producer): fill the working buffer, then publish it by
@@ -140,8 +168,11 @@ public:
     const AnalysisFrame& frame() const { return slots_[writeBuf_]; }
 private:
     static constexpr int kFftSize = 4096;   // kNumBins = 2049 in AnalysisFrame
+    static constexpr double kPinkTauSec  = 2.0;   // slow average: reads pink noise smoothly
+    static constexpr double kGlideTauSec = 0.1;   // fast average: tracks a sweep's moving tone
     double fs_ = 48000.0, coef_ = 0.0;
     double mLR_ = 0, mLL_ = 0, mRR_ = 0;
+    bool glide_ = false;
     seam::meter::LevelFollower lvlL_, lvlR_, lvlM_, lvlS_;
     seam::fft::Welch welchM_, welchS_;
 

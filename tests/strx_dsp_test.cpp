@@ -108,3 +108,92 @@ TEST_CASE("triple-buffer: publish/read cycles, coalescing, and no-new") {
     CHECK(out.panorama == doctest::Approx(-1.0).epsilon(0.1));
     CHECK_FALSE(a.tryReadFrame(out));   // only the latest was delivered; nothing more pending
 }
+
+TEST_CASE("Analyzer publishes a max-hold that survives silence") {
+    Seam::strx::Analyzer a;
+    a.prepare(48000.0);
+
+    // A loud burst, then silence. The live spectrum decays; the hold does not.
+    std::vector<float> loud(8192), quiet(8192, 0.0f);
+    for (size_t i = 0; i < loud.size(); ++i)
+        loud[i] = 0.5f * std::sin(2.0 * M_PI * 1000.0 * double(i) / 48000.0);
+
+    a.analyze(loud.data(), loud.data(), int(loud.size()));
+    const Seam::strx::AnalysisFrame& f1 = a.frame();
+    int peakBin = 0;
+    for (int k = 1; k < f1.numBins; ++k)
+        if (f1.holdM[k] > f1.holdM[peakBin]) peakBin = k;
+    const float peakHold = f1.holdM[peakBin];
+    // Bounded strictly below 0 dBFS, not just above -40: AnalysisFrame
+    // zero-initializes holdM (`= {}`), and a coherent-gain-calibrated dB value
+    // for this half-amplitude tone can never legitimately be exactly 0.0f, so
+    // an unbounded "> -40" alone would pass even if hM were never copied into
+    // the frame (0.0f satisfies "> -40" trivially).
+    CHECK(peakHold > -40.0f);
+    CHECK(peakHold < 0.0f);
+
+    for (int i = 0; i < 12; ++i) a.analyze(quiet.data(), quiet.data(), int(quiet.size()));
+    const Seam::strx::AnalysisFrame& f2 = a.frame();
+    CHECK(f2.specM[peakBin] < peakHold - 6.0f);   // live decayed
+    CHECK(f2.holdM[peakBin] == peakHold);         // hold held
+}
+
+TEST_CASE("Analyzer resetHold clears the published hold") {
+    Seam::strx::Analyzer a;
+    a.prepare(48000.0);
+    std::vector<float> loud(8192);
+    for (size_t i = 0; i < loud.size(); ++i)
+        loud[i] = 0.5f * std::sin(2.0 * M_PI * 1000.0 * double(i) / 48000.0);
+
+    a.analyze(loud.data(), loud.data(), int(loud.size()));
+    int peakBin = 0;
+    for (int k = 1; k < a.frame().numBins; ++k)
+        if (a.frame().holdM[k] > a.frame().holdM[peakBin]) peakBin = k;
+    CHECK(a.frame().holdM[peakBin] > -40.0f);
+
+    // Flush the Welch analysis window (kFftSize=4096, 50% overlap => a 2-hop
+    // ring) of the loud burst BEFORE calling resetHold(). Welch::resetHold()
+    // deliberately leaves the ring untouched (seam_fft.h), so if the ring
+    // still holds loud samples, the very next post-reset frame straddles the
+    // old/new boundary right where the Hann window's gain is highest, and
+    // that leaked energy latches into the hold permanently (a max-hold never
+    // decreases). One quiet 8192-sample block is two full kFftSize windows,
+    // which guarantees the ring is completely silent by the time we reset.
+    std::vector<float> quiet(8192, 0.0f);
+    a.analyze(quiet.data(), quiet.data(), int(quiet.size()));
+
+    a.resetHold();
+    a.analyze(quiet.data(), quiet.data(), int(quiet.size()));
+    CHECK(a.frame().holdM[peakBin] == -120.0f);
+}
+
+TEST_CASE("Analyzer glide mode is idempotent and switches the live decay") {
+    // Same excitation and same silence in the two modes: glide's fast tau must
+    // decay further. This is the property the swept display depends on.
+    std::vector<float> loud(8192), quiet(8192, 0.0f);
+    for (size_t i = 0; i < loud.size(); ++i)
+        loud[i] = 0.5f * std::sin(2.0 * M_PI * 1000.0 * double(i) / 48000.0);
+
+    Seam::strx::Analyzer pink, glide;
+    pink.prepare(48000.0);
+    glide.prepare(48000.0);
+    CHECK_FALSE(pink.glideMode());
+    glide.setGlideMode(true);
+    glide.setGlideMode(true);          // idempotent: must not reset anything
+    CHECK(glide.glideMode());
+
+    pink.analyze(loud.data(), loud.data(), int(loud.size()));
+    glide.analyze(loud.data(), loud.data(), int(loud.size()));
+    int peakBin = 0;
+    for (int k = 1; k < pink.frame().numBins; ++k)
+        if (pink.frame().holdM[k] > pink.frame().holdM[peakBin]) peakBin = k;
+
+    for (int i = 0; i < 4; ++i) {
+        pink.analyze(quiet.data(), quiet.data(), int(quiet.size()));
+        glide.analyze(quiet.data(), quiet.data(), int(quiet.size()));
+    }
+    CHECK(glide.frame().specM[peakBin] < pink.frame().specM[peakBin] - 6.0f);
+
+    glide.setGlideMode(false);
+    CHECK_FALSE(glide.glideMode());
+}
