@@ -118,32 +118,29 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
     if (name && std::string(name) == kViewGoniometer) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
         VSTGUI::CColor structure = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
-        VSTGUI::CColor track = VSTGUI::kBlackCColor, fill(0xc8, 0xa2, 0x4a, 0xff);
+        VSTGUI::CColor fill(0xc8, 0xa2, 0x4a, 0xff);
         VSTGUI::CColor needle(0x4a, 0x9e, 0xc8, 0xff);   // SliderActive azure (the M colour)
         if (description) {
             description->getColor("Structure", structure);
             description->getColor("TextLight", text);
-            description->getColor("SliderTrack", track);
             description->getColor("MeterFill", fill);
             description->getColor("SliderActive", needle);
         }
         return new Seam::StrxGoniometer(VSTGUI::CRect(0, 0, 260, 300), this, font,
-                                         structure, text, track, fill, needle);
+                                         structure, text, fill, needle);
     }
     if (name && std::string(name) == kViewSpectrum) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
         VSTGUI::CColor structure = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
-        VSTGUI::CColor track = VSTGUI::kBlackCColor;
         VSTGUI::CColor colorM(0x4a, 0x9e, 0xc8, 0xff), colorS(0xc8, 0xa2, 0x4a, 0xff);
         if (description) {
             description->getColor("Structure", structure);
             description->getColor("TextLight", text);
-            description->getColor("SliderTrack", track);
             description->getColor("SliderActive", colorM);
             description->getColor("MeterFill", colorS);
         }
         return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 560, 240), this, font,
-                                       structure, text, track, colorM, colorS);
+                                       structure, text, colorM, colorS);
     }
     if (name && std::string(name) == kViewStatus) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;

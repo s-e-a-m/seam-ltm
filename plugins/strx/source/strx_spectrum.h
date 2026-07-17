@@ -49,15 +49,14 @@ public:
     StrxSpectrum(const VSTGUI::CRect& size, StrxProcessor* processor,
                  VSTGUI::CFontRef font,
                  const VSTGUI::CColor& structureColor, const VSTGUI::CColor& textColor,
-                 const VSTGUI::CColor& trackColor,
                  const VSTGUI::CColor& colorM, const VSTGUI::CColor& colorS)
         : VSTGUI::CView(size), processor_(processor), font_(font),
-          structureColor_(structureColor), textColor_(textColor), trackColor_(trackColor),
+          structureColor_(structureColor), textColor_(textColor),
           colorM_(colorM), colorS_(colorS) {
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
             [this](VSTGUI::CVSTGUITimer*) {
-                glide_ = processor_->calbusWatch().poll().glide;
+                if (processor_) glide_ = processor_->calbusWatch().poll().glide;
                 invalid();
             }, kTimerMs, /*doStart*/true);
     }
@@ -190,7 +189,7 @@ public:
 private:
     StrxProcessor* processor_ = nullptr;
     VSTGUI::CFontRef font_ = nullptr;
-    VSTGUI::CColor structureColor_, textColor_, trackColor_, colorM_, colorS_;
+    VSTGUI::CColor structureColor_, textColor_, colorM_, colorS_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
     // Set by the timer poll (GUI thread), read by draw() (GUI thread). Copied
     // out of CalbusWatch::poll()'s returned digest immediately — never store

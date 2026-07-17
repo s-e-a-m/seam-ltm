@@ -71,11 +71,10 @@ public:
     StrxGoniometer(const VSTGUI::CRect& size, StrxProcessor* processor,
                    VSTGUI::CFontRef font,
                    const VSTGUI::CColor& structureColor, const VSTGUI::CColor& textColor,
-                   const VSTGUI::CColor& trackColor, const VSTGUI::CColor& fillColor,
-                   const VSTGUI::CColor& needleColor)
+                   const VSTGUI::CColor& fillColor, const VSTGUI::CColor& needleColor)
         : VSTGUI::CView(size), processor_(processor), font_(font),
           structureColor_(structureColor), textColor_(textColor),
-          trackColor_(trackColor), fillColor_(fillColor), needleColor_(needleColor) {
+          fillColor_(fillColor), needleColor_(needleColor) {
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
             [this](VSTGUI::CVSTGUITimer*) { pushGeneration(); invalid(); }, kTimerMs, /*doStart*/true);
@@ -230,7 +229,7 @@ private:
 
     StrxProcessor* processor_ = nullptr;
     VSTGUI::CFontRef font_ = nullptr;
-    VSTGUI::CColor structureColor_, textColor_, trackColor_, fillColor_, needleColor_;
+    VSTGUI::CColor structureColor_, textColor_, fillColor_, needleColor_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
 
     std::array<Generation, kTrailFrames> history_{};

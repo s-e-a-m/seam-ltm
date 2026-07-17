@@ -117,8 +117,13 @@ private:
         }
         std::string text = describe(watch.records()[d.firstActive]);
         if (d.activeCount > 1) {
-            // Compact by design: the view is 300px wide at 11px, so this can
-            // only afford a few characters, not a second emitter's name.
+            // Kept compact on purpose, not out of necessity: at 560px/11px
+            // (Source Code Pro Light, ~6.6 px/char) the longest record plus
+            // this flag is ~66 glyphs (~436px), leaving ~124px of headroom —
+            // room enough for a second emitter's name if we ever wanted one.
+            // The flag stays a count because "who else" matters less than
+            // "someone else is sounding": that's the fact this line exists
+            // to surface (see the comment above on the un-mute slip).
             char extra[16];
             std::snprintf(extra, sizeof(extra), " \xC2\xB7 +%d more", d.activeCount - 1);
             text += extra;
