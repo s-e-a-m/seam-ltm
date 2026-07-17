@@ -56,7 +56,10 @@ public:
           colorM_(colorM), colorS_(colorS) {
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
-            [this](VSTGUI::CVSTGUITimer*) { invalid(); }, kTimerMs, /*doStart*/true);
+            [this](VSTGUI::CVSTGUITimer*) {
+                glide_ = processor_->calbusWatch().poll().glide;
+                invalid();
+            }, kTimerMs, /*doStart*/true);
     }
 
     ~StrxSpectrum() override {
@@ -129,12 +132,12 @@ public:
 
         // --- M/S curves. ---
         const int fftSize = (frame.numBins > 1) ? 2 * (frame.numBins - 1) : 0;
-        auto drawCurve = [&](const float* spec, const CColor& color) {
+        auto drawCurve = [&](const float* spec, int numBins, CColor color, uint8_t alpha) {
             if (fftSize <= 0 || fs <= 0.0) return;
             CGraphicsPath* path = c->createGraphicsPath();
             if (!path) return;
             bool started = false;
-            for (int k = 0; k < frame.numBins; ++k) {
+            for (int k = 0; k < numBins; ++k) {
                 const double f = k * fs / double(fftSize);
                 if (f < kFMin) continue;
                 if (f > kFMax) break;
@@ -143,14 +146,28 @@ public:
                 else path->addLine(p);
             }
             if (started) {
+                color.alpha = alpha;
                 c->setFrameColor(color);
                 c->setLineWidth(1.5);
                 c->drawGraphicsPath(path, CDrawContext::kPathStroked);
             }
             path->forget();
         };
-        drawCurve(frame.specM, colorM_);
-        drawCurve(frame.specS, colorS_);
+
+        // Pink noise is stationary, so one averaged curve per channel says
+        // everything. A sweep is not: it presents ONE frequency at a time, so
+        // the average would smear a moving peak. The hold accumulates the
+        // response as the sweep descends (each bin is excited once), and the
+        // live curve — fast now, tau 100 ms — shows where the sweep IS.
+        if (glide_) {
+            drawCurve(frame.holdM, frame.numBins, colorM_, /*alpha*/255);
+            drawCurve(frame.holdS, frame.numBins, colorS_, /*alpha*/255);
+            drawCurve(frame.specM, frame.numBins, colorM_, /*alpha*/90);
+            drawCurve(frame.specS, frame.numBins, colorS_, /*alpha*/90);
+        } else {
+            drawCurve(frame.specM, frame.numBins, colorM_, /*alpha*/255);
+            drawCurve(frame.specS, frame.numBins, colorS_, /*alpha*/255);
+        }
 
         // --- Legend: "M" / "S" swatches, top-right corner of the plot. ---
         if (font_) {
@@ -175,6 +192,11 @@ private:
     VSTGUI::CFontRef font_ = nullptr;
     VSTGUI::CColor structureColor_, textColor_, trackColor_, colorM_, colorS_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
+    // Set by the timer poll (GUI thread), read by draw() (GUI thread). Copied
+    // out of CalbusWatch::poll()'s returned digest immediately — never store
+    // the reference itself, which aliases the watch's internal state and
+    // would silently observe a later snapshot (see strx_calbus_watch.h).
+    bool glide_ = false;
 };
 
 } // namespace Seam
