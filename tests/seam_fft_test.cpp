@@ -128,6 +128,36 @@ TEST_CASE("Welch max-hold keeps the peak after the tone stops") {
     CHECK(w.holdDb()[bin] == peakHold);     // hold did NOT move
 }
 
+// This is the actual sweep scenario the hold exists for: a tone passes
+// through a bin quickly and is gone. A LONG tau means the EMA — starting
+// from silence — can only crawl a small fraction of the way toward the raw
+// power in that time; the hold must still capture the true (near full-scale)
+// peak because it feeds off the RAW per-frame power `p`, not the smeared
+// `magLin_`. If the hold were fed `magLin_` instead (the defect the feature
+// removes), it would read just as low as the EMA and this test would fail.
+TEST_CASE("Welch max-hold captures a short burst before a long-tau EMA can catch up") {
+    const double fs = 48000.0;
+    const int    n  = 1024;
+    seam::fft::Welch w;
+    w.prepare(n, 5.0, fs);               // long tau: EMA moves very slowly
+
+    const int    bin  = 64;
+    const double freq = double(bin) * fs / double(n);
+
+    // Short burst: just enough samples to run a couple of hops (a few tens
+    // of ms) so at least one frame's window is fully tone-filled. That is a
+    // tiny fraction of the 5 s tau, so the EMA — starting from silence —
+    // cannot have moved appreciably by the time we check.
+    pushSine(w, fs, freq, n * 2);
+
+    const float hold = w.holdDb()[bin];
+    const float ema  = w.magnitudeDb()[bin];
+
+    CHECK(hold > -1.0f);        // hold caught the true near-full-scale peak
+    CHECK(ema  < -15.0f);       // EMA is still far below -- it hasn't caught up
+    CHECK(hold - ema > 15.0f);  // the defining gap: raw peak vs smeared average
+}
+
 TEST_CASE("Welch resetHold clears the hold and leaves the EMA alone") {
     const double fs = 48000.0;
     const int    n  = 1024;
@@ -173,6 +203,35 @@ TEST_CASE("Welch setEmaTau changes the decay rate and nothing else") {
 
     // The hold is independent of tau: both saw the same peak.
     CHECK(slow.holdDb()[bin] == doctest::Approx(fast.holdDb()[bin]).epsilon(0.01));
+}
+
+// setEmaTau's contract is "changes the decay rate and nothing else": it must
+// not disturb the hold or the current magnitudes AT THE INSTANT of the call
+// -- it only governs how they evolve afterward. Every other test calls
+// setEmaTau() immediately after prepare(), before any push(), when the hold
+// and magnitudes are still blank (-120 dB / floor); a side effect that only
+// clears blank state is invisible there. This test calls it mid-stream,
+// after real, non-initial state has built up, and checks nothing moved.
+TEST_CASE("Welch setEmaTau leaves the current hold and magnitudes untouched mid-stream") {
+    const double fs = 48000.0;
+    const int    n  = 1024;
+    seam::fft::Welch w;
+    w.prepare(n, 2.0, fs);
+
+    const int    bin  = 64;
+    const double freq = double(bin) * fs / double(n);
+    pushSine(w, fs, freq, n * 200);   // real, settled hold and EMA state
+
+    // Snapshot every bin, not just the excited one, before the call.
+    std::vector<float> holdBefore(w.holdDb(), w.holdDb() + w.numBins());
+    std::vector<float> magBefore(w.magnitudeDb(), w.magnitudeDb() + w.numBins());
+
+    w.setEmaTau(0.1);   // switch decay rate mid-stream, no push() in between
+
+    for (int k = 0; k < w.numBins(); ++k) {
+        CHECK(w.holdDb()[k] == holdBefore[k]);
+        CHECK(w.magnitudeDb()[k] == magBefore[k]);
+    }
 }
 
 TEST_CASE("Welch reset clears the hold too") {
