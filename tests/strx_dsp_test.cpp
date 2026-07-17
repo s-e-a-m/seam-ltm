@@ -197,3 +197,38 @@ TEST_CASE("Analyzer glide mode is idempotent and switches the live decay") {
     glide.setGlideMode(false);
     CHECK_FALSE(glide.glideMode());
 }
+
+TEST_CASE("Analyzer prepare() honours a glide mode set before it") {
+    // Mirrors "Analyzer glide mode is idempotent and switches the live decay"
+    // above, but sets glide mode BEFORE calling prepare() rather than after.
+    // This is the sample-rate-change-mid-glide scenario: the host calls
+    // setupProcessing() -> prepare(fs) while a sweep is sounding, so glide_
+    // is already true when prepare() runs. prepare() must derive its tau
+    // from the current mode (not hardcode the pink tau), because
+    // setGlideMode() is idempotent — a later setGlideMode(true) from the
+    // processor would short-circuit on `on == glide_` and never repair a
+    // wrong tau left behind by prepare().
+    std::vector<float> loud(8192), quiet(8192, 0.0f);
+    for (size_t i = 0; i < loud.size(); ++i)
+        loud[i] = 0.5f * std::sin(2.0 * M_PI * 1000.0 * double(i) / 48000.0);
+
+    Seam::strx::Analyzer pink, glide;
+    pink.prepare(48000.0);
+
+    glide.setGlideMode(true);          // mode set BEFORE prepare()
+    CHECK(glide.glideMode());
+    glide.prepare(48000.0);            // must pick up glide tau, not reset to pink
+    CHECK(glide.glideMode());          // prepare() must not disturb the mode either
+
+    pink.analyze(loud.data(), loud.data(), int(loud.size()));
+    glide.analyze(loud.data(), loud.data(), int(loud.size()));
+    int peakBin = 0;
+    for (int k = 1; k < pink.frame().numBins; ++k)
+        if (pink.frame().holdM[k] > pink.frame().holdM[peakBin]) peakBin = k;
+
+    for (int i = 0; i < 4; ++i) {
+        pink.analyze(quiet.data(), quiet.data(), int(quiet.size()));
+        glide.analyze(quiet.data(), quiet.data(), int(quiet.size()));
+    }
+    CHECK(glide.frame().specM[peakBin] < pink.frame().specM[peakBin] - 6.0f);
+}
