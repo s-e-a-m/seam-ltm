@@ -15,8 +15,8 @@
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 740"
-              minSize="300, 740" maxSize="300, 740"
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 800"
+              minSize="300, 800" maxSize="300, 800"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Title -->
@@ -116,8 +116,17 @@
         <view class="CTextLabel" origin="238, 607" size="46, 16" font="KnobLabelFont"
               font-color="TextLight" text-alignment="left" title="SHOT" transparent="true"/>
 
+        <!-- STONE identity for the calibration bus. ltglide has no slot to be
+             inferred from and the receiver cannot read the host's routing, so
+             this is declared by hand. Default "?" = undeclared. -->
+        <view class="CTextLabel" origin="20, 640" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="STONE" transparent="true"/>
+        <view class="COptionMenu" origin="80, 660" size="140, 20" control-tag="StoneId"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
         <!-- Logo at bottom (native aspect 240x77 — CView does not scale bitmaps) -->
-        <view class="CView" origin="30, 646" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 700" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
@@ -130,5 +139,6 @@
         <control-tag name="Delta"   tag="105"/>
         <control-tag name="Time"    tag="106"/>
         <control-tag name="Loop"    tag="108"/>
+        <control-tag name="StoneId" tag="109"/>
     </control-tags>
 </vstgui-ui-description>

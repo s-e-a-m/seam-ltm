@@ -15,8 +15,8 @@
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 380"
-              minSize="300, 380" maxSize="300, 380"
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 450"
+              minSize="300, 450" maxSize="300, 450"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- Title -->
@@ -52,26 +52,36 @@
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
               frame-width="1" transparent="true" autosize-to-fit="false"/>
 
+        <!-- STONE identity for the calibration bus. Declared by hand, never
+             inferred from the pool slot: with four STONEs in the room, an
+             instance that guesses is an instance that calibrates the wrong
+             power amp. Default "?" = undeclared, which strx renders "STONE ?". -->
+        <view class="CTextLabel" origin="20, 252" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="STONE" transparent="true"/>
+        <view class="COptionMenu" origin="80, 272" size="140, 20" control-tag="StoneId"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
         <!-- Slot badge -->
-        <view class="CTextLabel" origin="20, 252" size="60, 16" font="InfoFont"
+        <view class="CTextLabel" origin="20, 302" size="60, 16" font="InfoFont"
               font-color="TextDim" text-alignment="left" title="Slot:" transparent="true"/>
-        <view class="CParamDisplay" origin="55, 252" size="40, 16" control-tag="SlotStart"
+        <view class="CParamDisplay" origin="55, 302" size="40, 16" control-tag="SlotStart"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
-        <view class="CTextLabel" origin="100, 252" size="60, 16" font="InfoFont"
+        <view class="CTextLabel" origin="100, 302" size="60, 16" font="InfoFont"
               font-color="TextDim" text-alignment="left" title="N:" transparent="true"/>
-        <view class="CParamDisplay" origin="120, 252" size="40, 16" control-tag="SlotCount"
+        <view class="CParamDisplay" origin="120, 302" size="40, 16" control-tag="SlotCount"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
-        <view class="CTextLabel" origin="170, 252" size="110, 16" font="InfoFont"
+        <view class="CTextLabel" origin="170, 302" size="110, 16" font="InfoFont"
               font-color="TextDim" text-alignment="right" title="of 64 pool" transparent="true"/>
 
         <!-- Pool Status -->
-        <view class="CTextLabel" origin="20, 272" size="60, 16" font="InfoFont"
+        <view class="CTextLabel" origin="20, 322" size="60, 16" font="InfoFont"
               font-color="TextDim" text-alignment="left" title="Status:" transparent="true"/>
-        <view class="CParamDisplay" origin="80, 272" size="200, 16" control-tag="PoolStatus"
+        <view class="CParamDisplay" origin="80, 322" size="200, 16" control-tag="PoolStatus"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
 
         <!-- Logo at bottom (native aspect 240x77) -->
-        <view class="CView" origin="30, 295" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 345" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
@@ -79,6 +89,7 @@
         <control-tag name="Reference"  tag="100"/>
         <control-tag name="Trim"       tag="101"/>
         <control-tag name="Mute"       tag="102"/>
+        <control-tag name="StoneId"    tag="103"/>
         <control-tag name="SlotStart"  tag="200"/>
         <control-tag name="SlotCount"  tag="201"/>
         <control-tag name="PoolStatus" tag="202"/>
