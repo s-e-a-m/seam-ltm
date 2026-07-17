@@ -108,6 +108,14 @@
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
               frame-width="1" transparent="true" autosize-to-fit="false"/>
 
+        <!-- Single-shot launch. With LOOP off the transport has no exit from
+             Idle, so this is the only way to fire one pass. Lit for the pass's
+             whole duration (~32 s). -->
+        <view class="CView" origin="220, 609" size="14, 14" custom-view-name="LtglideShot"
+              tooltip="Fire one pass (LOOP off). Lit while the pass runs."/>
+        <view class="CTextLabel" origin="238, 607" size="46, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="SHOT" transparent="true"/>
+
         <!-- Logo at bottom (native aspect 240x77 — CView does not scale bitmaps) -->
         <view class="CView" origin="30, 646" size="240, 77" bitmap="logo"/>
     </template>

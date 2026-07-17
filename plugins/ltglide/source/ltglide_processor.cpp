@@ -1,5 +1,6 @@
 #include "ltglide_processor.h"
 #include "ltglide_ids.h"
+#include "ltglide_shot_button.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -12,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -184,6 +186,11 @@ void LTGLIDEProcessor::publishBusRecord(int64_t hostStartSample) {
 
 tresult PLUGIN_API LTGLIDEProcessor::process(ProcessData& data) {
     readParameterChanges(data);
+
+    // Consume the GUI's shot request. trigger() no-ops unless the transport is
+    // idle, so a press during a pass, or with LOOP on, does nothing.
+    if (shotRequest_.exchange(false, std::memory_order_relaxed)) transport_.trigger();
+
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
 
     glide_.setDelta(paramDeltaSec_.load());
@@ -297,6 +304,20 @@ IPlugView* PLUGIN_API LTGLIDEProcessor::createView(FIDString name) {
     return nullptr;
 }
 
+VSTGUI::CView* PLUGIN_API LTGLIDEProcessor::createCustomView(
+    VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& /*attributes*/,
+    const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* /*editor*/) {
+    if (name && std::string(name) == kViewShot) {
+        VSTGUI::CColor idle = VSTGUI::kGreyCColor, lit = VSTGUI::kBlueCColor;
+        if (description) {
+            description->getColor("SliderTrack", idle);
+            description->getColor("SliderActive", lit);
+        }
+        return new Seam::LtglideShotButton(VSTGUI::CRect(0, 0, 14, 14), this, idle, lit);
+    }
+    return nullptr;
+}
+
 double LTGLIDEProcessor::computeGainLin() const {
     return std::pow(10.0, paramLevelDb_.load() / 20.0);
 }
@@ -386,6 +407,9 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
     int64_t anchor = -1;
     if (busAnchor_.onRunningChanged(transport_.running(), &anchor))
         publishBusRecord(anchor);
+
+    // GUI-thread poll target for the SHOT button's lit state.
+    transportRunning_.store(transport_.running(), std::memory_order_relaxed);
 }
 
 template void LTGLIDEProcessor::processBlock<float>(float**, int, int, int64_t);

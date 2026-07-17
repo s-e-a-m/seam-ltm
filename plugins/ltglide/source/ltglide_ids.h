@@ -21,6 +21,9 @@ enum LTGLIDEParams : Steinberg::Vst::ParamID {
     kParamStoneId = 109,   // 0=undeclared, 1..8 (stepped) — calibration bus
 };
 
+// Custom-view name tag (matches resource/ltglide.uidesc custom-view-name).
+static const char* kViewShot = "LtglideShot";
+
 // STONE identity for the calibration bus (Spec 2). ltglide has no slot to be
 // inferred from and its chain identity lives in the host routing, which the
 // receiver cannot read — so it is declared by hand. 0 = undeclared ("STONE ?").

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
+#include "vstgui/plugin-bindings/vst3editor.h"
 #include "ltglide_ids.h"
 #include "ltglide_dsp.h"
 #include "seam_calbus_client.h"
@@ -22,7 +23,8 @@
 
 namespace Seam {
 
-class LTGLIDEProcessor : public Steinberg::Vst::SingleComponentEffect {
+class LTGLIDEProcessor : public Steinberg::Vst::SingleComponentEffect,
+                         public VSTGUI::VST3EditorDelegate {
 public:
     LTGLIDEProcessor();
     ~LTGLIDEProcessor() override = default;
@@ -44,6 +46,17 @@ public:
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream* state) override;
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) override;
 
+    // VST3EditorDelegate — build the SHOT button custom view by its kView*
+    // name tag (ltglide_ids.h).
+    VSTGUI::CView* PLUGIN_API createCustomView(
+        VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& attributes,
+        const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* editor) override;
+
+    // GUI thread: fire one pass. Ignored by the transport unless it is idle.
+    void requestShot() { shotRequest_.store(true, std::memory_order_relaxed); }
+    // GUI thread: is a pass running right now? Drives the button's lit state.
+    bool transportRunning() const { return transportRunning_.load(std::memory_order_relaxed); }
+
 private:
     // Parameters (audio-thread-readable).
     std::atomic<double> paramLevelDb_{kLevelDefaultDb};
@@ -63,6 +76,15 @@ private:
     // so it is unit-tested (tests/ltglide_dsp_test.cpp) without depending on
     // the VST3 SDK. See ltglide_dsp.h for the -1 contract this exists for.
     ltglide::BusAnchor busAnchor_;
+
+    // SHOT button <-> DSP. No VST3 parameter is involved in either direction:
+    // trigger() is internal transport state, not something a host can automate,
+    // and a parameterless path is also immune to the momentary-button
+    // coalescing problem. This works because SingleComponentEffect makes the
+    // processor and the controller the same object, so the view can reach here
+    // directly — exactly as strx's views read the analyzer.
+    std::atomic<bool> shotRequest_{false};
+    std::atomic<bool> transportRunning_{false};
 
     // Publish this instance's record. Called from the audio thread.
     // hostStartSample is -1 when the host provides no valid continuous clock.
