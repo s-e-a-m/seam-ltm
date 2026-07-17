@@ -250,6 +250,55 @@ TEST_CASE("reset() returns to Idle without resuming a pass mid-way") {
     CHECK(t.process().kind == GlideTransport::Kind::Silence);
 }
 
+TEST_CASE("GlideTransport::trigger fires exactly one pass with LOOP off") {
+    using GT = Seam::ltglide::GlideTransport;
+    GT t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(2.0);
+    t.setLoop(false);
+
+    // With LOOP off the transport is silent forever until triggered: Idle's
+    // only exit is `if (loop_) beginPass()`. This is why SHOT exists.
+    for (int i = 0; i < 1000; ++i) t.process();
+    CHECK_FALSE(t.running());
+    CHECK(t.passCount() == 0u);
+
+    t.trigger();
+    CHECK(t.running());
+    CHECK(t.passCount() == 1u);
+
+    // Run the pass out; with LOOP off it must stop and stay stopped.
+    const long total = (long)((GT::kLeadSec + 2.0 + GT::kTailSec) * 48000.0) + 16;
+    for (long i = 0; i < total; ++i) t.process();
+    CHECK_FALSE(t.running());
+    CHECK(t.passCount() == 1u);
+    for (int i = 0; i < 1000; ++i) t.process();
+    CHECK(t.passCount() == 1u);          // no second pass appeared
+}
+
+TEST_CASE("GlideTransport::trigger during a pass does not restart it") {
+    using GT = Seam::ltglide::GlideTransport;
+    GT t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(2.0);
+    t.setLoop(false);
+
+    t.trigger();
+    CHECK(t.passCount() == 1u);
+    for (long i = 0; i < 48000; ++i) t.process();   // 1 s into the pass
+    CHECK(t.running());
+
+    t.trigger();                                    // must be ignored
+    CHECK(t.passCount() == 1u);
+
+    // A truncated-and-restarted pass would still publish a passCounter and an
+    // anchor, and Spec 3 would average it as if it were whole. The guard is
+    // what stops that.
+    for (long i = 0; i < 48000; ++i) t.process();
+    CHECK(t.running());
+    CHECK(t.passCount() == 1u);
+}
+
 TEST_CASE("passCount survives reset() and prepare()") {
     // Load-bearing monotonicity invariant: a receiver must never see
     // passCounter go backwards. reset() is called from setActive(true)
