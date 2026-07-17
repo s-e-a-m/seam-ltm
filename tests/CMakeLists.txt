@@ -164,3 +164,14 @@ add_test(NAME seam_calbus_version_test COMMAND seam_calbus_version_test)
 set_tests_properties(seam_calbus_version_test PROPERTIES
     ENVIRONMENT "SEAM_CALBUS_PATH=$<TARGET_FILE:calbus_badversion_stub>"
 )
+
+add_executable(strx_calbus_digest_test
+    strx_calbus_digest_test.cpp
+)
+target_include_directories(strx_calbus_digest_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/strx/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
+)
+target_compile_features(strx_calbus_digest_test PRIVATE cxx_std_17)
+add_test(NAME strx_calbus_digest_test COMMAND strx_calbus_digest_test)

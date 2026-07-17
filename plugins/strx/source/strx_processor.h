@@ -4,7 +4,9 @@
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include "strx_ids.h"
 #include "strx_dsp.h"
+#include "strx_calbus_watch.h"
 
+#include <atomic>
 #include <vector>
 
 // FAUST REFERENCE: see strx_dsp.h — sst.sdmx (seam.stereophony.lib) +
@@ -81,10 +83,20 @@ public:
     // triple-buffer. StrxSpectrum (Task 9) uses it for the bin -> Hz mapping.
     double sampleRate() const { return sampleRate_; }
 
+    // GUI thread only. The one cached bus reading both custom views share.
+    Seam::strx::CalbusWatch& calbusWatch() { return calbusWatch_; }
+
 private:
     Seam::strx::Analyzer analyzer_;
     Seam::strx::AnalysisFrame frameCache_;
     double sampleRate_ = 48000.0;
+
+    // GUI -> DSP. Written by the CalbusWatch on the GUI thread, read by
+    // process() once per block. The bus itself is never touched from audio.
+    std::atomic<bool>     specGlide_{false};
+    std::atomic<uint32_t> holdEpoch_{0};
+    uint32_t              lastHoldEpoch_ = 0;
+    Seam::strx::CalbusWatch calbusWatch_{specGlide_, holdEpoch_};
 
     // Analyzer::process() always takes float buffers. When the host processes
     // in kSample64 (double), the pass-through copy stays double-precision but

@@ -55,6 +55,13 @@ tresult PLUGIN_API StrxProcessor::process(ProcessData& data) {
 
     void** in  = getChannelBuffersPointer(processSetup, data.inputs[0]);
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
+
+    // Apply what the GUI read from the bus. Once per block, never per sample,
+    // and never by touching the bus from this thread.
+    analyzer_.setGlideMode(specGlide_.load(std::memory_order_relaxed));
+    const uint32_t he = holdEpoch_.load(std::memory_order_relaxed);
+    if (he != lastHoldEpoch_) { lastHoldEpoch_ = he; analyzer_.resetHold(); }
+
     if (data.symbolicSampleSize == kSample32)
         processBlock<float>((float**)in, (float**)out, data.numSamples);
     else
@@ -142,7 +149,7 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
         VSTGUI::CColor text = VSTGUI::kGreyCColor;
         if (description) description->getColor("TextDim", text);
-        return new Seam::StrxStatusLine(VSTGUI::CRect(0, 0, 300, 26), font, text);
+        return new Seam::StrxStatusLine(VSTGUI::CRect(0, 0, 300, 26), this, font, text);
     }
     return nullptr;
 }
