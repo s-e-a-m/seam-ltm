@@ -693,8 +693,46 @@ inline CalbusDigest digest(const SeamCalbusRecord* recs, int32_t n, bool availab
     return d;
 }
 
+// Decides whether a NEW measurement pass has begun and the hold must
+// therefore be cleared. `lastPass` is in/out state owned by the caller (one
+// instance per watch, since only one emitter is ever measured at a time).
+//
+// Keying the decision on `passCounter` ALONE is a bug: `passCounter` is
+// per-emitter-instance and starts at 1 on that instance's first pass
+// (GlideTransport::beginPass() increments before a pass sounds — see
+// ltglide_dsp.h), so STONE 1's pass 1 and STONE 2's pass 1 are the same
+// number. Resetting `lastPass` to 0 whenever no glide is sounding closes that
+// gap: 0 can never collide with a real pass number (an ACTIVE glide always
+// has passCounter >= 1, because beginPass() sets the non-Idle state and
+// increments the counter together), and there is always a moment with no
+// glide active between two different STONEs being measured one at a time —
+// the previous chain stops before the next one starts. Within a single
+// LOOPING instance the sentinel never resets (the transport's `active` flag
+// stays 1 across a loop's passes, so `d.glide` never goes false), but that is
+// fine: `passCounter` itself increments on every new pass, so the `!=` check
+// alone keeps catching each one.
+inline bool shouldResetHold(const CalbusDigest& d, uint64_t& lastPass) {
+    if (!d.glide) {
+        lastPass = 0;
+        return false;
+    }
+    if (d.passCounter != lastPass) {
+        lastPass = d.passCounter;
+        return true;
+    }
+    return false;
+}
+
 }} // namespace Seam::strx
 ```
+
+**Post-review addendum:** the code block above already includes
+`shouldResetHold()`, added by a review round that caught a collision: keying
+the hold-reset decision on `passCounter` alone lets two different ltglide
+instances' identical pass-1 counters look like "the same pass" (see the
+function's own comment for the full argument). The pure decision now lives
+next to `digest()` — SDK-free and unit-tested — and `CalbusWatch::poll()`
+(Step 6 below) only calls it; it owns no decision logic of its own.
 
 - [ ] **Step 4: Add the test target**
 
@@ -722,7 +760,13 @@ cmake --build build-test --target strx_calbus_digest_test --config Release
 ./build-test/tests/Release/strx_calbus_digest_test
 ```
 
-Expected: 7 cases pass.
+Expected: 7 cases pass. (A later review round added `shouldResetHold()` plus
+its own coverage — a new pass bumps once, the cross-instance pass-1 collision,
+idle-glide never bumps, pink never bumps, a looping instance bumps once per
+counter increment — plus two cases hardening `digest()` itself: `available ==
+false` with live non-null records, and `count == 4` on the four-record case.
+13 cases / 57 assertions is the number to expect once that round's fixes are
+folded in.)
 
 - [ ] **Step 6: Write the watch**
 
@@ -778,9 +822,12 @@ public:
 
         // Drive the DSP. setGlideMode is idempotent, so publishing every poll
         // costs nothing; the hold epoch only moves when a new pass starts.
+        // The actual new-pass decision (and the per-emitter sentinel that
+        // makes it collision-safe across instances) is shouldResetHold(),
+        // next to digest() — pure and unit-tested, so this watch keeps only
+        // the snapshot + rate-limit + atomic-store duties.
         glide_.store(digest_.glide, std::memory_order_relaxed);
-        if (digest_.glide && digest_.passCounter != lastPass_) {
-            lastPass_ = digest_.passCounter;
+        if (shouldResetHold(digest_, lastPass_)) {
             holdEpoch_.fetch_add(1, std::memory_order_relaxed);
         }
         return digest_;

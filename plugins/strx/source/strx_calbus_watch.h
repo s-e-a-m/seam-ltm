@@ -47,9 +47,12 @@ public:
 
         // Drive the DSP. setGlideMode is idempotent, so publishing every poll
         // costs nothing; the hold epoch only moves when a new pass starts.
+        // The actual new-pass decision (and the per-emitter sentinel that
+        // makes it collision-safe across instances) is shouldResetHold(),
+        // next to digest() — pure and unit-tested, so this watch keeps only
+        // the snapshot + rate-limit + atomic-store duties.
         glide_.store(digest_.glide, std::memory_order_relaxed);
-        if (digest_.glide && digest_.passCounter != lastPass_) {
-            lastPass_ = digest_.passCounter;
+        if (shouldResetHold(digest_, lastPass_)) {
             holdEpoch_.fetch_add(1, std::memory_order_relaxed);
         }
         return digest_;
