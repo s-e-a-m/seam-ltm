@@ -48,11 +48,11 @@ public:
 
     StrxSpectrum(const VSTGUI::CRect& size, StrxProcessor* processor,
                  VSTGUI::CFontRef font,
-                 const VSTGUI::CColor& labelColor, const VSTGUI::CColor& textColor,
+                 const VSTGUI::CColor& structureColor, const VSTGUI::CColor& textColor,
                  const VSTGUI::CColor& trackColor,
                  const VSTGUI::CColor& colorM, const VSTGUI::CColor& colorS)
         : VSTGUI::CView(size), processor_(processor), font_(font),
-          labelColor_(labelColor), textColor_(textColor), trackColor_(trackColor),
+          structureColor_(structureColor), textColor_(textColor), trackColor_(trackColor),
           colorM_(colorM), colorS_(colorS) {
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
@@ -75,10 +75,6 @@ public:
         const CRect r = getViewSize();
         c->setDrawMode(kAntiAliasing);
 
-        // Background.
-        c->setFillColor(trackColor_);
-        c->drawRect(r, kDrawFilled);
-
         const CRect plot(r.left + kLeftMargin, r.top + kTopMargin,
                           r.right - kRightMargin, r.bottom - kBottomMargin);
 
@@ -98,7 +94,7 @@ public:
         if (font_) c->setFont(font_);
 
         // --- dB grid (horizontal lines every 20 dB) + left-axis labels. ---
-        CColor grid = labelColor_;
+        CColor grid = structureColor_;
         grid.alpha = 70;
         static constexpr double kDbLines[] = { 0.0, -20.0, -40.0, -60.0, -80.0, -100.0, -120.0 };
         for (double db : kDbLines) {
@@ -108,7 +104,7 @@ public:
             c->drawLine(CPoint(plot.left, y), CPoint(plot.right, y));
             char buf[8];
             std::snprintf(buf, sizeof buf, "%.0f", db);
-            c->setFontColor(labelColor_);
+            c->setFontColor(structureColor_);
             c->drawString(buf, CRect(r.left, y - 6, plot.left - 3, y + 6), kRightText);
         }
 
@@ -122,12 +118,12 @@ public:
             c->setFrameColor(grid);
             c->setLineWidth(1.0);
             c->drawLine(CPoint(x, plot.top), CPoint(x, plot.bottom));
-            c->setFontColor(labelColor_);
+            c->setFontColor(structureColor_);
             c->drawString(fl.label, CRect(x - 16, plot.bottom + 1, x + 16, r.bottom), kCenterText);
         }
 
         // Plot border.
-        c->setFrameColor(labelColor_);
+        c->setFrameColor(structureColor_);
         c->setLineWidth(1.0);
         c->drawRect(plot, kDrawStroked);
 
@@ -177,7 +173,7 @@ public:
 private:
     StrxProcessor* processor_ = nullptr;
     VSTGUI::CFontRef font_ = nullptr;
-    VSTGUI::CColor labelColor_, textColor_, trackColor_, colorM_, colorS_;
+    VSTGUI::CColor structureColor_, textColor_, trackColor_, colorM_, colorS_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
 };
 

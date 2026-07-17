@@ -102,54 +102,54 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
     const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* /*editor*/) {
     if (name && std::string(name) == kViewMeters) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
-        VSTGUI::CColor label = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor structure = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
         VSTGUI::CColor track = VSTGUI::kBlackCColor, fill(0xc8, 0xa2, 0x4a, 0xff);
         VSTGUI::CColor inv(0xc0, 0x40, 0x40, 0xff);
         if (description) {
-            description->getColor("TextDim", label);
+            description->getColor("Structure", structure);
             description->getColor("TextLight", text);
             description->getColor("SliderTrack", track);
             description->getColor("MeterFill", fill);
             description->getColor("MeterInv", inv);
         }
-        return new Seam::StrxMeters(VSTGUI::CRect(0, 0, 270, 260), this, font,
-                                     label, text, track, fill, inv);
+        return new Seam::StrxMeters(VSTGUI::CRect(0, 0, 270, 300), this, font,
+                                     structure, text, track, fill, inv);
     }
     if (name && std::string(name) == kViewGoniometer) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
-        VSTGUI::CColor label = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor structure = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
         VSTGUI::CColor track = VSTGUI::kBlackCColor, fill(0xc8, 0xa2, 0x4a, 0xff);
         VSTGUI::CColor needle(0x4a, 0x9e, 0xc8, 0xff);   // SliderActive azure (the M colour)
         if (description) {
-            description->getColor("TextDim", label);
+            description->getColor("Structure", structure);
             description->getColor("TextLight", text);
             description->getColor("SliderTrack", track);
             description->getColor("MeterFill", fill);
             description->getColor("SliderActive", needle);
         }
-        return new Seam::StrxGoniometer(VSTGUI::CRect(0, 0, 260, 260), this, font,
-                                         label, text, track, fill, needle);
+        return new Seam::StrxGoniometer(VSTGUI::CRect(0, 0, 260, 300), this, font,
+                                         structure, text, track, fill, needle);
     }
     if (name && std::string(name) == kViewSpectrum) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
-        VSTGUI::CColor label = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor structure = VSTGUI::kGreyCColor, text = VSTGUI::kWhiteCColor;
         VSTGUI::CColor track = VSTGUI::kBlackCColor;
         VSTGUI::CColor colorM(0x4a, 0x9e, 0xc8, 0xff), colorS(0xc8, 0xa2, 0x4a, 0xff);
         if (description) {
-            description->getColor("TextDim", label);
+            description->getColor("Structure", structure);
             description->getColor("TextLight", text);
             description->getColor("SliderTrack", track);
             description->getColor("SliderActive", colorM);
             description->getColor("MeterFill", colorS);
         }
-        return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 310, 260), this, font,
-                                       label, text, track, colorM, colorS);
+        return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 560, 240), this, font,
+                                       structure, text, track, colorM, colorS);
     }
     if (name && std::string(name) == kViewStatus) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
-        VSTGUI::CColor text = VSTGUI::kGreyCColor;
-        if (description) description->getColor("TextDim", text);
-        return new Seam::StrxStatusLine(VSTGUI::CRect(0, 0, 300, 26), this, font, text);
+        VSTGUI::CColor text = VSTGUI::kWhiteCColor;
+        if (description) description->getColor("TextLight", text);
+        return new Seam::StrxStatusLine(VSTGUI::CRect(0, 0, 560, 26), this, font, text);
     }
     return nullptr;
 }

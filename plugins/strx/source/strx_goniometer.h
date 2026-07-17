@@ -52,11 +52,15 @@ public:
     static constexpr double kDecayFactor  = 0.55;    // per-age alpha multiplier
 
     // --- Layout / drawing ---
-    static constexpr double kMarginFrac   = 0.06;    // circle inset as a fraction of the view
+    // The view splits into three vertical bands: label (L/R), plot (circle +
+    // scatter), value (ANGLE/PANORAMA readout). The plot band is sized to
+    // match the meters' bar band at the same absolute y, so the circle and
+    // the bars align by construction — nobody hand-tunes either to match.
+    static constexpr double kLabelBandH   = 18.0;    // top band: L / R
+    static constexpr double kValueBandH   = 22.0;    // bottom band: ANGLE / PANORAMA
+    static constexpr double kMarginFrac   = 0.06;    // circle inset as a fraction of the plot band
     static constexpr double kPointHalfPx  = 1.3;     // scatter point half-size (px)
-    static constexpr double kAxisFrac     = 0.98;     // diagonal axis length vs. circle radius
-    static constexpr double kLabelFrac    = 1.10;    // L/R label placement vs. circle radius (>1 = outside the circle, in the corners)
-    static constexpr double kReadoutH     = 16.0;    // bottom readout strip height (px)
+    static constexpr double kAxisFrac     = 0.98;    // diagonal axis length vs. circle radius
 
     // --- Radial scale (log-dB, floored) ---
     static constexpr double kRadiusFloorDb = -48.0;  // signals at/below this floor sit at the circle's center
@@ -66,11 +70,11 @@ public:
 
     StrxGoniometer(const VSTGUI::CRect& size, StrxProcessor* processor,
                    VSTGUI::CFontRef font,
-                   const VSTGUI::CColor& labelColor, const VSTGUI::CColor& textColor,
+                   const VSTGUI::CColor& structureColor, const VSTGUI::CColor& textColor,
                    const VSTGUI::CColor& trackColor, const VSTGUI::CColor& fillColor,
                    const VSTGUI::CColor& needleColor)
         : VSTGUI::CView(size), processor_(processor), font_(font),
-          labelColor_(labelColor), textColor_(textColor),
+          structureColor_(structureColor), textColor_(textColor),
           trackColor_(trackColor), fillColor_(fillColor), needleColor_(needleColor) {
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
@@ -88,44 +92,45 @@ public:
         const CRect r = getViewSize();
         c->setDrawMode(kAntiAliasing);
 
-        // Background.
-        c->setFillColor(trackColor_);
-        c->drawRect(r, kDrawFilled);
+        // Label band: L / R, outside the plot so they never eat into it.
+        if (font_) {
+            c->setFont(font_);
+            c->setFontColor(textColor_);
+            const CRect labelBand(r.left, r.top, r.right, r.top + kLabelBandH);
+            c->drawString("L", CRect(labelBand.left + 4, labelBand.top, labelBand.left + 40, labelBand.bottom), kLeftText);
+            c->drawString("R", CRect(labelBand.right - 40, labelBand.top, labelBand.right - 4, labelBand.bottom), kRightText);
+        }
 
-        const CCoord plotBottom = r.bottom - kReadoutH;
-        const CCoord side = std::min(r.getWidth(), plotBottom - r.top);
+        // Plot band: sized to itself, not to the whole view, so the circle's
+        // diameter equals the meters' bar height at the same absolute y.
+        const CCoord plotTop = r.top + kLabelBandH;
+        const CCoord plotBottom = r.bottom - kValueBandH;
+        const CCoord side = std::min(r.getWidth(), plotBottom - plotTop);
         const CCoord margin = side * kMarginFrac;
         const CCoord radius = std::max(1.0, side * 0.5 - margin);
-        const CPoint center((r.left + r.right) * 0.5, (r.top + plotBottom) * 0.5);
+        const CPoint center((r.left + r.right) * 0.5, (plotTop + plotBottom) * 0.5);
 
-        // Bounding circle.
-        c->setFrameColor(labelColor_);
+        // Bounding circle: structure, not data.
+        c->setFrameColor(structureColor_);
         c->setLineWidth(1.0);
         c->drawEllipse(CRect(center.x - radius, center.y - radius,
                               center.x + radius, center.y + radius), kDrawStroked);
 
         // Light grid: S (horizontal) and M (vertical) crosshair.
-        CColor grid = labelColor_;
+        CColor grid = structureColor_;
         grid.alpha = 70;
         c->setFrameColor(grid);
         c->drawLine(CPoint(center.x - radius, center.y), CPoint(center.x + radius, center.y));
         c->drawLine(CPoint(center.x, center.y - radius), CPoint(center.x, center.y + radius));
 
-        // L/R diagonal axes: pure-L is gx==gy, pure-R is gx==-gy.
+        // L/R diagonal axes: pure-L is gx==gy, pure-R is gx==-gy. The L/R
+        // letters that used to sit at these corners now live in the label
+        // band above; the lines alone are enough of a reference once the
+        // scatter is on screen.
         const CCoord d = radius * kAxisFrac * 0.70710678; // projected onto each screen axis
-        const CCoord dLabel = radius * kLabelFrac * 0.70710678; // label placement, inset from the axis line
-        c->setFrameColor(labelColor_);
+        c->setFrameColor(structureColor_);
         c->drawLine(CPoint(center.x - d, center.y + d), CPoint(center.x + d, center.y - d)); // R: bottom-left <-> top-right
         c->drawLine(CPoint(center.x - d, center.y - d), CPoint(center.x + d, center.y + d)); // L: top-left <-> bottom-right
-        if (font_) {
-            c->setFont(font_);
-            c->setFontColor(labelColor_);
-            // Mirrored screen mapping (sx = cx - gx*scale): pure L (l>0, r=0):
-            // gx=gy=+0.707l -> screen (cx-d, cy-d), top-left.
-            // Pure R (r>0, l=0): gx=-0.707r, gy=+0.707r -> screen (cx+d, cy-d), top-right.
-            c->drawString("L", CRect(center.x - dLabel - 8, center.y - dLabel - 14, center.x - dLabel + 8, center.y - dLabel), kCenterText);
-            c->drawString("R", CRect(center.x + dLabel - 8, center.y - dLabel - 14, center.x + dLabel + 8, center.y - dLabel), kCenterText);
-        }
 
         const Generation& newest = history_[head_];
 
@@ -225,7 +230,7 @@ private:
 
     StrxProcessor* processor_ = nullptr;
     VSTGUI::CFontRef font_ = nullptr;
-    VSTGUI::CColor labelColor_, textColor_, trackColor_, fillColor_, needleColor_;
+    VSTGUI::CColor structureColor_, textColor_, trackColor_, fillColor_, needleColor_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
 
     std::array<Generation, kTrailFrames> history_{};

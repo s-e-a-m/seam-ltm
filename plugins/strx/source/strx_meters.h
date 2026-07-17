@@ -37,11 +37,11 @@ public:
 
     StrxMeters(const VSTGUI::CRect& size, StrxProcessor* processor,
                VSTGUI::CFontRef font,
-               const VSTGUI::CColor& labelColor, const VSTGUI::CColor& textColor,
+               const VSTGUI::CColor& structureColor, const VSTGUI::CColor& textColor,
                const VSTGUI::CColor& trackColor, const VSTGUI::CColor& fillColor,
                const VSTGUI::CColor& invColor)
         : VSTGUI::CView(size), processor_(processor), font_(font),
-          labelColor_(labelColor), textColor_(textColor),
+          structureColor_(structureColor), textColor_(textColor),
           trackColor_(trackColor), fillColor_(fillColor), invColor_(invColor) {
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
@@ -68,8 +68,11 @@ public:
         static const char* kLabels[kNumBars] = { "L", "R", "M", "S", "W" };
         const float dbValues[4] = { frame.inL, frame.inR, frame.mid, frame.side };
 
-        const CCoord labelH  = 14.0;  // top row: bar name
-        const CCoord valueH  = 12.0;  // bottom row: dB / mono-wide-inv readout
+        // Label/plot/value bands match the goniometer's exactly (same
+        // absolute y within each view), so the bars are as tall as the
+        // circle without either view being tuned to match the other.
+        const CCoord labelH  = 18.0;  // top band: bar name
+        const CCoord valueH  = 22.0;  // bottom band: dB / mono-wide-inv readout
         const CCoord gap     = 6.0;
         const CCoord top     = r.top + labelH;
         const CCoord bottom  = r.bottom - valueH;
@@ -105,8 +108,8 @@ public:
                 c->drawRect(fill, kDrawFilled);
             }
 
-            // Frame outline over the fill.
-            c->setFrameColor(labelColor_);
+            // Frame outline over the fill: structure, not data.
+            c->setFrameColor(structureColor_);
             c->setLineWidth(1.0);
             c->drawRect(track, kDrawStroked);
 
@@ -121,7 +124,7 @@ public:
 private:
     StrxProcessor* processor_ = nullptr;
     VSTGUI::CFontRef font_ = nullptr;
-    VSTGUI::CColor labelColor_, textColor_, trackColor_, fillColor_, invColor_;
+    VSTGUI::CColor structureColor_, textColor_, trackColor_, fillColor_, invColor_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
 };
 
