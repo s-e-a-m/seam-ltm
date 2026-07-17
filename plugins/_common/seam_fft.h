@@ -69,13 +69,38 @@ public:
         scratch_.assign(2*n_, 0.0f);
         magDb_.assign(bins_, -120.0f);
         magLin_.assign(bins_, 0.0f);
+        holdLin_.assign(bins_, 0.0f);
+        holdDb_.assign(bins_, -120.0f);
         reset();
     }
+
+    // Change the EMA time constant in place. Used to switch between the slow
+    // average that reads pink noise well (tau = 2 s) and the fast one a swept
+    // tone needs (tau = 0.1 s): a sweep presents ONE frequency at a time, so a
+    // slow average sees a moving peak and smears it.
+    void setEmaTau(double tau) {
+        const double dt = double(hop_) / fs_;
+        ema_ = (tau > 0.0) ? std::exp(-dt / tau) : 0.0;
+    }
+
+    // Clear the max-hold without disturbing the EMA, the ring, or the window.
+    void resetHold() {
+        std::fill(holdLin_.begin(), holdLin_.end(), 0.0f);
+        std::fill(holdDb_.begin(), holdDb_.end(), -120.0f);
+    }
+
+    // Per-bin maximum power ever seen since the last resetHold(), in dB.
+    // Always computed — it costs one compare per bin per frame (~23 frames/s
+    // at hop 2048 / 48 kHz), so there is no mode to get wrong.
+    const float* holdDb() const { return holdDb_.data(); }
+
     void reset() {
         pos_ = 0; sinceHop_ = 0; primed_ = false; newFrame_ = false;
         std::fill(ring_.begin(), ring_.end(), 0.0f);
         std::fill(magLin_.begin(), magLin_.end(), 0.0f);
         std::fill(magDb_.begin(), magDb_.end(), -120.0f);
+        std::fill(holdLin_.begin(), holdLin_.end(), 0.0f);
+        std::fill(holdDb_.begin(), holdDb_.end(), -120.0f);
     }
     void push(float x) {
         ring_[pos_] = x;
@@ -97,6 +122,11 @@ private:
         for (int k = 0; k < bins_; ++k) {
             const double re = scratch_[2*k], im = scratch_[2*k+1];
             const double p = (re*re + im*im) * winNorm_;   // power
+            if (p > holdLin_[k]) {                      // max-hold on raw power
+                holdLin_[k] = float(p);
+                const double hdb = 10.0 * std::log10(p > 1e-12 ? p : 1e-12);
+                holdDb_[k] = float(hdb < -120.0 ? -120.0 : hdb);
+            }
             magLin_[k] = float(p + ema_ * (magLin_[k] - p)); // EMA on power
             const double db = 10.0 * std::log10(magLin_[k] > 1e-12 ? magLin_[k] : 1e-12);
             magDb_[k] = float(db < -120.0 ? -120.0 : db);
@@ -106,7 +136,7 @@ private:
     int n_=0, bins_=0, hop_=0, pos_=0, sinceHop_=0;
     double fs_=48000.0, ema_=0.0, winNorm_=1.0;
     bool primed_=false, newFrame_=false;
-    std::vector<float> win_, ring_, scratch_, magLin_, magDb_;
+    std::vector<float> win_, ring_, scratch_, magLin_, magDb_, holdLin_, holdDb_;
 };
 
 }} // namespace seam::fft

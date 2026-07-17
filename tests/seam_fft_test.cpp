@@ -97,3 +97,91 @@ TEST_CASE("Welch: half-scale sine peak bin reads ~-6 dBFS") {
     CHECK(peak == 64);
     CHECK(std::abs((double)mag[64] - (-6.0)) < 0.5); // within 0.5 dB of -6 dBFS
 }
+
+// A full-scale sine at an exact bin centre, pushed long enough for the EMA to
+// settle, then silence. The EMA decays toward the floor; the hold must not.
+static void pushSine(seam::fft::Welch& w, double fs, double freq, int nSamples) {
+    for (int i = 0; i < nSamples; ++i)
+        w.push(float(std::sin(2.0 * M_PI * freq * double(i) / fs)));
+}
+static void pushSilence(seam::fft::Welch& w, int nSamples) {
+    for (int i = 0; i < nSamples; ++i) w.push(0.0f);
+}
+
+TEST_CASE("Welch max-hold keeps the peak after the tone stops") {
+    const double fs = 48000.0;
+    const int    n  = 1024;
+    seam::fft::Welch w;
+    w.prepare(n, 0.05, fs);              // short tau so the EMA decays fast
+
+    const int    bin  = 64;
+    const double freq = double(bin) * fs / double(n);   // exact bin centre
+    pushSine(w, fs, freq, n * 20);
+
+    const float peakEma  = w.magnitudeDb()[bin];
+    const float peakHold = w.holdDb()[bin];
+    CHECK(peakEma  > -6.0f);             // full-scale sine reads ~0 dBFS
+    CHECK(peakHold > -6.0f);
+
+    pushSilence(w, n * 40);
+    CHECK(w.magnitudeDb()[bin] < -60.0f);   // EMA decayed to the floor
+    CHECK(w.holdDb()[bin] == peakHold);     // hold did NOT move
+}
+
+TEST_CASE("Welch resetHold clears the hold and leaves the EMA alone") {
+    const double fs = 48000.0;
+    const int    n  = 1024;
+    seam::fft::Welch w;
+    w.prepare(n, 2.0, fs);
+
+    const int bin = 64;
+    pushSine(w, fs, double(bin) * fs / double(n), n * 20);
+    CHECK(w.holdDb()[bin] > -6.0f);
+
+    const float emaBefore = w.magnitudeDb()[bin];
+    w.resetHold();
+    CHECK(w.holdDb()[bin] == -120.0f);          // hold cleared
+    CHECK(w.magnitudeDb()[bin] == emaBefore);   // EMA untouched
+}
+
+TEST_CASE("Welch setEmaTau changes the decay rate and nothing else") {
+    const double fs = 48000.0;
+    const int    n  = 1024;
+    const int    bin = 64;
+    const double freq = double(bin) * fs / double(n);
+
+    // Same excitation, same silence, two different taus -> the SHORT tau must
+    // have decayed further. This is the property glide mode depends on.
+    //
+    // Excitation length: slow.prepare() keeps its tau = 2 s for this burst
+    // (fast switches to 0.1 s below), so the burst must run several of ITS
+    // time constants or slow never reaches steady state and starts the
+    // silence already far below 0 dBFS, collapsing the margin this check
+    // relies on. n*20 (~0.43 s, ~0.2 tau) settles fast (tau 0.1 s) but
+    // leaves slow only ~19% converged; n*200 (~4.3 s, ~2 tau) settles both.
+    seam::fft::Welch slow, fast;
+    slow.prepare(n, 2.0, fs);
+    fast.prepare(n, 2.0, fs);
+    fast.setEmaTau(0.1);                        // switch at runtime
+
+    pushSine(slow, fs, freq, n * 200);
+    pushSine(fast, fs, freq, n * 200);
+    pushSilence(slow, n * 10);
+    pushSilence(fast, n * 10);
+
+    CHECK(fast.magnitudeDb()[bin] < slow.magnitudeDb()[bin] - 6.0f);
+
+    // The hold is independent of tau: both saw the same peak.
+    CHECK(slow.holdDb()[bin] == doctest::Approx(fast.holdDb()[bin]).epsilon(0.01));
+}
+
+TEST_CASE("Welch reset clears the hold too") {
+    const double fs = 48000.0;
+    const int    n  = 1024;
+    seam::fft::Welch w;
+    w.prepare(n, 2.0, fs);
+    pushSine(w, fs, double(64) * fs / double(n), n * 20);
+    CHECK(w.holdDb()[64] > -6.0f);
+    w.reset();
+    CHECK(w.holdDb()[64] == -120.0f);
+}
