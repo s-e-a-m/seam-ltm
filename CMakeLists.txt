@@ -81,21 +81,38 @@ add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
 add_subdirectory(plugins/_common/calbus)
 
 # ─── Plugins ─────────────────────────────────────────────────────────────────
-add_subdirectory(plugins/sdmx)
-add_subdirectory(plugins/xyprrot)
-add_subdirectory(plugins/b2xrot)
-add_subdirectory(plugins/lr2xhgr)
-add_subdirectory(plugins/m2xhgr)
-add_subdirectory(plugins/bamodulex)
-add_subdirectory(plugins/ddelay)
-add_subdirectory(plugins/multipink)
-add_subdirectory(plugins/x2uhj)
-add_subdirectory(plugins/abmodulex)
-add_subdirectory(plugins/hilbert)
-add_subdirectory(plugins/ltburst)
-add_subdirectory(plugins/ltglide)
-add_subdirectory(plugins/dslar)
-add_subdirectory(plugins/strx)
+# smtg_add_vst3plugin installs a POST_BUILD symlink into
+# ~/Library/Audio/Plug-Ins/VST3, and the LAST build tree to compile a target
+# owns that symlink. So a throwaway build tree that also builds plugins will
+# silently hijack the links the DAW loads — and when that tree is deleted, the
+# plugin vanishes from the host. This has bitten twice (dslar → /tmp, 2026-07-14;
+# multipink → build-test, 2026-07-17).
+#
+# Turn this OFF for any build tree that is not the one feeding the DAW:
+#   cmake -B build-test -DSEAM_BUILD_TESTS=ON -DSEAM_BUILD_PLUGINS=OFF
+# The unit tests need only the SDK-free cores (headers) and libseamcalbus, both
+# of which are configured above, outside this block.
+option(SEAM_BUILD_PLUGINS "Build the VST3 plugins (owns the ~/Library/Audio/Plug-Ins/VST3 symlinks)" ON)
+
+if(SEAM_BUILD_PLUGINS)
+    add_subdirectory(plugins/sdmx)
+    add_subdirectory(plugins/xyprrot)
+    add_subdirectory(plugins/b2xrot)
+    add_subdirectory(plugins/lr2xhgr)
+    add_subdirectory(plugins/m2xhgr)
+    add_subdirectory(plugins/bamodulex)
+    add_subdirectory(plugins/ddelay)
+    add_subdirectory(plugins/multipink)
+    add_subdirectory(plugins/x2uhj)
+    add_subdirectory(plugins/abmodulex)
+    add_subdirectory(plugins/hilbert)
+    add_subdirectory(plugins/ltburst)
+    add_subdirectory(plugins/ltglide)
+    add_subdirectory(plugins/dslar)
+    add_subdirectory(plugins/strx)
+else()
+    message(STATUS "[SEAM] SEAM_BUILD_PLUGINS=OFF — plugins skipped; VST3 symlinks left untouched")
+endif()
 
 if(SEAM_BUILD_TESTS)
     add_subdirectory(tests)
