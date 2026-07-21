@@ -129,5 +129,128 @@ class TestCheckFile(unittest.TestCase):
         self.assertIn("malformed XML", errors[0])
 
 
+class TestPalette(unittest.TestCase):
+    def _root(self, colors):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(TITLE_OK, colors=colors))
+
+    def test_canonical_palette_passes(self):
+        root = self._root(
+            '<color name="BgDark" rgba="#292c2fff"/>'
+            '<color name="TextLight" rgba="#fcfbfdff"/>'
+            '<color name="SliderTrack" rgba="#444444ff"/>'
+            '<color name="SliderActive" rgba="#4a9ec8ff"/>')
+        self.assertEqual(check_uidesc.check_palette(root, "p.uidesc"), [])
+
+    def test_allowed_accent_passes(self):
+        root = self._root('<color name="TextLight" rgba="#fcfbfdff"/>'
+                          '<color name="MeterFill" rgba="#c8a24aff"/>')
+        self.assertEqual(check_uidesc.check_palette(root, "p.uidesc"), [])
+
+    def test_wrong_rgba_for_known_name_fails(self):
+        root = self._root('<color name="TextLight" rgba="#ffffffff"/>')
+        errors = check_uidesc.check_palette(root, "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("#fcfbfdff", errors[0])
+
+    def test_unknown_color_name_fails(self):
+        root = self._root('<color name="TextLight" rgba="#fcfbfdff"/>'
+                          '<color name="HotPink" rgba="#ff69b4ff"/>')
+        errors = check_uidesc.check_palette(root, "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("HotPink", errors[0])
+
+
+class TestNoTextDim(unittest.TestCase):
+    def _root(self, body, colors='<color name="TextLight" rgba="#fcfbfdff"/>'):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(body, colors=colors))
+
+    def test_clean_file_passes(self):
+        self.assertEqual(
+            check_uidesc.check_no_textdim(self._root(TITLE_OK), "p.uidesc"), [])
+
+    def test_definition_alone_fails(self):
+        root = self._root(TITLE_OK,
+                          colors='<color name="TextLight" rgba="#fcfbfdff"/>'
+                                 '<color name="TextDim" rgba="#888888ff"/>')
+        errors = check_uidesc.check_no_textdim(root, "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("definition", errors[0])
+
+    def test_usage_as_boxframe_fails(self):
+        body = TITLE_OK + ('\n    <view class="CCheckBox" origin="0, 40" size="80, 20"'
+                           ' title="LOOP" font-color="TextLight"'
+                           ' boxframe-color="TextDim"/>')
+        errors = check_uidesc.check_no_textdim(self._root(body), "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("boxframe-color", errors[0])
+
+
+class TestFontColors(unittest.TestCase):
+    def _root(self, body):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(body))
+
+    def test_textlight_passes(self):
+        self.assertEqual(
+            check_uidesc.check_font_colors(self._root(TITLE_OK), "p.uidesc"), [])
+
+    def test_missing_font_color_fails(self):
+        body = ('    <view class="CTextLabel" origin="0, 18" size="300, 26"'
+                ' font="TitleFont" title="SEAM DEMO"/>')
+        errors = check_uidesc.check_font_colors(self._root(body), "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("declares no font-color", errors[0])
+
+    def test_accent_on_text_fails(self):
+        body = TITLE_OK + ('\n    <view class="CTextLabel" origin="0, 60" size="300, 14"'
+                           ' font="TitleFont" font-color="Structure" title="x"/>')
+        errors = check_uidesc.check_font_colors(self._root(body), "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Structure", errors[0])
+
+    def test_untitled_checkbox_is_exempt(self):
+        # dslar's Power box draws no text of its own — its caption is a
+        # separate CTextLabel — so it has no font-color to declare.
+        body = TITLE_OK + ('\n    <view class="CCheckBox" origin="93, 88" size="14, 14"'
+                           ' control-tag="Power" title=""/>')
+        self.assertEqual(
+            check_uidesc.check_font_colors(self._root(body), "p.uidesc"), [])
+
+
+class TestZoneOrder(unittest.TestCase):
+    def _root(self, body):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(body))
+
+    SETUP = ('    <view class="COptionMenu" origin="160, 106" size="140, 20"'
+             ' control-tag="StoneId" font-color="TextLight"/>')
+    OPS = ('    <view class="CCheckBox" origin="180, 140" size="100, 20"'
+           ' control-tag="Power" title="POWER" font-color="TextLight"/>')
+    FINE = ('    <view class="CSlider" origin="30, 228" size="180, 18"'
+            ' control-tag="Trim"/>')
+
+    def test_correct_order_passes(self):
+        body = "\n".join([TITLE_OK, self.SETUP, self.OPS, self.FINE])
+        self.assertEqual(check_uidesc.check_zone_order(self._root(body), "p.uidesc"), [])
+
+    def test_setup_below_ops_warns(self):
+        setup_low = self.SETUP.replace('origin="160, 106"', 'origin="160, 252"')
+        body = "\n".join([TITLE_OK, setup_low, self.OPS, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("SETUP", messages[0])
+
+    def test_ops_below_fine_warns(self):
+        ops_low = self.OPS.replace('origin="180, 140"', 'origin="180, 606"')
+        body = "\n".join([TITLE_OK, self.SETUP, ops_low, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("OPS", messages[0])
+
+
 if __name__ == "__main__":
     unittest.main()

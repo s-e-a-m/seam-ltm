@@ -67,6 +67,128 @@ def check_title(root, plugin_name, path):
     return []
 
 
+# The standard's palette. A name that appears here must carry exactly this
+# rgba; a colour name absent from both tables is a drift and an error.
+CANONICAL_COLORS = {
+    "BgDark":       "#292c2fff",
+    "TextLight":    "#fcfbfdff",
+    "SliderTrack":  "#444444ff",
+    "SliderActive": "#4a9ec8ff",
+}
+# Functional accents: allowed, but only where a plugin genuinely needs them.
+# Structure is graphic structure (frames, axes, circles) and never text.
+ACCENT_COLORS = {
+    "MeterFill": "#c8a24aff",
+    "MeterInv":  "#c04040ff",
+    "SliderDiv": "#c8874aff",
+    "Structure": "#888888ff",
+}
+# Views that render text and must therefore declare an explicit font-color.
+TEXT_CLASSES = ("CTextLabel", "CTextEdit", "CParamDisplay",
+                "COptionMenu", "CCheckBox")
+
+
+def check_palette(root, path):
+    """Colour definitions match the canonical values; no unknown names."""
+    errors = []
+    for color in root.iter("color"):
+        name, rgba = color.get("name"), color.get("rgba")
+        expected = CANONICAL_COLORS.get(name) or ACCENT_COLORS.get(name)
+        if expected is None:
+            errors.append("%s: ERROR unknown colour %r (not in the standard "
+                          "palette; see doc/style/ui-style.md)" % (path, name))
+        elif rgba != expected:
+            errors.append("%s: ERROR colour %r is %s, expected %s"
+                          % (path, name, rgba, expected))
+    return errors
+
+
+def check_no_textdim(root, path):
+    """TextDim is gone from the standard: definition and every use of it.
+
+    Text is white (TextLight); the grey that used to frame checkboxes is
+    graphic structure and is now named Structure. Checking for the absence
+    of the definition, not just of its uses, is what stops it creeping back.
+    """
+    errors = []
+    for color in root.iter("color"):
+        if color.get("name") == "TextDim":
+            errors.append("%s: ERROR TextDim colour definition present — "
+                          "remove it (text is TextLight, frames are Structure)"
+                          % path)
+    for view in root.iter("view"):
+        for attribute, value in view.attrib.items():
+            if value == "TextDim":
+                errors.append("%s: ERROR %s=\"TextDim\" on %s — use TextLight "
+                              "for text, Structure for frames"
+                              % (path, attribute, view.get("class")))
+    return errors
+
+
+def check_font_colors(root, path):
+    """Every text-bearing view declares font-color, and it is TextLight.
+
+    A CCheckBox with no title draws no text of its own (its caption is a
+    separate label), so it is exempt.
+    """
+    errors = []
+    for view in root.iter("view"):
+        klass = view.get("class")
+        if klass not in TEXT_CLASSES:
+            continue
+        if klass == "CCheckBox" and not (view.get("title") or ""):
+            continue
+        font_color = view.get("font-color")
+        if font_color is None:
+            errors.append("%s: ERROR %s %r declares no font-color"
+                          % (path, klass, view.get("title") or view.get("control-tag")))
+        elif font_color != "TextLight":
+            errors.append("%s: ERROR %s %r uses font-color=%r — all text is "
+                          "TextLight (accents are for graphics, not text)"
+                          % (path, klass, view.get("title") or view.get("control-tag"),
+                             font_color))
+    return errors
+
+
+def _first_y(root, predicate):
+    """Smallest y origin among views matching predicate, or None."""
+    ys = []
+    for view in root.iter("view"):
+        if not predicate(view):
+            continue
+        origin = (view.get("origin") or "").split(",")
+        if len(origin) == 2:
+            try:
+                ys.append(float(origin[1]))
+            except ValueError:
+                pass
+    return min(ys) if ys else None
+
+
+def check_zone_order(root, path):
+    """SETUP above OPS above FINE.
+
+    A warning, not an error: zones are recognised by convention (the StoneId
+    menu is SETUP, an operational toggle is OPS, the first slider opens FINE)
+    and a future plugin may legitimately not fit that shape. It is here to
+    catch the accidental reordering, not to legislate layout.
+    """
+    setup_y = _first_y(root, lambda v: v.get("control-tag") == "StoneId")
+    ops_y = _first_y(root, lambda v: (v.get("title") or "").isupper()
+                     and (v.get("title") or "") != ""
+                     and v.get("class") == "CCheckBox")
+    fine_y = _first_y(root, lambda v: v.get("class") == "CSlider")
+
+    messages = []
+    if setup_y is not None and ops_y is not None and setup_y > ops_y:
+        messages.append("%s: WARN SETUP (StoneId, y=%g) sits below OPS (y=%g) — "
+                        "identity is set before working" % (path, setup_y, ops_y))
+    if ops_y is not None and fine_y is not None and ops_y > fine_y:
+        messages.append("%s: WARN OPS (y=%g) sits below the first fine control "
+                        "(y=%g)" % (path, ops_y, fine_y))
+    return messages
+
+
 def check_file(path):
     """Run every rule over one .uidesc and return all messages."""
     plugin_name = os.path.basename(os.path.dirname(os.path.dirname(path)))
@@ -74,6 +196,10 @@ def check_file(path):
     if root is None:
         return errors                      # nothing else is meaningful
     errors += check_title(root, plugin_name, path)
+    errors += check_palette(root, path)
+    errors += check_no_textdim(root, path)
+    errors += check_font_colors(root, path)
+    errors += check_zone_order(root, path)
     return errors
 
 
