@@ -251,6 +251,33 @@ class TestZoneOrder(unittest.TestCase):
         self.assertIn("WARN", messages[0])
         self.assertIn("OPS", messages[0])
 
+    def test_both_violations_warn_without_a_third_overlapping_message(self):
+        # SETUP below OPS *and* OPS below FINE together also mean SETUP is
+        # below FINE, but that's implied by the two messages already
+        # emitted — a third complaint about the same layout would be noise.
+        setup_low = self.SETUP.replace('origin="160, 106"', 'origin="160, 606"')
+        ops_low = self.OPS.replace('origin="180, 140"', 'origin="180, 300"')
+        body = "\n".join([TITLE_OK, setup_low, ops_low, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 2)
+
+    def test_setup_below_fine_warns_when_ops_is_absent(self):
+        # No OPS zone at all (e.g. a passive converter that still declares
+        # a STONE identity): the SETUP-vs-OPS and OPS-vs-FINE comparisons
+        # both go silent since ops_y is None, so this is the only check
+        # that can catch SETUP sitting below the fine controls.
+        setup_low = self.SETUP.replace('origin="160, 106"', 'origin="160, 252"')
+        body = "\n".join([TITLE_OK, setup_low, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("SETUP", messages[0])
+        self.assertIn("fine control", messages[0])
+
+    def test_setup_above_fine_with_no_ops_passes(self):
+        body = "\n".join([TITLE_OK, self.SETUP, self.FINE])
+        self.assertEqual(check_uidesc.check_zone_order(self._root(body), "p.uidesc"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

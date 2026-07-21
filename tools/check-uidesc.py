@@ -172,6 +172,16 @@ def check_zone_order(root, path):
     menu is SETUP, an operational toggle is OPS, the first slider opens FINE)
     and a future plugin may legitimately not fit that shape. It is here to
     catch the accidental reordering, not to legislate layout.
+
+    OPS is optional (a passive converter may declare a STONE identity with
+    no operational toggle at all), so the SETUP-OPS and OPS-FINE checks below
+    both go silent when ops_y is None. Without a direct SETUP-vs-FINE check,
+    a plugin missing OPS could put SETUP below its fine controls and this
+    rule would never notice — exactly the mistake it exists to catch. That
+    comparison only runs when OPS is absent: when OPS is present, a SETUP
+    below FINE violation is already implied by (and reported through) the
+    SETUP-vs-OPS and OPS-vs-FINE messages, so adding a third overlapping
+    complaint about the same layout would just be noise.
     """
     setup_y = _first_y(root, lambda v: v.get("control-tag") == "StoneId")
     ops_y = _first_y(root, lambda v: (v.get("title") or "").isupper()
@@ -186,6 +196,12 @@ def check_zone_order(root, path):
     if ops_y is not None and fine_y is not None and ops_y > fine_y:
         messages.append("%s: WARN OPS (y=%g) sits below the first fine control "
                         "(y=%g)" % (path, ops_y, fine_y))
+    if (ops_y is None and setup_y is not None and fine_y is not None
+            and setup_y > fine_y):
+        messages.append("%s: WARN SETUP (StoneId, y=%g) sits below the first "
+                        "fine control (y=%g) — identity is set before fine "
+                        "tuning, and no OPS zone was found to separate them"
+                        % (path, setup_y, fine_y))
     return messages
 
 
