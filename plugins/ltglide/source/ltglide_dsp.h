@@ -31,7 +31,7 @@ public:
     void reset() { phase_ = 0.0; fg_ = 0.0; started_ = false; releasing_ = false; done_ = false; }
 
     void setDelta(double sec) { delta_ = (sec > 0.0) ? sec : 0.0; }
-    void setDmode(int dmode)  { dmode_ = (dmode != 0) ? 1 : 0; }  // 0 passo, 1 gap
+    void setDmode(int dmode)  { dmode_ = (dmode != 0) ? 1 : 0; }  // 0 step, 1 gap
 
     double heldFrequency() const { return fg_; }
     double grainPhase()    const { return phase_; }
@@ -84,7 +84,7 @@ public:
 
 private:
     inline double periodSec(double den) const {
-        // passo: onset-fixed max(delta, N/f); gap: gap-fixed N/f + delta.
+        // step: onset-fixed max(delta, N/f); gap: gap-fixed N/f + delta.
         return (dmode_ == 0) ? std::max(delta_, (double)kN / den)
                              : (double)kN / den + delta_;
     }

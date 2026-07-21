@@ -81,7 +81,7 @@ tresult PLUGIN_API LTGLIDEProcessor::initialize(FUnknown* context) {
     parameters.addParameter(sm);
 
     auto* dm = new StringListParameter(STR16("Timing"), kParamDmode);
-    dm->appendString(STR16("passo"));
+    dm->appendString(STR16("step"));
     dm->appendString(STR16("gap"));
     dm->getInfo().defaultNormalizedValue = 1.0;   // gap is the default
     dm->setNormalized(1.0);

@@ -71,7 +71,7 @@
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
-        <!-- Timing (passo / gap) -->
+        <!-- Timing (step / gap) -->
         <view class="CTextLabel" origin="20, 384" size="260, 16" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Timing" transparent="true"/>
         <view class="COptionMenu" origin="80, 404" size="140, 20" control-tag="Timing"

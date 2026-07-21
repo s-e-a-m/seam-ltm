@@ -83,7 +83,7 @@ typedef struct SeamCalbusRecord {
             int64_t  passStartSample;
             double   f0, f1, durationSec, deltaSec;
             uint32_t sweepMode;   // 0 linear, 1 exponential
-            uint32_t diracMode;   // 0 passo, 1 gap
+            uint32_t diracMode;   // 0 step, 1 gap
         } glide;
     } u;
 } SeamCalbusRecord;

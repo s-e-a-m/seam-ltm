@@ -14,7 +14,7 @@ enum LTGLIDEParams : Steinberg::Vst::ParamID {
     kParamF0      = 101,   // 20 … 20000 Hz      (log) sweep start
     kParamF1      = 102,   // 20 … 20000 Hz      (log) sweep end
     kParamSmode   = 103,   // 0 linear / 1 exponential
-    kParamDmode   = 104,   // 0 passo / 1 gap
+    kParamDmode   = 104,   // 0 step / 1 gap
     kParamDelta   = 105,   // grain spacing, seconds
     kParamT       = 106,   // sweep duration, seconds
     kParamLoop    = 108,   // toggle: continuous passes (the sole transport control)
