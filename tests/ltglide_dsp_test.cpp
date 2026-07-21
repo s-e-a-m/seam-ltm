@@ -498,6 +498,176 @@ TEST_CASE("BusAnchor: running/idle edge fires exactly once per transition, not o
     CHECK(edgeCount == 2);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// GlissBurst::release()/done() -- declick at sweep end (GS-reported bug).
+// The transport stops feeding GlissBurst::process() the instant it leaves
+// State::Glide, which used to hard-truncate an in-flight grain mid-window
+// (a step from a mid-window sine value to 0 -- audible as a click whenever
+// the sweep end happened to land mid-grain, e.g. f1=160 Hz but not 120 Hz).
+// release() lets the CURRENT grain ring out to a clean window close instead
+// of being cut, and latches done() so no further grain can ever retrigger.
+// ─────────────────────────────────────────────────────────────────────────
+
+TEST_CASE("release() lets an in-flight grain ring out instead of hard-truncating it") {
+    const double fs = 48000.0;
+    const double f  = 160.0;
+    const double delta = 0.02;
+    GlissBurst g = makeGap(f, delta);
+
+    // Gap-mode period: Tg = N/f + delta. The Hann window is active (u < N)
+    // for the first N/f seconds of each period (1500 samples here); drive to
+    // a sample PROVABLY inside that window, i.e. u strictly in (0.5, N-0.5),
+    // by recomputing u independently from the public phase/frequency getters.
+    // Target u == 2.25 rather than merely "> 0.5": sin(2*pi*u) is itself
+    // ZERO at every half-integer u (0.5, 1.5, ... 4.5), so stopping right
+    // after crossing 0.5 would land on a sample that is coincidentally near
+    // silent regardless of truncation, defeating the continuity check below.
+    // 2.25 sits a quarter-cycle away from the nearest zero (peak-ish sine),
+    // guaranteeing a substantially non-zero sample to release() from.
+    const double Tg = (double)GlissBurst::kN / f + delta;
+    double y = g.process(f);                          // sample 0: forced onset
+    double u = g.heldFrequency() * g.grainPhase() * Tg;
+    int n = 0;
+    while (u < 2.25 && n < 1500) {
+        y = g.process(f);
+        u = g.heldFrequency() * g.grainPhase() * Tg;
+        ++n;
+    }
+    REQUIRE(u > 0.5);
+    REQUIRE(u < (double)GlissBurst::kN - 0.5);
+    REQUIRE(std::fabs(y) > 0.5);                       // genuinely mid-grain, not near a zero crossing
+    CHECK_FALSE(g.done());
+
+    g.release();
+    CHECK_FALSE(g.done());                             // not done yet -- still ringing
+
+    // (a) Sample-to-sample continuity through the rest of the ring-out: no
+    // jump bigger than the max slope of a windowed 160 Hz sine at 48 kHz
+    // (~2*pi*f/fs ~= 0.021), with margin.
+    const double kMaxStep = 0.05;
+    double prev = y;
+    bool   sawExactZero = false;
+    int    zeroAtSample = -1;
+    for (int i = 0; i < 4000; ++i) {
+        const double cur = g.process(f);
+        CHECK(std::fabs(cur - prev) < kMaxStep);
+        if (!sawExactZero && cur == 0.0) { sawExactZero = true; zeroAtSample = i; }
+        prev = cur;
+    }
+
+    // (b) The grain completes to exactly 0.0 within 5/f seconds of margin,
+    // and stays there for at least one further would-be period -- no
+    // retrigger at the next onset.
+    REQUIRE(sawExactZero);
+    CHECK(zeroAtSample < (int)std::llround(5.0 / f * fs) + 200);
+    const int oneMorePeriod = (int)std::llround(Tg * fs) + 10;
+    for (int i = 0; i < oneMorePeriod; ++i)
+        CHECK(g.process(f) == 0.0);
+
+    // (c) done() reports true once the released grain has finished.
+    CHECK(g.done());
+}
+
+TEST_CASE("integration: fixed Glide->Silence pipeline lets the last grain ring out at sweep end") {
+    // Mirrors LTGLIDEProcessor::processBlock's per-sample switch (transport_
+    // + glide_): Glide ticks set a lastTickWasGlide flag and drive glide_;
+    // Silence/Dirac ticks release() on the Glide->X edge and, for Silence,
+    // keep pumping glide_.process() at the clamped arrival frequency (p=1.0)
+    // until done() -- instead of dropping straight to 0.
+    const double fs = 48000.0;
+    const double f0 = 1000.0, f1 = 160.0;
+    const double delta = 0.02;
+    const int    sm = 1;                    // exponential; irrelevant to the boundary
+
+    GlideTransport transport;
+    transport.prepare(fs);
+    transport.setSweepSeconds(2.0);
+    transport.setLoop(false);
+
+    GlissBurst glide;
+    glide.prepare(fs);
+    glide.setDelta(delta);
+    glide.setDmode(1);                      // gap
+    glide.reset();
+
+    bool lastTickWasGlide = false;
+    double prev = 0.0;
+    double maxJumpAtOrAfterBoundary = 0.0;
+    bool   boundaryHit = false;
+    bool   sawNonZeroAfterBoundary = false;
+    int    samplesSinceBoundary = 0;
+
+    transport.trigger();
+    const long guard = (long)((GlideTransport::kLeadSec + 2.0 + GlideTransport::kTailSec) * fs) + 100;
+    for (long i = 0; i < guard; ++i) {
+        auto tick = transport.process();
+        double y = 0.0;
+        switch (tick.kind) {
+            case GlideTransport::Kind::Dirac:
+                if (lastTickWasGlide) { glide.release(); lastTickWasGlide = false; }
+                y = 1.0;
+                break;
+            case GlideTransport::Kind::Glide: {
+                if (tick.p == 0.0) glide.reset();
+                lastTickWasGlide = true;
+                y = glide.process(SweepFreq(f0, f1, sm, tick.p));
+                break;
+            }
+            case GlideTransport::Kind::Silence:
+            default:
+                if (lastTickWasGlide) {
+                    glide.release();
+                    lastTickWasGlide = false;
+                    boundaryHit = true;             // this sample IS the Glide->Tail edge
+                }
+                y = glide.done() ? 0.0 : glide.process(SweepFreq(f0, f1, sm, 1.0));
+                break;
+        }
+
+        if (boundaryHit) {
+            maxJumpAtOrAfterBoundary = std::max(maxJumpAtOrAfterBoundary, std::fabs(y - prev));
+            if (y != 0.0) sawNonZeroAfterBoundary = true;
+            if (++samplesSinceBoundary > 4000) break;   // ring-out is <= 5/160 s ~= 1500 samples
+        }
+        prev = y;
+        if (!transport.running() && boundaryHit && samplesSinceBoundary > 4000) break;
+    }
+
+    REQUIRE(boundaryHit);
+    CHECK(sawNonZeroAfterBoundary);          // some ring-out actually happened
+    CHECK(maxJumpAtOrAfterBoundary < 0.05);  // same bound as the burst-level test
+}
+
+TEST_CASE("release() edge cases: before any sample, called twice, and reset() afterwards") {
+    // release() before any process() call at all: there is no grain in
+    // flight to ring out, so output must be all-zero from the start (the
+    // mandatory start-up onset is itself an onset, and release() blocks any
+    // onset from latching a grain).
+    GlissBurst none;
+    none.prepare(48000.0);
+    none.setDelta(0.02);
+    none.setDmode(1);
+    none.reset();
+    none.release();
+    for (int i = 0; i < 200; ++i) CHECK(none.process(160.0) == 0.0);
+    CHECK(none.done());
+
+    // Double release() mid-grain is harmless -- same outcome as one call.
+    GlissBurst g = makeGap(160.0, 0.02);
+    for (int i = 0; i < 100; ++i) g.process(160.0);
+    g.release();
+    g.release();
+    for (int i = 0; i < 4000; ++i) g.process(160.0);
+    CHECK(g.done());
+
+    // reset() after done() restores normal operation: a fresh grain starts,
+    // i.e. the very next sample is again close to a zero crossing (see
+    // "burst starts on a zero crossing" above).
+    g.reset();
+    CHECK_FALSE(g.done());
+    CHECK(std::fabs(g.process(160.0)) < 1e-4);
+}
+
 TEST_CASE("BusAnchor: no false unanchored record when a running/idle transition lands on a block boundary (mid-loop flicker)") {
     const double fs = 48000.0;
     using GT = GlideTransport;

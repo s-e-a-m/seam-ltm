@@ -94,6 +94,12 @@ private:
     ltglide::GlissBurst    glide_;
     ltglide::GlideTransport transport_;
     double prevGainLin_ = 0.0;
+    // True while the previous sample's tick was Kind::Glide. Drives the
+    // Glide->Silence/Dirac edge: the in-flight grain must be released()d
+    // there instead of hard-truncated (GS-reported end-of-sweep click; see
+    // processBlock in ltglide_processor.cpp and ltglide_dsp.h's
+    // GlissBurst::release()).
+    bool lastTickWasGlide_ = false;
 
     double computeGainLin() const;
     void   readParameterChanges(Steinberg::Vst::ProcessData& data);

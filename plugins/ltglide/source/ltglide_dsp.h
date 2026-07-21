@@ -28,7 +28,7 @@ public:
     static constexpr double kFloorHz = 20.0;  // guards N/fg while fg is still 0
 
     void prepare(double fs) { fs_ = (fs > 0.0) ? fs : 48000.0; reset(); }
-    void reset() { phase_ = 0.0; fg_ = 0.0; started_ = false; }
+    void reset() { phase_ = 0.0; fg_ = 0.0; started_ = false; releasing_ = false; done_ = false; }
 
     void setDelta(double sec) { delta_ = (sec > 0.0) ? sec : 0.0; }
     void setDmode(int dmode)  { dmode_ = (dmode != 0) ? 1 : 0; }  // 0 passo, 1 gap
@@ -36,8 +36,19 @@ public:
     double heldFrequency() const { return fg_; }
     double grainPhase()    const { return phase_; }
 
+    // Ask the grain to stop retriggering: the CURRENT grain (if any is in
+    // flight) is allowed to ring out to a clean window close, but no further
+    // onset may ever latch a new one. Idempotent -- calling it more than
+    // once, or before the first process() call, is harmless.
+    void release() { releasing_ = true; }
+    // True once the released grain has finished ringing out (or immediately,
+    // if release() was called with none in flight).
+    bool done() const { return done_; }
+
     // One sample. fsig is the continuous swept frequency (Hz) for this sample.
     inline double process(double fsig) {
+        if (done_) return 0.0;
+
         // --- recursive grain engine: carries previous (phase_, fg_) ---
         const double pphase = phase_;
         const double pfg    = fg_;
@@ -48,6 +59,16 @@ public:
         const bool   start  = !started_;                 // 1 - 1' : true at sample 0
         started_ = true;
         const bool   onset  = (adv >= 1.0) || start;
+
+        // Once released, an onset here would latch a NEW grain -- or, on the
+        // very first call ever, the mandatory start-up onset would latch the
+        // first one. Either way that is exactly the retrigger release()
+        // exists to prevent, so finalize instead of latching. The CURRENT
+        // in-flight grain (if any) has already rung out by construction: its
+        // Hann window closes at u==kN well before phase wraps around to the
+        // next onset, so there is nothing left to lose here.
+        if (releasing_ && onset) { done_ = true; return 0.0; }
+
         phase_ = adv - std::floor(adv);
         fg_    = onset ? fsig : pfg;                      // hold; latch at onset
 
@@ -68,12 +89,14 @@ private:
                              : (double)kN / den + delta_;
     }
 
-    double fs_      = 48000.0;
-    double delta_   = 0.3;
-    int    dmode_   = 1;       // gap by default
-    double phase_   = 0.0;     // grain ramp [0,1)
-    double fg_      = 0.0;     // latched grain frequency (Hz)
-    bool   started_ = false;
+    double fs_        = 48000.0;
+    double delta_     = 0.3;
+    int    dmode_     = 1;       // gap by default
+    double phase_     = 0.0;     // grain ramp [0,1)
+    double fg_        = 0.0;     // latched grain frequency (Hz)
+    bool   started_   = false;
+    bool   releasing_ = false;   // release() was called; ring out, then finalize
+    bool   done_      = false;   // released grain has finished; process() now silent
 };
 
 // Pass transport: owns the progress p and the Dirac-bracketed pass timeline.

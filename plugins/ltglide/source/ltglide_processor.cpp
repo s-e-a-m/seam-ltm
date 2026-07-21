@@ -367,17 +367,37 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
         auto tick = transport_.process();
         switch (tick.kind) {
             case ltglide::GlideTransport::Kind::Dirac:
+                // A Dirac can follow a Glide tick directly (transport_.reset()
+                // mid-pass jumps Idle->HeadDirac on the very next tick, with
+                // no intervening Silence); release() there too so the grain
+                // is never left dangling. The ring-out itself is applied on
+                // Silence ticks only below -- TailDirac arrives 5 s after any
+                // ring-out has long finished, so this never mixes the two.
+                if (lastTickWasGlide_) { glide_.release(); lastTickWasGlide_ = false; }
                 y = 1.0;                                 // unit impulse (scaled by g)
                 break;
             case ltglide::GlideTransport::Kind::Glide: {
                 if (tick.p == 0.0) glide_.reset();       // deterministic per-pass start
+                lastTickWasGlide_ = true;
                 const double f = ltglide::SweepFreq(f0, f1, sm, tick.p);
                 y = glide_.process(f);
                 break;
             }
             case ltglide::GlideTransport::Kind::Silence:
             default:
-                y = 0.0;
+                // The Glide->Silence edge is where the GS-reported
+                // end-of-sweep click lived: the in-flight grain used to be
+                // hard-truncated the instant the transport left State::Glide
+                // (whether or not its Hann window had closed). Release it
+                // instead and let it ring out at the clamped arrival
+                // frequency (p==1.0) until GlissBurst::done() -- a few
+                // milliseconds at most, and inaudible as a click. Bonus:
+                // stopping the transport mid-pass (transport_.reset()) now
+                // declicks the same way, since the edge fires regardless of
+                // cause.
+                if (lastTickWasGlide_) { glide_.release(); lastTickWasGlide_ = false; }
+                y = glide_.done() ? 0.0
+                                   : glide_.process(ltglide::SweepFreq(f0, f1, sm, 1.0));
                 break;
         }
         const SampleType out = (SampleType)(y * g);
