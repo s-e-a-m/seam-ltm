@@ -278,6 +278,26 @@ class TestZoneOrder(unittest.TestCase):
         body = "\n".join([TITLE_OK, self.SETUP, self.FINE])
         self.assertEqual(check_uidesc.check_zone_order(self._root(body), "p.uidesc"), [])
 
+    def test_untitled_checkbox_with_ops_control_tag_is_recognised(self):
+        # The actual bug shape (dslar, plugins/_template): POWER is an
+        # untitled CCheckBox (title="") carrying control-tag="Power", with
+        # its caption drawn by a separate CTextLabel next to it. The OPS
+        # fixture above carries a control-tag *and* an all-caps title at
+        # once, so it cannot isolate the control-tag branch of
+        # _is_ops_view from the title branch — a title-only predicate
+        # already matches it. Here the checkbox has no title of its own,
+        # so only the control-tag branch can find it, and it sits below
+        # the first CSlider so a correct implementation must warn.
+        ops_untitled = ('    <view class="CCheckBox" origin="93, 260" size="14, 14"'
+                        ' control-tag="Power" title=""/>')
+        caption = ('    <view class="CTextLabel" origin="30, 260" size="60, 14"'
+                   ' font-color="TextLight" title="POWER"/>')
+        body = "\n".join([TITLE_OK, self.SETUP, self.FINE, ops_untitled, caption])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("OPS", messages[0])
+
 
 if __name__ == "__main__":
     unittest.main()

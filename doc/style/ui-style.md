@@ -106,10 +106,16 @@ It compares SETUP against OPS, OPS against FINE, and — only when a plugin
 has no OPS zone — SETUP against FINE directly.
 HEADER and FOOTER positions are never compared against anything, so a
 title drawn below the logo would lint clean.
-The check recognises SETUP by the `StoneId` control-tag, OPS by a POWER,
-RESET or LOOP control — named either by its own control-tag or, when the
-caption is a separate label next to an untitled `CCheckBox`, by an
-all-caps `CCheckBox` title — and FINE by the first `CSlider`.
+The check recognises SETUP by the `StoneId` control-tag and FINE by the
+first `CSlider`.
+It recognises OPS two ways.
+A control-tag naming the operational vocabulary — POWER, RESET or LOOP —
+catches the view regardless of how its caption is drawn, including an
+untitled `CCheckBox` whose caption is a separate label next to it (dslar,
+`_template`).
+A `CCheckBox` whose own title is non-empty and all-caps also counts, and
+that branch accepts any such title, not only the three vocabulary words:
+multipink's MUTE is recognised this way.
 Knowing where this net has gaps is itself useful: watch HEADER and FOOTER
 placement by eye, because the lint does not.
 
