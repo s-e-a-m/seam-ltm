@@ -45,34 +45,44 @@ inline CalbusDigest digest(const SeamCalbusRecord* recs, int32_t n, bool availab
     return d;
 }
 
-// Decides whether a NEW measurement pass has begun and the hold must
-// therefore be cleared. `lastPass` is in/out state owned by the caller (one
-// instance per watch, since only one emitter is ever measured at a time).
+// Classifies what a NEW bus reading means for the measurement:
+//   SessionStart — first pass after a no-glide state: a new measurement
+//                  session begins, the previous accumulation must go.
+//   PassBoundary — passCounter advanced within a session: the previous pass
+//                  completed and can fold into the accumulation.
+//   None         — nothing changed (same pass re-polled, idle, or pink).
+// `lastPass` is in/out state owned by the caller (one instance per watch).
 //
-// Keying the decision on `passCounter` ALONE is the bug this function fixes:
+// Keying the decision on `passCounter` ALONE is the bug the sentinel fixes:
 // `passCounter` is per-emitter-instance and starts at 1 on that instance's
 // first pass (GlideTransport::beginPass() increments before a pass sounds —
 // see ltglide_dsp.h), so STONE 1's pass 1 and STONE 2's pass 1 are the same
 // number. Resetting `lastPass` to 0 whenever no glide is sounding closes that
 // gap: 0 can never collide with a real pass number (an ACTIVE glide always
-// has passCounter >= 1, because beginPass() sets the non-Idle state and
-// increments the counter together), and there is always a moment with no
-// glide active between two different STONEs being measured one at a time —
-// the previous chain stops before the next one starts. Within a single
-// LOOPING instance the sentinel never resets (the transport's `active` flag
-// stays 1 across a loop's passes, so `d.glide` never goes false), but that is
-// fine: `passCounter` itself increments on every new pass, so the `!=` check
-// alone keeps catching each one.
-inline bool shouldResetHold(const CalbusDigest& d, uint64_t& lastPass) {
+// has passCounter >= 1), and there is always a moment with no glide active
+// between two different STONEs being measured one at a time. That same
+// sentinel is what distinguishes SessionStart (lastPass == 0: we came from a
+// no-glide state) from PassBoundary (a loop advancing within one session,
+// where `active` never drops and the sentinel never clears).
+enum class HoldAction { None, SessionStart, PassBoundary };
+
+inline HoldAction holdAction(const CalbusDigest& d, uint64_t& lastPass) {
     if (!d.glide) {
         lastPass = 0;
-        return false;
+        return HoldAction::None;
     }
     if (d.passCounter != lastPass) {
+        const bool fresh = (lastPass == 0);
         lastPass = d.passCounter;
-        return true;
+        return fresh ? HoldAction::SessionStart : HoldAction::PassBoundary;
     }
-    return false;
+    return HoldAction::None;
+}
+
+// Boolean view of holdAction: does the hold need clearing at all? Kept so the
+// pre-accumulation tests keep pinning the shared sentinel semantics.
+inline bool shouldResetHold(const CalbusDigest& d, uint64_t& lastPass) {
+    return holdAction(d, lastPass) != HoldAction::None;
 }
 
 }} // namespace Seam::strx

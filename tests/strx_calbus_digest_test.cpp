@@ -4,6 +4,8 @@
 
 using Seam::strx::digest;
 using Seam::strx::shouldResetHold;
+using Seam::strx::holdAction;
+using Seam::strx::HoldAction;
 
 static SeamCalbusRecord pink(uint32_t stone, bool active, int32_t slotStart) {
     SeamCalbusRecord r{};
@@ -196,4 +198,53 @@ TEST_CASE("shouldResetHold bumps once per pass in a loop, not once per poll") {
 
     SeamCalbusRecord pass3[1] = { glide(1, true, 3) };
     CHECK(shouldResetHold(digest(pass3, 1, true), lastPass));
+}
+
+//──────────────────────────────────────────────────────────────────────────
+// holdAction — the three-outcome refinement of shouldResetHold that the
+// cross-loop accumulator needs: a SessionStart clears the accumulation, a
+// PassBoundary folds the completed pass into it. Same seam as above:
+// exercised through digest() + real record builders.
+//──────────────────────────────────────────────────────────────────────────
+
+TEST_CASE("holdAction: the first pass after idle is a session start") {
+    uint64_t lastPass = 0;
+    SeamCalbusRecord recs[1] = { glide(1, true, 1) };
+    CHECK(holdAction(digest(recs, 1, true), lastPass) == HoldAction::SessionStart);
+    CHECK(lastPass == 1u);
+    CHECK(holdAction(digest(recs, 1, true), lastPass) == HoldAction::None);  // same pass re-polled
+}
+
+TEST_CASE("holdAction: loop passes after the first are pass boundaries") {
+    uint64_t lastPass = 0;
+    SeamCalbusRecord pass1[1] = { glide(1, true, 1) };
+    CHECK(holdAction(digest(pass1, 1, true), lastPass) == HoldAction::SessionStart);
+    SeamCalbusRecord pass2[1] = { glide(1, true, 2) };   // loop advanced, still active
+    CHECK(holdAction(digest(pass2, 1, true), lastPass) == HoldAction::PassBoundary);
+    CHECK(holdAction(digest(pass2, 1, true), lastPass) == HoldAction::None);
+    SeamCalbusRecord pass3[1] = { glide(1, true, 3) };
+    CHECK(holdAction(digest(pass3, 1, true), lastPass) == HoldAction::PassBoundary);
+}
+
+TEST_CASE("holdAction: a different STONE after a gap starts a NEW session, never a boundary") {
+    // Same scenario as the cross-instance collision above: fold STONE 2's
+    // first pass into STONE 1's accumulation and the whole measurement lies.
+    uint64_t lastPass = 0;
+    SeamCalbusRecord stoneOne[1] = { glide(1, true, 1) };
+    CHECK(holdAction(digest(stoneOne, 1, true), lastPass) == HoldAction::SessionStart);
+    SeamCalbusRecord gap[1] = { glide(1, false, 1) };     // nothing sounding
+    CHECK(holdAction(digest(gap, 1, true), lastPass) == HoldAction::None);
+    CHECK(lastPass == 0u);                                // sentinel cleared
+    SeamCalbusRecord stoneTwo[1] = { glide(2, true, 1) }; // different instance, its own pass 1
+    CHECK(holdAction(digest(stoneTwo, 1, true), lastPass) == HoldAction::SessionStart);
+}
+
+TEST_CASE("holdAction: pink or idle emitters never act and clear the sentinel") {
+    uint64_t lastPass = 0;
+    SeamCalbusRecord activePass[1] = { glide(1, true, 5) };
+    CHECK(holdAction(digest(activePass, 1, true), lastPass) == HoldAction::SessionStart);
+    CHECK(lastPass == 5u);
+    SeamCalbusRecord pinkRec[1] = { pink(1, true, 0) };
+    CHECK(holdAction(digest(pinkRec, 1, true), lastPass) == HoldAction::None);
+    CHECK(lastPass == 0u);
 }
