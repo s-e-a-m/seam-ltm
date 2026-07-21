@@ -69,6 +69,7 @@ public:
         std::fill(accM_, accM_ + AnalysisFrame::kNumBins, -120.0f);
         std::fill(accS_, accS_ + AnalysisFrame::kNumBins, -120.0f);
         accPasses_ = 0;
+        foldArmed_ = false;
         for (auto& s : slots_) s = AnalysisFrame{};
         // SPSC triple-buffer to distinct init indices (runs single-threaded here).
         back_.store(0, std::memory_order_relaxed);  // index 0, not dirty
@@ -91,11 +92,28 @@ public:
     // new measurement, so the previous pass's curve must not linger.
     void resetHold() { welchM_.resetHold(); welchS_.resetHold(); }
 
-    // A completed pass: fold its hold curve into the cross-pass MIN
-    // accumulator, then clear the hold for the next pass. The first fold
-    // COPIES (a MIN against the -120 init floor would pin the accumulation
-    // there forever). dB min == linear min (monotone map), so fold in dB.
+    // A completed pass boundary. The accumulator only folds a pass it
+    // observed from its very beginning — a SessionStart can land mid-pass
+    // (editor opened, or processing reactivated, while ltglide is already
+    // running a loop), so the hold at THIS boundary may only cover the tail
+    // of that pass. Folding a partial hold under MIN would floor-pin every
+    // bin the pass never got to re-excite, for the rest of the session. So:
+    // the first completePass() after arming (a fresh session or reset) is a
+    // DISCARD — it clears the hold and arms folding, contributing nothing to
+    // acc — and only the boundaries after that fold. This costs one good
+    // pass in the clean workflow (glide starts, then the first full sweep is
+    // thrown away), which is irrelevant next to a multi-minute LOOP run.
+    // Once armed, the fold COPIES on first use (a MIN against the -120 init
+    // floor would pin the accumulation there forever). dB min == linear min
+    // (monotone map), so fold in dB.
     void completePass() {
+        if (!foldArmed_) {
+            // This boundary's hold may be a partial pass (mid-pass session
+            // join) — discard it and arm folding for the next boundary.
+            resetHold();
+            foldArmed_ = true;
+            return;
+        }
         const float* hM = welchM_.holdDb();
         const float* hS = welchS_.holdDb();
         const int n = welchM_.numBins();
@@ -106,14 +124,15 @@ public:
         ++accPasses_;
         resetHold();
     }
-    // A new measurement session: previous accumulation and hold both go.
-    // Partial passes never fold BY CONSTRUCTION: the only fold site is
-    // completePass(), which the processor calls on a pass boundary — a
-    // mid-pass stop leaves the partial hold to die here or in resetHold().
+    // A new measurement session: previous accumulation and hold both go, and
+    // folding is disarmed again — the very next completePass() boundary is
+    // itself an unknown-origin pass (session start can land mid-pass), so it
+    // must discard rather than fold; see completePass() above.
     void startSession() {
         std::fill(accM_, accM_ + AnalysisFrame::kNumBins, -120.0f);
         std::fill(accS_, accS_ + AnalysisFrame::kNumBins, -120.0f);
         accPasses_ = 0;
+        foldArmed_ = false;
         resetHold();
     }
     int accPasses() const { return accPasses_; }
@@ -217,6 +236,11 @@ private:
     float accM_[AnalysisFrame::kNumBins] = {};
     float accS_[AnalysisFrame::kNumBins] = {};
     int   accPasses_ = 0;
+    // false = the next completePass() boundary discards (observed-from-the-
+    // beginning rule: unknown whether the in-progress hold started at a real
+    // pass boundary or mid-pass at a session join). Set false by reset() and
+    // startSession(); set true by the discarding completePass() itself.
+    bool  foldArmed_ = false;
 
     // --- SPSC triple-buffer: producer = audio thread (process), consumer =
     // GUI thread (tryReadFrame). One atomic packs the "back" buffer index

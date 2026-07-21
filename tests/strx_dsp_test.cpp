@@ -235,6 +235,9 @@ TEST_CASE("Analyzer prepare() honours a glide mode set before it") {
 
 TEST_CASE("cross-pass MIN keeps what every pass contains, discards what one pass had") {
     Analyzer a; a.prepare(48000.0);
+    a.setGlideMode(true);   // matches production: the accumulator only runs
+                            // while a sweep is sounding, so strx is always in
+                            // glide mode (fast tau, 0.1 s) here too.
     const int N = a.fftSize();
     std::vector<float> tone(2*N), mixed(2*N), quiet(2*N, 0.0f);
     for (int i = 0; i < 2*N; ++i) {
@@ -252,8 +255,13 @@ TEST_CASE("cross-pass MIN keeps what every pass contains, discards what one pass
         a.analyze(quiet.data(), quiet.data(), 2*N);
         a.completePass();
     };
-    feedPass(mixed);   // pass 1: 1 kHz + an intermittent 3 kHz disturbance
-    feedPass(tone);    // pass 2: clean 1 kHz — the disturbance is absent
+    a.startSession();
+    // Arm folding: the first boundary after a session start always discards
+    // (observed-from-the-beginning rule — see completePass()), so feed
+    // anything and consume that discard before the passes we count on.
+    feedPass(quiet);
+    feedPass(mixed);   // pass 1 (armed, folds): 1 kHz + an intermittent 3 kHz disturbance
+    feedPass(tone);    // pass 2 (folds): clean 1 kHz — the disturbance is absent
     a.analyze(quiet.data(), quiet.data(), 2*N);   // publish acc into the frame
 
     const auto& f = a.frame();
@@ -264,8 +272,13 @@ TEST_CASE("cross-pass MIN keeps what every pass contains, discards what one pass
     // AnalysisFrame zero-initializes accM, so a never-copied 0.0f must fail.
     CHECK(f.accM[bin1k] > -40.0f);
     CHECK(f.accM[bin1k] < 0.0f);
-    // Present in ONE pass only -> discarded by the MIN.
-    // Spectral leakage from 1kHz into 3kHz limits minimum attenuation to ~-55dB.
+    // Present in ONE pass only -> discarded by the MIN. Measured floor here
+    // is Hann window spectral leakage from the 1 kHz tone into the 3 kHz bin
+    // (~-55.4 dB down, ~2000 Hz / ~171 bins away) — NOT EMA carry-over: the
+    // MIN folds welchM_.holdDb(), a per-frame raw-FFT-power max that never
+    // touches the EMA, so setGlideMode() above (and its tau) has no effect
+    // on this bound at all. -60 dB fails empirically; -50 dB is the loosest
+    // 10-dB-step bound that passes.
     CHECK(f.accM[bin3k] < -50.0f);
     // Same L=R signal -> no side energy; also proves accS is copied (its
     // never-copied default 0.0f would fail this bound).
@@ -279,9 +292,15 @@ TEST_CASE("startSession clears the accumulator; acc changes only on completePass
     for (int i = 0; i < 2*N; ++i) tone[i] = 0.5f*std::sin(2.0*M_PI*1000.0*i/48000.0);
     const int bin1k = int(std::lround(1000.0 * N / 48000.0));
 
-    a.analyze(tone.data(), tone.data(), 2*N);
+    // Arm folding: the boundary right after prepare()/reset() is itself a
+    // "first boundary" and discards (observed-from-the-beginning rule).
     a.analyze(quiet.data(), quiet.data(), 2*N);
     a.completePass();
+    CHECK(a.accPasses() == 0);   // discard, not a fold
+
+    a.analyze(tone.data(), tone.data(), 2*N);
+    a.analyze(quiet.data(), quiet.data(), 2*N);
+    a.completePass();            // now armed: this one folds
     a.analyze(quiet.data(), quiet.data(), 2*N);   // publish
     CHECK(a.frame().accPasses == 1);
     CHECK(a.frame().accM[bin1k] > -40.0f);
@@ -294,4 +313,65 @@ TEST_CASE("startSession clears the accumulator; acc changes only on completePass
     a.startSession();
     a.analyze(quiet.data(), quiet.data(), 2*N);   // publish
     CHECK(a.frame().accPasses == 0);
+    // Pin the clearing of the VALUES too, not just the counter: today
+    // stale accM/accS survive under the first-fold-copy semantics unless
+    // startSession() actually re-fills them to the floor.
+    CHECK(a.frame().accM[bin1k] < -100.0f);
+}
+
+TEST_CASE("completePass discards the first boundary after a session start") {
+    // GS's decided rule: the accumulator only folds a pass it observed from
+    // its very beginning. A SessionStart can fire mid-pass (editor opened,
+    // or processing reactivated, while ltglide is already looping), so the
+    // hold at the NEXT boundary may be a partial pass.
+    //
+    // Proof strategy: run two analyzers through the identical real pass
+    // (toneB), but give one of them a LOUD, unrelated tone (toneA) across
+    // its pre-arm boundary and the other silence there instead. If the
+    // discard genuinely contributes nothing, both must converge on an
+    // IDENTICAL acc — this doesn't rely on assuming how far window leakage
+    // reaches, unlike a fixed dB bound would (see the MIN test above, where
+    // that leakage floor turned out to sit around -55 dB, not -60).
+    Analyzer withPreArmTone, control;
+    withPreArmTone.prepare(48000.0);
+    control.prepare(48000.0);
+    const int N = withPreArmTone.fftSize();
+    std::vector<float> toneA(2*N), toneB(2*N), quiet(2*N, 0.0f);
+    for (int i = 0; i < 2*N; ++i) {
+        toneA[i] = 0.5f*std::sin(2.0*M_PI*3000.0*i/48000.0);  // pre-arm partial only
+        toneB[i] = 0.5f*std::sin(2.0*M_PI*1000.0*i/48000.0);  // the armed, fully-observed pass
+    }
+    const int bin1k = int(std::lround(1000.0 * N / 48000.0));
+    const int bin3k = int(std::lround(3000.0 * N / 48000.0));
+
+    auto runSession = [&](Analyzer& a, std::vector<float>& preArmSignal) {
+        a.startSession();
+        // First boundary after the session start: discard, per the rule above.
+        a.analyze(preArmSignal.data(), preArmSignal.data(), 2*N);
+        a.analyze(quiet.data(), quiet.data(), 2*N);
+        a.analyze(quiet.data(), quiet.data(), 2*N);
+        a.completePass();
+        CHECK(a.accPasses() == 0);   // discarded, not folded
+        a.analyze(quiet.data(), quiet.data(), 2*N);   // publish; read the cleared hold
+        CHECK(a.frame().holdM[bin3k] == -120.0f);     // the discard cleared the hold too
+
+        // Second boundary: a real, fully-observed pass — this one folds.
+        a.analyze(toneB.data(), toneB.data(), 2*N);
+        a.analyze(quiet.data(), quiet.data(), 2*N);
+        a.analyze(quiet.data(), quiet.data(), 2*N);
+        a.completePass();
+        CHECK(a.accPasses() == 1);
+        a.analyze(quiet.data(), quiet.data(), 2*N);   // publish
+        CHECK(a.frame().accPasses == 1);
+    };
+    runSession(withPreArmTone, toneA);   // pre-arm boundary carries a loud 3 kHz tone
+    runSession(control, quiet);          // pre-arm boundary carries silence instead
+
+    // Both converge on the same acc after folding the identical real pass:
+    // toneA never reached the accumulator, however loud it was.
+    for (int k = 0; k < withPreArmTone.frame().numBins; ++k) {
+        CHECK(withPreArmTone.frame().accM[k] == doctest::Approx(control.frame().accM[k]));
+        CHECK(withPreArmTone.frame().accS[k] == doctest::Approx(control.frame().accS[k]));
+    }
+    CHECK(withPreArmTone.frame().accM[bin1k] > -40.0f);   // sanity: the real pass did fold
 }

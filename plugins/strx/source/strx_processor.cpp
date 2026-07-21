@@ -36,7 +36,19 @@ tresult PLUGIN_API StrxProcessor::initialize(FUnknown* context) {
 tresult PLUGIN_API StrxProcessor::terminate() { return SingleComponentEffect::terminate(); }
 
 tresult PLUGIN_API StrxProcessor::setActive(TBool state) {
-    if (state) analyzer_.reset();
+    if (state) {
+        analyzer_.reset();
+        // Resync both shadows to the bus's current epochs: while processing
+        // was inactive, the GUI thread could still have bumped sessionEpoch_/
+        // holdEpoch_ (editor open, ltglide free-running). Those bumps' hold
+        // data just died in reset() above, so a stale delta must be swallowed
+        // here rather than replayed on the next process() call — replaying it
+        // would fire completePass() against a freshly reset analyzer, and the
+        // first fold COPIES the (empty) hold: an all-floor copy would pin the
+        // MIN accumulator at -120 dB for the rest of the session.
+        lastSessionEpoch_ = sessionEpoch_.load(std::memory_order_relaxed);
+        lastHoldEpoch_    = holdEpoch_.load(std::memory_order_relaxed);
+    }
     return SingleComponentEffect::setActive(state);
 }
 
