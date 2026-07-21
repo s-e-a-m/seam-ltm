@@ -59,8 +59,18 @@ tresult PLUGIN_API StrxProcessor::process(ProcessData& data) {
     // Apply what the GUI read from the bus. Once per block, never per sample,
     // and never by touching the bus from this thread.
     analyzer_.setGlideMode(specGlide_.load(std::memory_order_relaxed));
+    const uint32_t se = sessionEpoch_.load(std::memory_order_relaxed);
     const uint32_t he = holdEpoch_.load(std::memory_order_relaxed);
-    if (he != lastHoldEpoch_) { lastHoldEpoch_ = he; analyzer_.resetHold(); }
+    if (se != lastSessionEpoch_) {
+        // New measurement session: previous accumulation and hold both go.
+        // Any pending pass bump belonged to the old session — swallow it.
+        lastSessionEpoch_ = se;
+        lastHoldEpoch_    = he;
+        analyzer_.startSession();
+    } else if (he != lastHoldEpoch_) {
+        lastHoldEpoch_ = he;
+        analyzer_.completePass();   // fold the completed pass, then clear the hold
+    }
 
     if (data.symbolicSampleSize == kSample32)
         processBlock<float>((float**)in, (float**)out, data.numSamples);

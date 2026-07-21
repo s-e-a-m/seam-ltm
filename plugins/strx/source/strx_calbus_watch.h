@@ -26,10 +26,11 @@ class CalbusWatch {
 public:
     static constexpr int kMinIntervalMs = 80;   // finer than the 10 Hz status line
 
-    // `glideOut` and `holdEpochOut` are the processor's atomics, read by the
-    // audio thread once per process() block.
-    CalbusWatch(std::atomic<bool>& glideOut, std::atomic<uint32_t>& holdEpochOut)
-        : glide_(glideOut), holdEpoch_(holdEpochOut) {}
+    // `glideOut`, `holdEpochOut` and `sessionEpochOut` are the processor's
+    // atomics, read by the audio thread once per process() block.
+    CalbusWatch(std::atomic<bool>& glideOut, std::atomic<uint32_t>& holdEpochOut,
+                std::atomic<uint32_t>& sessionEpochOut)
+        : glide_(glideOut), holdEpoch_(holdEpochOut), sessionEpoch_(sessionEpochOut) {}
 
     // GUI thread. Re-snapshots at most every kMinIntervalMs; otherwise returns
     // the cached digest, so two views polling at different rates see one state.
@@ -47,13 +48,23 @@ public:
 
         // Drive the DSP. setGlideMode is idempotent, so publishing every poll
         // costs nothing; the hold epoch only moves when a new pass starts.
-        // The actual new-pass decision (and the per-emitter sentinel that
-        // makes it collision-safe across instances) is shouldResetHold(),
-        // next to digest() — pure and unit-tested, so this watch keeps only
-        // the snapshot + rate-limit + atomic-store duties.
+        // The actual decision — session start vs pass boundary, with the
+        // per-emitter sentinel — is holdAction(), next to digest(), pure and
+        // unit-tested, so this watch keeps only the snapshot + rate-limit +
+        // atomic-store duties.
         glide_.store(digest_.glide, std::memory_order_relaxed);
-        if (shouldResetHold(digest_, lastPass_)) {
+        switch (holdAction(digest_, lastPass_)) {
+        case HoldAction::SessionStart:
+            // The processor's session branch clears BOTH accumulation and
+            // hold, so a session start bumps only this epoch: bumping
+            // holdEpoch too would race a fold against the just-cleared hold.
+            sessionEpoch_.fetch_add(1, std::memory_order_relaxed);
+            break;
+        case HoldAction::PassBoundary:
             holdEpoch_.fetch_add(1, std::memory_order_relaxed);
+            break;
+        case HoldAction::None:
+            break;
         }
         return digest_;
     }
@@ -63,6 +74,7 @@ public:
 private:
     std::atomic<bool>&     glide_;
     std::atomic<uint32_t>& holdEpoch_;
+    std::atomic<uint32_t>& sessionEpoch_;
     SeamCalbusRecord       recs_[SEAM_CALBUS_MAX_SLOTS] = {};
     CalbusDigest           digest_;
     uint64_t               lastPass_ = 0;

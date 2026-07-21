@@ -95,8 +95,10 @@ private:
     // process() once per block. The bus itself is never touched from audio.
     std::atomic<bool>     specGlide_{false};
     std::atomic<uint32_t> holdEpoch_{0};
+    std::atomic<uint32_t> sessionEpoch_{0};
     uint32_t              lastHoldEpoch_ = 0;
-    Seam::strx::CalbusWatch calbusWatch_{specGlide_, holdEpoch_};
+    uint32_t              lastSessionEpoch_ = 0;
+    Seam::strx::CalbusWatch calbusWatch_{specGlide_, holdEpoch_, sessionEpoch_};
 
     // Analyzer::process() always takes float buffers. When the host processes
     // in kSample64 (double), the pass-through copy stays double-precision but
