@@ -40,6 +40,37 @@ back to the already-validated fixed-burst generator: `GlissBurst` is a
 strict generalization of `ShapedBurst`, and reduces to it when the sweep
 is degenerate (constant frequency).
 
+### `GlissBurst` — step-mode fuse threshold (regime boundary)
+
+Step mode's onset stride is `max(delta, N/f)` (`GlissBurst::periodSec()`,
+`ltglide_dsp.h`) — a *floor*, not a fixed period like gap mode's `N/f + delta`.
+At high frequencies `N/f` is small, so `delta` is the binding term: onset
+spacing is constant at `delta`, which is longer than each grain's own duration
+(`N/f`), so the grains sound as separated pips with silence between them.
+
+As the swept frequency falls, `N/f` grows. At the crossover `delta == N/f`,
+i.e. `f* = N/delta` (`5/delta` for the canonical `N=5`), the binding term
+switches: below `f*`, `N/f` exceeds `delta` and becomes the onset stride
+itself, so the next grain's onset lands exactly when the current grain's Hann
+window closes. Onsets and window closes then coincide, grains touch with no
+gap, and the morphology changes from a train of separated pips to a single
+fused, continuously micro-stepped glissando — still amplitude-modulated by
+the Hann window at each onset, but with no silence left to mark the
+individual grains apart (Hann-envelope AM sidebands appear at `+-f/5` around
+the carrier once fused).
+
+Measured with `delta=0.02 s`: the morphology visibly changes around
+`f ~= 250 Hz`, matching `f* = 5/0.02 = 250 Hz` exactly. Gap mode has no such
+floor — its period `N/f + delta` never lets `N/f` alone determine the
+spacing, so grains never touch regardless of frequency, and the fuse
+threshold is a step-mode-only phenomenon. This is also why the GUI's
+step-fuse threshold label (`ltglide_fuse_label.h`) draws nothing in gap mode.
+
+For a morphologically uniform sweep of separated pips all the way down to
+the sweep's low endpoint `f1`, either use gap mode, or, if step mode's
+onset-spacing-tightens-with-frequency character is wanted, choose
+`delta >= N/f1` so the floor never binds below `f1`.
+
 ### `GlissBurst` — burst starts on a zero crossing (near-zero, not bit-exact)
 
 Approach A advances the grain ramp `phase_` by one increment *before* it is
@@ -75,7 +106,7 @@ sample-and-hold semantics of the retriggered-grain engine (Approach A).
 - Peak amplitude over one full gap-mode period (`f=1000`, 14640 samples)
   never exceeds `1.0 + 1e-9` (Hann-windowed unit-amplitude carrier) and
   exceeds `0.5` (the window does reach its intended peak region).
-- Swept over `fs in {44100, 48000, 96000}`, `dmode in {passo, gap}`,
+- Swept over `fs in {44100, 48000, 96000}`, `dmode in {step, gap}`,
   `delta in {0.05, 0.3, 1.0}`, driven by a full exponential sweep
   `f0=20000 -> f1=20` across 20000 samples: every output sample is
   `std::isfinite` — no NaN/Inf produced anywhere in the parameter space
@@ -128,19 +159,26 @@ Plugin enumerated correctly:
   | 101 | F0 | Hz | Float (log) | 20000 Hz |
   | 102 | F1 | Hz | Float (log) | 20 Hz |
   | 103 | Sweep | — | choice (linear/exponential) | exponential |
-  | 104 | Timing | — | choice (passo/gap) | gap |
+  | 104 | Timing | — | choice (step/gap) | gap |
   | 105 | Delta | s | Float (linear) | 0.3 s |
   | 106 | Sweep Time | s | Float (linear) | 20.0 s |
   | 108 | Loop | — | Toggle | 0 |
 
-  Loop is the sole transport control: while on, passes run continuously
-  (Dirac → lead → glide → tail → Dirac → wait → repeat); turning it off stops
-  at the next pass boundary. A manual Trigger parameter was prototyped and then
-  removed: a momentary GUI button delivers its whole press/release pulse as one
-  coalesced parameter point in some hosts (Reaper), so the rising edge never
-  reached the processor. `GlideTransport::trigger()` remains in the SDK-free
-  core (exercised by the doctest and reserved for the 3b-ii receiver) without a
-  bound parameter.
+  The host transport is the sole sounding switch (design doc
+  `2026-07-21-ltglide-host-transport-design.md`): play sounds, stop is
+  silent. With Loop off, a play edge fires exactly one pass (Dirac → lead →
+  glide → tail → Dirac), then silence until the next play edge; with Loop
+  on, passes repeat (…→ wait → repeat) for as long as the transport keeps
+  playing. Stopping mid-pass aborts to idle immediately and rings the
+  in-flight grain out through the existing declick path, rather than
+  clicking. A GUI SHOT button was prototyped for a LOOP-off single pass and
+  then removed once the host transport took over that role: a momentary
+  button also delivers its whole press/release pulse as one coalesced
+  parameter point in some hosts (Reaper), so the rising edge never reliably
+  reached the processor anyway. `GlideTransport::trigger()` remains in the
+  SDK-free core as a manual/test primitive (exercised by the doctest and
+  reserved for the 3b-ii receiver), independent of the host-transport gate,
+  without a bound parameter.
 
 - 1 mono output bus ("Output", Main-Default Active); 0 input buses
   (instrument, matching `ltburst`'s bus shape).

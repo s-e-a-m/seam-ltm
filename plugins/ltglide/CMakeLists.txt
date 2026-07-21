@@ -10,7 +10,7 @@ set(ltglide_sources
     ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/vstsinglecomponenteffect.h
     source/ltglide_ids.h
     source/ltglide_dsp.h
-    source/ltglide_shot_button.h
+    source/ltglide_fuse_label.h
     source/ltglide_processor.cpp
     source/ltglide_processor.h
     source/version.h

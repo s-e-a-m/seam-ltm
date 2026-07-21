@@ -78,6 +78,14 @@
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
+        <!-- Step-fuse threshold: below f* = 5/delta Hz the step-mode grain
+             train fuses into a continuous micro-stepped glissando (see
+             ltglide_fuse_label.h and doc/ltglide-validation.md). Blank in
+             gap mode -- gap mode has no such floor. -->
+        <view class="CView" origin="20, 428" size="260, 14" custom-view-name="LtglideFuseLabel"
+              transparent="true"
+              tooltip="Step mode only: below this frequency the grain train fuses into a continuous micro-stepped glissando."/>
+
         <!-- Delta (grain spacing) -->
         <view class="CTextLabel" origin="20, 456" size="260, 16" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Delta (s)" transparent="true"/>
@@ -102,19 +110,13 @@
         <view class="CTextEdit" origin="20, 570" size="260, 18" font="ValueFont" control-tag="Time"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
 
-        <!-- Transport: Loop (toggle) — passes run continuously while on -->
-        <view class="CCheckBox" origin="95, 606" size="110, 20" control-tag="Loop"
+        <!-- Transport: Loop (toggle) — the host transport is the sole
+             sounding switch (play = sound, stop = silent); LOOP means
+             "repeat while playing", not "start sounding". -->
+        <view class="CCheckBox" origin="100, 606" size="100, 20" control-tag="Loop"
               title="LOOP" font="ValueFont" font-color="TextLight"
               boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
               frame-width="1" transparent="true" autosize-to-fit="false"/>
-
-        <!-- Single-shot launch. With LOOP off the transport has no exit from
-             Idle, so this is the only way to fire one pass. Lit for the pass's
-             whole duration (~32 s). -->
-        <view class="CView" origin="220, 609" size="14, 14" custom-view-name="LtglideShot"
-              tooltip="Fire one pass (LOOP off). Lit while the pass runs."/>
-        <view class="CTextLabel" origin="238, 607" size="46, 16" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="left" title="SHOT" transparent="true"/>
 
         <!-- STONE identity for the calibration bus. ltglide has no slot to be
              inferred from and the receiver cannot read the host's routing, so

@@ -352,8 +352,10 @@ TEST_CASE("GlideTransport::trigger fires exactly one pass with LOOP off") {
     t.setSweepSeconds(2.0);
     t.setLoop(false);
 
-    // With LOOP off the transport is silent forever until triggered: Idle's
-    // only exit is `if (loop_) beginPass()`. This is why SHOT exists.
+    // Without setHostPlaying(true) (and without trigger()), Idle's auto-begin
+    // condition (hostPlaying_ && ...) never holds, so the transport is silent
+    // forever. trigger() is the manual/test primitive that bypasses that gate
+    // entirely -- see the host-transport-gating tests above for the gate itself.
     for (int i = 0; i < 1000; ++i) t.process();
     CHECK_FALSE(t.running());
     CHECK(t.passCount() == 0u);

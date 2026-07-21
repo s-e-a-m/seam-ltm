@@ -17,12 +17,15 @@ enum LTGLIDEParams : Steinberg::Vst::ParamID {
     kParamDmode   = 104,   // 0 step / 1 gap
     kParamDelta   = 105,   // grain spacing, seconds
     kParamT       = 106,   // sweep duration, seconds
-    kParamLoop    = 108,   // toggle: continuous passes (the sole transport control)
+    kParamLoop    = 108,   // toggle: repeat while the host transport plays
     kParamStoneId = 109,   // 0=undeclared, 1..8 (stepped) — calibration bus
 };
 
 // Custom-view name tag (matches resource/ltglide.uidesc custom-view-name).
-static const char* kViewShot = "LtglideShot";
+// Step-fuse threshold label: shown only in step timing mode (see
+// ltglide_fuse_label.h and the "step-fuse threshold" doc subsection in
+// plugins/ltglide/doc/ltglide-validation.md).
+static const char* kViewFuseLabel = "LtglideFuseLabel";
 
 // STONE identity for the calibration bus (Spec 2). ltglide has no slot to be
 // inferred from and its chain identity lives in the host routing, which the

@@ -1,6 +1,6 @@
 #include "ltglide_processor.h"
 #include "ltglide_ids.h"
-#include "ltglide_shot_button.h"
+#include "ltglide_fuse_label.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -130,6 +130,7 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         transport_.setSweepSeconds(paramTSec_.load());
         transport_.setLoop(paramLoop_.load());
         transport_.reset();               // never resume a pass mid-way on (re)activation
+        lastTickWasGlide_ = false;         // no in-flight grain carries across (re)activation
         prevGainLin_ = computeGainLin();
 
         busHandle_ = CalbusClient::instance().registerSlot();
@@ -186,10 +187,6 @@ void LTGLIDEProcessor::publishBusRecord(int64_t hostStartSample) {
 
 tresult PLUGIN_API LTGLIDEProcessor::process(ProcessData& data) {
     readParameterChanges(data);
-
-    // Consume the GUI's shot request. trigger() no-ops unless the transport is
-    // idle, so a press during a pass, or with LOOP on, does nothing.
-    if (shotRequest_.exchange(false, std::memory_order_relaxed)) transport_.trigger();
 
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
 
@@ -316,13 +313,11 @@ IPlugView* PLUGIN_API LTGLIDEProcessor::createView(FIDString name) {
 VSTGUI::CView* PLUGIN_API LTGLIDEProcessor::createCustomView(
     VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& /*attributes*/,
     const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* /*editor*/) {
-    if (name && std::string(name) == kViewShot) {
-        VSTGUI::CColor idle = VSTGUI::kGreyCColor, lit = VSTGUI::kBlueCColor;
-        if (description) {
-            description->getColor("SliderTrack", idle);
-            description->getColor("SliderActive", lit);
-        }
-        return new Seam::LtglideShotButton(VSTGUI::CRect(0, 0, 14, 14), this, idle, lit);
+    if (name && std::string(name) == kViewFuseLabel) {
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor text = VSTGUI::kWhiteCColor;
+        if (description) description->getColor("TextLight", text);
+        return new Seam::LtglideFuseLabel(VSTGUI::CRect(0, 0, 260, 14), this, font, text);
     }
     return nullptr;
 }
@@ -376,12 +371,17 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
         auto tick = transport_.process();
         switch (tick.kind) {
             case ltglide::GlideTransport::Kind::Dirac:
-                // A Dirac can follow a Glide tick directly (transport_.reset()
-                // mid-pass jumps Idle->HeadDirac on the very next tick, with
-                // no intervening Silence); release() there too so the grain
-                // is never left dangling. The ring-out itself is applied on
-                // Silence ticks only below -- TailDirac arrives 5 s after any
-                // ring-out has long finished, so this never mixes the two.
+                // A Dirac can follow a Glide tick directly, but only across a
+                // setActive(true) reactivation -- transport_.reset() (its one
+                // call site, in setActive() below) forces Idle with no
+                // intervening Silence tick, and if the host is still playing
+                // with LOOP on, the very next process() call auto-begins a
+                // fresh pass, landing on HeadDirac. release() here too, so
+                // the grain is never left dangling. The ordinary Glide->Tail
+                // edge (host-transport stop or pass completion) always goes
+                // through a Silence tick first -- see that branch below --
+                // and TailDirac itself arrives 5 s after any ring-out has
+                // long finished, so this never mixes the two.
                 if (lastTickWasGlide_) { glide_.release(); lastTickWasGlide_ = false; }
                 y = 1.0;                                 // unit impulse (scaled by g)
                 break;
@@ -436,9 +436,6 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
     int64_t anchor = -1;
     if (busAnchor_.onRunningChanged(transport_.running(), &anchor))
         publishBusRecord(anchor);
-
-    // GUI-thread poll target for the SHOT button's lit state.
-    transportRunning_.store(transport_.running(), std::memory_order_relaxed);
 }
 
 template void LTGLIDEProcessor::processBlock<float>(float**, int, int, int64_t);
