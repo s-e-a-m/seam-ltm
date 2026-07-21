@@ -273,12 +273,13 @@ TEST_CASE("cross-pass MIN keeps what every pass contains, discards what one pass
     CHECK(f.accM[bin1k] > -40.0f);
     CHECK(f.accM[bin1k] < 0.0f);
     // Present in ONE pass only -> discarded by the MIN. Measured floor here
-    // is Hann window spectral leakage from the 1 kHz tone into the 3 kHz bin
-    // (~-55.4 dB down, ~2000 Hz / ~171 bins away) — NOT EMA carry-over: the
-    // MIN folds welchM_.holdDb(), a per-frame raw-FFT-power max that never
-    // touches the EMA, so setGlideMode() above (and its tau) has no effect
-    // on this bound at all. -60 dB fails empirically; -50 dB is the loosest
-    // 10-dB-step bound that passes.
+    // is spectral leakage from the frames straddling the tone→silence truncation
+    // edge (~-55.4 dB down, the tone gates off mid-window), not steady-state
+    // Hann sidelobes (~-140 dB at this distance). NOT EMA carry-over: the MIN
+    // folds welchM_.holdDb(), a per-frame raw-FFT-power max that never touches
+    // the EMA, so setGlideMode() above (and its tau) has no effect on this bound
+    // at all. -60 dB fails empirically; -50 dB is the loosest 10-dB-step bound
+    // that passes.
     CHECK(f.accM[bin3k] < -50.0f);
     // Same L=R signal -> no side energy; also proves accS is copied (its
     // never-copied default 0.0f would fail this bound).

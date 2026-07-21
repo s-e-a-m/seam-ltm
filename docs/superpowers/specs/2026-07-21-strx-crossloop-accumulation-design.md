@@ -19,7 +19,7 @@ Honest limit, stated up front: stationary background noise does not go down — 
 
 A second, subtler honest limit: pass boundaries are detected on the GUI poll, not the audio thread.
 `CalbusWatch::poll()` re-snapshots at most every ~80 ms, and the audio thread only picks up the resulting epoch bump on its next block — so every boundary is detected ~80 ms plus one block late.
-The first ~80 ms of each new pass is therefore wiped when the fold finally runs, then refills from the fast EMA-backed hold rather than a full sweep excitation.
+The first ~80 ms of each new pass is therefore wiped when the fold finally runs; the 4096-sample analysis ring survives the reset (~85 ms at 48 kHz), so the next frames still span most of the wiped interval, Hann-attenuated at the frame edge.
 This is a systematic few-dB droop at the sweep-start frequencies, and the MIN accumulator keeps it forever once folded.
 Exact boundary timing is out of scope here; it belongs to Spec 3 (transfer-function measurement).
 
@@ -62,7 +62,7 @@ The accumulator lives in `Seam::strx::Analyzer` (`strx_dsp.h`): `accM_/accS_[kNu
 
 ### Spectrum view (`strx_spectrum.h`)
 
-The visible curve never resets per cycle:
+The visible curve resets exactly once per session — at the first pass boundary, when the discarded arming pass clears the hold — and never again within the session:
 
 - pass 1 (no fold yet): building hold at α255 + faint live at α90 — today's glide rendering;
 - from the first fold on (`accPasses ≥ 1`): **acc at α255 + faint live at α90**; the per-pass hold is no longer drawn, it exists only as the fold ingredient;

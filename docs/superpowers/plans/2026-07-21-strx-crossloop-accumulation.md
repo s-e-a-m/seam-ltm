@@ -532,7 +532,7 @@ Expected: strx.vst3 rebuilt; the `build` tree owns the `~/Library/Audio/Plug-Ins
 
 - [ ] **Step 3: Report the host checklist to GS (manual, in Reaper)**
 
-1. ltglide in LOOP → strx spectrum: pass 1 builds the hold; from pass 2 the curve refines and NEVER resets at the cycle boundary; status line advances "pass N".
+1. ltglide in LOOP → strx spectrum: pass 1 builds the hold; the pass 1→2 boundary clears it ONCE (the discarded arming pass); from the 2→3 boundary on the accumulated curve appears, refines, and never resets again; status line advances "pass N".
 2. Stop the loop mid-pass → curve stays (partial pass discarded, accumulation intact).
 3. Restart LOOP → the old curve is replaced by a fresh session.
 4. Stop the loop, un-mute a multipink → spectrum returns to the live pink view; mute it again → the accumulated measurement reappears.
