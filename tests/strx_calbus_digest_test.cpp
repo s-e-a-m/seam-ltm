@@ -3,10 +3,10 @@
 #include "strx_calbus_digest.h"
 
 using Seam::strx::digest;
-using Seam::strx::shouldResetHold;
 using Seam::strx::holdAction;
 using Seam::strx::HoldAction;
 using Seam::strx::GlideParams;
+using Seam::strx::pinkTakeover;
 
 static SeamCalbusRecord pink(uint32_t stone, bool active, int32_t slotStart) {
     SeamCalbusRecord r{};
@@ -124,97 +124,107 @@ TEST_CASE("digest follows the same record the status line names") {
 }
 
 //──────────────────────────────────────────────────────────────────────────
-// shouldResetHold — the new-pass decision CalbusWatch::poll() drives the
-// hold epoch with. Exercised through digest() + real record builders (not
-// hand-built CalbusDigest values) so the tests cover the actual seam between
-// the two functions, the same seam that hid the cross-instance collision.
+// holdAction (via its boolean edge, "!= HoldAction::None") — the new-pass
+// decision CalbusWatch::poll() drives the hold epoch with. Exercised through
+// digest() + real record builders (not hand-built CalbusDigest values) so
+// the tests cover the actual seam between the two functions, the same seam
+// that hid the cross-instance collision. These five cases used to pin
+// shouldResetHold(), a boolean-only wrapper around holdAction() that kept
+// its own GlideParams in a function-local static; that wrapper had zero
+// production callers and its scenarios are fully subsumed by holdAction(),
+// so it was deleted and these migrated to call holdAction() directly.
 //──────────────────────────────────────────────────────────────────────────
 
-TEST_CASE("shouldResetHold bumps once on a new pass, not again for the same counter") {
+TEST_CASE("holdAction bumps once on a new pass, not again for the same counter") {
     uint64_t lastPass = 0;
+    GlideParams lastParams;
     SeamCalbusRecord recs[1] = { glide(1, true, 1) };   // instance's first pass
     const auto d = digest(recs, 1, true);
-    CHECK(shouldResetHold(d, lastPass));                // new pass -> bump
+    CHECK(holdAction(d, lastPass, lastParams) != HoldAction::None);  // new pass -> bump
     CHECK(lastPass == 1u);
-    CHECK_FALSE(shouldResetHold(d, lastPass));           // re-polled, same pass -> no bump
-    CHECK_FALSE(shouldResetHold(d, lastPass));           // polled again -> still no bump
+    CHECK(holdAction(d, lastPass, lastParams) == HoldAction::None);  // re-polled, same pass -> no bump
+    CHECK(holdAction(d, lastPass, lastParams) == HoldAction::None);  // polled again -> still no bump
 }
 
-TEST_CASE("shouldResetHold catches the cross-instance collision GS's workflow hits") {
+TEST_CASE("holdAction catches the cross-instance collision GS's workflow hits") {
     // Calibrate STONE 1 (one pass, passCounter == 1), stop it, start STONE 2's
     // ltglide (a DIFFERENT instance whose first pass is ALSO passCounter == 1).
     // Without the per-emitter sentinel reset, "1 != lastPass" would be false
     // and STONE 2's pass would never clear STONE 1's max-hold curve.
     uint64_t lastPass = 0;
+    GlideParams lastParams;
 
     SeamCalbusRecord stoneOnePass1[1] = { glide(1, true, 1) };
-    CHECK(shouldResetHold(digest(stoneOnePass1, 1, true), lastPass));
+    CHECK(holdAction(digest(stoneOnePass1, 1, true), lastPass, lastParams) != HoldAction::None);
     CHECK(lastPass == 1u);
 
     // STONE 1 stops: no active glide anywhere on the bus (unregistered, or
     // simply idle) -- the gap the fix relies on existing between instances.
     SeamCalbusRecord noneActive[1] = { glide(1, false, 1) };
-    CHECK_FALSE(shouldResetHold(digest(noneActive, 1, true), lastPass));
+    CHECK(holdAction(digest(noneActive, 1, true), lastPass, lastParams) == HoldAction::None);
     CHECK(lastPass == 0u);                              // sentinel cleared
 
     // STONE 2 starts: a DIFFERENT instance, its own first pass, also == 1.
     SeamCalbusRecord stoneTwoPass1[1] = { glide(2, true, 1) };
-    CHECK(shouldResetHold(digest(stoneTwoPass1, 1, true), lastPass));  // MUST bump
+    CHECK(holdAction(digest(stoneTwoPass1, 1, true), lastPass, lastParams) != HoldAction::None);  // MUST bump
     CHECK(lastPass == 1u);
 }
 
-TEST_CASE("shouldResetHold never bumps for a registered-but-idle glide") {
+TEST_CASE("holdAction never bumps for a registered-but-idle glide") {
     // Prime lastPass from a REAL prior pass first (rather than starting from
     // the 0 default) so this test cannot pass merely because an idle glide's
     // digest.passCounter also happens to default to 0 -- it must exercise the
     // `!d.glide` gate itself, not a coincidence of two zeros matching.
     uint64_t lastPass = 0;
+    GlideParams lastParams;
     SeamCalbusRecord activePass[1] = { glide(1, true, 5) };
-    CHECK(shouldResetHold(digest(activePass, 1, true), lastPass));
+    CHECK(holdAction(digest(activePass, 1, true), lastPass, lastParams) != HoldAction::None);
     CHECK(lastPass == 5u);
 
     SeamCalbusRecord recs[1] = { glide(1, false, 5) };  // idle: passCounter carried over, not sounding
     const auto d = digest(recs, 1, true);
     CHECK_FALSE(d.glide);
-    CHECK_FALSE(shouldResetHold(d, lastPass));
-    CHECK_FALSE(shouldResetHold(d, lastPass));          // polled again, still idle -> still no bump
+    CHECK(holdAction(d, lastPass, lastParams) == HoldAction::None);
+    CHECK(holdAction(d, lastPass, lastParams) == HoldAction::None);  // polled again, still idle -> still no bump
 }
 
-TEST_CASE("shouldResetHold never bumps for a pink emitter") {
+TEST_CASE("holdAction never bumps for a pink emitter") {
     // Same priming as the idle-glide case above, and for the same reason:
     // pink's digest.passCounter also defaults to 0, so this must start from a
     // nonzero lastPass to actually exercise the `!d.glide` gate.
     uint64_t lastPass = 0;
+    GlideParams lastParams;
     SeamCalbusRecord activePass[1] = { glide(1, true, 5) };
-    CHECK(shouldResetHold(digest(activePass, 1, true), lastPass));
+    CHECK(holdAction(digest(activePass, 1, true), lastPass, lastParams) != HoldAction::None);
     CHECK(lastPass == 5u);
 
     SeamCalbusRecord recs[1] = { pink(1, true, 0) };
     const auto d = digest(recs, 1, true);
     CHECK_FALSE(d.glide);
-    CHECK_FALSE(shouldResetHold(d, lastPass));
+    CHECK(holdAction(d, lastPass, lastParams) == HoldAction::None);
     CHECK(lastPass == 0u);
 }
 
-TEST_CASE("shouldResetHold bumps once per pass in a loop, not once per poll") {
+TEST_CASE("holdAction bumps once per pass in a loop, not once per poll") {
     // A looping instance never goes idle between passes (running() stays true
     // across the loop), so the sentinel is never cleared by the !glide branch
     // -- but passCounter itself increments on every new pass, so the != check
     // alone must keep catching each one, and must NOT re-fire on repeated
     // polls of the same pass.
     uint64_t lastPass = 0;
+    GlideParams lastParams;
 
     SeamCalbusRecord pass1[1] = { glide(1, true, 1) };
-    CHECK(shouldResetHold(digest(pass1, 1, true), lastPass));
-    CHECK_FALSE(shouldResetHold(digest(pass1, 1, true), lastPass));  // GUI polls faster than the pass changes
-    CHECK_FALSE(shouldResetHold(digest(pass1, 1, true), lastPass));
+    CHECK(holdAction(digest(pass1, 1, true), lastPass, lastParams) != HoldAction::None);
+    CHECK(holdAction(digest(pass1, 1, true), lastPass, lastParams) == HoldAction::None);  // GUI polls faster than the pass changes
+    CHECK(holdAction(digest(pass1, 1, true), lastPass, lastParams) == HoldAction::None);
 
     SeamCalbusRecord pass2[1] = { glide(1, true, 2) };   // loop advanced to pass 2, still active
-    CHECK(shouldResetHold(digest(pass2, 1, true), lastPass));
-    CHECK_FALSE(shouldResetHold(digest(pass2, 1, true), lastPass));
+    CHECK(holdAction(digest(pass2, 1, true), lastPass, lastParams) != HoldAction::None);
+    CHECK(holdAction(digest(pass2, 1, true), lastPass, lastParams) == HoldAction::None);
 
     SeamCalbusRecord pass3[1] = { glide(1, true, 3) };
-    CHECK(shouldResetHold(digest(pass3, 1, true), lastPass));
+    CHECK(holdAction(digest(pass3, 1, true), lastPass, lastParams) != HoldAction::None);
 }
 
 //──────────────────────────────────────────────────────────────────────────
@@ -312,4 +322,55 @@ TEST_CASE("digest captures the active glide's generation parameters") {
     CHECK(d.params.deltaSec == doctest::Approx(1.0));
     CHECK(d.params.sweepMode == 1u);
     CHECK(d.params.diracMode == 0u);
+}
+
+//──────────────────────────────────────────────────────────────────────────
+// pinkTakeover — the edge detector that fires exactly once when a non-glide
+// (pink) emitter becomes the active one, so CalbusWatch can bump the session
+// epoch and permanently discard the glide accumulation the pink interrupted
+// (GS's "last measure wins" decision, 2026-07-21): a stopped pink must never
+// let a stale glide accumulation reappear on the spectrum.
+//──────────────────────────────────────────────────────────────────────────
+
+TEST_CASE("pinkTakeover fires once when pink becomes active, not on re-polls") {
+    bool lastNonGlideActive = false;
+    SeamCalbusRecord recs[1] = { pink(1, true, 0) };
+    const auto d = digest(recs, 1, true);
+    CHECK(pinkTakeover(d, lastNonGlideActive));            // edge: pink just took over
+    CHECK(lastNonGlideActive);
+    CHECK_FALSE(pinkTakeover(d, lastNonGlideActive));      // re-polled, still pink -> no edge
+    CHECK_FALSE(pinkTakeover(d, lastNonGlideActive));
+}
+
+TEST_CASE("pinkTakeover fires again after pink stops and a new pink takes over") {
+    bool lastNonGlideActive = false;
+    SeamCalbusRecord takeover1[1] = { pink(1, true, 0) };
+    CHECK(pinkTakeover(digest(takeover1, 1, true), lastNonGlideActive));
+
+    SeamCalbusRecord silence[1] = { pink(1, false, 0) };   // pink stops: nothing active
+    CHECK_FALSE(pinkTakeover(digest(silence, 1, true), lastNonGlideActive));
+    CHECK_FALSE(lastNonGlideActive);
+
+    SeamCalbusRecord takeover2[1] = { pink(2, true, 4) };  // a different pink takes over
+    CHECK(pinkTakeover(digest(takeover2, 1, true), lastNonGlideActive));
+}
+
+TEST_CASE("pinkTakeover never fires while glide is the active emitter") {
+    bool lastNonGlideActive = false;
+    SeamCalbusRecord recs[1] = { glide(1, true, 1) };
+    CHECK_FALSE(pinkTakeover(digest(recs, 1, true), lastNonGlideActive));
+    SeamCalbusRecord pass2[1] = { glide(1, true, 2) };
+    CHECK_FALSE(pinkTakeover(digest(pass2, 1, true), lastNonGlideActive));
+}
+
+TEST_CASE("pinkTakeover never fires when nothing is active") {
+    bool lastNonGlideActive = false;
+    SeamCalbusRecord recs[1] = { pink(1, false, 0) };
+    CHECK_FALSE(pinkTakeover(digest(recs, 1, true), lastNonGlideActive));
+}
+
+TEST_CASE("pinkTakeover never fires on an unavailable bus") {
+    bool lastNonGlideActive = false;
+    SeamCalbusRecord recs[1] = { pink(1, true, 0) };
+    CHECK_FALSE(pinkTakeover(digest(recs, 1, /*available*/false), lastNonGlideActive));
 }

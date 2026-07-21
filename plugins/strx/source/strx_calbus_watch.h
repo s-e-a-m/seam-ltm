@@ -68,6 +68,16 @@ public:
         case HoldAction::None:
             break;
         }
+        // A non-glide (pink) emitter taking over the bus permanently ends the
+        // measurement session it interrupts — GS's "last measure wins" rule
+        // (2026-07-21). The processor's session branch already clears both
+        // accumulation and hold on any sessionEpoch bump, so an empty acc is
+        // harmless here; this just makes sure the NEXT glide session (whether
+        // it's the same emitter resuming or a different one) starts clean
+        // rather than folding into whatever the interrupted session left
+        // behind.
+        if (pinkTakeover(digest_, lastNonGlideActive_))
+            sessionEpoch_.fetch_add(1, std::memory_order_relaxed);
         return digest_;
     }
 
@@ -81,6 +91,7 @@ private:
     CalbusDigest           digest_;
     uint64_t               lastPass_ = 0;
     GlideParams            lastParams_;
+    bool                   lastNonGlideActive_ = false;
     bool                   primed_   = false;
     std::chrono::steady_clock::time_point last_{};
 };

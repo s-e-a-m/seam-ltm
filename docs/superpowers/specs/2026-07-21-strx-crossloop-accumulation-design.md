@@ -72,7 +72,10 @@ The visible curve resets exactly once per session — at the first pass boundary
 - pass 1 (no fold yet): building hold at α255 + faint live at α90 — today's glide rendering;
 - from the first fold on (`accPasses ≥ 1`): **acc at α255 + faint live at α90**; the per-pass hold is no longer drawn, it exists only as the fold ingredient;
 - loop stopped: while `accPasses ≥ 1`, keep drawing acc + live even with no glide active (the result survives stopping the loop); a new session replaces it;
-- pink takeover: while a non-glide emitter (pink noise) sounds, the plain live view wins — full-alpha live spectrum only, no acc/hold overlay; the preserved accumulation returns as soon as that emitter stops (implemented as `otherActive_` in `strx_spectrum.h`).
+- pink takeover: while a non-glide emitter (pink noise) sounds, the plain live view wins — full-alpha live spectrum only, no acc/hold overlay.
+A pink takeover permanently discards the interrupted glide accumulation: `pinkTakeover()` (`strx_calbus_digest.h`) fires once on the edge where a non-glide emitter becomes active, and `CalbusWatch` bumps the session epoch on that edge, so the processor clears acc and hold before the next glide session can start (GS decision, 2026-07-21: "last measure wins" — superseding the earlier "the preserved accumulation returns" design).
+When the last active emitter goes silent — the loop stopped, or the pink observation itself stops — the view freezes on the last-shown curves instead of reverting to a stale or unrelated live frame, and draws a small HELD tag so a frozen display is honest about being stale.
+A new glide or pink session replaces the frozen picture as soon as it starts sounding.
 
 ### Status line (`strx_status.h`)
 

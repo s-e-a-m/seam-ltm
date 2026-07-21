@@ -82,10 +82,13 @@ private:
                 std::snprintf(clock, sizeof(clock), "no host clock");
             else
                 std::snprintf(clock, sizeof(clock), "T=%.0fs", r.u.glide.durationSec);
+            // sweepMode: 0 linear, 1 exponential. GS chased a "wrong curve"
+            // for an hour before this was visible on the line at all.
+            const char* mode = (r.u.glide.sweepMode == 1) ? "exp" : "lin";
             std::snprintf(buf, sizeof(buf),
-                          "ltglide \xC2\xB7 %s \xC2\xB7 pass %llu \xC2\xB7 %.0f\xE2\x86\x92%.0f Hz \xC2\xB7 %s",
+                          "ltglide \xC2\xB7 %s \xC2\xB7 pass %llu \xC2\xB7 %.0f\xE2\x86\x92%.0f Hz \xC2\xB7 %s \xC2\xB7 %s",
                           stone, (unsigned long long)r.u.glide.passCounter,
-                          r.u.glide.f0, r.u.glide.f1, clock);
+                          r.u.glide.f0, r.u.glide.f1, mode, clock);
         }
         // (UTF-8 byte escapes above for the middle-dot/arrow glyphs — keeps
         // the source ASCII-clean regardless of editor/terminal encoding.)
@@ -118,12 +121,19 @@ private:
         std::string text = describe(watch.records()[d.firstActive]);
         if (d.activeCount > 1) {
             // Kept compact on purpose, not out of necessity: at 560px/11px
-            // (Source Code Pro Light, ~6.6 px/char) the longest record plus
-            // this flag is ~66 glyphs (~436px), leaving ~124px of headroom —
-            // room enough for a second emitter's name if we ever wanted one.
-            // The flag stays a count because "who else" matters less than
-            // "someone else is sounding": that's the fact this line exists
-            // to surface (see the comment above on the un-mute slip).
+            // (Source Code Pro Light, ~6.6 px/char) the longest record is the
+            // ltglide branch with a "no host clock" clock field (longer than
+            // any realistic "T=%.0fs"), an unresolved STONE ("STONE ?"), and
+            // now the sweepMode word this describe() also appends — e.g.
+            // "ltglide · STONE ? · pass 9999 · 20000→20 Hz · exp · no host
+            // clock" is 65 glyphs; plus this flag (~10 glyphs) that is ~75
+            // glyphs (~495px), leaving ~65px of headroom on the 560px view —
+            // tighter than before the sweepMode word (was ~124px), but still
+            // positive, and still room enough for a second emitter's name if
+            // we ever wanted one. The flag stays a count because "who else"
+            // matters less than "someone else is sounding": that's the fact
+            // this line exists to surface (see the comment above on the
+            // un-mute slip).
             char extra[16];
             std::snprintf(extra, sizeof(extra), " \xC2\xB7 +%d more", d.activeCount - 1);
             text += extra;

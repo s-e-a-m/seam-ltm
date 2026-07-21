@@ -129,18 +129,15 @@ inline HoldAction holdAction(const CalbusDigest& d, uint64_t& lastPass, GlidePar
     return HoldAction::None;
 }
 
-// Boolean view of holdAction: does the hold need clearing at all? Kept so the
-// pre-accumulation tests keep pinning the shared sentinel semantics. This
-// wrapper's signature has no room for caller-owned GlideParams state, so it
-// keeps its own in a function-local static; that is safe here (and only
-// here — never do this in a hot-path helper) because every call sequence
-// starts from lastPass == 0, and holdAction's fresh branch unconditionally
-// overwrites lastParams before ever comparing it, so a stale value left by a
-// previous, unrelated sequence can never leak into a decision. A real param
-// change also returning true is correct — it IS a hold-reset case.
-inline bool shouldResetHold(const CalbusDigest& d, uint64_t& lastPass) {
-    static thread_local GlideParams lastParams;
-    return holdAction(d, lastPass, lastParams) != HoldAction::None;
+// TRUE exactly on the poll where a non-glide emitter becomes the active one
+// (pink takeover). The measurement session it interrupts is over for good —
+// GS's "last measure wins" rule — so the watch clears the accumulation via
+// the session epoch. `lastNonGlideActive` is caller-owned edge state.
+inline bool pinkTakeover(const CalbusDigest& d, bool& lastNonGlideActive) {
+    const bool nowActive = d.available && d.firstActive >= 0 && !d.glide;
+    const bool edge = nowActive && !lastNonGlideActive;
+    lastNonGlideActive = nowActive;
+    return edge;
 }
 
 }} // namespace Seam::strx

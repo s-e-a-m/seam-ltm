@@ -58,8 +58,8 @@ public:
             [this](VSTGUI::CVSTGUITimer*) {
                 if (processor_) {
                     const auto& d = processor_->calbusWatch().poll();
-                    glide_ = d.glide;
-                    otherActive_ = (d.firstActive >= 0) && !d.glide;
+                    glide_  = d.glide;
+                    active_ = d.available && d.firstActive >= 0;   // any emitter sounding
                 }
                 invalid();
             }, kTimerMs, /*doStart*/true);
@@ -157,21 +157,56 @@ public:
             path->forget();
         };
 
-        // The visible measurement never resets per loop cycle (that per-cycle
-        // reset was the reported malfunction). Pass 1 shows the building
-        // hold; from the first fold on, the cross-pass MIN accumulation IS
-        // the measurement — and it survives the loop stopping, until a pink
-        // (non-glide) emitter takes over the observation or a new glide
-        // session replaces it. Pink noise is stationary, so outside a
-        // measurement one averaged curve per channel still says everything.
-        const bool haveAcc  = frame.accPasses > 0;
-        const bool measured = glide_ || (haveAcc && !otherActive_);
-        if (measured) {
-            drawCurve(haveAcc ? frame.accM : frame.holdM, frame.numBins, colorM_, /*alpha*/255);
-            drawCurve(haveAcc ? frame.accS : frame.holdS, frame.numBins, colorS_, /*alpha*/255);
-            drawCurve(frame.specM, frame.numBins, colorM_, /*alpha*/90);
-            drawCurve(frame.specS, frame.numBins, colorS_, /*alpha*/90);
+        // "Last measure wins" (GS decision, 2026-07-21): while ANY emitter is
+        // sounding, draw the live measurement and remember exactly what was
+        // drawn. The moment nothing is sounding any more — the loop stopped,
+        // or the pink observation that took over the bus stops in turn — the
+        // view freezes on that remembered snapshot instead of falling back to
+        // whatever the (possibly stale, possibly pre-takeover) live analysis
+        // frame contains. A pink takeover itself invalidates the interrupted
+        // glide session at the DSP level (see pinkTakeover() in
+        // strx_calbus_digest.h), so the accumulation this snapshot could
+        // ever capture is always the one that was actually on screen.
+        if (active_) {
+            const bool haveAcc = frame.accPasses > 0;
+            const float* primaryM = glide_ ? (haveAcc ? frame.accM : frame.holdM) : frame.specM;
+            const float* primaryS = glide_ ? (haveAcc ? frame.accS : frame.holdS) : frame.specS;
+            drawCurve(primaryM, frame.numBins, colorM_, /*alpha*/255);
+            drawCurve(primaryS, frame.numBins, colorS_, /*alpha*/255);
+            if (glide_) {
+                drawCurve(frame.specM, frame.numBins, colorM_, /*alpha*/90);
+                drawCurve(frame.specS, frame.numBins, colorS_, /*alpha*/90);
+            }
+
+            // Snapshot exactly what was just drawn (cheap: only refreshed on
+            // a repaint that actually had live data). GUI thread only, no
+            // locking needed.
+            const int nb = std::min(frame.numBins, Seam::strx::AnalysisFrame::kNumBins);
+            std::copy(primaryM, primaryM + nb, heldPrimaryM_);
+            std::copy(primaryS, primaryS + nb, heldPrimaryS_);
+            heldHasLive_ = glide_;
+            if (heldHasLive_) {
+                std::copy(frame.specM, frame.specM + nb, heldLiveM_);
+                std::copy(frame.specS, frame.specS + nb, heldLiveS_);
+            }
+            heldNumBins_ = nb;
+            heldValid_   = true;
+        } else if (heldValid_) {
+            // Nothing sounding, but a measure was shown before: freeze it.
+            drawCurve(heldPrimaryM_, heldNumBins_, colorM_, /*alpha*/255);
+            drawCurve(heldPrimaryS_, heldNumBins_, colorS_, /*alpha*/255);
+            if (heldHasLive_) {
+                drawCurve(heldLiveM_, heldNumBins_, colorM_, /*alpha*/90);
+                drawCurve(heldLiveS_, heldNumBins_, colorS_, /*alpha*/90);
+            }
+            if (font_) {
+                c->setFontColor(structureColor_);
+                c->drawString("HELD", CRect(plot.left + 2, plot.top + 2, plot.left + 44, plot.top + 14),
+                               kLeftText);
+            }
         } else {
+            // Fresh instance, nothing sounding yet, no snapshot to fall back
+            // on: today's plain live rendering.
             drawCurve(frame.specM, frame.numBins, colorM_, /*alpha*/255);
             drawCurve(frame.specS, frame.numBins, colorS_, /*alpha*/255);
         }
@@ -203,8 +238,22 @@ private:
     // out of CalbusWatch::poll()'s returned digest immediately — never store
     // the reference itself, which aliases the watch's internal state and
     // would silently observe a later snapshot (see strx_calbus_watch.h).
-    bool glide_ = false;
-    bool otherActive_ = false;   // a non-glide emitter (pink) is sounding
+    bool glide_  = false;
+    bool active_ = false;   // any emitter (glide or pink) is sounding
+
+    // "Last measure wins" snapshot (see draw()): the curves last drawn while
+    // active_ was true, so the view can freeze on them once nothing is
+    // sounding any more instead of reverting to a stale or unrelated live
+    // frame. heldHasLive_ is true only when the held primary curve was a
+    // glide accumulation/hold (the faint live overlay only ever accompanies
+    // that case).
+    bool  heldValid_   = false;
+    bool  heldHasLive_ = false;
+    int   heldNumBins_ = 0;
+    float heldPrimaryM_[Seam::strx::AnalysisFrame::kNumBins] = {};
+    float heldPrimaryS_[Seam::strx::AnalysisFrame::kNumBins] = {};
+    float heldLiveM_[Seam::strx::AnalysisFrame::kNumBins] = {};
+    float heldLiveS_[Seam::strx::AnalysisFrame::kNumBins] = {};
 };
 
 } // namespace Seam
