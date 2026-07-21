@@ -105,6 +105,99 @@ TEST_CASE("transport is silent when idle and not looping") {
     CHECK(t.running() == false);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Host-transport gating (design doc 2026-07-21): play = sounds, stop =
+// silent. setHostPlaying() is the gate; trigger() remains an independent
+// manual/test primitive that bypasses it entirely (it sets state_ directly).
+// ─────────────────────────────────────────────────────────────────────────
+
+TEST_CASE("host not playing: transport stays Idle regardless of LOOP") {
+    for (bool loopOn : {false, true}) {
+        GlideTransport t;
+        t.prepare(48000.0);
+        t.setSweepSeconds(1.0);
+        t.setLoop(loopOn);
+        // Never told the host is playing -- hostPlaying_ defaults to false.
+        for (int n = 0; n < 1000; ++n)
+            CHECK(t.process().kind == GlideTransport::Kind::Silence);
+        CHECK_FALSE(t.running());
+        CHECK(t.passCount() == 0u);
+    }
+}
+
+TEST_CASE("host playing, LOOP off: exactly one pass per play edge, no retrigger while still playing") {
+    using GT = GlideTransport;
+    GT t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(1.0);
+    t.setLoop(false);
+
+    t.setHostPlaying(true);
+    // First tick after the play edge is the head Dirac of an AUTO-begun pass
+    // -- no trigger() call anywhere in this test.
+    CHECK(t.process().kind == GT::Kind::Dirac);
+    CHECK(t.passCount() == 1u);
+
+    const long remaining = (long)((GT::kLeadSec + 1.0 + GT::kTailSec) * 48000.0) + 16;
+    for (long i = 0; i < remaining; ++i) t.process();
+    CHECK_FALSE(t.running());
+    CHECK(t.passCount() == 1u);
+
+    // Playing is STILL true (no stop/start cycle) -- must NOT retrigger. This
+    // is exactly the playedThisRun_ latch: without it, Idle's auto-begin
+    // condition would fire again on every subsequent tick.
+    for (int i = 0; i < 5000; ++i) {
+        CHECK(t.process().kind == GT::Kind::Silence);
+    }
+    CHECK(t.passCount() == 1u);
+
+    // A stop -> play cycle plays exactly one more pass.
+    t.setHostPlaying(false);
+    CHECK_FALSE(t.running());
+    t.setHostPlaying(true);
+    CHECK(t.process().kind == GT::Kind::Dirac);
+    CHECK(t.passCount() == 2u);
+}
+
+TEST_CASE("host playing, LOOP on: passes repeat while playing; stop mid-pass silences immediately; resume starts fresh") {
+    using GT = GlideTransport;
+    GT t;
+    t.prepare(48000.0);
+    t.setSweepSeconds(1.0);
+    t.setLoop(true);
+
+    t.setHostPlaying(true);
+    CHECK(t.process().kind == GT::Kind::Dirac);       // pass 1 auto-begins
+    CHECK(t.passCount() == 1u);
+
+    // Drain pass 1 completely (lead + glide + tail + tail Dirac + wait) --
+    // playing stays true throughout.
+    const long body = (long)((GT::kLeadSec + 1.0 + GT::kTailSec) * 48000.0);
+    for (long i = 0; i < body; ++i) t.process();
+    CHECK(t.process().kind == GT::Kind::Dirac);       // tail Dirac
+    const long waitN = (long)(GT::kWaitSec * 48000.0);
+    for (long i = 0; i < waitN; ++i)
+        CHECK(t.process().kind == GT::Kind::Silence);
+    // A second pass begins after the Wait elapses, still with playing == true.
+    CHECK(t.process().kind == GT::Kind::Dirac);
+    CHECK(t.passCount() == 2u);
+
+    // Stop mid-pass: running() must go false IMMEDIATELY (no further process()
+    // call needed), and the very next tick must be Silence, not a resumed
+    // Glide/Lead/Tail sample.
+    for (int i = 0; i < 1000; ++i) t.process();       // get into the body
+    CHECK(t.running());
+    t.setHostPlaying(false);
+    CHECK_FALSE(t.running());
+    CHECK(t.process().kind == GT::Kind::Silence);
+
+    // Resume: a fresh pass from HeadDirac, never resumed mid-pass. passCount
+    // increments to 3 (a NEW pass, not pass 2 continuing).
+    t.setHostPlaying(true);
+    CHECK(t.process().kind == GT::Kind::Dirac);
+    CHECK(t.passCount() == 3u);
+}
+
 TEST_CASE("triggered pass has the exact Dirac/silence/glide timeline") {
     const double fs = 48000.0;
     GlideTransport t;
@@ -180,6 +273,7 @@ TEST_CASE("loop restarts automatically with a wait gap") {
     t.prepare(fs);
     t.setSweepSeconds(1.0);
     t.setLoop(true);
+    t.setHostPlaying(true);   // LOOP no longer sounds on its own (host-transport gating)
     // First tick from Idle+loop must be the head Dirac of pass 1.
     CHECK(t.process().kind == GlideTransport::Kind::Dirac);
     // Drain the pass: lead + glide + tail.
@@ -218,6 +312,7 @@ TEST_CASE("GlideTransport increments the counter once per looped pass") {
     t.prepare(48000.0);
     t.setSweepSeconds(2.0);
     t.setLoop(true);
+    t.setHostPlaying(true);   // LOOP no longer sounds on its own (host-transport gating)
 
     using GT = GlideTransport;
     const long onePass = (long)((GT::kLeadSec + 2.0 + GT::kTailSec + GT::kWaitSec) * 48000.0);
@@ -308,6 +403,7 @@ TEST_CASE("passCount survives reset() and prepare()") {
     t.prepare(48000.0);
     t.setSweepSeconds(2.0);
     t.setLoop(true);
+    t.setHostPlaying(true);   // LOOP no longer sounds on its own (host-transport gating)
     for (long i = 0; i < 48000L * 40; ++i) t.process();
     const uint64_t n = t.passCount();
     CHECK(n >= 1u);
@@ -675,6 +771,7 @@ TEST_CASE("BusAnchor: no false unanchored record when a running/idle transition 
     t.prepare(fs);
     t.setSweepSeconds(1.0);
     t.setLoop(true);
+    t.setHostPlaying(true);   // LOOP no longer sounds on its own (host-transport gating)
     BusAnchor anchor;
     anchor.reset(t.passCount());
 

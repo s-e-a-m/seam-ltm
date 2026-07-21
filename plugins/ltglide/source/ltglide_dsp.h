@@ -119,9 +119,34 @@ public:
     }
     void setSweepSeconds(double t) { tSec_ = (t > 0.0) ? t : 1.0; recomputeGlide(); }
     void setLoop(bool on) { loop_ = on; }
+
+    // Host-transport gate (design doc 2026-07-21: play = sounds, stop =
+    // silent). false->true (the host pressed play) arms a fresh run by
+    // clearing playedThisRun_, so a LOOP-off pass is eligible to auto-begin
+    // again. true->false (the host pressed stop) aborts an in-flight pass to
+    // Idle immediately -- the processor's Glide->Silence edge fires the grain
+    // release() on the very next tick, so the stop rings out cleanly instead
+    // of clicking. A redundant call (on == hostPlaying_ already) is a no-op.
+    void setHostPlaying(bool on) {
+        if (on && !hostPlaying_) {
+            playedThisRun_ = false;
+        } else if (!on && hostPlaying_ && running()) {
+            state_ = State::Idle; counter_ = 0;
+        }
+        hostPlaying_ = on;
+    }
+
     // Return to Idle without re-deriving the fs-dependent sample counts;
-    // used on (re)activation so a pass never resumes mid-way.
-    void reset() { state_ = State::Idle; counter_ = 0; }
+    // used on (re)activation so a pass never resumes mid-way. Does NOT clear
+    // hostPlaying_: the host is still playing across a reactivation (the
+    // transport, not the host transport state, is what reactivated). DOES
+    // clear playedThisRun_: a reactivation is treated as a fresh run, so the
+    // intuitive outcome is one new pass on resume rather than staying latched
+    // silent because a pass "already played" in a run that no longer exists.
+    void reset() { state_ = State::Idle; counter_ = 0; playedThisRun_ = false; }
+    // Manual/test primitive: begin a pass if Idle, independent of the host-
+    // transport gate above (it sets state_ directly, bypassing process()'s
+    // Idle branch entirely). Unchanged by the host-transport gating work.
     void trigger() { if (state_ == State::Idle) beginPass(); }
     bool running() const { return state_ != State::Idle; }
 
@@ -133,8 +158,19 @@ public:
     Tick process() {
         switch (state_) {
             case State::Idle:
-                if (loop_) beginPass();
-                else return { Kind::Silence, 0.0 };
+                // Auto-begin only while the host is playing: LOOP's meaning
+                // is now "repeat while playing" (loop_ re-arms every time),
+                // not "start sounding by itself". With LOOP off, a pass
+                // begins once per play edge -- the playedThisRun_ latch
+                // (cleared on the false->true edge by setHostPlaying(), and
+                // on reset()) is what stops it from firing again while
+                // hostPlaying_ merely stays true.
+                if (hostPlaying_ && (loop_ || !playedThisRun_)) {
+                    playedThisRun_ = true;
+                    beginPass();
+                } else {
+                    return { Kind::Silence, 0.0 };
+                }
                 return process();                 // fall into the fresh pass
             case State::HeadDirac:
                 state_ = State::Lead; counter_ = 0;
@@ -170,6 +206,8 @@ private:
     bool loop_ = false;
     State state_ = State::Idle;
     uint64_t passCounter_ = 0;
+    bool hostPlaying_ = false;      // host-transport gate (setHostPlaying())
+    bool playedThisRun_ = false;    // LOOP-off latch: one pass per play edge
 };
 
 // Bus-publish bookkeeping (calbus, Spec 2): decides WHEN to publish and WHAT

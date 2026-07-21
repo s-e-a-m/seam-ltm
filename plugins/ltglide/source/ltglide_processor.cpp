@@ -198,6 +198,15 @@ tresult PLUGIN_API LTGLIDEProcessor::process(ProcessData& data) {
     transport_.setSweepSeconds(paramTSec_.load());
     transport_.setLoop(paramLoop_.load());
 
+    // Host-transport gate (design doc 2026-07-21): play = sounds, stop =
+    // silent. Read once per block, before the transport ticks at all. No
+    // process context at all is treated as "not playing" -- a degraded mode
+    // documented by the design (a host that never supplies one keeps ltglide
+    // permanently silent, same as if it never presses play).
+    const bool playing = data.processContext &&
+        (data.processContext->state & ProcessContext::kPlaying);
+    transport_.setHostPlaying(playing);
+
     // ProcessContext::continousTimeSamples [sic — the SDK header spells it
     // without the second 'u'] is an OPTIONAL anchor: the host declares its
     // validity with kContTimeValid, and processContext may be null outright.
