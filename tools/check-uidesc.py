@@ -33,22 +33,35 @@ def parse_uidesc(path):
         return None, ["%s: ERROR cannot read file: %s" % (path, exc)]
 
 
-def _title_label(root):
-    """The header title label: the first CTextLabel drawn in TitleFont."""
-    for view in root.iter("view"):
-        if view.get("class") == "CTextLabel" and view.get("font") == "TitleFont":
-            return view
-    return None
+def _title_labels(root):
+    """Every CTextLabel view drawn in TitleFont.
+
+    The window title is unique by definition in the UI standard, so this
+    returns *all* matches rather than the first: check_title uses the full
+    list to flag a second TitleFont label as a violation instead of silently
+    checking one of the two and ignoring the other.
+    """
+    return [view for view in root.iter("view")
+            if view.get("class") == "CTextLabel" and view.get("font") == "TitleFont"]
 
 
 def check_title(root, plugin_name, path):
-    """Title must read 'SEAM ' + the plugin directory name, uppercased."""
+    """Title must read 'SEAM ' + the plugin directory name, uppercased.
+
+    There must be exactly one TitleFont label: zero is a missing title,
+    more than one means the title is ambiguous (which one is *the* title?)
+    and is itself a standard violation, not just a lint inconvenience.
+    """
     expected = "SEAM " + plugin_name.upper()
-    label = _title_label(root)
-    if label is None:
+    labels = _title_labels(root)
+    if not labels:
         return ["%s: ERROR no TitleFont label found (expected title %r)"
                 % (path, expected)]
-    actual = label.get("title") or ""
+    if len(labels) > 1:
+        titles = ", ".join(repr(label.get("title") or "") for label in labels)
+        return ["%s: ERROR %d TitleFont labels found, expected exactly 1 (titles: %s)"
+                % (path, len(labels), titles)]
+    actual = labels[0].get("title") or ""
     if actual != expected:
         return ["%s: ERROR title is %r, expected %r" % (path, actual, expected)]
     return []

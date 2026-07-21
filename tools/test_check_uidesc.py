@@ -2,6 +2,7 @@
 """Unit tests for check-uidesc.py, driven by inline fixture XML."""
 import importlib.util
 import os
+import shutil
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -78,6 +79,54 @@ class TestTitle(unittest.TestCase):
         errors = check_uidesc.check_title(root, "demo", "p.uidesc")
         self.assertEqual(len(errors), 1)
         self.assertIn("no TitleFont label", errors[0])
+
+    def test_duplicate_title_label_fails(self):
+        second = TITLE_OK.replace("SEAM DEMO", "SEAM OTHER")
+        body = TITLE_OK + "\n" + second
+        root = self._root(fixture(body))
+        errors = check_uidesc.check_title(root, "demo", "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("2 TitleFont labels", errors[0])
+        self.assertIn("'SEAM DEMO'", errors[0])
+        self.assertIn("'SEAM OTHER'", errors[0])
+
+
+class TestCheckFile(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir)
+        # The filename ("anything.uidesc") is deliberately not "demo" —
+        # check_file must derive the plugin name from the *directory* two
+        # levels up ("demo"), not from the file itself.
+        resource_dir = os.path.join(tmpdir, "plugins", "demo", "resource")
+        os.makedirs(resource_dir)
+        self.path = os.path.join(resource_dir, "anything.uidesc")
+
+    def _write(self, text):
+        with open(self.path, "w") as f:
+            f.write(text)
+        return self.path
+
+    def test_plugin_name_comes_from_directory_matching_title_passes(self):
+        path = self._write(fixture(TITLE_OK))
+        self.assertEqual(check_uidesc.check_file(path), [])
+
+    def test_plugin_name_comes_from_directory_not_filename_fails(self):
+        # If check_file used the filename ("anything") instead of the
+        # directory ("demo"), this title would wrongly pass.
+        body = TITLE_OK.replace("SEAM DEMO", "SEAM ANYTHING")
+        path = self._write(fixture(body))
+        errors = check_uidesc.check_file(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("SEAM DEMO", errors[0])
+
+    def test_malformed_document_reports_only_parse_error(self):
+        body = TITLE_OK + '\n    <!-- a comment -- with a double dash -->'
+        path = self._write(fixture(body))
+        errors = check_uidesc.check_file(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("malformed XML", errors[0])
 
 
 if __name__ == "__main__":
