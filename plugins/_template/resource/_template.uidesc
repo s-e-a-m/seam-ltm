@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SEAM-LTM plugin skeleton, L format. Copy, rename, and delete the zones
+     the plugin does not have; never reorder them. Not registered in CMake:
+     this file is inert until it is copied. See doc/style/ui-style.md. -->
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="11"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="Structure" rgba="#888888ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 420"
+              minSize="460, 420" maxSize="460, 420"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- ── HEADER ─────────────────────────────────────────────────── -->
+        <view class="CTextLabel" origin="0, 14" size="460, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM _TEMPLATE" transparent="true"/>
+        <view class="CTextLabel" origin="0, 42" size="460, 18" font="SubtitleFont"
+              font-color="TextLight" text-alignment="center" title="Subtitle In Title Case" transparent="true"/>
+        <view class="CTextLabel" origin="0, 60" size="460, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="tagline" transparent="true"/>
+
+        <!-- ── SETUP — what the user tells the plugin ─────────────────── -->
+        <view class="CTextLabel" origin="0, 88" size="460, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="— STONE —" transparent="true"/>
+        <view class="COptionMenu" origin="160, 106" size="140, 20" control-tag="StoneId"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- ── OPS — ALL CAPS labels ──────────────────────────────────── -->
+        <view class="CCheckBox" origin="196, 140" size="14, 14" control-tag="Power"
+              boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
+              title="" transparent="true"/>
+        <view class="CTextLabel" origin="214, 138" size="52, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="POWER" transparent="true"/>
+
+        <!-- ── FINE — two 180 px columns at x=30 and x=250, 58 px stride ─ -->
+        <view class="CTextLabel" origin="30, 172" size="180, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="— LEFT —" transparent="true"/>
+        <view class="CTextLabel" origin="250, 172" size="180, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="— RIGHT —" transparent="true"/>
+
+        <view class="CTextLabel" origin="30, 194" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Control" transparent="true"/>
+        <view class="CSlider" origin="30, 210" size="180, 18" control-tag="Control"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CTextEdit" origin="30, 230" size="180, 16" font="ValueFont" control-tag="Control"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="2" style-no-frame="true"/>
+
+        <!-- ── FOOTER — what the plugin tells the user, then the logo ──── -->
+        <view class="CTextLabel" origin="30, 268" size="400, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="Status:" transparent="true"/>
+        <view class="CView" origin="110, 300" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="StoneId" tag="100"/>
+        <control-tag name="Power"   tag="101"/>
+        <control-tag name="Control" tag="102"/>
+    </control-tags>
+</vstgui-ui-description>
