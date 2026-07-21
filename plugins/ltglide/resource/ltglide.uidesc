@@ -81,7 +81,7 @@
         <!-- Step-fuse threshold: below f* = 5/delta Hz the step-mode grain
              train fuses into a continuous micro-stepped glissando (see
              ltglide_fuse_label.h and doc/ltglide-validation.md). Blank in
-             gap mode -- gap mode has no such floor. -->
+             gap mode (which has no such floor). -->
         <view class="CView" origin="20, 428" size="260, 14" custom-view-name="LtglideFuseLabel"
               transparent="true"
               tooltip="Step mode only: below this frequency the grain train fuses into a continuous micro-stepped glissando."/>

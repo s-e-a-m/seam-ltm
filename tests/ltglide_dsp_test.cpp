@@ -671,7 +671,9 @@ TEST_CASE("integration: fixed Glide->Silence pipeline lets the last grain ring o
     // + glide_): Glide ticks set a lastTickWasGlide flag and drive glide_;
     // Silence/Dirac ticks release() on the Glide->X edge and, for Silence,
     // keep pumping glide_.process() at the clamped arrival frequency (p=1.0)
-    // until done() -- instead of dropping straight to 0.
+    // while ringing() -- released and not yet done -- instead of dropping
+    // straight to 0. (Guarding on !done() alone pumped FRESH bursts too:
+    // the pre-glide Lead regression pinned two tests below.)
     const double fs = 48000.0;
     const double f0 = 1000.0, f1 = 160.0;
     const double delta = 0.02;
@@ -718,7 +720,7 @@ TEST_CASE("integration: fixed Glide->Silence pipeline lets the last grain ring o
                     lastTickWasGlide = false;
                     boundaryHit = true;             // this sample IS the Glide->Tail edge
                 }
-                y = glide.done() ? 0.0 : glide.process(SweepFreq(f0, f1, sm, 1.0));
+                y = glide.ringing() ? glide.process(SweepFreq(f0, f1, sm, 1.0)) : 0.0;
                 break;
         }
 
@@ -807,4 +809,55 @@ TEST_CASE("BusAnchor: no false unanchored record when a running/idle transition 
     CHECK_FALSE(t.running());
     CHECK(block2Anchor == block2Start);       // fresh anchor, not leaked from pass 1
     CHECK(block2Anchor != block1Start);
+}
+
+TEST_CASE("integration: the pre-glide Lead is SILENT (a fresh burst must not be pumped)") {
+    // GS in-host regression: a continuous low-frequency tone sounded during
+    // the 5 s Lead before the sweep. Root cause: the processor's Silence-tick
+    // branch pumped glide_.process() guarded only by !done() -- but a FRESH
+    // burst has done()==false without release() ever having been called, so
+    // the "ring-out" path synthesized grains at f1 from the very first
+    // Silence tick. The contract this test pins: Silence ticks pump the burst
+    // only while it is RINGING (released and not yet done).
+    const double fs = 48000.0;
+    const double f0 = 1000.0, f1 = 160.0;
+
+    GlideTransport transport;
+    transport.prepare(fs);
+    transport.setSweepSeconds(2.0);
+    transport.setLoop(false);
+
+    GlissBurst glide;
+    glide.prepare(fs);
+    glide.setDelta(0.02);
+    glide.setDmode(1);
+
+    CHECK_FALSE(glide.ringing());           // fresh burst: not ringing
+
+    bool lastTickWasGlide = false;
+    transport.trigger();
+    bool sawGlideTick = false;
+    double maxPreGlide = 0.0;
+    const long guard = (long)((GlideTransport::kLeadSec + 0.5) * fs);
+    for (long i = 0; i < guard && !sawGlideTick; ++i) {
+        auto tk = transport.process();
+        double y = 0.0;
+        switch (tk.kind) {
+            case GlideTransport::Kind::Glide:
+                sawGlideTick = true;        // stop before the sweep itself
+                break;
+            case GlideTransport::Kind::Dirac:
+                if (lastTickWasGlide) { glide.release(); lastTickWasGlide = false; }
+                break;
+            case GlideTransport::Kind::Silence:
+            default:
+                if (lastTickWasGlide) { glide.release(); lastTickWasGlide = false; }
+                y = glide.ringing() ? glide.process(SweepFreq(f0, f1, 1, 1.0)) : 0.0;
+                break;
+        }
+        if (!sawGlideTick && tk.kind == GlideTransport::Kind::Silence)
+            maxPreGlide = std::max(maxPreGlide, std::fabs(y));
+    }
+    REQUIRE(sawGlideTick);                  // the pass did reach the sweep
+    CHECK(maxPreGlide == 0.0);              // the whole Lead was dead silent
 }

@@ -405,8 +405,8 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
                 // declicks the same way, since the edge fires regardless of
                 // cause.
                 if (lastTickWasGlide_) { glide_.release(); lastTickWasGlide_ = false; }
-                y = glide_.done() ? 0.0
-                                   : glide_.process(ltglide::SweepFreq(f0, f1, sm, 1.0));
+                y = glide_.ringing() ? glide_.process(ltglide::SweepFreq(f0, f1, sm, 1.0))
+                                     : 0.0;
                 break;
         }
         const SampleType out = (SampleType)(y * g);

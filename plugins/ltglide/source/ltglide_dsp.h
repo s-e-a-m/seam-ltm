@@ -44,6 +44,12 @@ public:
     // True once the released grain has finished ringing out (or immediately,
     // if release() was called with none in flight).
     bool done() const { return done_; }
+    // TRUE only between release() and the ring-out finishing. This — not
+    // !done() — is the pump guard for Silence ticks: a FRESH burst also has
+    // done()==false, and pumping it would synthesize grains at the clamped
+    // arrival frequency through the whole pre-glide Lead (GS in-host bug:
+    // a continuous low tone before the sweep).
+    bool ringing() const { return releasing_ && !done_; }
 
     // One sample. fsig is the continuous swept frequency (Hz) for this sample.
     inline double process(double fsig) {
