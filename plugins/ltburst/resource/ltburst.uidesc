@@ -10,7 +10,6 @@
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
         <color name="TextLight" rgba="#fcfbfdff"/>
-        <color name="TextDim" rgba="#888888ff"/>
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
@@ -23,9 +22,9 @@
         <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM LTBURST" transparent="true"/>
         <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
-              font-color="TextDim" text-alignment="center" title="Linkwitz Shaped Tone-Burst" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Linkwitz Shaped Tone-Burst" transparent="true"/>
         <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
-              font-color="TextDim" text-alignment="center"
+              font-color="TextLight" text-alignment="center"
               title="N=5 cycles · fixed frequency" transparent="true"/>
 
         <!-- Frequency -->

@@ -9,7 +9,6 @@
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
         <color name="TextLight" rgba="#fcfbfdff"/>
-        <color name="TextDim" rgba="#888888ff"/>
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
         <color name="SliderDiv" rgba="#c8874aff"/>
@@ -23,7 +22,7 @@
         <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM LR2XHGR" transparent="true"/>
         <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
-              font-color="TextDim" text-alignment="center" title="Stereo to AmbiX via Haar" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Stereo to AmbiX via Haar" transparent="true"/>
 
         <!-- Divergence (orange) -->
         <view class="CTextLabel" origin="20, 80" size="260, 18" font="KnobLabelFont"
