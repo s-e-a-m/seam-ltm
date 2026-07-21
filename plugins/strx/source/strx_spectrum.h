@@ -56,7 +56,11 @@ public:
         if (font_) font_->remember();
         timer_ = new VSTGUI::CVSTGUITimer(
             [this](VSTGUI::CVSTGUITimer*) {
-                if (processor_) glide_ = processor_->calbusWatch().poll().glide;
+                if (processor_) {
+                    const auto& d = processor_->calbusWatch().poll();
+                    glide_ = d.glide;
+                    otherActive_ = (d.firstActive >= 0) && !d.glide;
+                }
                 invalid();
             }, kTimerMs, /*doStart*/true);
     }
@@ -153,14 +157,18 @@ public:
             path->forget();
         };
 
-        // Pink noise is stationary, so one averaged curve per channel says
-        // everything. A sweep is not: it presents ONE frequency at a time, so
-        // the average would smear a moving peak. The hold accumulates the
-        // response as the sweep descends (each bin is excited once), and the
-        // live curve — fast now, tau 100 ms — shows where the sweep IS.
-        if (glide_) {
-            drawCurve(frame.holdM, frame.numBins, colorM_, /*alpha*/255);
-            drawCurve(frame.holdS, frame.numBins, colorS_, /*alpha*/255);
+        // The visible measurement never resets per loop cycle (that per-cycle
+        // reset was the reported malfunction). Pass 1 shows the building
+        // hold; from the first fold on, the cross-pass MIN accumulation IS
+        // the measurement — and it survives the loop stopping, until a pink
+        // (non-glide) emitter takes over the observation or a new glide
+        // session replaces it. Pink noise is stationary, so outside a
+        // measurement one averaged curve per channel still says everything.
+        const bool haveAcc  = frame.accPasses > 0;
+        const bool measured = glide_ || (haveAcc && !otherActive_);
+        if (measured) {
+            drawCurve(haveAcc ? frame.accM : frame.holdM, frame.numBins, colorM_, /*alpha*/255);
+            drawCurve(haveAcc ? frame.accS : frame.holdS, frame.numBins, colorS_, /*alpha*/255);
             drawCurve(frame.specM, frame.numBins, colorM_, /*alpha*/90);
             drawCurve(frame.specS, frame.numBins, colorS_, /*alpha*/90);
         } else {
@@ -196,6 +204,7 @@ private:
     // the reference itself, which aliases the watch's internal state and
     // would silently observe a later snapshot (see strx_calbus_watch.h).
     bool glide_ = false;
+    bool otherActive_ = false;   // a non-glide emitter (pink) is sounding
 };
 
 } // namespace Seam
