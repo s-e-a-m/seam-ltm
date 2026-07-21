@@ -53,7 +53,9 @@ public:
         // unit-tested, so this watch keeps only the snapshot + rate-limit +
         // atomic-store duties.
         glide_.store(digest_.glide, std::memory_order_relaxed);
-        switch (holdAction(digest_, lastPass_)) {
+        // lastParams_ is the third sentinel: a generation-parameter change
+        // (e.g. Level during LOOP) also forces SessionStart, see holdAction().
+        switch (holdAction(digest_, lastPass_, lastParams_)) {
         case HoldAction::SessionStart:
             // The processor's session branch clears BOTH accumulation and
             // hold, so a session start bumps only this epoch: bumping
@@ -78,6 +80,7 @@ private:
     SeamCalbusRecord       recs_[SEAM_CALBUS_MAX_SLOTS] = {};
     CalbusDigest           digest_;
     uint64_t               lastPass_ = 0;
+    GlideParams            lastParams_;
     bool                   primed_   = false;
     std::chrono::steady_clock::time_point last_{};
 };

@@ -6,6 +6,7 @@ using Seam::strx::digest;
 using Seam::strx::shouldResetHold;
 using Seam::strx::holdAction;
 using Seam::strx::HoldAction;
+using Seam::strx::GlideParams;
 
 static SeamCalbusRecord pink(uint32_t stone, bool active, int32_t slotStart) {
     SeamCalbusRecord r{};
@@ -17,15 +18,31 @@ static SeamCalbusRecord pink(uint32_t stone, bool active, int32_t slotStart) {
     r.u.pink.slotCount = 4;
     return r;
 }
-static SeamCalbusRecord glide(uint32_t stone, bool active, uint64_t pass) {
+
+// Fixed defaults for every generation-parameter field the fingerprint reads,
+// so tests that don't care about a specific field still get a fully and
+// consistently populated record (matching what ltglide's publishBusRecord()
+// actually fills in). `levelDb` is the field GS's in-host finding hinges on,
+// so it is the one callers override via the extra parameter.
+static SeamCalbusRecord glideLevel(uint32_t stone, bool active, uint64_t pass, double levelDb) {
     SeamCalbusRecord r{};
     r.kind = kSeamCalbusGlide;
     r.stoneId = stone;
     r.active = active ? 1u : 0u;
-    r.levelDb = -20.0;
+    r.levelDb = levelDb;
+    r.sampleRate = 48000.0;
     r.u.glide.passCounter = pass;
     r.u.glide.passStartSample = 12345;
+    r.u.glide.f0 = 40.0;
+    r.u.glide.f1 = 12000.0;
+    r.u.glide.durationSec = 30.0;
+    r.u.glide.deltaSec = 1.0;
+    r.u.glide.sweepMode = 1;
+    r.u.glide.diracMode = 0;
     return r;
+}
+static SeamCalbusRecord glide(uint32_t stone, bool active, uint64_t pass) {
+    return glideLevel(stone, active, pass, -20.0);
 }
 
 TEST_CASE("digest of an unavailable bus reports nothing") {
@@ -209,42 +226,90 @@ TEST_CASE("shouldResetHold bumps once per pass in a loop, not once per poll") {
 
 TEST_CASE("holdAction: the first pass after idle is a session start") {
     uint64_t lastPass = 0;
+    GlideParams lastParams;
     SeamCalbusRecord recs[1] = { glide(1, true, 1) };
-    CHECK(holdAction(digest(recs, 1, true), lastPass) == HoldAction::SessionStart);
+    CHECK(holdAction(digest(recs, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
     CHECK(lastPass == 1u);
-    CHECK(holdAction(digest(recs, 1, true), lastPass) == HoldAction::None);  // same pass re-polled
+    CHECK(holdAction(digest(recs, 1, true), lastPass, lastParams) == HoldAction::None);  // same pass re-polled
 }
 
 TEST_CASE("holdAction: loop passes after the first are pass boundaries") {
     uint64_t lastPass = 0;
+    GlideParams lastParams;
     SeamCalbusRecord pass1[1] = { glide(1, true, 1) };
-    CHECK(holdAction(digest(pass1, 1, true), lastPass) == HoldAction::SessionStart);
+    CHECK(holdAction(digest(pass1, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
     SeamCalbusRecord pass2[1] = { glide(1, true, 2) };   // loop advanced, still active
-    CHECK(holdAction(digest(pass2, 1, true), lastPass) == HoldAction::PassBoundary);
-    CHECK(holdAction(digest(pass2, 1, true), lastPass) == HoldAction::None);
+    CHECK(holdAction(digest(pass2, 1, true), lastPass, lastParams) == HoldAction::PassBoundary);
+    CHECK(holdAction(digest(pass2, 1, true), lastPass, lastParams) == HoldAction::None);
     SeamCalbusRecord pass3[1] = { glide(1, true, 3) };
-    CHECK(holdAction(digest(pass3, 1, true), lastPass) == HoldAction::PassBoundary);
+    CHECK(holdAction(digest(pass3, 1, true), lastPass, lastParams) == HoldAction::PassBoundary);
 }
 
 TEST_CASE("holdAction: a different STONE after a gap starts a NEW session, never a boundary") {
     // Same scenario as the cross-instance collision above: fold STONE 2's
     // first pass into STONE 1's accumulation and the whole measurement lies.
     uint64_t lastPass = 0;
+    GlideParams lastParams;
     SeamCalbusRecord stoneOne[1] = { glide(1, true, 1) };
-    CHECK(holdAction(digest(stoneOne, 1, true), lastPass) == HoldAction::SessionStart);
+    CHECK(holdAction(digest(stoneOne, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
     SeamCalbusRecord gap[1] = { glide(1, false, 1) };     // nothing sounding
-    CHECK(holdAction(digest(gap, 1, true), lastPass) == HoldAction::None);
+    CHECK(holdAction(digest(gap, 1, true), lastPass, lastParams) == HoldAction::None);
     CHECK(lastPass == 0u);                                // sentinel cleared
     SeamCalbusRecord stoneTwo[1] = { glide(2, true, 1) }; // different instance, its own pass 1
-    CHECK(holdAction(digest(stoneTwo, 1, true), lastPass) == HoldAction::SessionStart);
+    CHECK(holdAction(digest(stoneTwo, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
 }
 
 TEST_CASE("holdAction: pink or idle emitters never act and clear the sentinel") {
     uint64_t lastPass = 0;
+    GlideParams lastParams;
     SeamCalbusRecord activePass[1] = { glide(1, true, 5) };
-    CHECK(holdAction(digest(activePass, 1, true), lastPass) == HoldAction::SessionStart);
+    CHECK(holdAction(digest(activePass, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
     CHECK(lastPass == 5u);
     SeamCalbusRecord pinkRec[1] = { pink(1, true, 0) };
-    CHECK(holdAction(digest(pinkRec, 1, true), lastPass) == HoldAction::None);
+    CHECK(holdAction(digest(pinkRec, 1, true), lastPass, lastParams) == HoldAction::None);
     CHECK(lastPass == 0u);
+}
+
+TEST_CASE("holdAction: a level change mid-loop starts a new session") {
+    // GS's in-host finding: changing ltglide's Level during LOOP must not be
+    // folded into the accumulation as if it were just another pass at the
+    // same stimulus -- it invalidates the whole session.
+    uint64_t lastPass = 0;
+    GlideParams lastParams;
+    SeamCalbusRecord pass1[1] = { glideLevel(1, true, 1, -20.0) };
+    CHECK(holdAction(digest(pass1, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
+    SeamCalbusRecord pass2[1] = { glideLevel(1, true, 2, -20.0) };  // same params, loop advanced
+    CHECK(holdAction(digest(pass2, 1, true), lastPass, lastParams) == HoldAction::PassBoundary);
+    SeamCalbusRecord pass3[1] = { glideLevel(1, true, 3, -14.0) };  // Level changed mid-loop
+    CHECK(holdAction(digest(pass3, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
+    SeamCalbusRecord pass4[1] = { glideLevel(1, true, 4, -14.0) };  // new params, loop advanced again
+    CHECK(holdAction(digest(pass4, 1, true), lastPass, lastParams) == HoldAction::PassBoundary);
+}
+
+TEST_CASE("holdAction: a param change with no pass advance still starts a new session") {
+    // Covers the run-edge republish case: the same passCounter is re-polled
+    // (e.g. the record is republished for another reason) but a generation
+    // parameter differs from what was last seen -- the passCounter-only
+    // check would report None and the stale accumulation would survive.
+    uint64_t lastPass = 0;
+    GlideParams lastParams;
+    SeamCalbusRecord pass1[1] = { glideLevel(1, true, 3, -20.0) };
+    CHECK(holdAction(digest(pass1, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
+    SeamCalbusRecord samePassNewLevel[1] = { glideLevel(1, true, 3, -14.0) };
+    CHECK(holdAction(digest(samePassNewLevel, 1, true), lastPass, lastParams) == HoldAction::SessionStart);
+}
+
+TEST_CASE("digest captures the active glide's generation parameters") {
+    SeamCalbusRecord recs[1] = { glideLevel(3, true, 2, -14.0) };
+    const auto d = digest(recs, 1, true);
+    CHECK(d.glide);
+    CHECK(d.params.stoneId == 3u);
+    CHECK(d.params.levelDb == doctest::Approx(-14.0));
+    CHECK(d.params.sampleRate == doctest::Approx(48000.0));
+    CHECK(d.params.f0 == doctest::Approx(40.0));
+    CHECK(d.params.f1 == doctest::Approx(12000.0));
+    CHECK(d.params.durationSec == doctest::Approx(30.0));
+    CHECK(d.params.deltaSec == doctest::Approx(1.0));
+    CHECK(d.params.sweepMode == 1u);
+    CHECK(d.params.diracMode == 0u);
 }

@@ -35,16 +35,21 @@ This costs one good pass in the clean workflow — glide starts, then the first 
 
 ### Session lifecycle
 
-One continuous LOOP run = one measurement session.
+One continuous LOOP run with unchanged generation parameters = one measurement session.
 The accumulator clears at the **start of the next** glide session, not when the loop stops: the measured curve stays visible after the loop is stopped, until a new glide begins.
+Any change to the emitted stimulus starts a new session at the next pass boundary: level, f0, f1, sweep time, sweep mode, delta, dirac mode, STONE, or sample rate — everything ltglide publishes on the bus.
+MIN over passes is only meaningful over identical stimuli; a pass measured at a different level (or frequency range, or sweep shape) is not comparable to the passes already folded, and folding it in would poison the accumulation with no way to undo it (MIN keeps whatever it sees once, in either direction).
+This is GS's in-host finding: changing ltglide's Level during LOOP left stale passes at the old level baked into the MIN curve forever.
+Note for the future analysis/log stages (Spec 3+), also a GS decision: generation parameters are NOT locked while a measurement is running.
+Instead, every change simply resets pass counting and analysis memories, so the operator stays free to retune mid-session at the cost of restarting the measurement.
 
 ### Boundary detection
 
 `shouldResetHold()` (pure, unit-tested, in `strx_calbus_digest.h`) is extended from a boolean to three outcomes:
 
 - `None` — nothing to do;
-- `SessionStart` — first pass after a non-glide state (the existing `lastPass == 0` sentinel);
-- `PassBoundary` — `passCounter` increment within a session.
+- `SessionStart` — first pass after a non-glide state (the `lastPass == 0` sentinel), OR a generation-parameter change mid-run (the `GlideParams` sentinel: stoneId, levelDb, sampleRate, f0, f1, durationSec, deltaSec, sweepMode, diracMode — everything ltglide's glide record publishes);
+- `PassBoundary` — `passCounter` increment within a session with unchanged parameters.
 
 `CalbusWatch` (GUI thread) maps the outcomes onto two atomics read by the audio thread: the existing `holdEpoch` (pass boundary) plus a new `sessionEpoch` (session start).
 A session start bumps **only** `sessionEpoch`.
