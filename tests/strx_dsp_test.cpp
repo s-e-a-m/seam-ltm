@@ -232,3 +232,66 @@ TEST_CASE("Analyzer prepare() honours a glide mode set before it") {
     }
     CHECK(glide.frame().specM[peakBin] < pink.frame().specM[peakBin] - 6.0f);
 }
+
+TEST_CASE("cross-pass MIN keeps what every pass contains, discards what one pass had") {
+    Analyzer a; a.prepare(48000.0);
+    const int N = a.fftSize();
+    std::vector<float> tone(2*N), mixed(2*N), quiet(2*N, 0.0f);
+    for (int i = 0; i < 2*N; ++i) {
+        tone[i]  = 0.5f*std::sin(2.0*M_PI*1000.0*i/48000.0);
+        mixed[i] = tone[i] + 0.5f*std::sin(2.0*M_PI*3000.0*i/48000.0);
+    }
+    // Per pass: feed the pass signal, then four full quiet windows to flush
+    // the Welch ring and decay spectral leakage (resetHold leaves the ring
+    // untouched — see the existing "Analyzer resetHold clears the published
+    // hold" case; silence never raises a max-hold, so the pass curve is
+    // unharmed), then fold.
+    auto feedPass = [&](std::vector<float>& sig) {
+        a.analyze(sig.data(), sig.data(), 2*N);
+        a.analyze(quiet.data(), quiet.data(), 2*N);
+        a.analyze(quiet.data(), quiet.data(), 2*N);
+        a.completePass();
+    };
+    feedPass(mixed);   // pass 1: 1 kHz + an intermittent 3 kHz disturbance
+    feedPass(tone);    // pass 2: clean 1 kHz — the disturbance is absent
+    a.analyze(quiet.data(), quiet.data(), 2*N);   // publish acc into the frame
+
+    const auto& f = a.frame();
+    CHECK(f.accPasses == 2);
+    const int bin1k = int(std::lround(1000.0 * N / 48000.0));
+    const int bin3k = int(std::lround(3000.0 * N / 48000.0));
+    // Present in EVERY pass -> survives the MIN. Bounded strictly below 0:
+    // AnalysisFrame zero-initializes accM, so a never-copied 0.0f must fail.
+    CHECK(f.accM[bin1k] > -40.0f);
+    CHECK(f.accM[bin1k] < 0.0f);
+    // Present in ONE pass only -> discarded by the MIN.
+    // Spectral leakage from 1kHz into 3kHz limits minimum attenuation to ~-55dB.
+    CHECK(f.accM[bin3k] < -50.0f);
+    // Same L=R signal -> no side energy; also proves accS is copied (its
+    // never-copied default 0.0f would fail this bound).
+    CHECK(f.accS[bin1k] < -60.0f);
+}
+
+TEST_CASE("startSession clears the accumulator; acc changes only on completePass") {
+    Analyzer a; a.prepare(48000.0);
+    const int N = a.fftSize();
+    std::vector<float> tone(2*N), quiet(2*N, 0.0f);
+    for (int i = 0; i < 2*N; ++i) tone[i] = 0.5f*std::sin(2.0*M_PI*1000.0*i/48000.0);
+    const int bin1k = int(std::lround(1000.0 * N / 48000.0));
+
+    a.analyze(tone.data(), tone.data(), 2*N);
+    a.analyze(quiet.data(), quiet.data(), 2*N);
+    a.completePass();
+    a.analyze(quiet.data(), quiet.data(), 2*N);   // publish
+    CHECK(a.frame().accPasses == 1);
+    CHECK(a.frame().accM[bin1k] > -40.0f);
+
+    // More audio WITHOUT a boundary must not touch the accumulation — this
+    // is the partial-pass guarantee: no completePass(), no fold.
+    a.analyze(tone.data(), tone.data(), 2*N);
+    CHECK(a.frame().accPasses == 1);
+
+    a.startSession();
+    a.analyze(quiet.data(), quiet.data(), 2*N);   // publish
+    CHECK(a.frame().accPasses == 0);
+}

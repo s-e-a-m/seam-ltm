@@ -37,6 +37,13 @@ struct AnalysisFrame {
     // view decides whether to draw it.
     float holdM[kNumBins] = {};  // dB
     float holdS[kNumBins] = {};  // dB
+    // Cross-loop accumulation: per-bin MIN over completed passes' hold
+    // curves (dB). Meaningful only when accPasses > 0. The MIN keeps what
+    // EVERY pass contains — the system response — and discards intermittent
+    // disturbances, which are absent from at least one pass.
+    float accM[kNumBins] = {};  // dB
+    float accS[kNumBins] = {};  // dB
+    int accPasses = 0;          // completed passes folded so far
     int numBins = 0;
 };
 
@@ -59,6 +66,9 @@ public:
         lvlL_.reset(); lvlR_.reset(); lvlM_.reset(); lvlS_.reset();
         mLR_ = mLL_ = mRR_ = 0.0;
         welchM_.reset(); welchS_.reset();
+        std::fill(accM_, accM_ + AnalysisFrame::kNumBins, -120.0f);
+        std::fill(accS_, accS_ + AnalysisFrame::kNumBins, -120.0f);
+        accPasses_ = 0;
         for (auto& s : slots_) s = AnalysisFrame{};
         // SPSC triple-buffer to distinct init indices (runs single-threaded here).
         back_.store(0, std::memory_order_relaxed);  // index 0, not dirty
@@ -80,6 +90,33 @@ public:
     // Clear the max-hold. Driven by the calibration bus: a new pass starts a
     // new measurement, so the previous pass's curve must not linger.
     void resetHold() { welchM_.resetHold(); welchS_.resetHold(); }
+
+    // A completed pass: fold its hold curve into the cross-pass MIN
+    // accumulator, then clear the hold for the next pass. The first fold
+    // COPIES (a MIN against the -120 init floor would pin the accumulation
+    // there forever). dB min == linear min (monotone map), so fold in dB.
+    void completePass() {
+        const float* hM = welchM_.holdDb();
+        const float* hS = welchS_.holdDb();
+        const int n = welchM_.numBins();
+        for (int k = 0; k < n; ++k) {
+            accM_[k] = (accPasses_ == 0) ? hM[k] : std::min(accM_[k], hM[k]);
+            accS_[k] = (accPasses_ == 0) ? hS[k] : std::min(accS_[k], hS[k]);
+        }
+        ++accPasses_;
+        resetHold();
+    }
+    // A new measurement session: previous accumulation and hold both go.
+    // Partial passes never fold BY CONSTRUCTION: the only fold site is
+    // completePass(), which the processor calls on a pass boundary — a
+    // mid-pass stop leaves the partial hold to die here or in resetHold().
+    void startSession() {
+        std::fill(accM_, accM_ + AnalysisFrame::kNumBins, -120.0f);
+        std::fill(accS_, accS_ + AnalysisFrame::kNumBins, -120.0f);
+        accPasses_ = 0;
+        resetHold();
+    }
+    int accPasses() const { return accPasses_; }
 
     void analyzeScalars(const float* L, const float* R, int n) {
         AnalysisFrame& fr = slots_[writeBuf_];
@@ -131,7 +168,9 @@ public:
         for (int k = 0; k < fr.numBins; ++k) {
             fr.specM[k] = mM[k]; fr.specS[k] = mS[k];
             fr.holdM[k] = hM[k]; fr.holdS[k] = hS[k];
+            fr.accM[k]  = accM_[k]; fr.accS[k] = accS_[k];
         }
+        fr.accPasses = accPasses_;
     }
 
     // Audio thread (producer): fill the working buffer, then publish it by
@@ -175,6 +214,9 @@ private:
     bool glide_ = false;
     seam::meter::LevelFollower lvlL_, lvlR_, lvlM_, lvlS_;
     seam::fft::Welch welchM_, welchS_;
+    float accM_[AnalysisFrame::kNumBins] = {};
+    float accS_[AnalysisFrame::kNumBins] = {};
+    int   accPasses_ = 0;
 
     // --- SPSC triple-buffer: producer = audio thread (process), consumer =
     // GUI thread (tryReadFrame). One atomic packs the "back" buffer index
