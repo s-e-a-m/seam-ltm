@@ -53,7 +53,7 @@ public:
         const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* editor) override;
 
     // GUI thread: read-only access for LtglideFuseLabel (ltglide_fuse_label.h)
-    // to compute f* = 5.0/delta and know whether timing is step or gap.
+    // to compute f* = GlissBurst::kN/delta and know whether timing is step or gap.
     double deltaSec() const { return paramDeltaSec_.load(std::memory_order_relaxed); }
     int    dmode()    const { return paramDmode_.load(std::memory_order_relaxed); }
 
