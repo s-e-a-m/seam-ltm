@@ -1,13 +1,17 @@
 # tools
 
-Repository-level tooling. Nothing here is required to build the suite;
-each script is a check or a generator run on demand.
+Repository-level tooling.
+Nothing here is required to build the suite; each script is a check or a
+generator run on demand.
 
 ## `check-uidesc.py` — UI standard lint
 
 Checks every `plugins/*/resource/*.uidesc` against `doc/style/ui-style.md`:
 XML validity first, then title, palette, absence of `TextDim`, explicit
-white `font-color` on text, and zone order.
+white `font-color` on text, and the vertical order of SETUP, OPS and FINE.
+HEADER and FOOTER placement is not checked; see doc/style/ui-style.md
+("Running the lint") for the exact comparisons and how each zone is
+recognised.
 
 ```bash
 python3 tools/check-uidesc.py                 # every plugin
@@ -25,8 +29,9 @@ ctest --test-dir build -R uidesc
 
 `uidesc_lint_selftest` runs `test_check_uidesc.py`, which proves each rule
 against inline fixture XML; `uidesc_lint` runs the lint over the real
-plugins. The self-test exists because a lint that is only ever run against
-files it already passes is a lint nobody has tested.
+plugins.
+The self-test exists because a lint that is only ever run against files it
+already passes is a lint nobody has tested.
 
 XML validity leads for a reason: no part of the build parses a `.uidesc`.
 On 2026-07-21 a `--` inside a comment produced an empty editor in the host
@@ -42,5 +47,6 @@ tools/gen-faust-doc.sh
 ```
 
 Requires `faust`, `faust2mathdoc`, `svg2pdf`, and `pdflatex` (with the
-`breqn` package) on the PATH. The output is committed documentation, so
-run it when the Faust specification changes, not on every build.
+`breqn` package) on the PATH.
+The output is committed documentation, so run it when the Faust
+specification changes, not on every build.

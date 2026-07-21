@@ -165,11 +165,43 @@ def _first_y(root, predicate):
     return min(ys) if ys else None
 
 
+#  The operational vocabulary (doc/style/ui-style.md, "Operational
+# vocabulary"): the control-tag names an OPS view carries regardless of how
+# its caption is drawn.
+OPS_CONTROL_TAGS = ("Power", "Reset", "Loop")
+
+
+def _is_ops_view(view):
+    """A view belongs to the OPS zone.
+
+    Two independent ways to recognise it, because the zone is drawn two
+    different ways across the suite:
+
+    - By control-tag: POWER, RESET and LOOP are the standard's operational
+      vocabulary, and the control-tag carries that name even when the
+      caption is a separate CTextLabel next to an untitled CCheckBox (dslar,
+      and the _template skeleton) — a layout that lets the caption sit in
+      its own column. dslar's Reset is a custom view with no control-tag at
+      all, so it is invisible either way; its Power box is enough to place
+      the zone.
+    - By title: a CCheckBox whose own title is non-empty and all-caps
+      (multipink's MUTE, ltglide's LOOP) draws its own caption and carries
+      no vocabulary control-tag, or one outside the vocabulary (Mute).
+
+    Keeping both means a plugin that captions its own checkbox is not
+    suddenly invisible just because the vocabulary check doesn't name it.
+    """
+    if view.get("control-tag") in OPS_CONTROL_TAGS:
+        return True
+    title = view.get("title") or ""
+    return view.get("class") == "CCheckBox" and title != "" and title.isupper()
+
+
 def check_zone_order(root, path):
     """SETUP above OPS above FINE.
 
     A warning, not an error: zones are recognised by convention (the StoneId
-    menu is SETUP, an operational toggle is OPS, the first slider opens FINE)
+    menu is SETUP, an operational view is OPS, the first slider opens FINE)
     and a future plugin may legitimately not fit that shape. It is here to
     catch the accidental reordering, not to legislate layout.
 
@@ -184,9 +216,7 @@ def check_zone_order(root, path):
     complaint about the same layout would just be noise.
     """
     setup_y = _first_y(root, lambda v: v.get("control-tag") == "StoneId")
-    ops_y = _first_y(root, lambda v: (v.get("title") or "").isupper()
-                     and (v.get("title") or "") != ""
-                     and v.get("class") == "CCheckBox")
+    ops_y = _first_y(root, _is_ops_view)
     fine_y = _first_y(root, lambda v: v.get("class") == "CSlider")
 
     messages = []
