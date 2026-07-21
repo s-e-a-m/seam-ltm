@@ -428,9 +428,11 @@ In Reaper:
    but append a count, e.g. `... · +1 more` — this is the diagnostic that
    catches "un-muted the wrong one, forgot to mute the last one" in the
    room. Mute one of the two again before continuing.
-6. Remove the multipinks, load `ltglide` with STONE = 2 and Loop on.
-   Expect: `ltglide · STONE 2 · pass N · 20000→20 Hz · T=20s`, with `N`
-   advancing once per pass.
+6. Remove the multipinks, load `ltglide` with STONE = 2 and Loop on, then
+   press play in the host. Sounding follows the host transport (play =
+   sound, stop = silent, since 219fa9e) — Loop on alone does not make
+   ltglide sound. Expect: `ltglide · STONE 2 · pass N · 20000→20 Hz ·
+   T=20s`, with `N` advancing once per pass.
 7. Confirm the line does **not** read `no host clock`. If it does, Reaper
    is not supplying `kContTimeValid` — that's a finding for Spec 3, to be
    recorded in the session doc rather than worked around here.

@@ -60,7 +60,7 @@ public:
         const double delta = processor_->deltaSec();
         char buf[64];
         std::snprintf(buf, sizeof(buf), "STEP FUSES < %.0f Hz",
-                      (delta > 0.0) ? (5.0 / delta) : 0.0);
+                      (delta > 0.0) ? ((double)Seam::ltglide::GlissBurst::kN / delta) : 0.0);
         c->drawString(buf, getViewSize(), VSTGUI::kCenterText);
         setDirty(false);
     }
