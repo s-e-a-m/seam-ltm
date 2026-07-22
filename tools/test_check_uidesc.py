@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Unit tests for check-uidesc.py, driven by inline fixture XML."""
+import contextlib
 import importlib.util
+import io
 import os
 import shutil
+import tempfile
 import unittest
+import unittest.mock
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location(
@@ -297,6 +301,181 @@ class TestZoneOrder(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertIn("WARN", messages[0])
         self.assertIn("OPS", messages[0])
+
+
+class TestSourceColors(unittest.TestCase):
+    """The C++ sweep: text drawn from source names its colours in C++, where
+    no .uidesc rule can see them, and that is where the greys came back."""
+
+    def setUp(self):
+        self.plugins = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.plugins)
+
+    def _source(self, name, text, plugin="demo"):
+        directory = os.path.join(self.plugins, plugin, "source")
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, name)
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+
+    def test_conforming_source_passes(self):
+        self._source("demo_processor.cpp",
+                     'description->getColor("TextLight", text);\n')
+        self.assertEqual(check_uidesc.check_source_colors(self.plugins), [])
+
+    def test_getcolor_call_fails(self):
+        # hilbert and x2uhj shipped exactly this line until this branch.
+        self._source("demo_processor.cpp",
+                     'void draw() {\n'
+                     '    description->getColor("TextDim", label);\n'
+                     '}\n')
+        messages = check_uidesc.check_source_colors(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("line 2", messages[0])
+        self.assertIn("demo_processor.cpp", messages[0])
+
+    def test_comment_naming_the_removed_colour_fails(self):
+        # Two view headers carried a comment about the TextDim tier long
+        # after the colour itself was gone; the name is what is banned.
+        self._source("demo_view.h", '// label drawn in TextDim\n')
+        messages = check_uidesc.check_source_colors(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("line 1", messages[0])
+
+    def test_only_h_and_cpp_are_read(self):
+        self._source("notes.txt", 'TextDim\n')
+        self.assertEqual(check_uidesc.check_source_colors(self.plugins), [])
+
+    def test_every_occurrence_is_reported_across_plugins(self):
+        self._source("a_processor.cpp", 'TextDim\nTextLight\nTextDim\n',
+                     plugin="alpha")
+        self._source("b_view.h", 'TextDim\n', plugin="beta")
+        messages = check_uidesc.check_source_colors(self.plugins)
+        self.assertEqual(len(messages), 3)
+
+    def test_the_real_suite_is_clean(self):
+        plugins = os.path.join(os.path.dirname(_HERE), "plugins")
+        self.assertEqual(check_uidesc.check_source_colors(plugins), [])
+
+
+class TestMessageSeverity(unittest.TestCase):
+    """A message knows its own level; the printed form is unchanged."""
+
+    def test_error_prints_and_reports_its_level(self):
+        message = check_uidesc.error("p.uidesc", "something is wrong")
+        self.assertEqual(message, "p.uidesc: ERROR something is wrong")
+        self.assertEqual(message.level, check_uidesc.ERROR)
+
+    def test_warn_prints_and_reports_its_level(self):
+        message = check_uidesc.warn("p.uidesc", "something is odd")
+        self.assertEqual(message, "p.uidesc: WARN something is odd")
+        self.assertEqual(message.level, check_uidesc.WARN)
+
+    def test_severity_survives_rewording(self):
+        # The point of carrying the level as data: a message whose text never
+        # contains the word ERROR is still an error.
+        message = check_uidesc.error("p.uidesc", "title mismatch")
+        self.assertEqual(message.level, check_uidesc.ERROR)
+
+
+class TestMainExitCode(unittest.TestCase):
+    """main() decides whether the ctest passes. Nothing else in the suite
+    pins that decision, so a rule can keep reporting while the run goes
+    green — which is how a lint gets switched off without anyone noticing."""
+
+    def _run(self, *paths):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = check_uidesc.main(["check-uidesc.py"] + list(paths))
+        return code, out.getvalue()
+
+    def _plugin_file(self, body):
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir)
+        resource = os.path.join(tmpdir, "plugins", "demo", "resource")
+        os.makedirs(resource)
+        path = os.path.join(resource, "demo.uidesc")
+        with open(path, "w") as f:
+            f.write(body)
+        return path
+
+    def test_conforming_file_returns_zero(self):
+        # The skeleton is the conforming case by construction: a new plugin
+        # starts from it and must lint clean before any C++ is written.
+        template = os.path.join(os.path.dirname(_HERE), "plugins", "_template",
+                                "resource", "_template.uidesc")
+        code, output = self._run(template)
+        self.assertEqual(code, 0)
+        self.assertIn("0 error(s)", output)
+
+    def test_file_with_an_error_returns_one(self):
+        path = self._plugin_file(fixture(TITLE_OK.replace("SEAM DEMO", "SEAM WRONG")))
+        code, output = self._run(path)
+        self.assertEqual(code, 1)
+        self.assertIn("ERROR", output)
+        self.assertIn("1 error(s)", output)
+
+    def test_warning_only_file_returns_zero(self):
+        # Warnings are printed and counted and do not fail the run: the other
+        # half of the contract, and the half a "failed = messages" slip breaks.
+        setup_low = ('    <view class="COptionMenu" origin="160, 252" size="140, 20"'
+                     ' control-tag="StoneId" font-color="TextLight"/>')
+        fine = ('    <view class="CSlider" origin="30, 228" size="180, 18"'
+                ' control-tag="Trim"/>')
+        path = self._plugin_file(fixture("\n".join([TITLE_OK, setup_low, fine])))
+        code, output = self._run(path)
+        self.assertEqual(code, 0)
+        self.assertIn("WARN", output)
+        self.assertIn("0 error(s), 1 warning(s)", output)
+
+
+class TestMainWholeSuite(unittest.TestCase):
+    """With no arguments the lint sweeps the whole suite, C++ included."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root)
+        resource = os.path.join(self.root, "plugins", "demo", "resource")
+        self.source = os.path.join(self.root, "plugins", "demo", "source")
+        os.makedirs(resource)
+        os.makedirs(self.source)
+        self.uidesc = os.path.join(resource, "demo.uidesc")
+        with open(self.uidesc, "w") as f:
+            f.write(fixture(TITLE_OK))
+
+    def _run(self, *paths):
+        out = io.StringIO()
+        with unittest.mock.patch.object(check_uidesc, "REPO_ROOT", self.root):
+            with contextlib.redirect_stdout(out):
+                code = check_uidesc.main(["check-uidesc.py"] + list(paths))
+        return code, out.getvalue()
+
+    def _grey_source(self):
+        with open(os.path.join(self.source, "demo_processor.cpp"), "w") as f:
+            f.write('description->getColor("TextDim", label);\n')
+
+    def test_clean_suite_passes_and_counts_only_uidesc_documents(self):
+        # No C++ written at all: the sweep has nothing to find.
+        code, output = self._run()
+        self.assertEqual(code, 0)
+        self.assertIn("checked 1 file(s): 0 error(s), 0 warning(s)", output)
+
+    def test_grey_in_cpp_fails_the_run(self):
+        self._grey_source()
+        code, output = self._run()
+        self.assertEqual(code, 1)
+        self.assertIn("names TextDim", output)
+        # The count is documents, the errors are messages: the .uidesc is
+        # still the only file counted, and the C++ defect is still an error.
+        self.assertIn("checked 1 file(s): 1 error(s), 0 warning(s)", output)
+
+    def test_naming_one_uidesc_does_not_sweep_the_source_tree(self):
+        self._grey_source()
+        code, output = self._run(self.uidesc)
+        self.assertEqual(code, 0)
+        self.assertNotIn("names TextDim", output)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,9 @@ generator run on demand.
 Checks every `plugins/*/resource/*.uidesc` against `doc/style/ui-style.md`:
 XML validity first, then title, palette, absence of `TextDim`, explicit
 white `font-color` on text, and the vertical order of SETUP, OPS and FINE.
+A seventh rule leaves the XML and scans `plugins/*/source/` for the name
+`TextDim`, because the five plugins that draw text from custom views name
+their colours in C++ where no `.uidesc` rule can see them.
 HEADER and FOOTER placement is not checked; see doc/style/ui-style.md
 ("Running the lint") for the exact comparisons and how each zone is
 recognised.
@@ -18,14 +21,25 @@ python3 tools/check-uidesc.py                 # every plugin
 python3 tools/check-uidesc.py path/to.uidesc  # one file
 ```
 
+The C++ scan belongs to the whole-suite run: naming one `.uidesc` asks
+about that document alone.
 Errors exit non-zero; zone-order findings are warnings and do not.
 Standard library only — no virtualenv, no pip step.
+
+The summary line counts `.uidesc` documents, and its error and warning
+totals count messages rather than distinct defects: one `font-color="TextDim"`
+trips both the palette rule and the absence rule, so a single mistake can
+be reported twice.
 
 Wired into the build as two ctests:
 
 ```bash
-ctest --test-dir build -R uidesc
+ctest --test-dir build -C Release -R uidesc
 ```
+
+The `-C Release` is required because the suite is generated with Xcode, a
+multi-config generator: without a named configuration `ctest` finds no test
+to run and exits 8.
 
 `uidesc_lint_selftest` runs `test_check_uidesc.py`, which proves each rule
 against inline fixture XML; `uidesc_lint` runs the lint over the real

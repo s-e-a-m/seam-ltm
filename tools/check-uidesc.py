@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """SEAM-LTM UI standard lint.
 
-Checks every plugins/*/resource/*.uidesc against doc/style/ui-style.md.
+Checks every plugins/*/resource/*.uidesc against doc/style/ui-style.md, and
+sweeps plugins/*/source/ for the one colour name the standard removed.
 Standard library only: this must run from a bare python3, with no pip step,
 on any machine that can build the suite.
 
@@ -13,6 +14,39 @@ import sys
 import xml.etree.ElementTree as ET
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ERROR = "ERROR"
+WARN = "WARN"
+
+
+class Message(str):
+    """One lint finding, carrying its severity as data.
+
+    The printed form is exactly '<path>: <LEVEL> <text>', which is what the
+    documentation quotes and what a reader greps for. The severity is also
+    kept in .level, so main() decides the exit code by asking the message
+    what it is instead of searching its prose for the word ERROR: rewording
+    a message must never be able to switch the ctest off.
+
+    Subclassing str keeps every rule function returning something that reads,
+    compares and formats as a plain string, so the rules and their tests are
+    untouched by the severity becoming explicit.
+    """
+
+    def __new__(cls, path, level, text):
+        message = super().__new__(cls, "%s: %s %s" % (path, level, text))
+        message.level = level
+        return message
+
+
+def error(path, text):
+    """An ERROR: it fails the run."""
+    return Message(path, ERROR, text)
+
+
+def warn(path, text):
+    """A WARN: it is printed and counted, and the run still passes."""
+    return Message(path, WARN, text)
 
 
 def parse_uidesc(path):
@@ -28,9 +62,9 @@ def parse_uidesc(path):
         with open(path, "r", encoding="utf-8") as f:
             return ET.fromstring(f.read()), []
     except ET.ParseError as exc:
-        return None, ["%s: ERROR malformed XML: %s" % (path, exc)]
+        return None, [error(path, "malformed XML: %s" % exc)]
     except OSError as exc:
-        return None, ["%s: ERROR cannot read file: %s" % (path, exc)]
+        return None, [error(path, "cannot read file: %s" % exc)]
 
 
 def _title_labels(root):
@@ -55,15 +89,15 @@ def check_title(root, plugin_name, path):
     expected = "SEAM " + plugin_name.upper()
     labels = _title_labels(root)
     if not labels:
-        return ["%s: ERROR no TitleFont label found (expected title %r)"
-                % (path, expected)]
+        return [error(path, "no TitleFont label found (expected title %r)"
+                      % expected)]
     if len(labels) > 1:
         titles = ", ".join(repr(label.get("title") or "") for label in labels)
-        return ["%s: ERROR %d TitleFont labels found, expected exactly 1 (titles: %s)"
-                % (path, len(labels), titles)]
+        return [error(path, "%d TitleFont labels found, expected exactly 1 "
+                            "(titles: %s)" % (len(labels), titles))]
     actual = labels[0].get("title") or ""
     if actual != expected:
-        return ["%s: ERROR title is %r, expected %r" % (path, actual, expected)]
+        return [error(path, "title is %r, expected %r" % (actual, expected))]
     return []
 
 
@@ -86,6 +120,10 @@ ACCENT_COLORS = {
 # Views that render text and must therefore declare an explicit font-color.
 TEXT_CLASSES = ("CTextLabel", "CTextEdit", "CParamDisplay",
                 "COptionMenu", "CCheckBox")
+# The one name the standard deleted rather than redefined, so that it cannot
+# creep back one plugin at a time. It is banned in the .uidesc and in the C++
+# that asks the description for a colour by name.
+FORBIDDEN_COLOR = "TextDim"
 
 
 def check_palette(root, path):
@@ -95,11 +133,11 @@ def check_palette(root, path):
         name, rgba = color.get("name"), color.get("rgba")
         expected = CANONICAL_COLORS.get(name) or ACCENT_COLORS.get(name)
         if expected is None:
-            errors.append("%s: ERROR unknown colour %r (not in the standard "
-                          "palette; see doc/style/ui-style.md)" % (path, name))
+            errors.append(error(path, "unknown colour %r (not in the standard "
+                                      "palette; see doc/style/ui-style.md)" % name))
         elif rgba != expected:
-            errors.append("%s: ERROR colour %r is %s, expected %s"
-                          % (path, name, rgba, expected))
+            errors.append(error(path, "colour %r is %s, expected %s"
+                                % (name, rgba, expected)))
     return errors
 
 
@@ -112,16 +150,16 @@ def check_no_textdim(root, path):
     """
     errors = []
     for color in root.iter("color"):
-        if color.get("name") == "TextDim":
-            errors.append("%s: ERROR TextDim colour definition present — "
-                          "remove it (text is TextLight, frames are Structure)"
-                          % path)
+        if color.get("name") == FORBIDDEN_COLOR:
+            errors.append(error(path, "TextDim colour definition present — "
+                                      "remove it (text is TextLight, frames "
+                                      "are Structure)"))
     for view in root.iter("view"):
         for attribute, value in view.attrib.items():
-            if value == "TextDim":
-                errors.append("%s: ERROR %s=\"TextDim\" on %s — use TextLight "
-                              "for text, Structure for frames"
-                              % (path, attribute, view.get("class")))
+            if value == FORBIDDEN_COLOR:
+                errors.append(error(path, "%s=\"TextDim\" on %s — use TextLight "
+                                          "for text, Structure for frames"
+                                    % (attribute, view.get("class"))))
     return errors
 
 
@@ -139,14 +177,14 @@ def check_font_colors(root, path):
         if klass == "CCheckBox" and not (view.get("title") or ""):
             continue
         font_color = view.get("font-color")
+        name = view.get("title") or view.get("control-tag")
         if font_color is None:
-            errors.append("%s: ERROR %s %r declares no font-color"
-                          % (path, klass, view.get("title") or view.get("control-tag")))
+            errors.append(error(path, "%s %r declares no font-color"
+                                % (klass, name)))
         elif font_color != "TextLight":
-            errors.append("%s: ERROR %s %r uses font-color=%r — all text is "
-                          "TextLight (accents are for graphics, not text)"
-                          % (path, klass, view.get("title") or view.get("control-tag"),
-                             font_color))
+            errors.append(error(path, "%s %r uses font-color=%r — all text is "
+                                      "TextLight (accents are for graphics, "
+                                      "not text)" % (klass, name, font_color)))
     return errors
 
 
@@ -223,17 +261,54 @@ def check_zone_order(root, path):
 
     messages = []
     if setup_y is not None and ops_y is not None and setup_y > ops_y:
-        messages.append("%s: WARN SETUP (StoneId, y=%g) sits below OPS (y=%g) — "
-                        "identity is set before working" % (path, setup_y, ops_y))
+        messages.append(warn(path, "SETUP (StoneId, y=%g) sits below OPS (y=%g) — "
+                                   "identity is set before working"
+                             % (setup_y, ops_y)))
     if ops_y is not None and fine_y is not None and ops_y > fine_y:
-        messages.append("%s: WARN OPS (y=%g) sits below the first fine control "
-                        "(y=%g)" % (path, ops_y, fine_y))
+        messages.append(warn(path, "OPS (y=%g) sits below the first fine control "
+                                   "(y=%g)" % (ops_y, fine_y)))
     if (ops_y is None and setup_y is not None and fine_y is not None
             and setup_y > fine_y):
-        messages.append("%s: WARN SETUP (StoneId, y=%g) sits below the first "
-                        "fine control (y=%g) — identity is set before fine "
-                        "tuning, and no OPS zone was found to separate them"
-                        % (path, setup_y, fine_y))
+        messages.append(warn(path, "SETUP (StoneId, y=%g) sits below the first "
+                                   "fine control (y=%g) — identity is set before "
+                                   "fine tuning, and no OPS zone was found to "
+                                   "separate them" % (setup_y, fine_y)))
+    return messages
+
+
+# C++ that draws its own text asks the description for a colour by name, so
+# the rules above — which read .uidesc files — never see it.
+SOURCE_SUFFIXES = (".h", ".cpp")
+
+
+def check_source_colors(plugins_dir):
+    """The forbidden colour name in the C++ that the .uidesc rules cannot see.
+
+    Five plugins (strx, dslar, hilbert, x2uhj, ltglide) draw text from custom
+    views, naming their colours in C++ rather than in the XML. That is exactly
+    where TextDim survived the previous suite-wide tidy-up: the greys came
+    back through getColor("TextDim", ...) calls no .uidesc rule could reach.
+
+    This is a name scan over the source text, not a parse of it, so a comment
+    that merely mentions TextDim is reported too. That is deliberate: the
+    standard removed the name itself, and a comment still explaining a colour
+    tier that no longer exists is drift in the prose students read.
+    """
+    messages = []
+    for path in sorted(glob.glob(os.path.join(plugins_dir, "*", "source", "*"))):
+        if not path.endswith(SOURCE_SUFFIXES):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                lines = f.read().splitlines()
+        except OSError as exc:
+            messages.append(error(path, "cannot read file: %s" % exc))
+            continue
+        for number, line in enumerate(lines, 1):
+            if FORBIDDEN_COLOR in line:
+                messages.append(error(path, "line %d names TextDim — text is "
+                                            "TextLight, graphic structure is "
+                                            "Structure" % number))
     return messages
 
 
@@ -252,17 +327,30 @@ def check_file(path):
 
 
 def main(argv):
+    """Lint the named .uidesc files, or the whole suite when given none.
+
+    The C++ sweep runs in whole-suite mode only: asking about one .uidesc is
+    asking about that document, and answering with findings from a source
+    tree the caller never named would be surprising.
+
+    The count in the summary line is .uidesc documents; the error and warning
+    counts are messages, and one defect can raise several of them.
+    """
+    plugins_dir = os.path.join(REPO_ROOT, "plugins")
+    whole_suite = not argv[1:]
     paths = argv[1:] or sorted(
-        glob.glob(os.path.join(REPO_ROOT, "plugins", "*", "resource", "*.uidesc")))
+        glob.glob(os.path.join(plugins_dir, "*", "resource", "*.uidesc")))
     if not paths:
         print("no .uidesc files found under plugins/*/resource/", file=sys.stderr)
         return 1
     messages = []
     for path in paths:
         messages += check_file(path)
+    if whole_suite:
+        messages += check_source_colors(plugins_dir)
     for message in messages:
         print(message)
-    failed = [m for m in messages if ": ERROR " in m]
+    failed = [m for m in messages if m.level == ERROR]
     print("checked %d file(s): %d error(s), %d warning(s)"
           % (len(paths), len(failed), len(messages) - len(failed)))
     return 1 if failed else 0
