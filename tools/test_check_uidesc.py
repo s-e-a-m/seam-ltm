@@ -630,6 +630,115 @@ class TestMetadataNames(unittest.TestCase):
         self.assertEqual(check_uidesc.check_metadata_names(plugins), [])
 
 
+class TestScreenshots(unittest.TestCase):
+    """Every plugin that ships a GUI shows a window in the README gallery.
+
+    The window is a photographable fact and the four name rules verify what
+    it says, but nothing checked that the picture existed and reached the
+    README — the gallery drifted by hand three times before this rule. Its
+    two findings are WARN, not ERROR: a missing screenshot embarrasses the
+    docs, it does not ship a broken plugin, so it prints and counts but does
+    not fail the build. The rule reads the plugin tree, docs/img/ and
+    README.md, all found relative to the repo root (the parent of the
+    plugins dir), so it drives entirely from a temp tree. With no README
+    there is no gallery to be incomplete, and the rule is a no-op.
+    """
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root)
+        self.plugins = os.path.join(self.root, "plugins")
+        self.img = os.path.join(self.root, "docs", "img")
+        os.makedirs(self.img)
+
+    def _plugin(self, name, with_gui=True):
+        """A plugin dir; with a resource/<name>.uidesc when it ships a GUI."""
+        if with_gui:
+            resource = os.path.join(self.plugins, name, "resource")
+            os.makedirs(resource, exist_ok=True)
+            with open(os.path.join(resource, name + ".uidesc"), "w") as f:
+                f.write(fixture(TITLE_OK))
+        else:
+            os.makedirs(os.path.join(self.plugins, name, "source"),
+                        exist_ok=True)
+
+    def _screenshot(self, name):
+        with open(os.path.join(self.img, name + ".png"), "wb") as f:
+            f.write(b"\x89PNG\r\n")
+
+    def _readme(self, *names):
+        body = "\n".join("![%s](docs/img/%s.png)" % (n.upper(), n)
+                         for n in names)
+        with open(os.path.join(self.root, "README.md"), "w") as f:
+            f.write("# Suite\n\n" + body + "\n")
+
+    def test_photographed_and_shown_plugin_passes(self):
+        self._plugin("demo")
+        self._screenshot("demo")
+        self._readme("demo")
+        self.assertEqual(check_uidesc.check_screenshots(self.plugins), [])
+
+    def test_missing_screenshot_file_warns(self):
+        self._plugin("demo")
+        self._readme("demo")            # linked, but the file is not there
+        messages = check_uidesc.check_screenshots(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].level, check_uidesc.WARN)
+        self.assertIn("docs/img/demo.png", messages[0])
+
+    def test_screenshot_not_in_readme_warns(self):
+        # The orphan shape: the file is in the repo but the gallery forgot it,
+        # which is exactly how six windows sat un-shown for a full cycle.
+        self._plugin("demo")
+        self._screenshot("demo")
+        self._readme()                 # gallery is empty
+        messages = check_uidesc.check_screenshots(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].level, check_uidesc.WARN)
+        self.assertIn("README", messages[0])
+
+    def test_missing_file_and_missing_link_are_one_warning_each(self):
+        self._plugin("demo")
+        self._readme()                 # no file, and not linked either
+        messages = check_uidesc.check_screenshots(self.plugins)
+        self.assertEqual(len(messages), 2)
+        self.assertTrue(all(m.level == check_uidesc.WARN for m in messages))
+
+    def test_plugin_without_a_gui_is_skipped(self):
+        # A WIP plugin dir with source but no .uidesc yet is not a finished,
+        # shippable window; demanding a screenshot of it would nag.
+        self._plugin("wip", with_gui=False)
+        self._readme()
+        self.assertEqual(check_uidesc.check_screenshots(self.plugins), [])
+
+    def test_underscore_infrastructure_dirs_are_skipped(self):
+        # _template ships a .uidesc and is linted for the XML rules, but it is
+        # a skeleton to copy, not a plugin, and never appears in the gallery.
+        self._plugin("_template")
+        self._readme()
+        self.assertEqual(check_uidesc.check_screenshots(self.plugins), [])
+
+    def test_a_second_plugin_is_checked_independently(self):
+        self._plugin("alpha")
+        self._plugin("beta")
+        self._screenshot("alpha")
+        self._readme("alpha")          # alpha is complete; beta is not
+        messages = check_uidesc.check_screenshots(self.plugins)
+        self.assertEqual(len(messages), 2)   # beta: no file + not linked
+        self.assertTrue(all("beta" in m for m in messages))
+
+    def test_no_readme_is_a_noop(self):
+        # The synthetic tree the whole-suite tests build has no README; the
+        # rule has no gallery to check and must stay silent rather than warn
+        # about every plugin at once.
+        self._plugin("demo")           # no _readme() call
+        self.assertEqual(check_uidesc.check_screenshots(self.plugins), [])
+
+    def test_the_real_suite_is_clean(self):
+        plugins = os.path.join(os.path.dirname(_HERE), "plugins")
+        self.assertEqual(check_uidesc.check_screenshots(plugins), [])
+
+
 class TestMessageSeverity(unittest.TestCase):
     """A message knows its own level; the printed form is unchanged."""
 

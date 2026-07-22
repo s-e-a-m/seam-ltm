@@ -5,7 +5,8 @@ Checks every plugins/*/resource/*.uidesc against doc/style/ui-style.md, and
 sweeps plugins/*/source/ for the one colour name the standard removed, for
 the display name each plugin registers with the VST3 factory, and (with each
 plugin's CMakeLists.txt) for the same name in the two build-metadata files
-that carry it.
+that carry it. A last sweep checks that every plugin with a GUI is
+photographed under docs/img/ and shown in the README gallery.
 Standard library only: this must run from a bare python3, with no pip step,
 on any machine that can build the suite.
 
@@ -553,6 +554,59 @@ def check_metadata_names(plugins_dir):
     return messages
 
 
+def check_screenshots(plugins_dir):
+    """Every plugin that ships a GUI shows a window in the README gallery.
+
+    The four name rules above verify what a plugin's window *says*; nothing
+    verified that the window was *photographed and shown*. It was left to the
+    eye, and the eye let the gallery drift three times: six windows sat
+    un-shown for a full development cycle, and two more (hilbert, ltglide) had
+    never been photographed at all. This rule is that missing eye — the same
+    two checks done by hand when the gallery was finally completed, now run by
+    ctest.
+
+    For each plugin directory that carries a .uidesc (an underscore-prefixed
+    dir like _common or _template is infrastructure, not a plugin, and is
+    skipped; a WIP dir with source but no .uidesc yet has no finished window
+    to photograph and is skipped too), two facts are asserted:
+
+      - docs/img/<name>.png exists, and
+      - README.md references 'docs/img/<name>.png'.
+
+    Both findings are WARN, not ERROR: a missing screenshot embarrasses the
+    documentation, it does not ship a broken plugin, so the run still passes.
+    The subject of the rule is the README gallery, so with no README.md there
+    is no gallery to be incomplete and the rule is a silent no-op — which is
+    also what keeps it out of the way of the synthetic single-plugin trees the
+    whole-suite tests build.
+    """
+    repo_root = os.path.dirname(plugins_dir)
+    readme_path = os.path.join(repo_root, "README.md")
+    if not os.path.isfile(readme_path):
+        return []
+    try:
+        with open(readme_path, "r", encoding="utf-8") as f:
+            readme = f.read()
+    except OSError as exc:
+        return [error(readme_path, "cannot read file: %s" % exc)]
+
+    messages = []
+    for plugin_dir in sorted(glob.glob(os.path.join(plugins_dir, "*"))):
+        name = os.path.basename(plugin_dir)
+        if not os.path.isdir(plugin_dir) or name.startswith("_"):
+            continue
+        if not glob.glob(os.path.join(plugin_dir, "resource", "*.uidesc")):
+            continue                            # no finished window yet
+        relative = "docs/img/%s.png" % name
+        if not os.path.isfile(os.path.join(repo_root, relative)):
+            messages.append(warn(readme_path, "%s ships a GUI but there is no "
+                                              "screenshot at %s" % (name, relative)))
+        if relative not in readme:
+            messages.append(warn(readme_path, "%s screenshot %s is not shown in "
+                                              "the README gallery" % (name, relative)))
+    return messages
+
+
 def check_file(path):
     """Run every rule over one .uidesc and return all messages."""
     plugin_name = os.path.basename(os.path.dirname(os.path.dirname(path)))
@@ -570,11 +624,11 @@ def check_file(path):
 def main(argv):
     """Lint the named .uidesc files, or the whole suite when given none.
 
-    The three source-tree sweeps — the forbidden colour name, the factory
-    display name, and the CMakeLists.txt/version.h metadata names — run in
-    whole-suite mode only: asking about one .uidesc is asking about that
-    document, and answering with findings from a source tree the caller
-    never named would be surprising.
+    The four whole-suite sweeps — the forbidden colour name, the factory
+    display name, the CMakeLists.txt/version.h metadata names, and the
+    README screenshot gallery — run in whole-suite mode only: asking about
+    one .uidesc is asking about that document, and answering with findings
+    from a source tree the caller never named would be surprising.
 
     The count in the summary line is .uidesc documents; the error and warning
     counts are messages, and one defect can raise several of them.
@@ -593,6 +647,7 @@ def main(argv):
         messages += check_source_colors(plugins_dir)
         messages += check_factory_names(plugins_dir)
         messages += check_metadata_names(plugins_dir)
+        messages += check_screenshots(plugins_dir)
     for message in messages:
         print(message)
     failed = [m for m in messages if m.level == ERROR]

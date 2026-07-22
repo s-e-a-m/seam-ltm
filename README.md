@@ -51,16 +51,24 @@ Every window follows the same grammar, described in
 
 ### Screenshots
 
-| SDMX | LR2XHGR | X2UHJ | BAMODULEX |
+All fifteen windows, photographed after the UI standard landed, in the order
+of the three families above.
+
+| SDMX | B2XROT | XYPRROT | M2XHGR |
 |:---:|:---:|:---:|:---:|
-| ![SDMX](docs/img/sdmx.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![X2UHJ](docs/img/x2uhj.png) | ![BAMODULEX](docs/img/bamodulex.png) |
+| ![SDMX](docs/img/sdmx.png) | ![B2XROT](docs/img/b2xrot.png) | ![XYPRROT](docs/img/xyprrot.png) | ![M2XHGR](docs/img/m2xhgr.png) |
 
-| LTBURST | DSLAR | STRX |
+| LR2XHGR | ABMODULEX | BAMODULEX | X2UHJ |
+|:---:|:---:|:---:|:---:|
+| ![LR2XHGR](docs/img/lr2xhgr.png) | ![ABMODULEX](docs/img/abmodulex.png) | ![BAMODULEX](docs/img/bamodulex.png) | ![X2UHJ](docs/img/x2uhj.png) |
+
+| LTBURST | LTGLIDE | MULTIPINK |
 |:---:|:---:|:---:|
-| ![LTBURST](docs/img/ltburst.png) | ![DSLAR](docs/img/dslar.png) | ![STRX](docs/img/strx.png) |
+| ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) |
 
-The remaining windows changed with the UI standard and their screenshots are
-being retaken.
+| STRX | DSLAR | DDELAY | HILBERT |
+|:---:|:---:|:---:|:---:|
+| ![STRX](docs/img/strx.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) |
 
 ## Installation
 

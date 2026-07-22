@@ -9,8 +9,8 @@ generator run on demand.
 Checks every `plugins/*/resource/*.uidesc` against `doc/style/ui-style.md`:
 XML validity first, then title, palette, absence of `TextDim`, explicit
 white `font-color` on text, and the vertical order of SETUP, OPS and FINE.
-Three further rules leave the XML for `plugins/*/source/` and each plugin's
-`CMakeLists.txt`.
+Four further rules leave the XML for `plugins/*/source/`, each plugin's
+`CMakeLists.txt`, and the README gallery.
 One scans every `.h` and `.cpp` for the name `TextDim`, because the five
 plugins that draw text from custom views name their colours in C++ where no
 `.uidesc` rule can see them.
@@ -37,6 +37,13 @@ full development cycle.
 Only the name is checked, never the subtitle after the dash, since the
 subtitle is prose allowed to differ between files; a file with no
 `SEAM <NAME>` prefix, or that does not exist, is skipped rather than flagged.
+The fourth reads `README.md` and `docs/img/`: every plugin that ships a GUI
+must be photographed at `docs/img/<name>.png` and shown in the README
+gallery.
+Both misses are warnings, not errors — a missing screenshot embarrasses the
+documentation, it does not ship a broken plugin — and the check exists
+because the gallery drifted by hand three times, leaving eight windows
+un-shown until they were added back one afternoon.
 HEADER and FOOTER placement is not checked; see doc/style/ui-style.md
 ("Running the lint") for the exact comparisons and how each zone is
 recognised.
@@ -46,7 +53,7 @@ python3 tools/check-uidesc.py                 # every plugin
 python3 tools/check-uidesc.py path/to.uidesc  # one file
 ```
 
-All three source-tree scans belong to the whole-suite run: naming one
+All four whole-suite scans belong to the whole-suite run: naming one
 `.uidesc` asks about that document alone.
 Errors exit non-zero; zone-order findings are warnings and do not.
 Standard library only — no virtualenv, no pip step.
