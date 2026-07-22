@@ -26,13 +26,18 @@ Zones appear in this vertical order; an absent zone is simply omitted.
 ```
 HEADER   title, subtitle, tagline
 SETUP    user-entered station identity (STONE id; later: room coordinates)
-OPS      operational buttons (POWER, RESET, LOOP, SHOT, MUTE)
+OPS      operational buttons (POWER, RESET, LOOP)
 FINE     fine controls (sliders, menus), two columns in L format
 FOOTER   runtime readouts, status line, logo
 ```
 
 SETUP precedes OPS: identity is set once before working.
 Runtime feedback (slot/pool status, meters) is FOOTER content, never SETUP.
+The OPS list read "POWER, RESET, LOOP, SHOT, MUTE" when this spec was
+written; SHOT had already been removed from ltglide in f8fb76e, and MUTE
+became POWER under this work (see "Out of scope"), so the vocabulary that
+landed — and that `doc/style/ui-style.md` now carries — is the three words
+above.
 
 ### Typography and casing
 
@@ -75,7 +80,7 @@ No editor size constant exists in C++ — geometry lives entirely in the .uidesc
 The restructure is a pure XML edit.
 
 **multipink** — 300×450 vertical → L format, ~460×360 (built: 460×390 — see "Verification" below).
-HEADER → SETUP (`— STONE —`, StoneId menu) → OPS (MUTE) → FINE two columns: Reference | Trim → FOOTER (Slot/N/pool/Status line, logo).
+HEADER → SETUP (`— STONE —`, StoneId menu) → OPS (POWER) → FINE two columns: Reference | Trim → FOOTER (Slot/N/pool/Status line, logo).
 
 **dslar** — already structurally conformant (Power/Reset on top, two columns); Tier 1 only.
 

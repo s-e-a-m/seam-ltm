@@ -1154,7 +1154,7 @@ The OPS vocabulary makes POWER the standard on/off for emitters. multipink is th
 
 This is a parameter change, which the spec's "out of scope" section excludes and the later OPS-vocabulary decision (2026-07-21) explicitly requires. The later decision governs.
 
-**Decision taken with GS (2026-07-21): clean break on the state format.** The stream writes `power` directly, with 1 meaning on. Sessions saved before this change re-open with POWER **off** — multipink is silent until the user clicks it once. The alternative (keeping mute polarity on the wire and inverting at the boundary) was rejected as a permanent piece of misdirection in the serialisation code for a plugin whose presets are cheap to re-make.
+**Decision taken with GS (2026-07-21): clean break on the state format.** The stream writes `power` directly, with 1 meaning on. The third field held MUTE, so the break reads **loud, not silent**: a session saved with the instance MUTED re-opens SOUNDING — pink noise at the calibration reference into a power amp, on load — and a session saved active re-opens silent. The same inversion reaches host automation: parameter tag 102 kept its number and reversed its meaning, so an existing Reaper envelope written against MUTE now drives POWER to the opposite state at every point on the curve. Re-make any preset and re-draw any envelope from before this change. The alternative (keeping mute polarity on the wire and inverting at the boundary) was rejected as a permanent piece of misdirection in the serialisation code for a plugin whose presets are cheap to re-make.
 
 **Files:**
 - Modify: `plugins/multipink/source/multipink_ids.h:16`
@@ -1236,11 +1236,14 @@ In `setState`, around lines 198–228:
 
     paramReferenceIdx_.store(std::clamp<int>(refIdx, 0, kReferenceStepCount - 1));
     paramTrimDb_.store(std::clamp(trim, -6.0, 6.0));
-    // Third field is POWER (1 = sounding). It held MUTE, with the opposite
-    // meaning, until the 2026-07 UI revision: a session saved before that
-    // re-opens with POWER off and stays silent until the user clicks it.
-    // A deliberate one-off break rather than an inverted wire format kept
-    // forever in a plugin whose presets take seconds to re-make.
+    // Third field is POWER (1 = sounding). It held MUTE, with the
+    // opposite meaning, until the 2026-07 UI revision. A session
+    // saved MUTED therefore re-opens SOUNDING -- pink noise at the
+    // calibration reference, on load. A session saved active
+    // re-opens silent. Re-make any preset from before that date.
+    // Tag 102 kept its number through the rename, so a host
+    // automation envelope written against MUTE now drives POWER and
+    // is inverted along its whole length: re-draw it too.
     paramPower_.store(power ? 1 : 0);
 ```
 
@@ -1299,8 +1302,12 @@ The suite's OPS vocabulary makes POWER the standard on/off for emitters;
 an inverted switch read backwards next to dslar's POWER.
 
 The state format takes a clean break: the third stream field is now POWER
-(1 = sounding) where it was MUTE. Sessions saved before this re-open with
-POWER off and stay silent until clicked once."
+(1 = sounding) where it was MUTE, so it re-opens inverted. A session saved
+MUTED comes back SOUNDING -- pink noise at the calibration reference, on
+load -- and a session saved active comes back silent. Tag 102 kept its
+number, so a host automation envelope written against MUTE now drives POWER
+and is inverted along its whole length. Re-make the presets, re-draw the
+envelopes."
 ```
 
 ---
@@ -1727,3 +1734,4 @@ git commit -m "docs(ui): close the UI standard spec — implemented across all 1
 - `multipink` is 460×390 and `ltglide` 460×510, against the spec's "~360" and "~480": the 77 px logo and the 58 px column stride need the extra room.
 - Tier 2 involves no C++ geometry change — there is no size constant, and SHOT no longer exists.
 - `TextDim` becomes `Structure` (same `#888888ff`) wherever it framed a shape rather than coloured text; the spec only anticipated the text case.
+- `multipink`'s MUTE → POWER inverts the meaning of the third state field and of parameter tag 102 without changing either's position or number. The break is loud, not silent: a session saved MUTED re-opens SOUNDING (pink noise at the calibration reference, into a power amp, on load), a session saved active re-opens silent, and a host automation envelope drawn against MUTE now drives POWER inverted along its whole length. This is the one user-visible risk on the branch; it is recorded in `multipink_processor.cpp:setState` where a reader meets it.

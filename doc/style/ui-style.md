@@ -39,13 +39,30 @@ Two-column geometry (the dslar reference): columns 180 px wide at x=30 and
 x=250, a 40 px gutter between them.
 Within a column a control block is label (14 px), slider (18 px), value
 (16 px), and blocks repeat every 58 px.
+A menu block is the same 14 px label followed by a 20 px `COptionMenu` and
+no value row, since the menu already reads out its own selection; both
+rebuilt windows use it (multipink's Reference, ltglide's Sweep and Timing).
+`KnobLabelFont` is 12 and `ValueFont` 11 in every two-column window, so a
+plugin copied from the skeleton matches the ones already built.
 
 ## Typography and casing
 
 - Title: `SEAM <NAME>`, where `<NAME>` is the plugin directory name
   uppercased.
   Drawn in `TitleFont`.
-- Subtitle and tagline: Title Case.
+- Subtitle: Title Case.
+  It names the plugin in plain language: "Multichannel Pink Noise",
+  "Wideband Quadrature Transformer".
+- Tagline: the lowercase technical gloss under the subtitle, naming the
+  mechanism in the plugin's own vocabulary rather than describing it again.
+  `N=5 grains · swept · looped` (ltglide), `64-slot shared pool ·
+  RMS-calibrated` (multipink), `c = 331.4 m/s · nextprime · 4ch sync`
+  (ddelay), `quadrature ±90° · mono → I/Q` (hilbert).
+  Facts are separated by a middle dot, and no casing rule is imposed on it:
+  symbols, units, channel names and proper names keep the capitalisation the
+  domain gives them (`AmbiX`, `LFU RFD RBU LBD`, `dBFS`, dslar's
+  "Homeostatic Loop"), which is what makes the line read as notation instead
+  of a second title.
 - Zone and column headers: `— NAME —`, centred.
 - Operational button labels: ALL CAPS.
 
@@ -76,6 +93,13 @@ Functional accents, used only where the plugin needs them, and never as a
 It carries the same value and the same pixels, and a different meaning: it
 draws shapes, not words.
 
+The ban on `TextDim` covers the C++ as well as the XML.
+Five plugins — `strx`, `dslar`, `hilbert`, `x2uhj`, `ltglide` — draw text
+from custom views, which ask the description for a colour by name at draw
+time, so a grey label can exist in a plugin whose `.uidesc` is spotless.
+That is where the greys survived the previous tidy-up, and the lint now
+scans `plugins/*/source/` for the name for exactly that reason.
+
 ## Operational vocabulary
 
 | Label | Meaning |
@@ -92,10 +116,16 @@ to a POWER on its neighbour's window.
 ```bash
 python3 tools/check-uidesc.py                       # all plugins
 python3 tools/check-uidesc.py plugins/dslar/resource/dslar.uidesc
-ctest --test-dir build -R uidesc                    # as part of the suite
+ctest --test-dir build -C Release -R uidesc         # as part of the suite
 ```
 
+The `-C Release` is not optional: the suite is generated with Xcode, a
+multi-config generator, and without a named configuration `ctest` reports
+both tests `Not Run` and exits 8.
+
 Errors fail the run; warnings (zone order) do not.
+The whole-plugin run also sweeps `plugins/*/source/` for `TextDim`; naming
+a single `.uidesc` checks that document alone.
 The first rule the lint applies is XML validity, because nothing else in
 the build parses a `.uidesc`: on 2026-07-21 a `--` inside a comment shipped
 an empty editor that the compiler and the VST3 validator both accepted in
@@ -121,6 +151,13 @@ control-tag (multipink's POWER, ltglide's LOOP), so the control-tag branch
 catches it first.
 Knowing where this net has gaps is itself useful: watch HEADER and FOOTER
 placement by eye, because the lint does not.
+Nor does it see a colour a plugin composes rather than names — a `CColor`
+built from literal components, an alpha applied to a palette entry, a shade
+derived from another — since only a name can be checked against the palette.
+The C++ sweep catches the one removed name, and everything else a custom
+view invents for itself is on the reviewer.
+Casing beyond the title is unchecked too: the subtitle rule and the tagline
+description above are read by people, not by the lint.
 
 ## Starting a new plugin
 

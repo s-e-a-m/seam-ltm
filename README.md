@@ -198,11 +198,16 @@ the Gerzon/Blumlein theoretical framework.
 ### GUI
 All plugins share a consistent visual identity:
 
-- **300px wide**, variable height
+- **300px wide** single column for passive converters, **460px** two columns
+  for working and calibration plugins; variable height
 - **Source Code Pro Light** monospace font throughout
 - Dark background (#292c2f), light text
 - Horizontal sliders with center-origin fill (bipolar rotation controls)
 - SEAM logo at bottom
+
+The window grammar is written down in [doc/style/ui-style.md](doc/style/ui-style.md),
+started from `plugins/_template/`, and checked by `tools/check-uidesc.py` as
+part of `ctest`.
 
 ### Architecture
 Built on `SingleComponentEffect` (processor + controller in one class).
