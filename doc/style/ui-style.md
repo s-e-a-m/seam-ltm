@@ -25,25 +25,45 @@ the plugin tells the user.
 
 ## Formats
 
-**S — `300, N`, single column.** Passive converters and rotators: up to
-about four fine controls, no OPS or SETUP zone.
+The control count decides the format.
+A SETUP selector and an operational switch are one menu and one box: they
+occupy a row each, they are not fine controls, and they crowd nothing.
+Reading the OPS zone as the threshold sent multipink to 460 px to draw four
+controls in a grid that was half empty, which is how the rule was found to
+be wrong.
 
-**L — width 460 or more, two columns.** Required as soon as a plugin has an
-OPS zone or more than about five fine controls.
-Working and calibration plugins (dslar, ltglide, multipink, strx) are all L.
+**S — `300, N`, single column.** Up to about five fine controls, whatever the
+plugin does with them.
+A STONE selector above a POWER switch above two controls still reads as one
+column: that is multipink.
 
-The window shape therefore tells the user the plugin's role before they
-read a single label.
+**L — width 460 or more, two columns.** From about six fine controls, where a
+single column runs the window taller than it is readable.
+dslar (seven fine controls) and ltglide (seven) are L on that count; strx is
+L for the width its four measurement views need, having no controls at all;
+multipink is S.
+
+The window shape therefore tells the user how much there is to set before
+they read a single label.
 
 Two-column geometry (the dslar reference): columns 180 px wide at x=30 and
 x=250, a 40 px gutter between them.
 Within a column a control block is label (14 px), slider (18 px), value
 (16 px), and blocks repeat every 58 px.
 A menu block is the same 14 px label followed by a 20 px `COptionMenu` and
-no value row, since the menu already reads out its own selection; both
-rebuilt windows use it (multipink's Reference, ltglide's Sweep and Timing).
+no value row, since the menu already reads out its own selection, and it
+repeats every 42 px.
+It belongs to both formats: ltglide uses it twice in its left column (Sweep
+and Timing), multipink once in its single column (Reference).
 `KnobLabelFont` is 12 and `ValueFont` 11 in every two-column window, so a
-plugin copied from the skeleton matches the ones already built.
+plugin copied from the skeleton matches the ones already built; the 300 px
+windows carry the wider scale they have always used, `KnobLabelFont` 13 and
+`ValueFont` 12.
+
+A control that belongs to neither column spans the full width above both:
+dslar's Output and ltglide's Level are the plugin's output level, not a
+member of either group, and a full-width block (label across the window,
+300 px slider and value centred) says so without a label having to.
 
 ## Typography and casing
 
@@ -184,3 +204,9 @@ description above are read by people, not by the lint.
 Copy `plugins/_template/resource/_template.uidesc`, rename it, and run the
 lint before writing any C++.
 The skeleton traces all five zones and passes the standard as-is.
+It is an L skeleton because two columns are the harder shape to lay out from
+scratch; a plugin with five fine controls or fewer narrows it to S, which is
+a smaller edit than widening the other way, and `plugins/_template/README.md`
+says how.
+The display name in the `DEF_CLASS2` block follows when the C++ arrives, and
+the lint checks it against the same directory name.

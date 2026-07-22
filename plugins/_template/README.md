@@ -18,6 +18,15 @@ To start a plugin:
    before writing any C++.
 5. Add `add_subdirectory(plugins/<name>)` to the root `CMakeLists.txt`.
 
-An S-format plugin (a passive converter, up to about four controls) starts
-from the same file: narrow the template to `300, N`, drop the SETUP and OPS
-zones, and keep one column.
+An S-format plugin — five fine controls or fewer, whatever the plugin does
+with them — starts from the same file.
+Narrow the frame to `300, N`, keep one column at x=20 of width 260, move the
+right column's blocks under the left one, and widen the type scale to
+`KnobLabelFont` 13 and `ValueFont` 12, which is what the 300 px windows use.
+Keep the SETUP and OPS zones if the plugin has them: a STONE selector and a
+POWER switch cost one row each and fit a single column, as multipink shows.
+Drop the column headers, which name a group of one once there is only one
+column.
+
+The skeleton is L because two columns are the harder shape to lay out from
+scratch, and narrowing is the smaller edit.
