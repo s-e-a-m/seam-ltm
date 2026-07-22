@@ -285,7 +285,7 @@ BEGIN_FACTORY_DEF (stringCompanyName, stringCompanyWeb, stringCompanyEmail)
         INLINE_UID_FROM_FUID (Seam::XYPRrotProcessorUID),
         PClassInfo::kManyInstances,
         kVstAudioEffectClass,
-        "SEAM XYPRrot",
+        "SEAM XYPRROT",
         0,
         "Fx|Spatial",
         FULL_VERSION_STR,

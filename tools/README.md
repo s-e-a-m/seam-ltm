@@ -9,9 +9,18 @@ generator run on demand.
 Checks every `plugins/*/resource/*.uidesc` against `doc/style/ui-style.md`:
 XML validity first, then title, palette, absence of `TextDim`, explicit
 white `font-color` on text, and the vertical order of SETUP, OPS and FINE.
-A seventh rule leaves the XML and scans `plugins/*/source/` for the name
-`TextDim`, because the five plugins that draw text from custom views name
-their colours in C++ where no `.uidesc` rule can see them.
+Two further rules leave the XML for `plugins/*/source/`.
+One scans every `.h` and `.cpp` for the name `TextDim`, because the five
+plugins that draw text from custom views name their colours in C++ where no
+`.uidesc` rule can see them.
+The other reads the display name each `*_processor.cpp` registers with the
+VST3 factory, in its `DEF_CLASS2` block, and requires the same
+`SEAM <NAME>` the window title carries: the host draws that string in its
+title bar and its plugin browser, so a plugin has two names, and until this
+rule existed only the one inside the window was ever checked.
+It parses the macro's argument list, so both `DEF_CLASS2` formattings in the
+suite read alike; it checks the audio effect registration and skips a
+processor file that registers no class.
 HEADER and FOOTER placement is not checked; see doc/style/ui-style.md
 ("Running the lint") for the exact comparisons and how each zone is
 recognised.
@@ -21,7 +30,7 @@ python3 tools/check-uidesc.py                 # every plugin
 python3 tools/check-uidesc.py path/to.uidesc  # one file
 ```
 
-The C++ scan belongs to the whole-suite run: naming one `.uidesc` asks
+Both C++ scans belong to the whole-suite run: naming one `.uidesc` asks
 about that document alone.
 Errors exit non-zero; zone-order findings are warnings and do not.
 Standard library only — no virtualenv, no pip step.

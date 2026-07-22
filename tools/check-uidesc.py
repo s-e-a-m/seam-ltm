@@ -2,7 +2,8 @@
 """SEAM-LTM UI standard lint.
 
 Checks every plugins/*/resource/*.uidesc against doc/style/ui-style.md, and
-sweeps plugins/*/source/ for the one colour name the standard removed.
+sweeps plugins/*/source/ for the one colour name the standard removed and for
+the display name each plugin registers with the VST3 factory.
 Standard library only: this must run from a bare python3, with no pip step,
 on any machine that can build the suite.
 
@@ -312,6 +313,169 @@ def check_source_colors(plugins_dir):
     return messages
 
 
+# The VST3 factory macro and the shape of its argument list. DEF_CLASS2 takes
+# (cid, cardinality, category, name, classFlags, subCategories, version,
+# sdkVersion, createMethod), so the display name is argument 3 and the class
+# category — which says whether this registration is the audio effect or its
+# controller — is argument 2.
+FACTORY_MACRO = "DEF_CLASS2"
+FACTORY_CATEGORY_ARGUMENT = 2
+FACTORY_NAME_ARGUMENT = 3
+AUDIO_EFFECT_CLASS = "kVstAudioEffectClass"
+
+
+def _macro_arguments(text, paren_index):
+    """The argument list of a macro invocation whose '(' is at paren_index.
+
+    Commas are split at depth 1 only, so the nested INLINE_UID_FROM_FUID(...)
+    call stays one argument, and commas inside a string literal are ignored.
+    Returns None when the parentheses never close, which the caller reports
+    rather than guessing at.
+    """
+    depth = 0
+    index = paren_index
+    argument = []
+    arguments = []
+    in_string = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            if char == "\\":
+                argument.append(text[index:index + 2])
+                index += 2
+                continue
+            if char == '"':
+                in_string = False
+            argument.append(char)
+        elif char == '"':
+            in_string = True
+            argument.append(char)
+        elif char == "(":
+            depth += 1
+            if depth > 1:
+                argument.append(char)
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                arguments.append("".join(argument).strip())
+                return arguments
+            argument.append(char)
+        elif char == "," and depth == 1:
+            arguments.append("".join(argument).strip())
+            argument = []
+        else:
+            argument.append(char)
+        index += 1
+    return None
+
+
+def _string_literal(argument):
+    """The text of a C++ string literal argument, or None if it is not one.
+
+    Adjacent literals concatenate in C++ ("SEAM " "DDELAY"), so the pieces are
+    joined the way the compiler joins them. An argument that is a macro or an
+    identifier has no text to check and returns None.
+    """
+    pieces = []
+    index = 0
+    while index < len(argument):
+        char = argument[index]
+        if char.isspace():
+            index += 1
+            continue
+        if char != '"':
+            return None
+        index += 1
+        piece = []
+        while index < len(argument) and argument[index] != '"':
+            if argument[index] == "\\":
+                piece.append(argument[index:index + 2])
+                index += 2
+                continue
+            piece.append(argument[index])
+            index += 1
+        if index >= len(argument):
+            return None                     # unterminated literal
+        index += 1                          # closing quote
+        pieces.append("".join(piece))
+    return "".join(pieces) if pieces else None
+
+
+def _factory_registrations(text):
+    """Every DEF_CLASS2 invocation in a translation unit, as argument lists.
+
+    Yields (arguments, offset) pairs, with arguments None when the macro's
+    parentheses do not close — a malformed factory block the caller reports.
+    """
+    index = text.find(FACTORY_MACRO)
+    while index != -1:
+        paren = text.find("(", index + len(FACTORY_MACRO))
+        yield (_macro_arguments(text, paren) if paren != -1 else None), index
+        index = text.find(FACTORY_MACRO, index + len(FACTORY_MACRO))
+
+
+def check_factory_names(plugins_dir):
+    """The display name registered with the VST3 factory, which the host draws.
+
+    A plugin carries two names, and until now the lint only ever saw one of
+    them. check_title reads the CTextLabel drawn *inside* the window; the
+    string in the DEF_CLASS2 block is what the host puts in its title bar and
+    its plugin browser (Reaper shows 'VST3: SEAM B2Xrot'). They are two
+    different strings in two different files, so they drift apart silently:
+    three plugins shipped an uppercased window title above a mixed-case host
+    title bar, and no rule could tell.
+
+    Both names follow the same rule, 'SEAM ' + the plugin directory name
+    uppercased, so this checks the factory string against exactly what
+    check_title requires of the window.
+
+    Only the audio effect registration is checked. A processor file that
+    registers no class at all is skipped rather than flagged: nothing says a
+    future source file must contain a factory block, and a lint that invents
+    a violation for an absent construct teaches the wrong lesson.
+    """
+    messages = []
+    pattern = os.path.join(plugins_dir, "*", "source", "*_processor.cpp")
+    for path in sorted(glob.glob(pattern)):
+        plugin_name = os.path.basename(os.path.dirname(os.path.dirname(path)))
+        expected = "SEAM " + plugin_name.upper()
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+        except OSError as exc:
+            messages.append(error(path, "cannot read file: %s" % exc))
+            continue
+        for arguments, offset in _factory_registrations(text):
+            line = text.count("\n", 0, offset) + 1
+            if arguments is None:
+                messages.append(error(path, "line %d: %s argument list does not "
+                                            "close" % (line, FACTORY_MACRO)))
+                continue
+            if len(arguments) <= FACTORY_NAME_ARGUMENT:
+                messages.append(error(path, "line %d: %s takes %d arguments, "
+                                            "found %d — cannot read the display "
+                                            "name" % (line, FACTORY_MACRO,
+                                                      FACTORY_NAME_ARGUMENT + 1,
+                                                      len(arguments))))
+                continue
+            if AUDIO_EFFECT_CLASS not in arguments[FACTORY_CATEGORY_ARGUMENT]:
+                continue                    # a controller, not the effect
+            actual = _string_literal(arguments[FACTORY_NAME_ARGUMENT])
+            if actual is None:
+                messages.append(error(path, "line %d: %s display name is %s, "
+                                            "not a string literal"
+                                      % (line, FACTORY_MACRO,
+                                         arguments[FACTORY_NAME_ARGUMENT])))
+            elif actual != expected:
+                messages.append(error(path, "line %d: factory display name is "
+                                            "%r, expected %r — the host title "
+                                            "bar and the window title are two "
+                                            "different strings and both follow "
+                                            "the same rule"
+                                      % (line, actual, expected)))
+    return messages
+
+
 def check_file(path):
     """Run every rule over one .uidesc and return all messages."""
     plugin_name = os.path.basename(os.path.dirname(os.path.dirname(path)))
@@ -329,9 +493,10 @@ def check_file(path):
 def main(argv):
     """Lint the named .uidesc files, or the whole suite when given none.
 
-    The C++ sweep runs in whole-suite mode only: asking about one .uidesc is
-    asking about that document, and answering with findings from a source
-    tree the caller never named would be surprising.
+    The two C++ sweeps — the forbidden colour name, and the factory display
+    name — run in whole-suite mode only: asking about one .uidesc is asking
+    about that document, and answering with findings from a source tree the
+    caller never named would be surprising.
 
     The count in the summary line is .uidesc documents; the error and warning
     counts are messages, and one defect can raise several of them.
@@ -348,6 +513,7 @@ def main(argv):
         messages += check_file(path)
     if whole_suite:
         messages += check_source_colors(plugins_dir)
+        messages += check_factory_names(plugins_dir)
     for message in messages:
         print(message)
     failed = [m for m in messages if m.level == ERROR]

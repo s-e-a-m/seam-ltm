@@ -50,6 +50,17 @@ plugin copied from the skeleton matches the ones already built.
 - Title: `SEAM <NAME>`, where `<NAME>` is the plugin directory name
   uppercased.
   Drawn in `TitleFont`.
+- Host name: the display name registered with the VST3 factory, argument 4 of
+  the `DEF_CLASS2` block at the bottom of
+  `plugins/<name>/source/<name>_processor.cpp`.
+  It reads `SEAM <NAME>` by the same rule as the title, because it is the
+  string the host draws for itself: Reaper prints it in the plugin browser and
+  above the window as `VST3: SEAM DDELAY`.
+  The window title and the host title bar are two different strings in two
+  different files, so they drift apart in silence — `SEAM B2Xrot`,
+  `SEAM hilbert` and `SEAM XYPRrot` sat above windows already reading
+  `SEAM B2XROT`, `SEAM HILBERT` and `SEAM XYPRROT` — and the lint now reads
+  both.
 - Subtitle: Title Case.
   It names the plugin in plain language: "Multichannel Pink Noise",
   "Wideband Quadrature Transformer".
@@ -124,8 +135,17 @@ multi-config generator, and without a named configuration `ctest` reports
 both tests `Not Run` and exits 8.
 
 Errors fail the run; warnings (zone order) do not.
-The whole-plugin run also sweeps `plugins/*/source/` for `TextDim`; naming
-a single `.uidesc` checks that document alone.
+The whole-plugin run also sweeps `plugins/*/source/`, twice: once over every
+`.h` and `.cpp` for `TextDim`, and once over `*_processor.cpp` for the factory
+display name.
+Naming a single `.uidesc` checks that document alone.
+The factory rule reads the `DEF_CLASS2` argument list rather than a line of
+text, so both of the formattings used in the suite are understood, and it
+checks the audio effect registration only.
+A processor file that registers no class at all is skipped rather than
+flagged, since nothing obliges a source file to carry a factory block; a
+display name hidden behind a macro instead of a literal is reported, because
+a name the lint cannot read is a rule that only appears to hold.
 The first rule the lint applies is XML validity, because nothing else in
 the build parses a `.uidesc`: on 2026-07-21 a `--` inside a comment shipped
 an empty editor that the compiler and the VST3 validator both accepted in

@@ -360,6 +360,161 @@ class TestSourceColors(unittest.TestCase):
         self.assertEqual(check_uidesc.check_source_colors(plugins), [])
 
 
+class TestFactoryNames(unittest.TestCase):
+    """The name the host draws, which lives in C++ and not in the XML.
+
+    check_title reads the label inside the window; this rule reads the string
+    registered with the VST3 factory, which is what Reaper prints in its title
+    bar. Three plugins shipped with the two disagreeing."""
+
+    # The two DEF_CLASS2 layouts actually used in the suite: the compact one
+    # (ltburst, multipink, strx, dslar, ltglide) and the one-argument-per-line
+    # one (b2xrot, ddelay, sdmx and the other converters).
+    COMPACT = ('BEGIN_FACTORY_DEF(a, b, c)\n'
+               '    DEF_CLASS2(INLINE_UID_FROM_FUID(Seam::DemoProcessorUID),\n'
+               '               PClassInfo::kManyInstances, kVstAudioEffectClass,\n'
+               '               "SEAM DEMO", Vst::kDistributable,\n'
+               '               "Fx|Tools", FULL_VERSION_STR, kVstVersionString,\n'
+               '               Seam::DemoProcessor::createInstance)\n'
+               'END_FACTORY\n')
+    SPREAD = ('BEGIN_FACTORY_DEF (a, b, c)\n'
+              '    DEF_CLASS2 (\n'
+              '        INLINE_UID_FROM_FUID (Seam::DemoProcessorUID),\n'
+              '        PClassInfo::kManyInstances,\n'
+              '        kVstAudioEffectClass,\n'
+              '        "SEAM DEMO",\n'
+              '        0,\n'
+              '        "Fx|Spatial",\n'
+              '        FULL_VERSION_STR,\n'
+              '        kVstVersionString,\n'
+              '        Seam::DemoProcessor::createInstance)\n'
+              'END_FACTORY\n')
+
+    def setUp(self):
+        self.plugins = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.plugins)
+
+    def _source(self, text, name="demo_processor.cpp", plugin="demo"):
+        directory = os.path.join(self.plugins, plugin, "source")
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, name)
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+
+    def test_compact_layout_matching_name_passes(self):
+        self._source(self.COMPACT)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_spread_layout_matching_name_passes(self):
+        # Same registration, one argument per line: the rule reads the macro's
+        # argument list, not a line of text.
+        self._source(self.SPREAD)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_nested_call_with_commas_stays_one_argument(self):
+        # The SDK's other spelling of the class id, INLINE_UID (a, b, c, d),
+        # puts three commas inside argument 0. Counting commas instead of
+        # tracking parenthesis depth shifts every argument three places, and
+        # the misread category then matches nothing, so the registration is
+        # skipped and a wrong name goes unreported. Passing the clean file is
+        # therefore not enough to prove the depth tracking: the same file with
+        # a wrong name must still be caught.
+        uid = "INLINE_UID (0x11223344, 0x55667788, 0x99aabbcc, 0xddeeff00)"
+        nested = self.SPREAD.replace(
+            "INLINE_UID_FROM_FUID (Seam::DemoProcessorUID)", uid)
+        self._source(nested)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+        self._source(nested.replace('"SEAM DEMO"', '"SEAM Demo"'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("'SEAM Demo'", messages[0])
+
+    def test_mixed_case_name_fails(self):
+        # The exact shape found in the host: window title 'SEAM B2XROT' above
+        # a title bar reading 'VST3: SEAM B2Xrot'.
+        self._source(self.SPREAD.replace('"SEAM DEMO"', '"SEAM Demo"'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("'SEAM Demo'", messages[0])
+        self.assertIn("'SEAM DEMO'", messages[0])
+
+    def test_expected_name_comes_from_the_directory_not_the_filename(self):
+        # plugins/demo/source/other_processor.cpp: 'demo' is the plugin, and
+        # a rule reading the filename would demand 'SEAM OTHER'.
+        self._source(self.COMPACT, name="other_processor.cpp")
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_processor_file_without_a_factory_block_is_skipped(self):
+        # Nothing requires a source file to register a class. Reporting a
+        # violation for an absent construct would be inventing one.
+        self._source('namespace Seam { void nothing() {} }\n')
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_controller_only_registration_is_skipped(self):
+        # A DEF_CLASS2 that registers the edit controller carries a different
+        # class category and a different name; the host title bar shows the
+        # audio effect, so only that registration is checked.
+        controller = self.SPREAD.replace("kVstAudioEffectClass",
+                                         "kVstComponentControllerClass")
+        controller = controller.replace('"SEAM DEMO"', '"SEAM DEMO Controller"')
+        self._source(controller)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_effect_is_still_checked_beside_a_controller_registration(self):
+        controller = self.SPREAD.replace("kVstAudioEffectClass",
+                                         "kVstComponentControllerClass")
+        controller = controller.replace('"SEAM DEMO"', '"SEAM DEMO Controller"')
+        self._source(controller + self.COMPACT.replace('"SEAM DEMO"',
+                                                       '"SEAM Demo"'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("'SEAM Demo'", messages[0])
+
+    def test_only_processor_files_are_read(self):
+        # multipink_pool.cpp and friends are not factory files.
+        self._source(self.COMPACT.replace('"SEAM DEMO"', '"SEAM Demo"'),
+                     name="demo_pool.cpp")
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_unterminated_macro_is_an_error(self):
+        self._source('DEF_CLASS2 (INLINE_UID_FROM_FUID (X), a, '
+                     'kVstAudioEffectClass, "SEAM DEMO"\n')
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("does not close", messages[0])
+
+    def test_non_literal_display_name_is_an_error(self):
+        # A name hidden behind a macro cannot be checked, and passing it in
+        # silence would be a rule that only appears to hold.
+        self._source(self.SPREAD.replace('"SEAM DEMO"', 'kPluginName'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("not a string literal", messages[0])
+
+    def test_too_few_arguments_is_an_error(self):
+        self._source('DEF_CLASS2 (INLINE_UID_FROM_FUID (X), a)\n')
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("cannot read the display name", messages[0])
+
+    def test_adjacent_literals_concatenate_as_the_compiler_joins_them(self):
+        self._source(self.SPREAD.replace('"SEAM DEMO"', '"SEAM " "DEMO"'))
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_every_plugin_is_reported_not_just_the_first(self):
+        self._source(self.COMPACT.replace('"SEAM DEMO"', '"SEAM Alpha"'),
+                     name="alpha_processor.cpp", plugin="alpha")
+        self._source(self.COMPACT.replace('"SEAM DEMO"', '"SEAM Beta"'),
+                     name="beta_processor.cpp", plugin="beta")
+        self.assertEqual(len(check_uidesc.check_factory_names(self.plugins)), 2)
+
+    def test_the_real_suite_is_clean(self):
+        plugins = os.path.join(os.path.dirname(_HERE), "plugins")
+        self.assertEqual(check_uidesc.check_factory_names(plugins), [])
+
+
 class TestMessageSeverity(unittest.TestCase):
     """A message knows its own level; the printed form is unchanged."""
 
@@ -473,9 +628,26 @@ class TestMainWholeSuite(unittest.TestCase):
 
     def test_naming_one_uidesc_does_not_sweep_the_source_tree(self):
         self._grey_source()
+        self._wrong_factory_name()
         code, output = self._run(self.uidesc)
         self.assertEqual(code, 0)
         self.assertNotIn("names TextDim", output)
+        self.assertNotIn("factory display name", output)
+
+    def _wrong_factory_name(self):
+        with open(os.path.join(self.source, "demo_processor.cpp"), "w") as f:
+            f.write('DEF_CLASS2 (INLINE_UID_FROM_FUID (X), '
+                    'PClassInfo::kManyInstances, kVstAudioEffectClass, '
+                    '"SEAM Demo", 0, "Fx", V, S, create)\n')
+
+    def test_factory_name_in_cpp_fails_the_run(self):
+        # The rule lives outside the XML, so main() has to reach for it: the
+        # sweep is wired in beside the colour sweep, not into check_file.
+        self._wrong_factory_name()
+        code, output = self._run()
+        self.assertEqual(code, 1)
+        self.assertIn("factory display name", output)
+        self.assertIn("checked 1 file(s): 1 error(s), 0 warning(s)", output)
 
 
 if __name__ == "__main__":

@@ -287,7 +287,7 @@ BEGIN_FACTORY_DEF (stringCompanyName, stringCompanyWeb, stringCompanyEmail)
         INLINE_UID_FROM_FUID (Seam::B2XrotProcessorUID),
         PClassInfo::kManyInstances,
         kVstAudioEffectClass,
-        "SEAM B2Xrot",
+        "SEAM B2XROT",
         0,
         "Fx|Spatial",
         FULL_VERSION_STR,

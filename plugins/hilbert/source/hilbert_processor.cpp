@@ -174,7 +174,7 @@ BEGIN_FACTORY_DEF(stringCompanyName, stringCompanyWeb, stringCompanyEmail)
         INLINE_UID_FROM_FUID(Seam::HilbertProcessorUID),
         Steinberg::PClassInfo::kManyInstances,
         kVstAudioEffectClass,
-        "SEAM hilbert",
+        "SEAM HILBERT",
         0,
         "Fx|Tools",
         FULL_VERSION_STR,
