@@ -5,38 +5,62 @@
 A pedagogical VST3 plugin suite for the [SEAM](https://github.com/s-e-a-m)
 project (Sustained Electro-Acoustic Music).
 
-Eight plugins built directly on the Steinberg VST3 SDK — no JUCE, no
+Fifteen plugins built directly on the Steinberg VST3 SDK — no JUCE, no
 frameworks. Clean C++17, VSTGUI for the interface, and the minimum code
 needed to do the job.
 
 ## Plugins
 
+The suite falls into three families: converters that move a signal from one
+spatial format to another, generators that produce the test signals a room
+is measured with, and the measurement and processing tools that listen to
+the result.
+Every window follows the same grammar, described in
+[doc/style/ui-style.md](doc/style/ui-style.md) and enforced by
+`tools/check-uidesc.py` as part of `ctest`.
+
+### Format converters and rotators
+
 | Plugin | I/O | Description |
 |---|---|---|
-| **SDMX** | stereo &rarr; stereo | Sum and Difference Matrix (MS encoding/decoding). Involutory: A = A⁻¹ |
-| **B2Xrot** | B-format &rarr; AmbiX | Classic B-format to first-order AmbiX conversion with YPR rotation |
-| **M2XHGR** | mono &rarr; AmbiX | Mono to first-order AmbiX via Haar encoding with YPR rotation |
-| **LR2XHGR** | stereo &rarr; AmbiX | Stereo to first-order AmbiX via Haar with divergence control and YPR rotation |
-| **XYPRrot** | AmbiX &rarr; AmbiX | First-order AmbiX rotation (Yaw, Pitch, Roll) |
-| **BAMODULEX** | AmbiX &rarr; tetrahedral (4ch) | Gerzon BA-module (AmbiX variant): decoder to LFU/RFD/RBU/LBD loudspeakers |
-| **DDELAY** | 4ch &rarr; 4ch | Quad distance delay for loudspeaker time-alignment. Distance in metres → integer-sample delay (c = 331.4 m/s, nextprime quantized) |
-| **MULTIPINK** | none &rarr; 1..64ch | Multichannel pink noise generator with shared 64-slot logical pool. Layout-adaptive (mono → 64ch). RMS-calibrated output (-23/-20/-18 dBFS RMS, ±6 dB trim). Cross-instance decorrelation via static slot allocator |
-| **X2UHJ** | AmbiX 4ch &rarr; UHJ C-format 4ch | First-Order AmbiX (ACN/SN3D) to UHJ C-format (L,R,T,Q). "UHJ decoder" for 2-channel listening. Quadrature ±90° pair designed live at the host sample rate by the reusable `seam_quadrature` engine (minimax phase fit), so accuracy holds across rates (1.36° max @48k, 0.43° @192k). GUI reads out the live coefficients and achieved error. Stateless |
-| **ABMODULEX** | A-format 4ch &rarr; AmbiX 4ch | Tetrahedral mic A-format (LFU,RFD,RBU,LBD) to First-Order AmbiX (ACN/SN3D). Front-end of the TETRAREC chain (→ X2UHJ → stereo). Involutory matrix (inverse of BAMODULEX). Stateless |
+| **SDMX** | stereo &rarr; stereo | Sum and Difference Matrix (Blumlein M/S). The matrix is involutory (A = A⁻¹), so one instance encodes LR &rarr; MS and a second one decodes MS &rarr; LR |
+| **B2XROT** | B-format 4ch &rarr; AmbiX 4ch | B-format (FuMa) to AmbiX with rotation: W is scaled by √2, channels are reordered to ACN/SN3D, then Yaw/Pitch/Roll is applied |
+| **XYPRROT** | AmbiX 4ch &rarr; AmbiX 4ch | First-order AmbiX rotation (Yaw, Pitch, Roll). Channel A0 is omnidirectional and passes through untouched |
+| **M2XHGR** | mono &rarr; AmbiX 4ch | Mono to AmbiX via Haar Decomposition: the Haar QMF bank `haarmn(1)` spreads one channel across four spatial components, which are then rotated by Yaw/Pitch/Roll |
+| **LR2XHGR** | stereo &rarr; AmbiX 4ch | Stereo to AmbiX via Haar (Silvi's method): each channel is Haar-decomposed, placed by a Divergence half-angle, summed, and finally oriented by a global Yaw/Pitch/Roll |
+| **ABMODULEX** | A-format 4ch &rarr; AmbiX 4ch | Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD &rarr; A0 A1 A2 A3. Pure matrix, involutory (M² = I), the inverse of BAMODULEX, and the front end of the TETRAREC chain |
+| **BAMODULEX** | AmbiX 4ch &rarr; tetrahedral 4ch | Gerzon's BA-module in the AmbiX domain: a decoder to the LFU · RFD · RBU · LBD vertices, which are the four drivers of a STONE loudspeaker. The Gerzon compensation shelves are omitted by design — the STONE amplifier corrects HF/LF downstream |
+| **X2UHJ** | AmbiX 4ch &rarr; UHJ C-format 4ch | First-order AmbiX (ACN/SN3D) to UHJ C-format (L, R, T, Q) — the "UHJ decoder" that makes an Ambisonic mix audible on two channels. The ±90° quadrature pair is designed live at the host sample rate by the shared `seam_quadrature` engine, and the GUI reads out the resulting coefficients together with the achieved maximum phase error |
+
+### Signal generators
+
+| Plugin | I/O | Description |
+|---|---|---|
+| **LTBURST** | none &rarr; mono | Linkwitz shaped tone-burst: N = 5 cycles of a sine under a Hann window, repeated at a fixed frequency. Frequency, Dwell and Level are the whole interface |
+| **LTGLIDE** | none &rarr; mono | Linkwitz glissando tone-burst: the carrier of each N = 5 grain is latched from a linear or exponential sweep F0 &rarr; F1 spread over a Sweep Time, with grains spaced in step or gap timing. It loops, declares a STONE id, and publishes what it is playing on the calibration bus |
+| **MULTIPINK** | none &rarr; 1..64ch | Multichannel pink noise drawn from a shared 64-slot logical pool, so that separate instances never emit the same stream. Layout-adaptive from mono to 64 channels, RMS-calibrated (-23/-20/-18 dBFS RMS reference, ±6 dB trim), with a POWER switch, a STONE id, and a calibration-bus announcement |
+
+### Measurement and processing
+
+| Plugin | I/O | Description |
+|---|---|---|
+| **STRX** | stereo &rarr; stereo | Stereo M/S Analyser: goniometer, overlaid M/S Welch spectra, and In L / In R / M / S / Width meters, plus a status line fed by the calibration bus. It observes only — the audio is passed through unchanged and there are no automatable parameters |
+| **DSLAR** | mono &rarr; mono | Agostino Di Scipio's LAR homeostatic loop, hand-ported from `LAR.pd`: the feedforward half of a Larsen system whose loop is closed acoustically by the room. Drive, loop delay, decorrelation, target, steepness and control smoothing, with live r (Hann RMS) and g (loop gain) readouts |
+| **DDELAY** | 4ch &rarr; 4ch | Quad Alignment Delay for loudspeaker time-alignment. A distance in metres becomes an integer-sample delay at c = 331.4 m/s, rounded up to the next prime so that several instances stay incommensurable. All four channels share one value |
+| **HILBERT** | mono &rarr; stereo | Wideband Quadrature Transformer: one input becomes an in-phase and a quadrature branch held −90° apart from 20 Hz to 20 kHz. Both outputs are all-pass filtered, since the relationship belongs to the pair rather than to either signal. Two topologies — RBJ biquad cascade and Niemitalo polyphase — are selectable live and redesigned per sample rate by the same `seam_quadrature` engine X2UHJ uses internally |
 
 ### Screenshots
 
-| SDMX | B2Xrot | XYPRrot | BAMODULEX |
+| SDMX | LR2XHGR | X2UHJ | BAMODULEX |
 |:---:|:---:|:---:|:---:|
-| ![SDMX](docs/img/sdmx.png) | ![B2Xrot](docs/img/b2xrot.png) | ![XYPRrot](docs/img/xyprrot.png) | ![BAMODULEX](docs/img/bamodulex.png) |
+| ![SDMX](docs/img/sdmx.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![X2UHJ](docs/img/x2uhj.png) | ![BAMODULEX](docs/img/bamodulex.png) |
 
-| ABMODULEX | M2XHGR | LR2XHGR | DDELAY |
-|:---:|:---:|:---:|:---:|
-| ![ABMODULEX](docs/img/abmodulex.png) | ![M2XHGR](docs/img/m2xhgr.png) | ![LR2XHGR](docs/img/lr2xhgr.png) | ![DDELAY](docs/img/ddelay.png) |
+| LTBURST | DSLAR | STRX |
+|:---:|:---:|:---:|
+| ![LTBURST](docs/img/ltburst.png) | ![DSLAR](docs/img/dslar.png) | ![STRX](docs/img/strx.png) |
 
-| MULTIPINK | X2UHJ |
-|:---:|:---:|
-| ![MULTIPINK](docs/img/multipink.png) | ![X2UHJ](docs/img/x2uhj.png) |
+The remaining windows changed with the UI standard and their screenshots are
+being retaken.
 
 ## Installation
 
@@ -189,17 +213,30 @@ Most Linux DAWs (Ardour, REAPER, Bitwig, Carla) scan `~/.vst3/` automatically.
 ## Design
 
 ### DSP
-Each plugin implements its DSP in a single `processMatrix` or
-`processAudio` template, supporting both 32-bit and 64-bit sample formats.
-The math follows the Faust reference implementations in
-[seam.stereophony.lib](https://github.com/s-e-a-m/faust-libraries) and
-the Gerzon/Blumlein theoretical framework.
+Each plugin implements its DSP in a single `processMatrix`, `processBlock`
+or `processAudio` template, supporting both 32-bit and 64-bit sample formats.
+The math follows the Faust reference implementations in the
+[SEAM Faust libraries](https://github.com/s-e-a-m/faust-libraries) —
+`seam.stereophony.lib`, `seam.ambisonics.lib`, `seam.analyzers.lib`,
+`seam.linkwitz.lib`, `seam.noises.lib`, `seam.discipio.lib` and
+`seam.math.lib`.
+Faust is the specification and readable C++ is the deliverable: every
+processor header opens with a `FAUST REFERENCE` block naming the definition
+it re-implements by hand, so that a student can read the DSP from the source
+in front of them.
+Code shared between plugins lives in `plugins/_common/` — the Haar bank, the
+quadrature designer, the FFT, the rotation matrices, the meters — and the
+peer-aware calibration bus lives in `plugins/_common/calbus/`, compiled once
+into its own dylib because static state does not cross `.vst3` module
+boundaries.
 
 ### GUI
 All plugins share a consistent visual identity:
 
-- **300px wide** single column for passive converters, **460px** two columns
-  for working and calibration plugins; variable height
+- Two formats decided by the control count: **S**, 300 px wide and a single
+  column, up to about five fine controls; **L**, 460 px or wider and two
+  columns, from about six. Height varies with content
+- Zones in a fixed vertical order: HEADER, SETUP, OPS, FINE, FOOTER
 - **Source Code Pro Light** monospace font throughout
 - Dark background (#292c2f), light text
 - Horizontal sliders with center-origin fill (bipolar rotation controls)
@@ -216,11 +253,15 @@ Cross-platform: macOS (Xcode) and Linux (GCC/Clang).
 
 ## Theory
 
-The plugin suite covers the Blumlein &rarr; Gerzon lineage of spatial audio:
+The plugin suite covers the Blumlein &rarr; Gerzon lineage of spatial audio,
+the measurement practice that a loudspeaker array needs, and one work of
+live electronics:
 
 - **Blumlein (1933)**: sum-and-difference matrix for MS stereophony
 - **Gerzon (1973)**: Ambisonics as a generalization of Blumlein's principles
 - **Haar transform**: orthogonal encoding of stereo/mono signals into Ambisonic B-format
+- **Linkwitz (1978, 1980)**: shaped tone-burst testing, the signal LTBURST and LTGLIDE emit
+- **Di Scipio**: the LAR homeostatic feedback system that DSLAR re-implements
 
 ## License
 
