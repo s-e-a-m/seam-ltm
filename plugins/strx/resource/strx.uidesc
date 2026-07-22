@@ -10,7 +10,6 @@
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
         <color name="TextLight" rgba="#fcfbfdff"/>
-        <color name="TextDim" rgba="#888888ff"/>
         <color name="Structure" rgba="#888888ff"/>
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
@@ -25,7 +24,7 @@
         <view class="CTextLabel" origin="0, 14" size="600, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM STRX" transparent="true"/>
         <view class="CTextLabel" origin="0, 42" size="600, 18" font="SubtitleFont"
-              font-color="TextLight" text-alignment="center" title="STEREO M/S Analyser" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Stereo M/S Analyser" transparent="true"/>
 
         <!-- Top row, two columns. Each view splits internally into three bands:
              labels 0-18, plot 18-278, values 278-300. The plot band is 260 px in
