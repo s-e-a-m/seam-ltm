@@ -153,12 +153,12 @@ VSTGUI::CView* PLUGIN_API HilbertProcessor::createCustomView(
     VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes&,
     const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor*) {
     if (name && std::string(name) == "HilbertReadout") {
-        // Match the suite's text scheme: TextDim labels, TextLight data, the
-        // same monospace font as the title block, all resolved from the uidesc.
+        // Match the suite's text scheme: all text is TextLight, in the same
+        // monospace font as the title block, resolved from the uidesc.
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
-        VSTGUI::CColor label = VSTGUI::kGreyCColor, value = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor label = VSTGUI::kWhiteCColor, value = VSTGUI::kWhiteCColor;
         if (description) {
-            description->getColor("TextDim", label);
+            description->getColor("TextLight", label);
             description->getColor("TextLight", value);
         }
         return new Seam::HilbertReadoutView(
@@ -174,7 +174,7 @@ BEGIN_FACTORY_DEF(stringCompanyName, stringCompanyWeb, stringCompanyEmail)
         INLINE_UID_FROM_FUID(Seam::HilbertProcessorUID),
         Steinberg::PClassInfo::kManyInstances,
         kVstAudioEffectClass,
-        "SEAM hilbert",
+        "SEAM HILBERT",
         0,
         "Fx|Tools",
         FULL_VERSION_STR,

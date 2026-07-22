@@ -13,7 +13,7 @@ namespace Seam {
 // Read-only view: prints the live-designed (fc, Q) pairs and the achieved
 // quadrature error for the current sample rate. The label/value colour split
 // and font follow the suite's title/subtitle scheme, resolved from the uidesc
-// (TextDim labels, TextLight data, Source Code Pro Light).
+// (all-white TextLight text, Source Code Pro Light).
 class QuadratureReadoutView : public VSTGUI::CView {
 public:
     QuadratureReadoutView(const VSTGUI::CRect& size, const x2uhj::UHJEncoder* enc,

@@ -9,9 +9,9 @@
 
 #define stringOriginalFilename  "b2xrot.vst3"
 #if SMTG_PLATFORM_64
-#define stringFileDescription   "SEAM B2Xrot – B-format to AmbiX with Rotation (64Bit)"
+#define stringFileDescription   "SEAM B2XROT – B-format to AmbiX with Rotation (64Bit)"
 #else
-#define stringFileDescription   "SEAM B2Xrot – B-format to AmbiX with Rotation"
+#define stringFileDescription   "SEAM B2XROT – B-format to AmbiX with Rotation"
 #endif
 #define stringCompanyWeb        "https://s-e-a-m.github.io"
 #define stringCompanyEmail      "mailto:seam@example.com"

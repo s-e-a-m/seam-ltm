@@ -43,8 +43,8 @@ tresult PLUGIN_API MULTIPINKProcessor::initialize(FUnknown* context) {
         ParameterInfo::kCanAutomate));
 
     parameters.addParameter(new RangeParameter(
-        STR16("Mute"), kParamMute, STR16(""),
-        0.0, 1.0, 0.0, 1,
+        STR16("Power"), kParamPower, STR16(""),
+        0.0, 1.0, 1.0, 1,
         ParameterInfo::kCanAutomate | ParameterInfo::kIsList));
 
     auto* stoneParam = new StringListParameter(
@@ -137,7 +137,7 @@ void MULTIPINKProcessor::publishBusRecord() {
     // claimed and cannot say which one is sounding. Level stays a separate
     // field — reference (-23/-20/-18) plus trim (±6) never reaches silence,
     // so an "audible level" test would need a threshold nobody can justify.
-    r.active  = (claimedStart_ >= 0 && paramMute_.load() == 0) ? 1u : 0u;
+    r.active  = (claimedStart_ >= 0 && paramPower_.load() != 0) ? 1u : 0u;
     r.levelDb = kReferenceLevelsDb[paramReferenceIdx_.load()] + paramTrimDb_.load();
     r.sampleRate = processSetup.sampleRate;
     r.u.pink.slotStart = claimedStart_;
@@ -196,15 +196,30 @@ tresult PLUGIN_API MULTIPINKProcessor::setBusArrangements(
 tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
     if (!state) return kResultFalse;
     IBStreamer s(state, kLittleEndian);
-    int32 refIdx = 0; double trim = 0.0; int32 mute = 0; int32 prefStart = -1;
+    int32 refIdx = 0; double trim = 0.0; int32 power = 0; int32 prefStart = -1;
     if (!s.readInt32(refIdx))    return kResultFalse;
     if (!s.readDouble(trim))     return kResultFalse;
-    if (!s.readInt32(mute))      return kResultFalse;
+    if (!s.readInt32(power))     return kResultFalse;
     if (!s.readInt32(prefStart)) return kResultFalse;
 
     paramReferenceIdx_.store(std::clamp<int>(refIdx, 0, kReferenceStepCount - 1));
     paramTrimDb_.store(std::clamp(trim, -6.0, 6.0));
-    paramMute_.store(mute ? 1 : 0);
+    // Third field is POWER (1 = sounding). It held MUTE, with the
+    // opposite meaning, until the 2026-07 UI revision. A session
+    // saved MUTED therefore re-opens SOUNDING -- pink noise at the
+    // calibration reference, on load. A session saved active
+    // re-opens silent. Re-make any preset from before that date.
+    //
+    // Host automation inverts with it, and nothing on the wire says
+    // so: kParamPower is tag 102, the number MUTE used, so an
+    // envelope drawn against MUTE now drives POWER and asks for the
+    // opposite state at every point on the curve. The tag was kept
+    // deliberately -- renumbering would have made the old envelope
+    // vanish instead of invert, which is quieter but no safer, since
+    // a silent generator is discovered at the next calibration pass
+    // and a loud one is discovered by the loudspeaker. Re-draw the
+    // envelope along with the presets.
+    paramPower_.store(power ? 1 : 0);
     preferredStart_ = (prefStart >= -1 && prefStart < kPoolSize) ? prefStart : -1;
 
     // stoneId is read last and tolerates absence: presets saved before this
@@ -223,8 +238,8 @@ tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
         p->setNormalized((double)paramReferenceIdx_.load() / (kReferenceStepCount - 1));
     if (auto* p = parameters.getParameter(kParamTrim))
         p->setNormalized((paramTrimDb_.load() + 6.0) / 12.0);
-    if (auto* p = parameters.getParameter(kParamMute))
-        p->setNormalized(paramMute_.load() ? 1.0 : 0.0);
+    if (auto* p = parameters.getParameter(kParamPower))
+        p->setNormalized(paramPower_.load() ? 1.0 : 0.0);
     if (auto* p = parameters.getParameter(kParamStoneId))
         p->setNormalized((double)paramStoneId_.load() / (kStoneIdStepCount - 1));
 
@@ -236,11 +251,11 @@ tresult PLUGIN_API MULTIPINKProcessor::getState(IBStream* state) {
     IBStreamer s(state, kLittleEndian);
     int32 refIdx = paramReferenceIdx_.load();
     double trim  = paramTrimDb_.load();
-    int32 mute   = paramMute_.load();
+    int32 power  = paramPower_.load();
     int32 prefStart = claimedStart_;
     if (!s.writeInt32(refIdx))     return kResultFalse;
     if (!s.writeDouble(trim))      return kResultFalse;
-    if (!s.writeInt32(mute))       return kResultFalse;
+    if (!s.writeInt32(power))      return kResultFalse;
     if (!s.writeInt32(prefStart))  return kResultFalse;
     if (!s.writeInt32(paramStoneId_.load())) return kResultFalse;
     return kResultOk;
@@ -287,7 +302,7 @@ void MULTIPINKProcessor::resetPinkFilters() {
     }
 }
 double MULTIPINKProcessor::computeGainLin() const {
-    if (paramMute_.load()) return 0.0;
+    if (!paramPower_.load()) return 0.0;
     if (poolStatus_.load() == (int)PoolStatus::Exhausted) return 0.0;
     int idx = paramReferenceIdx_.load();
     if (idx < 0) idx = 0;
@@ -320,8 +335,8 @@ void MULTIPINKProcessor::readParameterChanges(ProcessData& data) {
             case kParamTrim:
                 paramTrimDb_.store(v * 12.0 - 6.0);
                 break;
-            case kParamMute:
-                paramMute_.store(v >= 0.5 ? 1 : 0);
+            case kParamPower:
+                paramPower_.store(v >= 0.5 ? 1 : 0);
                 break;
             case kParamStoneId: {
                 int idx = (int)(v * (kStoneIdStepCount - 1) + 0.5);

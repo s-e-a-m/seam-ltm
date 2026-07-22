@@ -15,7 +15,7 @@ namespace Seam {
 // to the active topology — RBJ shows the (f, Q) sections of each branch,
 // polyphase shows the per-path `a` coefficients. The label/value colour split
 // and font follow the suite's title/subtitle scheme, resolved from the uidesc
-// (TextDim labels, TextLight data, Source Code Pro Light).
+// (all-white TextLight text, Source Code Pro Light).
 class HilbertReadoutView : public VSTGUI::CView {
 public:
     HilbertReadoutView(const VSTGUI::CRect& size, const hilbert::HilbertTransformer* dsp,

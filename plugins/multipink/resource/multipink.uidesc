@@ -5,90 +5,114 @@
         <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
         <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
         <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
-        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="12"/>
     </fonts>
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
         <color name="TextLight" rgba="#fcfbfdff"/>
-        <color name="TextDim" rgba="#888888ff"/>
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="Structure" rgba="#888888ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 450"
-              minSize="300, 450" maxSize="300, 450"
+    <!-- S format: 300 px wide, one column at x=20 of width 260.
+         Four controls do not fill two columns — a STONE selector, a POWER
+         switch, a reference menu and a trim slider read as an empty grid at
+         460 px — so multipink is S on its control count, and the type scale
+         is the one the other 300 px windows use (KnobLabel 13, Value 12,
+         Info 12). The zone order is the standard's: HEADER, SETUP, OPS,
+         FINE, FOOTER. -->
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 440"
+              minSize="300, 440" maxSize="300, 440"
               background-color="BgDark" background-color-draw-style="filled">
 
-        <!-- Title -->
+        <!-- ── HEADER ─────────────────────────────────────────────────── -->
         <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM MULTIPINK" transparent="true"/>
         <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
-              font-color="TextDim" text-alignment="center" title="Multichannel Pink Noise" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Multichannel Pink Noise" transparent="true"/>
         <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
-              font-color="TextDim" text-alignment="center"
-              title="64-slot shared pool · RMS-calibrated" transparent="true"/>
+              font-color="TextLight" text-alignment="center"
+              title="64-slot shared pool &#xB7; RMS-calibrated" transparent="true"/>
 
-        <!-- Reference (3-step list) -->
-        <view class="CTextLabel" origin="20, 100" size="260, 16" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Reference (dBFS RMS)" transparent="true"/>
-        <view class="COptionMenu" origin="80, 120" size="140, 20" control-tag="Reference"
+        <!-- ── SETUP ──────────────────────────────────────────────────────
+             STONE identity for the calibration bus. Declared by hand, never
+             inferred from the pool slot: with four STONEs in the room, an
+             instance that guesses is an instance that calibrates the wrong
+             power amp. Default "?" = undeclared, which strx renders "STONE ?".
+             It sits above OPS because identity is set once, before working. -->
+        <view class="CTextLabel" origin="0, 96" size="300, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="&#x2014; STONE &#x2014;" transparent="true"/>
+        <view class="COptionMenu" origin="80, 114" size="140, 20" control-tag="StoneId"
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
-        <!-- Trim slider -->
-        <view class="CTextLabel" origin="20, 154" size="260, 16" font="KnobLabelFont"
+        <!-- ── OPS ───────────────────────────────────────────────────────
+             POWER on means sounding, as everywhere in the suite. The box
+             draws its ink at the view's left edge (1 px in, side 10 px) and
+             the caption is a separate label, so the pair is centred on what
+             it draws: ink runs 122..178 in a 300 px window, centred on 150. -->
+        <view class="CCheckBox" origin="121, 148" size="14, 14" control-tag="Power"
+              boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
+              title="" transparent="true"/>
+        <view class="CTextLabel" origin="139, 146" size="52, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="POWER" transparent="true"/>
+
+        <!-- ── FINE ───────────────────────────────────────────────────────
+             One column, so each control carries its own label and there are
+             no column dividers to name a group of one. A menu block is label
+             14 / menu 20 on a 42 px stride; a slider block is label 14 /
+             slider 18 / value 16. -->
+        <view class="CTextLabel" origin="20, 170" size="260, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Reference (dBFS RMS)" transparent="true"/>
+        <view class="COptionMenu" origin="80, 186" size="140, 20" control-tag="Reference"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <view class="CTextLabel" origin="20, 212" size="260, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Trim (dB)" transparent="true"/>
-        <view class="CSlider" origin="20, 174" size="260, 20" control-tag="Trim" default-value="0.5"
+        <view class="CSlider" origin="20, 228" size="260, 18" control-tag="Trim" default-value="0.5"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="20, 196" size="260, 18" font="ValueFont" control-tag="Trim"
-              font-color="TextLight" text-alignment="center" transparent="true" value-precision="2" style-no-frame="true"/>
+        <view class="CTextEdit" origin="20, 248" size="260, 16" font="ValueFont" control-tag="Trim"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="2" style-no-frame="true"/>
 
-        <!-- Mute -->
-        <view class="CCheckBox" origin="100, 222" size="100, 20" control-tag="Mute"
-              title="MUTE" font="ValueFont" font-color="TextLight"
-              boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
-              frame-width="1" transparent="true" autosize-to-fit="false"/>
-
-        <!-- STONE identity for the calibration bus. Declared by hand, never
-             inferred from the pool slot: with four STONEs in the room, an
-             instance that guesses is an instance that calibrates the wrong
-             power amp. Default "?" = undeclared, which strx renders "STONE ?". -->
-        <view class="CTextLabel" origin="20, 252" size="260, 16" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="STONE" transparent="true"/>
-        <view class="COptionMenu" origin="80, 272" size="140, 20" control-tag="StoneId"
-              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
-              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
-
-        <!-- Slot badge -->
-        <view class="CTextLabel" origin="20, 302" size="60, 16" font="InfoFont"
-              font-color="TextDim" text-alignment="left" title="Slot:" transparent="true"/>
-        <view class="CParamDisplay" origin="55, 302" size="40, 16" control-tag="SlotStart"
+        <!-- ── FOOTER — runtime feedback, then the logo ─────────────────
+             Slot, pool occupancy and status are what the plugin reports back;
+             they are FOOTER content and never SETUP. At InfoFont 12 a
+             monospace character is 7.2 px wide, so the widest line each
+             readout can draw fits the 260 px column: "Slot: 63 N: 64" and a
+             right-aligned "of 64 pool" (72 px) on the first row, and
+             "OK (preferred)" (14 characters, 100.8 px) inside the 200 px
+             status field on the second. -->
+        <view class="CTextLabel" origin="20, 284" size="40, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="Slot:" transparent="true"/>
+        <view class="CParamDisplay" origin="62, 284" size="30, 16" control-tag="SlotStart"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
-        <view class="CTextLabel" origin="100, 302" size="60, 16" font="InfoFont"
-              font-color="TextDim" text-alignment="left" title="N:" transparent="true"/>
-        <view class="CParamDisplay" origin="120, 302" size="40, 16" control-tag="SlotCount"
+        <view class="CTextLabel" origin="96, 284" size="20, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="N:" transparent="true"/>
+        <view class="CParamDisplay" origin="118, 284" size="30, 16" control-tag="SlotCount"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
-        <view class="CTextLabel" origin="170, 302" size="110, 16" font="InfoFont"
-              font-color="TextDim" text-alignment="right" title="of 64 pool" transparent="true"/>
+        <view class="CTextLabel" origin="160, 284" size="120, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="right" title="of 64 pool" transparent="true"/>
 
-        <!-- Pool Status -->
-        <view class="CTextLabel" origin="20, 322" size="60, 16" font="InfoFont"
-              font-color="TextDim" text-alignment="left" title="Status:" transparent="true"/>
-        <view class="CParamDisplay" origin="80, 322" size="200, 16" control-tag="PoolStatus"
+        <view class="CTextLabel" origin="20, 304" size="56, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="Status:" transparent="true"/>
+        <view class="CParamDisplay" origin="80, 304" size="200, 16" control-tag="PoolStatus"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
 
-        <!-- Logo at bottom (native aspect 240x77) -->
-        <view class="CView" origin="30, 345" size="240, 77" bitmap="logo"/>
+        <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
+        <view class="CView" origin="30, 340" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
     <control-tags>
         <control-tag name="Reference"  tag="100"/>
         <control-tag name="Trim"       tag="101"/>
-        <control-tag name="Mute"       tag="102"/>
+        <control-tag name="Power"      tag="102"/>
         <control-tag name="StoneId"    tag="103"/>
         <control-tag name="SlotStart"  tag="200"/>
         <control-tag name="SlotCount"  tag="201"/>

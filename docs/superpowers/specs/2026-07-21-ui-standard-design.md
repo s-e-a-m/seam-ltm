@@ -1,7 +1,7 @@
 # SEAM LTM UI Standard — Design
 
 Date: 2026-07-21
-Status: approved (brainstorm with GS)
+Status: implemented (2026-07-22, plan docs/superpowers/plans/2026-07-22-ui-standard.md)
 
 ## Problem
 
@@ -26,13 +26,18 @@ Zones appear in this vertical order; an absent zone is simply omitted.
 ```
 HEADER   title, subtitle, tagline
 SETUP    user-entered station identity (STONE id; later: room coordinates)
-OPS      operational buttons (POWER, RESET, LOOP, SHOT, MUTE)
+OPS      operational buttons (POWER, RESET, LOOP)
 FINE     fine controls (sliders, menus), two columns in L format
 FOOTER   runtime readouts, status line, logo
 ```
 
 SETUP precedes OPS: identity is set once before working.
 Runtime feedback (slot/pool status, meters) is FOOTER content, never SETUP.
+The OPS list read "POWER, RESET, LOOP, SHOT, MUTE" when this spec was
+written; SHOT had already been removed from ltglide in f8fb76e, and MUTE
+became POWER under this work (see "Out of scope"), so the vocabulary that
+landed — and that `doc/style/ui-style.md` now carries — is the three words
+above.
 
 ### Typography and casing
 
@@ -69,12 +74,13 @@ The split is also semantic: working/calibration plugins (dslar, ltglide, multipi
 
 ### Tier 2 — restructure
 
-**ltglide** — 300×800 vertical → L format, ~460×480.
+**ltglide** — 300×800 vertical → L format, ~460×480 (built: 460×510 — see "Verification" below).
 HEADER → SETUP (`— STONE —`, StoneId menu) → OPS (LOOP and SHOT side by side) → FINE two columns: `— SWEEP —` (F0, F1, Sweep, Sweep Time) | `— TIMING —` (Timing, Delta, Level) → FOOTER (logo).
-The editor size constant in C++ and the SHOT custom-view position change with it.
+No editor size constant exists in C++ — geometry lives entirely in the .uidesc, and SHOT was removed in f8fb76e.
+The restructure is a pure XML edit.
 
-**multipink** — 300×450 vertical → L format, ~460×360.
-HEADER → SETUP (`— STONE —`, StoneId menu) → OPS (MUTE) → FINE two columns: Reference | Trim → FOOTER (Slot/N/pool/Status line, logo).
+**multipink** — 300×450 vertical → L format, ~460×360 (built: 460×390 — see "Verification" below).
+HEADER → SETUP (`— STONE —`, StoneId menu) → OPS (POWER) → FINE two columns: Reference | Trim → FOOTER (Slot/N/pool/Status line, logo).
 
 **dslar** — already structurally conformant (Power/Reset on top, two columns); Tier 1 only.
 
@@ -96,6 +102,8 @@ HEADER → SETUP (`— STONE —`, StoneId menu) → OPS (MUTE) → FINE two col
 - Lint green on all 15 plugins.
 - Affected plugins build (`-G Xcode`, `-DSEAM_VST3SDK_DIR=...`).
 - GS visual check in Reaper for the two restructured plugins (ltglide, multipink).
+- Final built window sizes: `multipink` 460×390 (spec estimated ~460×360), `ltglide` 460×510 (spec estimated ~460×480).
+The extra height in both cases is what the 77 px logo and the standard's 58 px column stride actually need.
 
 ## Sequencing
 
@@ -107,4 +115,6 @@ New strx controls added meanwhile (zoom selector, pass counter) are born conform
 
 - strx cross-loop accumulation and goniometer zoom (separate briefs).
 - Any DSP or parameter change; this spec touches presentation only.
+One exception was carried out under this work: `multipink`'s MUTE became POWER, with its polarity inverted and a clean break in the state format.
+That rename follows the OPS-vocabulary decision (2026-07-21), which post-dates this spec and takes precedence over the blanket exclusion above.
 - The shared web "docstyle" (postponed, see memory project_web_docs_strategy); `doc/style/ui-style.md` may later feed it.

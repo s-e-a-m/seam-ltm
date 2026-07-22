@@ -52,6 +52,16 @@ plugins/<name>/
 Add complementary `.cpp/.h` pairs only when a real concern justifies it
 (e.g., shared static state across instances). Do not split prematurely.
 
+The GUI is not free-form: `doc/style/ui-style.md` is the suite's window
+standard (zone order HEADER → SETUP → OPS → FINE → FOOTER, the S and L
+formats, the palette, the operational vocabulary POWER/RESET/LOOP).
+Start a new window by copying `plugins/_template/resource/_template.uidesc`,
+which traces all five zones and lints clean as it stands.
+`tools/check-uidesc.py` enforces the machine-checkable part of the standard
+and runs as a ctest, so a drifting `.uidesc` — or a `TextDim` in a
+plugin's C++ — fails the build's test suite rather than the next reader's
+eye.
+
 ## Build
 
 CMake at the repo root. Each plugin is registered with

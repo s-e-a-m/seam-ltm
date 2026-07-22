@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25.0)
 
 project(seam-b2xrot
     VERSION     ${CMAKE_PROJECT_VERSION}
-    DESCRIPTION "SEAM B2Xrot – B-format to AmbiX with Rotation"
+    DESCRIPTION "SEAM B2XROT – B-format to AmbiX with Rotation"
 )
 
 set(b2xrot_sources

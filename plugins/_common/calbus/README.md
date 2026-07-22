@@ -416,18 +416,20 @@ still waiting on a human at a real host. Do this before considering calbus
 In Reaper:
 
 1. Load four `multipink` instances, set their STONE parameters to 1, 2, 3,
-   4, and mute all four.
+   4, and turn POWER off on all four.
 2. Load `strx` on the measurement track. Expect: `calbus: 4 idle, none
    sounding`.
-3. Un-mute the `multipink` on STONE 2. Expect:
+3. Turn POWER on for the `multipink` on STONE 2. Expect:
    `multipink · STONE 2 · slot 4-7 · -23.0 dB` (slot numbers follow the
    actual pool claim).
-4. Mute it, un-mute STONE 3. Expect the line to name STONE 3.
-5. Without muting STONE 3, also un-mute STONE 2 (the operator-error case: two
-   STONEs left sounding at once). Expect the line to still name one emitter
-   but append a count, e.g. `... · +1 more` — this is the diagnostic that
-   catches "un-muted the wrong one, forgot to mute the last one" in the
-   room. Mute one of the two again before continuing.
+4. Turn its POWER off, turn STONE 3's POWER on. Expect the line to name
+   STONE 3.
+5. Without turning STONE 3's POWER off, also turn STONE 2's POWER on (the
+   operator-error case: two STONEs left sounding at once). Expect the line
+   to still name one emitter but append a count, e.g. `... · +1 more` —
+   this is the diagnostic that catches "turned on the wrong one, forgot to
+   turn off the last one" in the room. Turn one of the two back off before
+   continuing.
 6. Remove the multipinks, load `ltglide` with STONE = 2 and Loop on, then
    press play in the host. Sounding follows the host transport (play =
    sound, stop = silent, since 219fa9e) — Loop on alone does not make

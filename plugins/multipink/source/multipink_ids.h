@@ -13,7 +13,7 @@ static const Steinberg::FUID MULTIPINKProcessorUID(
 enum MULTIPINKParams : Steinberg::Vst::ParamID {
     kParamReference   = 100,   // 0=-23, 1=-20, 2=-18 dBFS RMS  (stepped)
     kParamTrim        = 101,   // -6.0 … +6.0 dB                (continuous)
-    kParamMute        = 102,   // 0 / 1                         (bool)
+    kParamPower       = 102,   // 0 = silent / 1 = sounding      (bool)
     kParamStoneId     = 103,   // 0=undeclared, 1..8            (stepped)
     // Read-only display parameters, pushed from the audio thread:
     kParamSlotStart   = 200,   // -1..63 (sentinel -1 = unclaimed)

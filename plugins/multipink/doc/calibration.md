@@ -42,7 +42,7 @@ is what matters, so we calibrate against `sox`.
 ## Re-verifying
 
 1. Add `multipink` to a stereo track in Reaper.
-2. Set `Reference = -23 dBFS RMS`, `Trim = 0.0`, `Mute = off`.
+2. Set `Reference = -23 dBFS RMS`, `Trim = 0.0`, `Power = on`.
 3. Render 30 s at 48 kHz, 32-bit float WAV, stereo, to `multipink_cal.wav`.
 4. Measure RMS:
    ```

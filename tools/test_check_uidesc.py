@@ -1,0 +1,769 @@
+#!/usr/bin/env python3
+"""Unit tests for check-uidesc.py, driven by inline fixture XML."""
+import contextlib
+import importlib.util
+import io
+import os
+import shutil
+import tempfile
+import unittest
+import unittest.mock
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_spec = importlib.util.spec_from_file_location(
+    "check_uidesc", os.path.join(_HERE, "check-uidesc.py"))
+check_uidesc = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(check_uidesc)
+
+
+def fixture(body, colors='<color name="TextLight" rgba="#fcfbfdff"/>'):
+    """Wrap a template body in a minimal but complete uidesc document."""
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<vstgui-ui-description version="1">\n'
+        '  <fonts><font font-name="Source Code Pro Light" name="TitleFont" size="20"/></fonts>\n'
+        f'  <colors>{colors}</colors>\n'
+        '  <template name="view" class="CViewContainer" origin="0, 0" size="300, 200">\n'
+        f'{body}\n'
+        '  </template>\n'
+        '</vstgui-ui-description>\n')
+
+
+TITLE_OK = ('    <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"'
+            ' font-color="TextLight" title="SEAM DEMO" transparent="true"/>')
+
+
+class TestParse(unittest.TestCase):
+    def _write(self, text):
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix=".uidesc")
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        self.addCleanup(os.unlink, path)
+        return path
+
+    def test_valid_xml_parses(self):
+        root, errors = check_uidesc.parse_uidesc(self._write(fixture(TITLE_OK)))
+        self.assertIsNotNone(root)
+        self.assertEqual(errors, [])
+
+    def test_double_dash_in_comment_is_an_error(self):
+        # The exact shape that shipped an empty editor on 2026-07-21.
+        body = TITLE_OK + '\n    <!-- a comment -- with a double dash -->'
+        root, errors = check_uidesc.parse_uidesc(self._write(fixture(body)))
+        self.assertIsNone(root)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("malformed XML", errors[0])
+
+    def test_unclosed_tag_is_an_error(self):
+        broken = fixture(TITLE_OK).replace("</template>", "")
+        root, errors = check_uidesc.parse_uidesc(self._write(broken))
+        self.assertIsNone(root)
+        self.assertIn("malformed XML", errors[0])
+
+
+class TestTitle(unittest.TestCase):
+    def _root(self, text):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(text)
+
+    def test_matching_title_passes(self):
+        root = self._root(fixture(TITLE_OK))
+        self.assertEqual(check_uidesc.check_title(root, "demo", "p.uidesc"), [])
+
+    def test_lowercase_title_fails(self):
+        body = TITLE_OK.replace("SEAM DEMO", "SEAM Demo")
+        root = self._root(fixture(body))
+        errors = check_uidesc.check_title(root, "demo", "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("SEAM DEMO", errors[0])
+
+    def test_missing_title_label_fails(self):
+        root = self._root(fixture("    <!-- no title label -->"))
+        errors = check_uidesc.check_title(root, "demo", "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("no TitleFont label", errors[0])
+
+    def test_duplicate_title_label_fails(self):
+        second = TITLE_OK.replace("SEAM DEMO", "SEAM OTHER")
+        body = TITLE_OK + "\n" + second
+        root = self._root(fixture(body))
+        errors = check_uidesc.check_title(root, "demo", "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("2 TitleFont labels", errors[0])
+        self.assertIn("'SEAM DEMO'", errors[0])
+        self.assertIn("'SEAM OTHER'", errors[0])
+
+
+class TestCheckFile(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir)
+        # The filename ("anything.uidesc") is deliberately not "demo" —
+        # check_file must derive the plugin name from the *directory* two
+        # levels up ("demo"), not from the file itself.
+        resource_dir = os.path.join(tmpdir, "plugins", "demo", "resource")
+        os.makedirs(resource_dir)
+        self.path = os.path.join(resource_dir, "anything.uidesc")
+
+    def _write(self, text):
+        with open(self.path, "w") as f:
+            f.write(text)
+        return self.path
+
+    def test_plugin_name_comes_from_directory_matching_title_passes(self):
+        path = self._write(fixture(TITLE_OK))
+        self.assertEqual(check_uidesc.check_file(path), [])
+
+    def test_plugin_name_comes_from_directory_not_filename_fails(self):
+        # If check_file used the filename ("anything") instead of the
+        # directory ("demo"), this title would wrongly pass.
+        body = TITLE_OK.replace("SEAM DEMO", "SEAM ANYTHING")
+        path = self._write(fixture(body))
+        errors = check_uidesc.check_file(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("SEAM DEMO", errors[0])
+
+    def test_malformed_document_reports_only_parse_error(self):
+        body = TITLE_OK + '\n    <!-- a comment -- with a double dash -->'
+        path = self._write(fixture(body))
+        errors = check_uidesc.check_file(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("malformed XML", errors[0])
+
+
+class TestPalette(unittest.TestCase):
+    def _root(self, colors):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(TITLE_OK, colors=colors))
+
+    def test_canonical_palette_passes(self):
+        root = self._root(
+            '<color name="BgDark" rgba="#292c2fff"/>'
+            '<color name="TextLight" rgba="#fcfbfdff"/>'
+            '<color name="SliderTrack" rgba="#444444ff"/>'
+            '<color name="SliderActive" rgba="#4a9ec8ff"/>')
+        self.assertEqual(check_uidesc.check_palette(root, "p.uidesc"), [])
+
+    def test_allowed_accent_passes(self):
+        root = self._root('<color name="TextLight" rgba="#fcfbfdff"/>'
+                          '<color name="MeterFill" rgba="#c8a24aff"/>')
+        self.assertEqual(check_uidesc.check_palette(root, "p.uidesc"), [])
+
+    def test_wrong_rgba_for_known_name_fails(self):
+        root = self._root('<color name="TextLight" rgba="#ffffffff"/>')
+        errors = check_uidesc.check_palette(root, "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("#fcfbfdff", errors[0])
+
+    def test_unknown_color_name_fails(self):
+        root = self._root('<color name="TextLight" rgba="#fcfbfdff"/>'
+                          '<color name="HotPink" rgba="#ff69b4ff"/>')
+        errors = check_uidesc.check_palette(root, "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("HotPink", errors[0])
+
+
+class TestNoTextDim(unittest.TestCase):
+    def _root(self, body, colors='<color name="TextLight" rgba="#fcfbfdff"/>'):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(body, colors=colors))
+
+    def test_clean_file_passes(self):
+        self.assertEqual(
+            check_uidesc.check_no_textdim(self._root(TITLE_OK), "p.uidesc"), [])
+
+    def test_definition_alone_fails(self):
+        root = self._root(TITLE_OK,
+                          colors='<color name="TextLight" rgba="#fcfbfdff"/>'
+                                 '<color name="TextDim" rgba="#888888ff"/>')
+        errors = check_uidesc.check_no_textdim(root, "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("definition", errors[0])
+
+    def test_usage_as_boxframe_fails(self):
+        body = TITLE_OK + ('\n    <view class="CCheckBox" origin="0, 40" size="80, 20"'
+                           ' title="LOOP" font-color="TextLight"'
+                           ' boxframe-color="TextDim"/>')
+        errors = check_uidesc.check_no_textdim(self._root(body), "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("boxframe-color", errors[0])
+
+
+class TestFontColors(unittest.TestCase):
+    def _root(self, body):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(body))
+
+    def test_textlight_passes(self):
+        self.assertEqual(
+            check_uidesc.check_font_colors(self._root(TITLE_OK), "p.uidesc"), [])
+
+    def test_missing_font_color_fails(self):
+        body = ('    <view class="CTextLabel" origin="0, 18" size="300, 26"'
+                ' font="TitleFont" title="SEAM DEMO"/>')
+        errors = check_uidesc.check_font_colors(self._root(body), "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("declares no font-color", errors[0])
+
+    def test_accent_on_text_fails(self):
+        body = TITLE_OK + ('\n    <view class="CTextLabel" origin="0, 60" size="300, 14"'
+                           ' font="TitleFont" font-color="Structure" title="x"/>')
+        errors = check_uidesc.check_font_colors(self._root(body), "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertIn("Structure", errors[0])
+
+    def test_untitled_checkbox_is_exempt(self):
+        # dslar's Power box draws no text of its own — its caption is a
+        # separate CTextLabel — so it has no font-color to declare.
+        body = TITLE_OK + ('\n    <view class="CCheckBox" origin="93, 88" size="14, 14"'
+                           ' control-tag="Power" title=""/>')
+        self.assertEqual(
+            check_uidesc.check_font_colors(self._root(body), "p.uidesc"), [])
+
+
+class TestZoneOrder(unittest.TestCase):
+    def _root(self, body):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(body))
+
+    SETUP = ('    <view class="COptionMenu" origin="160, 106" size="140, 20"'
+             ' control-tag="StoneId" font-color="TextLight"/>')
+    OPS = ('    <view class="CCheckBox" origin="180, 140" size="100, 20"'
+           ' control-tag="Power" title="POWER" font-color="TextLight"/>')
+    FINE = ('    <view class="CSlider" origin="30, 228" size="180, 18"'
+            ' control-tag="Trim"/>')
+
+    def test_correct_order_passes(self):
+        body = "\n".join([TITLE_OK, self.SETUP, self.OPS, self.FINE])
+        self.assertEqual(check_uidesc.check_zone_order(self._root(body), "p.uidesc"), [])
+
+    def test_setup_below_ops_warns(self):
+        setup_low = self.SETUP.replace('origin="160, 106"', 'origin="160, 252"')
+        body = "\n".join([TITLE_OK, setup_low, self.OPS, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("SETUP", messages[0])
+
+    def test_ops_below_fine_warns(self):
+        ops_low = self.OPS.replace('origin="180, 140"', 'origin="180, 606"')
+        body = "\n".join([TITLE_OK, self.SETUP, ops_low, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("OPS", messages[0])
+
+    def test_both_violations_warn_without_a_third_overlapping_message(self):
+        # SETUP below OPS *and* OPS below FINE together also mean SETUP is
+        # below FINE, but that's implied by the two messages already
+        # emitted — a third complaint about the same layout would be noise.
+        setup_low = self.SETUP.replace('origin="160, 106"', 'origin="160, 606"')
+        ops_low = self.OPS.replace('origin="180, 140"', 'origin="180, 300"')
+        body = "\n".join([TITLE_OK, setup_low, ops_low, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 2)
+
+    def test_setup_below_fine_warns_when_ops_is_absent(self):
+        # No OPS zone at all (e.g. a passive converter that still declares
+        # a STONE identity): the SETUP-vs-OPS and OPS-vs-FINE comparisons
+        # both go silent since ops_y is None, so this is the only check
+        # that can catch SETUP sitting below the fine controls.
+        setup_low = self.SETUP.replace('origin="160, 106"', 'origin="160, 252"')
+        body = "\n".join([TITLE_OK, setup_low, self.FINE])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("SETUP", messages[0])
+        self.assertIn("fine control", messages[0])
+
+    def test_setup_above_fine_with_no_ops_passes(self):
+        body = "\n".join([TITLE_OK, self.SETUP, self.FINE])
+        self.assertEqual(check_uidesc.check_zone_order(self._root(body), "p.uidesc"), [])
+
+    def test_untitled_checkbox_with_ops_control_tag_is_recognised(self):
+        # The actual bug shape (dslar, plugins/_template): POWER is an
+        # untitled CCheckBox (title="") carrying control-tag="Power", with
+        # its caption drawn by a separate CTextLabel next to it. The OPS
+        # fixture above carries a control-tag *and* an all-caps title at
+        # once, so it cannot isolate the control-tag branch of
+        # _is_ops_view from the title branch — a title-only predicate
+        # already matches it. Here the checkbox has no title of its own,
+        # so only the control-tag branch can find it, and it sits below
+        # the first CSlider so a correct implementation must warn.
+        ops_untitled = ('    <view class="CCheckBox" origin="93, 260" size="14, 14"'
+                        ' control-tag="Power" title=""/>')
+        caption = ('    <view class="CTextLabel" origin="30, 260" size="60, 14"'
+                   ' font-color="TextLight" title="POWER"/>')
+        body = "\n".join([TITLE_OK, self.SETUP, self.FINE, ops_untitled, caption])
+        messages = check_uidesc.check_zone_order(self._root(body), "p.uidesc")
+        self.assertEqual(len(messages), 1)
+        self.assertIn("WARN", messages[0])
+        self.assertIn("OPS", messages[0])
+
+
+class TestSourceColors(unittest.TestCase):
+    """The C++ sweep: text drawn from source names its colours in C++, where
+    no .uidesc rule can see them, and that is where the greys came back."""
+
+    def setUp(self):
+        self.plugins = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.plugins)
+
+    def _source(self, name, text, plugin="demo"):
+        directory = os.path.join(self.plugins, plugin, "source")
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, name)
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+
+    def test_conforming_source_passes(self):
+        self._source("demo_processor.cpp",
+                     'description->getColor("TextLight", text);\n')
+        self.assertEqual(check_uidesc.check_source_colors(self.plugins), [])
+
+    def test_getcolor_call_fails(self):
+        # hilbert and x2uhj shipped exactly this line until this branch.
+        self._source("demo_processor.cpp",
+                     'void draw() {\n'
+                     '    description->getColor("TextDim", label);\n'
+                     '}\n')
+        messages = check_uidesc.check_source_colors(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("line 2", messages[0])
+        self.assertIn("demo_processor.cpp", messages[0])
+
+    def test_comment_naming_the_removed_colour_fails(self):
+        # Two view headers carried a comment about the TextDim tier long
+        # after the colour itself was gone; the name is what is banned.
+        self._source("demo_view.h", '// label drawn in TextDim\n')
+        messages = check_uidesc.check_source_colors(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("line 1", messages[0])
+
+    def test_only_h_and_cpp_are_read(self):
+        self._source("notes.txt", 'TextDim\n')
+        self.assertEqual(check_uidesc.check_source_colors(self.plugins), [])
+
+    def test_every_occurrence_is_reported_across_plugins(self):
+        self._source("a_processor.cpp", 'TextDim\nTextLight\nTextDim\n',
+                     plugin="alpha")
+        self._source("b_view.h", 'TextDim\n', plugin="beta")
+        messages = check_uidesc.check_source_colors(self.plugins)
+        self.assertEqual(len(messages), 3)
+
+    def test_the_real_suite_is_clean(self):
+        plugins = os.path.join(os.path.dirname(_HERE), "plugins")
+        self.assertEqual(check_uidesc.check_source_colors(plugins), [])
+
+
+class TestFactoryNames(unittest.TestCase):
+    """The name the host draws, which lives in C++ and not in the XML.
+
+    check_title reads the label inside the window; this rule reads the string
+    registered with the VST3 factory, which is what Reaper prints in its title
+    bar. Three plugins shipped with the two disagreeing."""
+
+    # The two DEF_CLASS2 layouts actually used in the suite: the compact one
+    # (ltburst, multipink, strx, dslar, ltglide) and the one-argument-per-line
+    # one (b2xrot, ddelay, sdmx and the other converters).
+    COMPACT = ('BEGIN_FACTORY_DEF(a, b, c)\n'
+               '    DEF_CLASS2(INLINE_UID_FROM_FUID(Seam::DemoProcessorUID),\n'
+               '               PClassInfo::kManyInstances, kVstAudioEffectClass,\n'
+               '               "SEAM DEMO", Vst::kDistributable,\n'
+               '               "Fx|Tools", FULL_VERSION_STR, kVstVersionString,\n'
+               '               Seam::DemoProcessor::createInstance)\n'
+               'END_FACTORY\n')
+    SPREAD = ('BEGIN_FACTORY_DEF (a, b, c)\n'
+              '    DEF_CLASS2 (\n'
+              '        INLINE_UID_FROM_FUID (Seam::DemoProcessorUID),\n'
+              '        PClassInfo::kManyInstances,\n'
+              '        kVstAudioEffectClass,\n'
+              '        "SEAM DEMO",\n'
+              '        0,\n'
+              '        "Fx|Spatial",\n'
+              '        FULL_VERSION_STR,\n'
+              '        kVstVersionString,\n'
+              '        Seam::DemoProcessor::createInstance)\n'
+              'END_FACTORY\n')
+
+    def setUp(self):
+        self.plugins = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.plugins)
+
+    def _source(self, text, name="demo_processor.cpp", plugin="demo"):
+        directory = os.path.join(self.plugins, plugin, "source")
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, name)
+        with open(path, "w") as f:
+            f.write(text)
+        return path
+
+    def test_compact_layout_matching_name_passes(self):
+        self._source(self.COMPACT)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_spread_layout_matching_name_passes(self):
+        # Same registration, one argument per line: the rule reads the macro's
+        # argument list, not a line of text.
+        self._source(self.SPREAD)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_nested_call_with_commas_stays_one_argument(self):
+        # The SDK's other spelling of the class id, INLINE_UID (a, b, c, d),
+        # puts three commas inside argument 0. Counting commas instead of
+        # tracking parenthesis depth shifts every argument three places, and
+        # the misread category then matches nothing, so the registration is
+        # skipped and a wrong name goes unreported. Passing the clean file is
+        # therefore not enough to prove the depth tracking: the same file with
+        # a wrong name must still be caught.
+        uid = "INLINE_UID (0x11223344, 0x55667788, 0x99aabbcc, 0xddeeff00)"
+        nested = self.SPREAD.replace(
+            "INLINE_UID_FROM_FUID (Seam::DemoProcessorUID)", uid)
+        self._source(nested)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+        self._source(nested.replace('"SEAM DEMO"', '"SEAM Demo"'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("'SEAM Demo'", messages[0])
+
+    def test_mixed_case_name_fails(self):
+        # The exact shape found in the host: window title 'SEAM B2XROT' above
+        # a title bar reading 'VST3: SEAM B2Xrot'.
+        self._source(self.SPREAD.replace('"SEAM DEMO"', '"SEAM Demo"'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("'SEAM Demo'", messages[0])
+        self.assertIn("'SEAM DEMO'", messages[0])
+
+    def test_expected_name_comes_from_the_directory_not_the_filename(self):
+        # plugins/demo/source/other_processor.cpp: 'demo' is the plugin, and
+        # a rule reading the filename would demand 'SEAM OTHER'.
+        self._source(self.COMPACT, name="other_processor.cpp")
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_processor_file_without_a_factory_block_is_skipped(self):
+        # Nothing requires a source file to register a class. Reporting a
+        # violation for an absent construct would be inventing one.
+        self._source('namespace Seam { void nothing() {} }\n')
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_controller_only_registration_is_skipped(self):
+        # A DEF_CLASS2 that registers the edit controller carries a different
+        # class category and a different name; the host title bar shows the
+        # audio effect, so only that registration is checked.
+        controller = self.SPREAD.replace("kVstAudioEffectClass",
+                                         "kVstComponentControllerClass")
+        controller = controller.replace('"SEAM DEMO"', '"SEAM DEMO Controller"')
+        self._source(controller)
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_effect_is_still_checked_beside_a_controller_registration(self):
+        controller = self.SPREAD.replace("kVstAudioEffectClass",
+                                         "kVstComponentControllerClass")
+        controller = controller.replace('"SEAM DEMO"', '"SEAM DEMO Controller"')
+        self._source(controller + self.COMPACT.replace('"SEAM DEMO"',
+                                                       '"SEAM Demo"'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("'SEAM Demo'", messages[0])
+
+    def test_only_processor_files_are_read(self):
+        # multipink_pool.cpp and friends are not factory files.
+        self._source(self.COMPACT.replace('"SEAM DEMO"', '"SEAM Demo"'),
+                     name="demo_pool.cpp")
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_unterminated_macro_is_an_error(self):
+        self._source('DEF_CLASS2 (INLINE_UID_FROM_FUID (X), a, '
+                     'kVstAudioEffectClass, "SEAM DEMO"\n')
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("does not close", messages[0])
+
+    def test_non_literal_display_name_is_an_error(self):
+        # A name hidden behind a macro cannot be checked, and passing it in
+        # silence would be a rule that only appears to hold.
+        self._source(self.SPREAD.replace('"SEAM DEMO"', 'kPluginName'))
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("not a string literal", messages[0])
+
+    def test_too_few_arguments_is_an_error(self):
+        self._source('DEF_CLASS2 (INLINE_UID_FROM_FUID (X), a)\n')
+        messages = check_uidesc.check_factory_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("cannot read the display name", messages[0])
+
+    def test_adjacent_literals_concatenate_as_the_compiler_joins_them(self):
+        self._source(self.SPREAD.replace('"SEAM DEMO"', '"SEAM " "DEMO"'))
+        self.assertEqual(check_uidesc.check_factory_names(self.plugins), [])
+
+    def test_every_plugin_is_reported_not_just_the_first(self):
+        self._source(self.COMPACT.replace('"SEAM DEMO"', '"SEAM Alpha"'),
+                     name="alpha_processor.cpp", plugin="alpha")
+        self._source(self.COMPACT.replace('"SEAM DEMO"', '"SEAM Beta"'),
+                     name="beta_processor.cpp", plugin="beta")
+        self.assertEqual(len(check_uidesc.check_factory_names(self.plugins)), 2)
+
+    def test_the_real_suite_is_clean(self):
+        plugins = os.path.join(os.path.dirname(_HERE), "plugins")
+        self.assertEqual(check_uidesc.check_factory_names(plugins), [])
+
+
+class TestMetadataNames(unittest.TestCase):
+    """The other two files carrying the plugin name.
+
+    check_title reads the window; check_factory_names reads the host title
+    bar; this rule reads CMakeLists.txt's DESCRIPTION and version.h's
+    stringFileDescription, the two build-metadata files neither of the other
+    rules touches."""
+
+    def setUp(self):
+        self.plugins = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.plugins)
+
+    def _cmake(self, name_line, plugin="demo"):
+        directory = os.path.join(self.plugins, plugin)
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, "CMakeLists.txt")
+        with open(path, "w") as f:
+            f.write('cmake_minimum_required(VERSION 3.25.0)\n\n'
+                    'project(seam-%s\n'
+                    '    VERSION     0.1.0.1\n'
+                    '    %s\n'
+                    ')\n' % (plugin, name_line))
+        return path
+
+    def _version(self, lines, plugin="demo"):
+        directory = os.path.join(self.plugins, plugin, "source")
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, "version.h")
+        with open(path, "w") as f:
+            f.write("#pragma once\n" + "\n".join(lines) + "\n")
+        return path
+
+    def test_conforming_cmake_and_version_pass(self):
+        self._cmake('DESCRIPTION "SEAM DEMO – A Test Plugin"')
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Test Plugin (64Bit)"',
+                        '#define stringFileDescription   "SEAM DEMO – A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_lowercase_name_in_cmakelists_fails(self):
+        # The exact drift shape this rule exists to catch: the name is
+        # correct everywhere check_title and check_factory_names look, but
+        # CMakeLists.txt still carries the pre-rename spelling.
+        self._cmake('DESCRIPTION "SEAM demo – A Test Plugin"')
+        messages = check_uidesc.check_metadata_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("'SEAM demo'", messages[0])
+        self.assertIn("'SEAM DEMO'", messages[0])
+        self.assertIn("CMakeLists.txt", messages[0])
+
+    def test_lowercase_name_in_one_of_two_version_defines_fails(self):
+        # b2xrot's shape: two stringFileDescription lines (32-bit and
+        # 64-bit). The first is correct so a rule that stops at the first
+        # match would miss the straggler on the second line.
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Test Plugin (64Bit)"',
+                        '#define stringFileDescription   "SEAM demo – A Test Plugin"'])
+        messages = check_uidesc.check_metadata_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("'SEAM demo'", messages[0])
+        self.assertIn("version.h", messages[0])
+
+    def test_em_dash_separator_is_read_the_same_as_en_dash(self):
+        # ltglide spells the separator as an em dash where every other
+        # plugin uses an en dash; the rule reads only the name, so the dash
+        # character used for the subtitle must not matter.
+        self._version(['#define stringFileDescription "SEAM DEMO — A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_subtitle_mismatch_between_files_is_not_flagged(self):
+        # The subtitle is prose and is allowed to differ between the CMake
+        # description and the file-version string; only the name is checked.
+        self._cmake('DESCRIPTION "SEAM DEMO – Build Tooling Blurb"')
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Completely Different Blurb"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_missing_cmakelists_is_skipped(self):
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_missing_version_header_is_skipped(self):
+        self._cmake('DESCRIPTION "SEAM DEMO – A Test Plugin"')
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_file_with_no_name_prefix_is_skipped(self):
+        self._cmake('DESCRIPTION "A completely generic build blurb"')
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_bare_company_name_is_not_mistaken_for_a_name_prefix(self):
+        # 'SEAM' with nothing after it but a closing quote (COMPANY_NAME
+        # "SEAM"), immediately followed by the quote rather than whitespace,
+        # must not be read as a name prefix.
+        self._cmake('DESCRIPTION "SEAM DEMO – A Test Plugin"')
+        with open(os.path.join(self.plugins, "demo", "CMakeLists.txt"), "a") as f:
+            f.write('        COMPANY_NAME      "SEAM")\n')
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_seam_ltm_header_comment_is_not_mistaken_for_a_name_prefix(self):
+        # Every version.h opens with '// SEAM-LTM · <NAME> — ...'; the
+        # hyphen directly after SEAM (no whitespace) must not be read as a
+        # name prefix.
+        self._version(['// SEAM-LTM · DEMO — Version and metadata',
+                        '#define stringFileDescription   "SEAM DEMO – A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_every_plugin_is_reported_not_just_the_first(self):
+        self._cmake('DESCRIPTION "SEAM alpha – A Test Plugin"', plugin="alpha")
+        self._cmake('DESCRIPTION "SEAM beta – A Test Plugin"', plugin="beta")
+        self.assertEqual(len(check_uidesc.check_metadata_names(self.plugins)), 2)
+
+    def test_the_real_suite_is_clean(self):
+        plugins = os.path.join(os.path.dirname(_HERE), "plugins")
+        self.assertEqual(check_uidesc.check_metadata_names(plugins), [])
+
+
+class TestMessageSeverity(unittest.TestCase):
+    """A message knows its own level; the printed form is unchanged."""
+
+    def test_error_prints_and_reports_its_level(self):
+        message = check_uidesc.error("p.uidesc", "something is wrong")
+        self.assertEqual(message, "p.uidesc: ERROR something is wrong")
+        self.assertEqual(message.level, check_uidesc.ERROR)
+
+    def test_warn_prints_and_reports_its_level(self):
+        message = check_uidesc.warn("p.uidesc", "something is odd")
+        self.assertEqual(message, "p.uidesc: WARN something is odd")
+        self.assertEqual(message.level, check_uidesc.WARN)
+
+    def test_severity_survives_rewording(self):
+        # The point of carrying the level as data: a message whose text never
+        # contains the word ERROR is still an error.
+        message = check_uidesc.error("p.uidesc", "title mismatch")
+        self.assertEqual(message.level, check_uidesc.ERROR)
+
+
+class TestMainExitCode(unittest.TestCase):
+    """main() decides whether the ctest passes. Nothing else in the suite
+    pins that decision, so a rule can keep reporting while the run goes
+    green — which is how a lint gets switched off without anyone noticing."""
+
+    def _run(self, *paths):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = check_uidesc.main(["check-uidesc.py"] + list(paths))
+        return code, out.getvalue()
+
+    def _plugin_file(self, body):
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir)
+        resource = os.path.join(tmpdir, "plugins", "demo", "resource")
+        os.makedirs(resource)
+        path = os.path.join(resource, "demo.uidesc")
+        with open(path, "w") as f:
+            f.write(body)
+        return path
+
+    def test_conforming_file_returns_zero(self):
+        # The skeleton is the conforming case by construction: a new plugin
+        # starts from it and must lint clean before any C++ is written.
+        template = os.path.join(os.path.dirname(_HERE), "plugins", "_template",
+                                "resource", "_template.uidesc")
+        code, output = self._run(template)
+        self.assertEqual(code, 0)
+        self.assertIn("0 error(s)", output)
+
+    def test_file_with_an_error_returns_one(self):
+        path = self._plugin_file(fixture(TITLE_OK.replace("SEAM DEMO", "SEAM WRONG")))
+        code, output = self._run(path)
+        self.assertEqual(code, 1)
+        self.assertIn("ERROR", output)
+        self.assertIn("1 error(s)", output)
+
+    def test_warning_only_file_returns_zero(self):
+        # Warnings are printed and counted and do not fail the run: the other
+        # half of the contract, and the half a "failed = messages" slip breaks.
+        setup_low = ('    <view class="COptionMenu" origin="160, 252" size="140, 20"'
+                     ' control-tag="StoneId" font-color="TextLight"/>')
+        fine = ('    <view class="CSlider" origin="30, 228" size="180, 18"'
+                ' control-tag="Trim"/>')
+        path = self._plugin_file(fixture("\n".join([TITLE_OK, setup_low, fine])))
+        code, output = self._run(path)
+        self.assertEqual(code, 0)
+        self.assertIn("WARN", output)
+        self.assertIn("0 error(s), 1 warning(s)", output)
+
+
+class TestMainWholeSuite(unittest.TestCase):
+    """With no arguments the lint sweeps the whole suite, C++ included."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root)
+        resource = os.path.join(self.root, "plugins", "demo", "resource")
+        self.source = os.path.join(self.root, "plugins", "demo", "source")
+        os.makedirs(resource)
+        os.makedirs(self.source)
+        self.uidesc = os.path.join(resource, "demo.uidesc")
+        with open(self.uidesc, "w") as f:
+            f.write(fixture(TITLE_OK))
+
+    def _run(self, *paths):
+        out = io.StringIO()
+        with unittest.mock.patch.object(check_uidesc, "REPO_ROOT", self.root):
+            with contextlib.redirect_stdout(out):
+                code = check_uidesc.main(["check-uidesc.py"] + list(paths))
+        return code, out.getvalue()
+
+    def _grey_source(self):
+        with open(os.path.join(self.source, "demo_processor.cpp"), "w") as f:
+            f.write('description->getColor("TextDim", label);\n')
+
+    def test_clean_suite_passes_and_counts_only_uidesc_documents(self):
+        # No C++ written at all: the sweep has nothing to find.
+        code, output = self._run()
+        self.assertEqual(code, 0)
+        self.assertIn("checked 1 file(s): 0 error(s), 0 warning(s)", output)
+
+    def test_grey_in_cpp_fails_the_run(self):
+        self._grey_source()
+        code, output = self._run()
+        self.assertEqual(code, 1)
+        self.assertIn("names TextDim", output)
+        # The count is documents, the errors are messages: the .uidesc is
+        # still the only file counted, and the C++ defect is still an error.
+        self.assertIn("checked 1 file(s): 1 error(s), 0 warning(s)", output)
+
+    def test_naming_one_uidesc_does_not_sweep_the_source_tree(self):
+        self._grey_source()
+        self._wrong_factory_name()
+        code, output = self._run(self.uidesc)
+        self.assertEqual(code, 0)
+        self.assertNotIn("names TextDim", output)
+        self.assertNotIn("factory display name", output)
+
+    def _wrong_factory_name(self):
+        with open(os.path.join(self.source, "demo_processor.cpp"), "w") as f:
+            f.write('DEF_CLASS2 (INLINE_UID_FROM_FUID (X), '
+                    'PClassInfo::kManyInstances, kVstAudioEffectClass, '
+                    '"SEAM Demo", 0, "Fx", V, S, create)\n')
+
+    def test_factory_name_in_cpp_fails_the_run(self):
+        # The rule lives outside the XML, so main() has to reach for it: the
+        # sweep is wired in beside the colour sweep, not into check_file.
+        self._wrong_factory_name()
+        code, output = self._run()
+        self.assertEqual(code, 1)
+        self.assertIn("factory display name", output)
+        self.assertIn("checked 1 file(s): 1 error(s), 0 warning(s)", output)
+
+
+if __name__ == "__main__":
+    unittest.main()

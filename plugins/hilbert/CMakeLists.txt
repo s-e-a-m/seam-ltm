@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25.0)
 
 project(seam-hilbert
     VERSION     ${CMAKE_PROJECT_VERSION}
-    DESCRIPTION "SEAM hilbert – wideband quadrature transformer"
+    DESCRIPTION "SEAM HILBERT – Wideband Quadrature Transformer"
 )
 
 set(hilbert_sources

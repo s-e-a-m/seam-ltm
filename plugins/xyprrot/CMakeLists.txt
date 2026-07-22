@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25.0)
 
 project(seam-xyprrot
     VERSION     ${CMAKE_PROJECT_VERSION}
-    DESCRIPTION "SEAM XYPRrot – First-order AmbiX Rotation"
+    DESCRIPTION "SEAM XYPRROT – First-order AmbiX Rotation"
 )
 
 set(xyprrot_sources

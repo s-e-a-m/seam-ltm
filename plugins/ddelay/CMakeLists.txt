@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25.0)
 
 project(seam-ddelay
     VERSION     ${CMAKE_PROJECT_VERSION}
-    DESCRIPTION "SEAM DDELAY – Quad Speaker-Alignment Delay"
+    DESCRIPTION "SEAM DDELAY – Quad Alignment Delay"
 )
 
 set(ddelay_sources

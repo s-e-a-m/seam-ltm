@@ -175,3 +175,19 @@ target_include_directories(strx_calbus_digest_test PRIVATE
 )
 target_compile_features(strx_calbus_digest_test PRIVATE cxx_std_17)
 add_test(NAME strx_calbus_digest_test COMMAND strx_calbus_digest_test)
+
+# ─── UI standard lint (see doc/style/ui-style.md) ────────────────────────────
+# Two tests: the lint's own rule tests, then the lint over all plugins.
+# Python3 is optional — on a machine without it the tests are skipped rather
+# than failing the build, since no plugin needs Python to compile.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME uidesc_lint_selftest
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../tools/test_check_uidesc.py)
+    add_test(NAME uidesc_lint
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-uidesc.py)
+else()
+    message(STATUS "Python3 not found — uidesc lint tests will not be registered")
+endif()

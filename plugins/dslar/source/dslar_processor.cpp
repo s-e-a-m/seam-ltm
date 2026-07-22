@@ -183,7 +183,7 @@ VSTGUI::CView* PLUGIN_API DSLARProcessor::createCustomView(
         VSTGUI::CColor idle  = VSTGUI::kBlackCColor;
         VSTGUI::CColor azure(0x4a, 0x9e, 0xc8, 0xff);
         if (description) {
-            description->getColor("TextDim", frame);
+            description->getColor("Structure", frame);
             description->getColor("BgDark", idle);
             description->getColor("SliderActive", azure);
         }
