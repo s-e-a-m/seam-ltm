@@ -13,6 +13,7 @@
         <color name="TextDim" rgba="#888888ff"/>
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="Structure" rgba="#888888ff"/>
     </colors>
 
     <template name="view" class="CViewContainer" origin="0, 0" size="300, 450"
@@ -46,10 +47,10 @@
         <view class="CTextEdit" origin="20, 196" size="260, 18" font="ValueFont" control-tag="Trim"
               font-color="TextLight" text-alignment="center" transparent="true" value-precision="2" style-no-frame="true"/>
 
-        <!-- Mute -->
-        <view class="CCheckBox" origin="100, 222" size="100, 20" control-tag="Mute"
-              title="MUTE" font="ValueFont" font-color="TextLight"
-              boxframe-color="TextDim" boxfill-color="BgDark" checkmark-color="SliderActive"
+        <!-- Power -->
+        <view class="CCheckBox" origin="100, 222" size="100, 20" control-tag="Power"
+              title="POWER" font="ValueFont" font-color="TextLight"
+              boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
               frame-width="1" transparent="true" autosize-to-fit="false"/>
 
         <!-- STONE identity for the calibration bus. Declared by hand, never
@@ -88,7 +89,7 @@
     <control-tags>
         <control-tag name="Reference"  tag="100"/>
         <control-tag name="Trim"       tag="101"/>
-        <control-tag name="Mute"       tag="102"/>
+        <control-tag name="Power"      tag="102"/>
         <control-tag name="StoneId"    tag="103"/>
         <control-tag name="SlotStart"  tag="200"/>
         <control-tag name="SlotCount"  tag="201"/>

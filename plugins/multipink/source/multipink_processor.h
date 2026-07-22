@@ -93,7 +93,7 @@ private:
     // Parameters (audio-thread-readable).
     std::atomic<int>    paramReferenceIdx_{0};   // 0..2
     std::atomic<double> paramTrimDb_{0.0};       // -6..+6
-    std::atomic<int>    paramMute_{0};           // 0 or 1
+    std::atomic<int>    paramPower_{1};          // 1 = sounding (POWER on)
     std::atomic<int>    paramStoneId_{0};        // 0 = undeclared, 1..8
 
     // Calibration bus (Spec 2). The handle is claimed in setActive and
