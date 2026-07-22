@@ -3,9 +3,9 @@
     <fonts>
         <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
         <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
-        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="12"/>
-        <font font-name="Source Code Pro Light" name="ValueFont" size="11"/>
-        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="12"/>
     </fonts>
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
@@ -15,16 +15,23 @@
         <color name="Structure" rgba="#888888ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="460, 390"
-              minSize="460, 390" maxSize="460, 390"
+    <!-- S format: 300 px wide, one column at x=20 of width 260.
+         Four controls do not fill two columns — a STONE selector, a POWER
+         switch, a reference menu and a trim slider read as an empty grid at
+         460 px — so multipink is S on its control count, and the type scale
+         is the one the other 300 px windows use (KnobLabel 13, Value 12,
+         Info 12). The zone order is the standard's: HEADER, SETUP, OPS,
+         FINE, FOOTER. -->
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 440"
+              minSize="300, 440" maxSize="300, 440"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- ── HEADER ─────────────────────────────────────────────────── -->
-        <view class="CTextLabel" origin="0, 14" size="460, 26" font="TitleFont"
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM MULTIPINK" transparent="true"/>
-        <view class="CTextLabel" origin="0, 42" size="460, 18" font="SubtitleFont"
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
               font-color="TextLight" text-alignment="center" title="Multichannel Pink Noise" transparent="true"/>
-        <view class="CTextLabel" origin="0, 60" size="460, 14" font="InfoFont"
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
               font-color="TextLight" text-alignment="center"
               title="64-slot shared pool &#xB7; RMS-calibrated" transparent="true"/>
 
@@ -34,66 +41,71 @@
              instance that guesses is an instance that calibrates the wrong
              power amp. Default "?" = undeclared, which strx renders "STONE ?".
              It sits above OPS because identity is set once, before working. -->
-        <view class="CTextLabel" origin="0, 88" size="460, 16" font="InfoFont"
+        <view class="CTextLabel" origin="0, 96" size="300, 16" font="InfoFont"
               font-color="TextLight" text-alignment="center" title="&#x2014; STONE &#x2014;" transparent="true"/>
-        <view class="COptionMenu" origin="160, 106" size="140, 20" control-tag="StoneId"
+        <view class="COptionMenu" origin="80, 114" size="140, 20" control-tag="StoneId"
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
         <!-- ── OPS ───────────────────────────────────────────────────────
-             POWER on means sounding, matching dslar and the rest of the
-             suite; the box is centred on the window, its caption to the
-             right, exactly as dslar draws Power over its left column. -->
-        <view class="CCheckBox" origin="196, 140" size="14, 14" control-tag="Power"
+             POWER on means sounding, as everywhere in the suite. The box
+             draws its ink at the view's left edge (1 px in, side 10 px) and
+             the caption is a separate label, so the pair is centred on what
+             it draws: ink runs 122..178 in a 300 px window, centred on 150. -->
+        <view class="CCheckBox" origin="121, 148" size="14, 14" control-tag="Power"
               boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
               title="" transparent="true"/>
-        <view class="CTextLabel" origin="214, 138" size="52, 16" font="KnobLabelFont"
+        <view class="CTextLabel" origin="139, 146" size="52, 16" font="KnobLabelFont"
               font-color="TextLight" text-alignment="left" title="POWER" transparent="true"/>
 
-        <!-- ── FINE — two 180 px columns at x=30 and x=250 ─────────────── -->
-        <view class="CTextLabel" origin="30, 172" size="180, 16" font="InfoFont"
-              font-color="TextLight" text-alignment="center" title="&#x2014; REFERENCE &#x2014;" transparent="true"/>
-        <view class="CTextLabel" origin="250, 172" size="180, 16" font="InfoFont"
-              font-color="TextLight" text-alignment="center" title="&#x2014; TRIM &#x2014;" transparent="true"/>
-
-        <view class="CTextLabel" origin="30, 194" size="180, 14" font="KnobLabelFont"
+        <!-- ── FINE ───────────────────────────────────────────────────────
+             One column, so each control carries its own label and there are
+             no column dividers to name a group of one. A menu block is label
+             14 / menu 20 on a 42 px stride; a slider block is label 14 /
+             slider 18 / value 16. -->
+        <view class="CTextLabel" origin="20, 170" size="260, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Level (dBFS RMS)" transparent="true"/>
-        <view class="COptionMenu" origin="50, 210" size="140, 20" control-tag="Reference"
+        <view class="COptionMenu" origin="80, 186" size="140, 20" control-tag="Reference"
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
-        <view class="CTextLabel" origin="250, 194" size="180, 14" font="KnobLabelFont"
+        <view class="CTextLabel" origin="20, 212" size="260, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Offset (dB)" transparent="true"/>
-        <view class="CSlider" origin="250, 210" size="180, 18" control-tag="Trim" default-value="0.5"
+        <view class="CSlider" origin="20, 228" size="260, 18" control-tag="Trim" default-value="0.5"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="250, 230" size="180, 16" font="ValueFont" control-tag="Trim"
+        <view class="CTextEdit" origin="20, 248" size="260, 16" font="ValueFont" control-tag="Trim"
               font-color="TextLight" text-alignment="center" transparent="true"
               value-precision="2" style-no-frame="true"/>
 
         <!-- ── FOOTER — runtime feedback, then the logo ─────────────────
              Slot, pool occupancy and status are what the plugin reports back;
-             they are FOOTER content and never SETUP. -->
-        <view class="CTextLabel" origin="30, 262" size="40, 16" font="InfoFont"
+             they are FOOTER content and never SETUP. At InfoFont 12 a
+             monospace character is 7.2 px wide, so the widest line each
+             readout can draw fits the 260 px column: "Slot: 63 N: 64" and a
+             right-aligned "of 64 pool" (72 px) on the first row, and
+             "OK (preferred)" (14 characters, 100.8 px) inside the 200 px
+             status field on the second. -->
+        <view class="CTextLabel" origin="20, 284" size="40, 16" font="InfoFont"
               font-color="TextLight" text-alignment="left" title="Slot:" transparent="true"/>
-        <view class="CParamDisplay" origin="66, 262" size="40, 16" control-tag="SlotStart"
+        <view class="CParamDisplay" origin="62, 284" size="30, 16" control-tag="SlotStart"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
-        <view class="CTextLabel" origin="112, 262" size="24, 16" font="InfoFont"
+        <view class="CTextLabel" origin="96, 284" size="20, 16" font="InfoFont"
               font-color="TextLight" text-alignment="left" title="N:" transparent="true"/>
-        <view class="CParamDisplay" origin="138, 262" size="40, 16" control-tag="SlotCount"
+        <view class="CParamDisplay" origin="118, 284" size="30, 16" control-tag="SlotCount"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
-        <view class="CTextLabel" origin="250, 262" size="180, 16" font="InfoFont"
+        <view class="CTextLabel" origin="160, 284" size="120, 16" font="InfoFont"
               font-color="TextLight" text-alignment="right" title="of 64 pool" transparent="true"/>
 
-        <view class="CTextLabel" origin="30, 282" size="56, 16" font="InfoFont"
+        <view class="CTextLabel" origin="20, 304" size="56, 16" font="InfoFont"
               font-color="TextLight" text-alignment="left" title="Status:" transparent="true"/>
-        <view class="CParamDisplay" origin="90, 282" size="340, 16" control-tag="PoolStatus"
+        <view class="CParamDisplay" origin="80, 304" size="200, 16" control-tag="PoolStatus"
               font="InfoFont" font-color="TextLight" text-alignment="left" transparent="true" value-precision="0"/>
 
         <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
-        <view class="CView" origin="110, 304" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 340" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>

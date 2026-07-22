@@ -15,11 +15,11 @@
         <color name="SliderActive" rgba="#4a9ec8ff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="460, 510"
-              minSize="460, 510" maxSize="460, 510"
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 600"
+              minSize="460, 600" maxSize="460, 600"
               background-color="BgDark" background-color-draw-style="filled">
 
-        <!-- ── HEADER ─────────────────────────────────────────────────── -->
+        <!-- ── HEADER ───────────────────────────────────── -->
         <view class="CTextLabel" origin="0, 14" size="460, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM LTGLIDE" transparent="true"/>
         <view class="CTextLabel" origin="0, 42" size="460, 18" font="SubtitleFont"
@@ -28,7 +28,7 @@
               font-color="TextLight" text-alignment="center"
               title="N=5 grains &#xB7; swept &#xB7; looped" transparent="true"/>
 
-        <!-- ── SETUP ──────────────────────────────────────────────────────
+        <!-- ── SETUP ────────────────────────────────────
              STONE identity for the calibration bus. ltglide has no slot to be
              inferred from and the receiver cannot read the host's routing, so
              this is declared by hand. Default "?" = undeclared. -->
@@ -38,104 +38,129 @@
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
-        <!-- ── OPS ───────────────────────────────────────────────────────
+        <!-- ── OPS ──────────────────────────────────────
              The host transport is the sole sounding switch (play = sound,
              stop = silent); LOOP means "repeat while playing", not "start
              sounding". It is the only transport control left after SHOT was
-             removed. -->
-        <view class="CCheckBox" origin="180, 140" size="100, 20" control-tag="Loop"
+             removed.
+
+             Centred on what it draws, not on its rectangle. A CCheckBox
+             paints a box at its left edge (1 px in, side
+             floor(capHeight + 2.5) = floor(0.66*11 + 2.5) = 9 px at
+             ValueFont), then kCheckBoxTitleMargin = 5 px, then the caption:
+             4 characters of a monospace 11 pt face at 0.6 em = 26.4 px.
+             The ink is 1 + 9 + 5 + 26.4 = 41.4 px wide and starts at the
+             view's left, so a 100 px view at x=180 drew it 29 px left of
+             centre. A 42 px view at x=209 puts the ink at 209..250.4,
+             centred on 229.7 in a 460 px window, and makes the click target
+             the control the user sees. -->
+        <view class="CCheckBox" origin="209, 140" size="42, 20" control-tag="Loop"
               title="LOOP" font="ValueFont" font-color="TextLight"
               boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
               frame-width="1" transparent="true" autosize-to-fit="false"/>
 
-        <!-- ── FINE — two 180 px columns at x=30 and x=250, 58 px stride ─
-             Left: what the sweep traverses. Right: how it is paced and how
-             loud it plays. -->
-        <view class="CTextLabel" origin="30, 172" size="180, 16" font="InfoFont"
-              font-color="TextLight" text-alignment="center" title="&#x2014; SWEEP &#x2014;" transparent="true"/>
-        <view class="CTextLabel" origin="250, 172" size="180, 16" font="InfoFont"
-              font-color="TextLight" text-alignment="center" title="&#x2014; TIMING &#x2014;" transparent="true"/>
-
-        <!-- Left column: F0 / F1 / Sweep Time / Sweep shape -->
-        <view class="CTextLabel" origin="30, 194" size="180, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="F0 (Hz)" transparent="true"/>
-        <view class="CSlider" origin="30, 210" size="180, 18" control-tag="F0" default-value="1.0"
+        <!-- Level spans the full width, directly under LOOP, the way dslar
+             carries its Output above its two columns: it is the generator's
+             output level, neither a property of the sweep nor a duration, so
+             it belongs to neither column. -->
+        <view class="CTextLabel" origin="0, 172" size="460, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Level (dBFS)" transparent="true"/>
+        <view class="CSlider" origin="80, 188" size="300, 18" control-tag="Level" default-value="0.667"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="30, 230" size="180, 16" font="ValueFont" control-tag="F0"
-              font-color="TextLight" text-alignment="center" transparent="true"
-              value-precision="0" style-no-frame="true"/>
-
-        <view class="CTextLabel" origin="30, 252" size="180, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="F1 (Hz)" transparent="true"/>
-        <view class="CSlider" origin="30, 268" size="180, 18" control-tag="F1" default-value="0.0"
-              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
-              draw-value="true" draw-value-color="SliderActive"
-              draw-frame="true" draw-frame-color="SliderTrack"
-              frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="30, 288" size="180, 16" font="ValueFont" control-tag="F1"
-              font-color="TextLight" text-alignment="center" transparent="true"
-              value-precision="0" style-no-frame="true"/>
-
-        <view class="CTextLabel" origin="30, 310" size="180, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Sweep Time (s)" transparent="true"/>
-        <view class="CSlider" origin="30, 326" size="180, 18" control-tag="Time" default-value="0.153"
-              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
-              draw-value="true" draw-value-color="SliderActive"
-              draw-frame="true" draw-frame-color="SliderTrack"
-              frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="30, 346" size="180, 16" font="ValueFont" control-tag="Time"
+        <view class="CTextEdit" origin="80, 208" size="300, 16" font="ValueFont" control-tag="Level"
               font-color="TextLight" text-alignment="center" transparent="true"
               value-precision="1" style-no-frame="true"/>
 
-        <view class="CTextLabel" origin="30, 368" size="180, 14" font="KnobLabelFont"
+        <!-- ── FINE ── two 180 px columns at x=30 and x=250, 40 px gutter ──
+             SWEEP holds the shape of the sound: where it starts and ends, and
+             what grain it is made of. TIMING holds the durations. Slider
+             blocks are label 14 / slider 18 / value 16 on a 58 px stride;
+             a menu block is label 14 / menu 20 with no value row, on a 42 px
+             stride. -->
+        <view class="CTextLabel" origin="30, 242" size="180, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="&#x2014; SWEEP &#x2014;" transparent="true"/>
+        <view class="CTextLabel" origin="250, 242" size="180, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="&#x2014; TIMING &#x2014;" transparent="true"/>
+
+        <!-- Left column: F0 / F1 / Sweep / Timing / step-fuse label -->
+        <view class="CTextLabel" origin="30, 264" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="F0 (Hz)" transparent="true"/>
+        <view class="CSlider" origin="30, 280" size="180, 18" control-tag="F0" default-value="1.0"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="30, 300" size="180, 16" font="ValueFont" control-tag="F0"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="0" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="30, 322" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="F1 (Hz)" transparent="true"/>
+        <view class="CSlider" origin="30, 338" size="180, 18" control-tag="F1" default-value="0.0"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="30, 358" size="180, 16" font="ValueFont" control-tag="F1"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="0" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="30, 380" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Sweep" transparent="true"/>
-        <view class="COptionMenu" origin="50, 384" size="140, 20" control-tag="Sweep"
+        <view class="COptionMenu" origin="50, 396" size="140, 20" control-tag="Sweep"
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
-        <!-- Right column: Level / Delta / Timing mode, then the fuse label -->
-        <view class="CTextLabel" origin="250, 194" size="180, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Level (dBFS)" transparent="true"/>
-        <view class="CSlider" origin="250, 210" size="180, 18" control-tag="Level" default-value="0.667"
-              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
-              draw-value="true" draw-value-color="SliderActive"
-              draw-frame="true" draw-frame-color="SliderTrack"
-              frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="250, 230" size="180, 16" font="ValueFont" control-tag="Level"
-              font-color="TextLight" text-alignment="center" transparent="true"
-              value-precision="1" style-no-frame="true"/>
-
-        <view class="CTextLabel" origin="250, 252" size="180, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Delta (s)" transparent="true"/>
-        <view class="CSlider" origin="250, 268" size="180, 18" control-tag="Delta" default-value="0.141"
-              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
-              draw-value="true" draw-value-color="SliderActive"
-              draw-frame="true" draw-frame-color="SliderTrack"
-              frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="250, 288" size="180, 16" font="ValueFont" control-tag="Delta"
-              font-color="TextLight" text-alignment="center" transparent="true"
-              value-precision="2" style-no-frame="true"/>
-
-        <view class="CTextLabel" origin="250, 310" size="180, 14" font="KnobLabelFont"
+        <!-- Timing (step / gap) describes the grain the sweep is made of, so
+             it reads with the sweep and not with the durations. -->
+        <view class="CTextLabel" origin="30, 422" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Timing" transparent="true"/>
-        <view class="COptionMenu" origin="270, 326" size="140, 20" control-tag="Timing"
+        <view class="COptionMenu" origin="50, 438" size="140, 20" control-tag="Timing"
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
         <!-- Step-fuse threshold: below f* = 5/delta Hz the step-mode grain
              train fuses into a continuous micro-stepped glissando (see
              ltglide_fuse_label.h and doc/ltglide-validation.md). Blank in
-             gap mode, which has no such floor. Sits directly under the
-             Timing selector it depends on. -->
-        <view class="CView" origin="250, 352" size="180, 14" custom-view-name="LtglideFuseLabel"
+             gap mode, which has no such floor. Follows the Timing selector
+             it depends on. Its longest text, "STEP FUSES < 250 Hz", is
+             19 characters at InfoFont: 19 * 0.6 * 11 = 125.4 px, centred in
+             the 180 px column. -->
+        <view class="CView" origin="30, 464" size="180, 14" custom-view-name="LtglideFuseLabel"
               transparent="true"
               tooltip="Step mode only: below this frequency the grain train fuses into a continuous micro-stepped glissando."/>
 
-        <!-- ── FOOTER ─────────────────────────────────────────────────── -->
-        <view class="CView" origin="110, 420" size="240, 77" bitmap="logo"/>
+        <!-- Right column: the two durations -->
+        <view class="CTextLabel" origin="250, 264" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Sweep Time (s)" transparent="true"/>
+        <view class="CSlider" origin="250, 280" size="180, 18" control-tag="Time" default-value="0.153"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="250, 300" size="180, 16" font="ValueFont" control-tag="Time"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="250, 322" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Delta (s)" transparent="true"/>
+        <view class="CSlider" origin="250, 338" size="180, 18" control-tag="Delta" default-value="0.141"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="250, 358" size="180, 16" font="ValueFont" control-tag="Delta"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="2" style-no-frame="true"/>
+
+        <!-- ── FOOTER ─────────────────────────────────────
+             SEAM logo, native 240x77 (CView does not scale bitmaps). The left
+             column runs 24 px lower than the right one, so the logo clears
+             the fuse label at y=478 and ends at 579, 21 px above the frame. -->
+        <view class="CView" origin="110, 502" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
