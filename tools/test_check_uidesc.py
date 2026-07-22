@@ -515,6 +515,121 @@ class TestFactoryNames(unittest.TestCase):
         self.assertEqual(check_uidesc.check_factory_names(plugins), [])
 
 
+class TestMetadataNames(unittest.TestCase):
+    """The other two files carrying the plugin name.
+
+    check_title reads the window; check_factory_names reads the host title
+    bar; this rule reads CMakeLists.txt's DESCRIPTION and version.h's
+    stringFileDescription, the two build-metadata files neither of the other
+    rules touches."""
+
+    def setUp(self):
+        self.plugins = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.plugins)
+
+    def _cmake(self, name_line, plugin="demo"):
+        directory = os.path.join(self.plugins, plugin)
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, "CMakeLists.txt")
+        with open(path, "w") as f:
+            f.write('cmake_minimum_required(VERSION 3.25.0)\n\n'
+                    'project(seam-%s\n'
+                    '    VERSION     0.1.0.1\n'
+                    '    %s\n'
+                    ')\n' % (plugin, name_line))
+        return path
+
+    def _version(self, lines, plugin="demo"):
+        directory = os.path.join(self.plugins, plugin, "source")
+        os.makedirs(directory, exist_ok=True)
+        path = os.path.join(directory, "version.h")
+        with open(path, "w") as f:
+            f.write("#pragma once\n" + "\n".join(lines) + "\n")
+        return path
+
+    def test_conforming_cmake_and_version_pass(self):
+        self._cmake('DESCRIPTION "SEAM DEMO – A Test Plugin"')
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Test Plugin (64Bit)"',
+                        '#define stringFileDescription   "SEAM DEMO – A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_lowercase_name_in_cmakelists_fails(self):
+        # The exact drift shape this rule exists to catch: the name is
+        # correct everywhere check_title and check_factory_names look, but
+        # CMakeLists.txt still carries the pre-rename spelling.
+        self._cmake('DESCRIPTION "SEAM demo – A Test Plugin"')
+        messages = check_uidesc.check_metadata_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("'SEAM demo'", messages[0])
+        self.assertIn("'SEAM DEMO'", messages[0])
+        self.assertIn("CMakeLists.txt", messages[0])
+
+    def test_lowercase_name_in_one_of_two_version_defines_fails(self):
+        # b2xrot's shape: two stringFileDescription lines (32-bit and
+        # 64-bit). The first is correct so a rule that stops at the first
+        # match would miss the straggler on the second line.
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Test Plugin (64Bit)"',
+                        '#define stringFileDescription   "SEAM demo – A Test Plugin"'])
+        messages = check_uidesc.check_metadata_names(self.plugins)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("ERROR", messages[0])
+        self.assertIn("'SEAM demo'", messages[0])
+        self.assertIn("version.h", messages[0])
+
+    def test_em_dash_separator_is_read_the_same_as_en_dash(self):
+        # ltglide spells the separator as an em dash where every other
+        # plugin uses an en dash; the rule reads only the name, so the dash
+        # character used for the subtitle must not matter.
+        self._version(['#define stringFileDescription "SEAM DEMO — A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_subtitle_mismatch_between_files_is_not_flagged(self):
+        # The subtitle is prose and is allowed to differ between the CMake
+        # description and the file-version string; only the name is checked.
+        self._cmake('DESCRIPTION "SEAM DEMO – Build Tooling Blurb"')
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Completely Different Blurb"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_missing_cmakelists_is_skipped(self):
+        self._version(['#define stringFileDescription   "SEAM DEMO – A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_missing_version_header_is_skipped(self):
+        self._cmake('DESCRIPTION "SEAM DEMO – A Test Plugin"')
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_file_with_no_name_prefix_is_skipped(self):
+        self._cmake('DESCRIPTION "A completely generic build blurb"')
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_bare_company_name_is_not_mistaken_for_a_name_prefix(self):
+        # 'SEAM' with nothing after it but a closing quote (COMPANY_NAME
+        # "SEAM"), immediately followed by the quote rather than whitespace,
+        # must not be read as a name prefix.
+        self._cmake('DESCRIPTION "SEAM DEMO – A Test Plugin"')
+        with open(os.path.join(self.plugins, "demo", "CMakeLists.txt"), "a") as f:
+            f.write('        COMPANY_NAME      "SEAM")\n')
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_seam_ltm_header_comment_is_not_mistaken_for_a_name_prefix(self):
+        # Every version.h opens with '// SEAM-LTM · <NAME> — ...'; the
+        # hyphen directly after SEAM (no whitespace) must not be read as a
+        # name prefix.
+        self._version(['// SEAM-LTM · DEMO — Version and metadata',
+                        '#define stringFileDescription   "SEAM DEMO – A Test Plugin"'])
+        self.assertEqual(check_uidesc.check_metadata_names(self.plugins), [])
+
+    def test_every_plugin_is_reported_not_just_the_first(self):
+        self._cmake('DESCRIPTION "SEAM alpha – A Test Plugin"', plugin="alpha")
+        self._cmake('DESCRIPTION "SEAM beta – A Test Plugin"', plugin="beta")
+        self.assertEqual(len(check_uidesc.check_metadata_names(self.plugins)), 2)
+
+    def test_the_real_suite_is_clean(self):
+        plugins = os.path.join(os.path.dirname(_HERE), "plugins")
+        self.assertEqual(check_uidesc.check_metadata_names(plugins), [])
+
+
 class TestMessageSeverity(unittest.TestCase):
     """A message knows its own level; the printed form is unchanged."""
 

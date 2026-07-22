@@ -81,6 +81,21 @@ member of either group, and a full-width block (label across the window,
   `SEAM hilbert` and `SEAM XYPRrot` sat above windows already reading
   `SEAM B2XROT`, `SEAM HILBERT` and `SEAM XYPRROT` — and the lint now reads
   both.
+- Build metadata names: two more files carry `SEAM <NAME>` by the same
+  rule, naming only the plugin, never the subtitle after it.
+  `plugins/<name>/CMakeLists.txt`'s `DESCRIPTION "SEAM <NAME> – ..."` names
+  the CMake target for build tooling and packagers; `version.h`'s
+  `#define stringFileDescription "SEAM <NAME> – ..."` is the file-version
+  resource a file manager reads for "Get Info" or the Details tab, and some
+  plugins `#define` it twice — once inside a 64-bit conditional.
+  A plugin's name is therefore written by hand in four files: the window,
+  the host title bar, the CMake description, and the file-version string.
+  Checking only the window is why a stale name can survive three release
+  cycles in the other three without a single build failing, which is what
+  happened here — the lint now reads all four.
+  The dash separating `<NAME>` from its subtitle is drawn as an en dash
+  (`–`) everywhere except `ltglide`'s `stringFileDescription`, which uses
+  an em dash (`—`); the rule reads only the name and does not care which.
 - Subtitle: Title Case.
   It names the plugin in plain language: "Multichannel Pink Noise",
   "Wideband Quadrature Transformer".
@@ -155,9 +170,11 @@ multi-config generator, and without a named configuration `ctest` reports
 both tests `Not Run` and exits 8.
 
 Errors fail the run; warnings (zone order) do not.
-The whole-plugin run also sweeps `plugins/*/source/`, twice: once over every
-`.h` and `.cpp` for `TextDim`, and once over `*_processor.cpp` for the factory
-display name.
+The whole-plugin run also sweeps `plugins/*/source/` and each plugin's
+`CMakeLists.txt`, three times over: once over every `.h` and `.cpp` for
+`TextDim`, once over `*_processor.cpp` for the factory display name, and once
+over `CMakeLists.txt` and `source/version.h` for the same `SEAM <NAME>`
+prefix.
 Naming a single `.uidesc` checks that document alone.
 The factory rule reads the `DEF_CLASS2` argument list rather than a line of
 text, so both of the formattings used in the suite are understood, and it
@@ -166,6 +183,15 @@ A processor file that registers no class at all is skipped rather than
 flagged, since nothing obliges a source file to carry a factory block; a
 display name hidden behind a macro instead of a literal is reported, because
 a name the lint cannot read is a rule that only appears to hold.
+The metadata rule reads `CMakeLists.txt`'s `DESCRIPTION` and every
+`stringFileDescription` line in `version.h` — both, when a plugin `#define`s
+it twice for the 64-bit build — for the same `SEAM <NAME>` prefix, and
+compares only the name, never the subtitle after the dash: the subtitle is
+prose, and CMake's description and the file-version string are allowed to
+say it differently.
+A file that carries no `SEAM <NAME>` prefix at all, or does not exist, is
+skipped for the same reason an absent factory block is skipped: nothing
+requires either file to declare one on a particular line.
 The first rule the lint applies is XML validity, because nothing else in
 the build parses a `.uidesc`: on 2026-07-21 a `--` inside a comment shipped
 an empty editor that the compiler and the VST3 validator both accepted in
@@ -197,7 +223,10 @@ derived from another — since only a name can be checked against the palette.
 The C++ sweep catches the one removed name, and everything else a custom
 view invents for itself is on the reviewer.
 Casing beyond the title is unchecked too: the subtitle rule and the tagline
-description above are read by people, not by the lint.
+description above are read by people, not by the lint, and that includes the
+subtitles in `CMakeLists.txt`'s `DESCRIPTION` and `version.h`'s
+`stringFileDescription` — the metadata rule reads the `<NAME>` token in front
+of the dash and stops there.
 
 ## Starting a new plugin
 

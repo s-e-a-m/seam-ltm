@@ -9,11 +9,12 @@ generator run on demand.
 Checks every `plugins/*/resource/*.uidesc` against `doc/style/ui-style.md`:
 XML validity first, then title, palette, absence of `TextDim`, explicit
 white `font-color` on text, and the vertical order of SETUP, OPS and FINE.
-Two further rules leave the XML for `plugins/*/source/`.
+Three further rules leave the XML for `plugins/*/source/` and each plugin's
+`CMakeLists.txt`.
 One scans every `.h` and `.cpp` for the name `TextDim`, because the five
 plugins that draw text from custom views name their colours in C++ where no
 `.uidesc` rule can see them.
-The other reads the display name each `*_processor.cpp` registers with the
+The second reads the display name each `*_processor.cpp` registers with the
 VST3 factory, in its `DEF_CLASS2` block, and requires the same
 `SEAM <NAME>` the window title carries: the host draws that string in its
 title bar and its plugin browser, so a plugin has two names, and until this
@@ -21,6 +22,21 @@ rule existed only the one inside the window was ever checked.
 It parses the macro's argument list, so both `DEF_CLASS2` formattings in the
 suite read alike; it checks the audio effect registration and skips a
 processor file that registers no class.
+The third reads two more names: `CMakeLists.txt`'s
+`DESCRIPTION "SEAM <NAME> – ..."`, which names the CMake target for build
+tooling and packagers, and `version.h`'s
+`#define stringFileDescription "SEAM <NAME> – ..."`, the file-version
+resource a file manager reads for "Get Info" or the Details tab — checking
+every occurrence, since some plugins `#define` it twice, once inside a
+64-bit conditional.
+A plugin's name is written out by hand in four files (window, host title
+bar, CMake description, file-version string); this rule and the factory-name
+rule together are what closed the gap left by checking only the first of
+them, which is how a stale name survived unnoticed in the other three for a
+full development cycle.
+Only the name is checked, never the subtitle after the dash, since the
+subtitle is prose allowed to differ between files; a file with no
+`SEAM <NAME>` prefix, or that does not exist, is skipped rather than flagged.
 HEADER and FOOTER placement is not checked; see doc/style/ui-style.md
 ("Running the lint") for the exact comparisons and how each zone is
 recognised.
@@ -30,8 +46,8 @@ python3 tools/check-uidesc.py                 # every plugin
 python3 tools/check-uidesc.py path/to.uidesc  # one file
 ```
 
-Both C++ scans belong to the whole-suite run: naming one `.uidesc` asks
-about that document alone.
+All three source-tree scans belong to the whole-suite run: naming one
+`.uidesc` asks about that document alone.
 Errors exit non-zero; zone-order findings are warnings and do not.
 Standard library only — no virtualenv, no pip step.
 

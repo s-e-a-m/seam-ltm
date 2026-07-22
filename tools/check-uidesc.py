@@ -2,8 +2,10 @@
 """SEAM-LTM UI standard lint.
 
 Checks every plugins/*/resource/*.uidesc against doc/style/ui-style.md, and
-sweeps plugins/*/source/ for the one colour name the standard removed and for
-the display name each plugin registers with the VST3 factory.
+sweeps plugins/*/source/ for the one colour name the standard removed, for
+the display name each plugin registers with the VST3 factory, and (with each
+plugin's CMakeLists.txt) for the same name in the two build-metadata files
+that carry it.
 Standard library only: this must run from a bare python3, with no pip step,
 on any machine that can build the suite.
 
@@ -11,6 +13,7 @@ Exit code 0 when no ERROR was reported (WARNs do not fail the run), 1 otherwise.
 """
 import glob
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -476,6 +479,80 @@ def check_factory_names(plugins_dir):
     return messages
 
 
+# A name token is the plugin's directory name, or a miscased echo of it:
+# always alphanumeric (b2xrot, lr2xhgr, ...), never containing the space or
+# dash that starts the subtitle. Requiring at least one run of whitespace
+# before it is what keeps this from matching 'SEAM' on its own — the bare
+# company name in stringCompanyName "SEAM" and COMPANY_NAME "SEAM", and the
+# "SEAM-LTM" file-header comment in every version.h, none of which are
+# followed by a space — so only an actual '<name> <dash> <subtitle>' prefix
+# is ever captured.
+NAME_PREFIX_RE = re.compile(r"SEAM\s+([A-Za-z0-9]+)")
+
+# The two build-metadata files that carry a 'SEAM <NAME>' prefix, relative to
+# a plugin directory, checked by check_metadata_names below.
+METADATA_RELATIVE_PATHS = ("CMakeLists.txt", os.path.join("source", "version.h"))
+
+
+def check_metadata_names(plugins_dir):
+    """The plugin name as CMake and the file-version resource spell it.
+
+    A plugin's name is written out by hand in four separate files, not one:
+    the window title in the .uidesc (check_title), the VST3 factory display
+    name the host draws in its own title bar (check_factory_names, its
+    sibling, added this morning), CMakeLists.txt's
+    'DESCRIPTION "SEAM <NAME> - ..."' naming the CMake target for build
+    tooling and packagers, and version.h's
+    '#define stringFileDescription "SEAM <NAME> - ..."', the file-version
+    resource a file manager reads for "Get Info" / the Details tab — some
+    plugins define it twice, once inside a 64-bit conditional, and both
+    copies are checked. Checking only the first of the four is why 'SEAM
+    B2Xrot' could sit in Reaper's title bar above a window reading 'SEAM
+    B2XROT' for a full development cycle: each file agreed with itself and
+    disagreed with the other three, and nothing compared them. This rule is
+    the second half of closing that gap — CMakeLists.txt and version.h — so
+    that all four files are now covered, two rules each watching two files.
+
+    Only the <NAME> token is checked, not the subtitle after the dash: the
+    subtitle is prose that legitimately differs between a CMake description
+    and a file-version string, and deciding it should match everywhere is a
+    different, unmade decision. A file that does not exist, or exists but
+    contains no 'SEAM <token>' prefix at all, is skipped rather than
+    flagged — nothing requires either file to declare one on any particular
+    line, and inventing a violation for an absent construct teaches the
+    wrong lesson (the same reasoning check_factory_names uses for a
+    processor file with no factory block).
+    """
+    messages = []
+    for plugin_dir in sorted(glob.glob(os.path.join(plugins_dir, "*"))):
+        if not os.path.isdir(plugin_dir):
+            continue
+        plugin_name = os.path.basename(plugin_dir)
+        expected = "SEAM " + plugin_name.upper()
+        for relative in METADATA_RELATIVE_PATHS:
+            path = os.path.join(plugin_dir, relative)
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    text = f.read()
+            except OSError as exc:
+                messages.append(error(path, "cannot read file: %s" % exc))
+                continue
+            for match in NAME_PREFIX_RE.finditer(text):
+                actual_name = match.group(1)
+                if actual_name == plugin_name.upper():
+                    continue
+                line = text.count("\n", 0, match.start()) + 1
+                messages.append(error(path, "line %d: name is %r, expected "
+                                            "%r — the plugin name is written "
+                                            "in four files and this is one "
+                                            "of them"
+                                      % (line, "SEAM " + actual_name,
+                                         expected)))
+    return messages
+
+
 def check_file(path):
     """Run every rule over one .uidesc and return all messages."""
     plugin_name = os.path.basename(os.path.dirname(os.path.dirname(path)))
@@ -493,10 +570,11 @@ def check_file(path):
 def main(argv):
     """Lint the named .uidesc files, or the whole suite when given none.
 
-    The two C++ sweeps — the forbidden colour name, and the factory display
-    name — run in whole-suite mode only: asking about one .uidesc is asking
-    about that document, and answering with findings from a source tree the
-    caller never named would be surprising.
+    The three source-tree sweeps — the forbidden colour name, the factory
+    display name, and the CMakeLists.txt/version.h metadata names — run in
+    whole-suite mode only: asking about one .uidesc is asking about that
+    document, and answering with findings from a source tree the caller
+    never named would be surprising.
 
     The count in the summary line is .uidesc documents; the error and warning
     counts are messages, and one defect can raise several of them.
@@ -514,6 +592,7 @@ def main(argv):
     if whole_suite:
         messages += check_source_colors(plugins_dir)
         messages += check_factory_names(plugins_dir)
+        messages += check_metadata_names(plugins_dir)
     for message in messages:
         print(message)
     failed = [m for m in messages if m.level == ERROR]
