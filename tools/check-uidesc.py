@@ -185,8 +185,10 @@ def _is_ops_view(view):
       all, so it is invisible either way; its Power box is enough to place
       the zone.
     - By title: a CCheckBox whose own title is non-empty and all-caps
-      (multipink's MUTE, ltglide's LOOP) draws its own caption and carries
-      no vocabulary control-tag, or one outside the vocabulary (Mute).
+      (ltglide's LOOP) draws its own caption. The title alone is enough,
+      whether or not the control-tag names one of the vocabulary words,
+      so a plugin that labels a switch outside the vocabulary still has
+      its OPS zone placed.
 
     Keeping both means a plugin that captions its own checkbox is not
     suddenly invisible just because the vocabulary check doesn't name it.
