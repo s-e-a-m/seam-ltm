@@ -20,7 +20,7 @@
               font-color="TextLight" text-alignment="center" title="A-format &#x2192; AmbiX" transparent="true"/>
         <view class="CTextLabel" origin="0, 68" size="300, 16" font="InfoFont"
               font-color="TextLight" text-alignment="center"
-              title="LFU RFD RBU LBD &#x2192; W Y Z X" transparent="true"/>
+              title="LFU RFD RBU LBD &#x2192; A0 A1 A2 A3" transparent="true"/>
 
         <view class="CView" origin="30, 100" size="240, 77" bitmap="logo"/>
     </template>

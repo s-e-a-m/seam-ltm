@@ -21,7 +21,7 @@
         <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM M2XHGR" transparent="true"/>
         <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
-              font-color="TextLight" text-alignment="center" title="Mono to AmbiX via Haar" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Mono to AmbiX via Haar Decomposition" transparent="true"/>
 
         <!-- Yaw (Z) -->
         <view class="CTextLabel" origin="20, 80" size="260, 18" font="KnobLabelFont"
