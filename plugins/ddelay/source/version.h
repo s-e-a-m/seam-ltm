@@ -9,9 +9,9 @@
 
 #define stringOriginalFilename  "ddelay.vst3"
 #if SMTG_PLATFORM_64
-#define stringFileDescription   "SEAM DDELAY – Quad Speaker-Alignment Delay (64Bit)"
+#define stringFileDescription   "SEAM DDELAY – Quad Alignment Delay (64Bit)"
 #else
-#define stringFileDescription   "SEAM DDELAY – Quad Speaker-Alignment Delay"
+#define stringFileDescription   "SEAM DDELAY – Quad Alignment Delay"
 #endif
 #define stringCompanyWeb        "https://s-e-a-m.github.io"
 #define stringCompanyEmail      "mailto:seam@example.com"

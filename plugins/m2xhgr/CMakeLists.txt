@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25.0)
 
 project(seam-m2xhgr
     VERSION     ${CMAKE_PROJECT_VERSION}
-    DESCRIPTION "SEAM M2XHGR – Mono to AmbiX via Haar Wavelet"
+    DESCRIPTION "SEAM M2XHGR – Mono to AmbiX via Haar Decomposition"
 )
 
 set(m2xhgr_sources

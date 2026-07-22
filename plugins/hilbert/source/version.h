@@ -9,9 +9,9 @@
 
 #define stringOriginalFilename  "hilbert.vst3"
 #if SMTG_PLATFORM_64
-#define stringFileDescription   "SEAM hilbert – wideband quadrature transformer (64Bit)"
+#define stringFileDescription   "SEAM HILBERT – Wideband Quadrature Transformer (64Bit)"
 #else
-#define stringFileDescription   "SEAM hilbert – wideband quadrature transformer"
+#define stringFileDescription   "SEAM HILBERT – Wideband Quadrature Transformer"
 #endif
 #define stringCompanyWeb        "https://s-e-a-m.github.io"
 #define stringCompanyEmail      "mailto:seam@example.com"

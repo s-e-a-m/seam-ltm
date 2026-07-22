@@ -9,9 +9,9 @@
 
 #define stringOriginalFilename  "xyprrot.vst3"
 #if SMTG_PLATFORM_64
-#define stringFileDescription   "SEAM XYPRrot – First-order AmbiX Rotation (64Bit)"
+#define stringFileDescription   "SEAM XYPRROT – First-order AmbiX Rotation (64Bit)"
 #else
-#define stringFileDescription   "SEAM XYPRrot – First-order AmbiX Rotation"
+#define stringFileDescription   "SEAM XYPRROT – First-order AmbiX Rotation"
 #endif
 #define stringCompanyWeb        "https://s-e-a-m.github.io"
 #define stringCompanyEmail      "mailto:seam@example.com"

@@ -64,13 +64,13 @@
              14 / menu 20 on a 42 px stride; a slider block is label 14 /
              slider 18 / value 16. -->
         <view class="CTextLabel" origin="20, 170" size="260, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Level (dBFS RMS)" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Reference (dBFS RMS)" transparent="true"/>
         <view class="COptionMenu" origin="80, 186" size="140, 20" control-tag="Reference"
               font="ValueFont" font-color="TextLight" back-color="SliderTrack"
               frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
 
         <view class="CTextLabel" origin="20, 212" size="260, 14" font="KnobLabelFont"
-              font-color="TextLight" text-alignment="center" title="Offset (dB)" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="Trim (dB)" transparent="true"/>
         <view class="CSlider" origin="20, 228" size="260, 18" control-tag="Trim" default-value="0.5"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive"

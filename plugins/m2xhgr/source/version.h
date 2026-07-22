@@ -9,9 +9,9 @@
 
 #define stringOriginalFilename  "m2xhgr.vst3"
 #if SMTG_PLATFORM_64
-#define stringFileDescription   "SEAM M2XHGR – Mono to AmbiX via Haar (64Bit)"
+#define stringFileDescription   "SEAM M2XHGR – Mono to AmbiX via Haar Decomposition (64Bit)"
 #else
-#define stringFileDescription   "SEAM M2XHGR – Mono to AmbiX via Haar"
+#define stringFileDescription   "SEAM M2XHGR – Mono to AmbiX via Haar Decomposition"
 #endif
 #define stringCompanyWeb        "https://s-e-a-m.github.io"
 #define stringCompanyEmail      "mailto:seam@example.com"
