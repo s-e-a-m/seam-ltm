@@ -1414,7 +1414,9 @@ In `plugins/multipink/resource/multipink.uidesc`, replace everything from `<temp
 
 Also delete the now-unused `<color name="TextDim" .../>` line from the `<colors>` block and add `<color name="Structure" rgba="#888888ff"/>` in its place — the POWER checkbox frame needs it.
 
-The status `CParamDisplay` gains 140 px of width in the move (200 → 340), which is the practical gain of the L format here: the pool status string no longer truncates.
+The status `CParamDisplay` gains 140 px of width in the move (200 → 340).
+This is headroom, not a fix: `PoolStatus` produces only four strings, the longest being `"OK (preferred)"` at 14 characters, which already fitted the old 200 px field at the footer font.
+The wider field is consistent with the wider L-format layout.
 
 - [ ] **Step 3: Verify the lint is fully green**
 
@@ -1675,7 +1677,7 @@ Expected: 0 failures for each.
 
 The build and the validator both accept a `.uidesc` that renders an empty window; only a host proves the GUI. Ask Giuseppe to open in Reaper and confirm:
 
-- **multipink** — 460×390, POWER on by default and sounding, STONE menu above POWER, status line no longer truncated;
+- **multipink** — 460×390, POWER on by default and sounding, STONE menu above POWER, wider status line (headroom, not a truncation fix — the old field already fitted the longest status string);
 - **ltglide** — 460×510, LOOP toggling, the fuse label appearing in step mode and blank in gap mode, all nine controls responding;
 - **dslar** — unchanged except POWER/RESET now in caps and the subtitle white;
 - **strx** — unchanged except the subtitle;
