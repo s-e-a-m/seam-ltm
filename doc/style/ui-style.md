@@ -114,8 +114,11 @@ catches the view regardless of how its caption is drawn, including an
 untitled `CCheckBox` whose caption is a separate label next to it (dslar,
 `_template`).
 A `CCheckBox` whose own title is non-empty and all-caps also counts, and
-that branch accepts any such title, not only the three vocabulary words:
-multipink's MUTE is recognised this way.
+that branch accepts any such title, not only the three vocabulary words.
+No plugin in the suite currently exercises it on its own: every checkbox
+that draws an all-caps title of its own also carries a vocabulary
+control-tag (multipink's POWER, ltglide's LOOP), so the control-tag branch
+catches it first.
 Knowing where this net has gaps is itself useful: watch HEADER and FOOTER
 placement by eye, because the lint does not.
 

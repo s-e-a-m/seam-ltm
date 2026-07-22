@@ -204,11 +204,11 @@ tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
 
     paramReferenceIdx_.store(std::clamp<int>(refIdx, 0, kReferenceStepCount - 1));
     paramTrimDb_.store(std::clamp(trim, -6.0, 6.0));
-    // Third field is POWER (1 = sounding). It held MUTE, with the opposite
-    // meaning, until the 2026-07 UI revision: a session saved before that
-    // re-opens with POWER off and stays silent until the user clicks it.
-    // A deliberate one-off break rather than an inverted wire format kept
-    // forever in a plugin whose presets take seconds to re-make.
+    // Third field is POWER (1 = sounding). It held MUTE, with the
+    // opposite meaning, until the 2026-07 UI revision. A session
+    // saved MUTED therefore re-opens SOUNDING -- pink noise at the
+    // calibration reference, on load. A session saved active
+    // re-opens silent. Re-make any preset from before that date.
     paramPower_.store(power ? 1 : 0);
     preferredStart_ = (prefStart >= -1 && prefStart < kPoolSize) ? prefStart : -1;
 

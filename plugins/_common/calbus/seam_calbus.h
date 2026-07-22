@@ -63,7 +63,7 @@ typedef enum {
 typedef struct SeamCalbusRecord {
     uint32_t kind;        // SeamCalbusKind
     uint32_t stoneId;     // 1..8; 0 = undeclared
-    uint32_t active;      // claimed && !muted
+    uint32_t active;      // claimed && powered (1 = sounding)
     uint32_t _pad;        // explicit: keeps the union 8-byte aligned
     double   levelDb;
     double   sampleRate;
