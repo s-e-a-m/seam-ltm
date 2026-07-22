@@ -209,6 +209,16 @@ tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
     // saved MUTED therefore re-opens SOUNDING -- pink noise at the
     // calibration reference, on load. A session saved active
     // re-opens silent. Re-make any preset from before that date.
+    //
+    // Host automation inverts with it, and nothing on the wire says
+    // so: kParamPower is tag 102, the number MUTE used, so an
+    // envelope drawn against MUTE now drives POWER and asks for the
+    // opposite state at every point on the curve. The tag was kept
+    // deliberately -- renumbering would have made the old envelope
+    // vanish instead of invert, which is quieter but no safer, since
+    // a silent generator is discovered at the next calibration pass
+    // and a loud one is discovered by the loudspeaker. Re-draw the
+    // envelope along with the presets.
     paramPower_.store(power ? 1 : 0);
     preferredStart_ = (prefStart >= -1 && prefStart < kPoolSize) ? prefStart : -1;
 

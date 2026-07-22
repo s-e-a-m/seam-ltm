@@ -3,8 +3,8 @@
     <fonts>
         <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
         <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
-        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
-        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="11"/>
         <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
     </fonts>
     <colors>

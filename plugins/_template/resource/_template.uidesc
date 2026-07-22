@@ -28,7 +28,7 @@
         <view class="CTextLabel" origin="0, 42" size="460, 18" font="SubtitleFont"
               font-color="TextLight" text-alignment="center" title="Subtitle In Title Case" transparent="true"/>
         <view class="CTextLabel" origin="0, 60" size="460, 14" font="InfoFont"
-              font-color="TextLight" text-alignment="center" title="Tagline In Title Case" transparent="true"/>
+              font-color="TextLight" text-alignment="center" title="tagline &#xB7; lowercase technical gloss" transparent="true"/>
 
         <!-- ── SETUP — what the user tells the plugin ─────────────────── -->
         <view class="CTextLabel" origin="0, 88" size="460, 16" font="InfoFont"

@@ -108,11 +108,12 @@ private:
         // One emitter sounds at a time BY METHOD (see the design doc), so the
         // first active record is the headline answer. But "by method" is an
         // operator discipline, not something the bus enforces, and the most
-        // likely slip in the room is un-muting one STONE while forgetting to
-        // mute another. Silently naming only the first active record would
-        // hide exactly that mistake during the session that depends on this
-        // line catching it — so the digest counts ALL active records, not
-        // just the idle ones, and flags it when more than one is sounding.
+        // likely slip in the room is powering one STONE on while forgetting
+        // to power the previous one off. Silently naming only the first
+        // active record would hide exactly that mistake during the session
+        // that depends on this line catching it — so the digest counts ALL
+        // active records, not just the idle ones, and flags it when more
+        // than one is sounding.
         if (d.firstActive < 0) {
             char buf[64];
             std::snprintf(buf, sizeof(buf), "calbus: %d idle, none sounding", d.idleCount);
@@ -133,7 +134,7 @@ private:
             // we ever wanted one. The flag stays a count because "who else"
             // matters less than "someone else is sounding": that's the fact
             // this line exists to surface (see the comment above on the
-            // un-mute slip).
+            // POWER slip).
             char extra[16];
             std::snprintf(extra, sizeof(extra), " \xC2\xB7 +%d more", d.activeCount - 1);
             text += extra;
