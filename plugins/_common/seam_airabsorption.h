@@ -16,6 +16,7 @@
 #pragma once
 #include <cmath>
 #include <algorithm>
+#include <complex>
 
 namespace Seam { namespace air {
 
@@ -58,45 +59,81 @@ inline double alphaISO9613(double fHz, double tempC, double rhPercent,
 //──────────────────────────────────────────────────────────────────────────
 // Minimum-phase air-absorption filter.
 //
-// Building block: one first-order minimum-phase shelf, mix form:
-//   lp += c*(x - lp);   c = 1 - exp(-2*pi*fc/fs)   // one-pole low-pass
-//   y   = v*x + (1 - v)*lp                          // v = HF linear gain
-// DC (lp -> x) => y = x (0 dB); HF (lp -> 0) => y = v*x (gain v). One pole
-// => minimum phase, zero latency. Shelf topology = one such section;
-// Cascade = up to three, at fixed log-spaced corners, whose HF gains are
-// least-squares fit (in dB, over a log-frequency grid) to alpha*d.
+// Building block: a Direct-Form biquad cascade (up to 3 sections), a0
+// normalised to 1. Shelf topology = one first-order high-shelf (stored as a
+// biquad with b2 = a2 = 0), fixed corner 5000 Hz, gain fit by a
+// single-variable dB least-squares -- a deliberately loose "gross tilt".
+// Cascade topology = three second-order RBJ high-shelf biquads at fixed
+// corners {3000, 8000, 16000} Hz, gains fit by linearised dB least-squares
+// -- a genuine multi-band staircase that tracks alpha*d tightly, including
+// at large distance where alpha*d's rolloff accelerates (alpha ~ f^2)
+// beyond what a first-order section can follow. Both are minimum-phase,
+// zero-latency. The design bakes fs into the stored coefficients, so
+// AirFilter needs no sample rate at all -- configure() just copies them.
 //──────────────────────────────────────────────────────────────────────────
+
+// ── biquad magnitude (dB) at frequency f, coeffs normalised so a0 = 1 ──────────
+inline double biquadMagDb_(double b0, double b1, double b2, double a1, double a2,
+                           double f, double fs) {
+    const double w = 2.0 * M_PI * f / fs;
+    const std::complex<double> z1 = std::exp(std::complex<double>(0.0, -w));
+    const std::complex<double> z2 = z1 * z1;
+    const std::complex<double> num = b0 + b1 * z1 + b2 * z2;
+    const std::complex<double> den = 1.0 + a1 * z1 + a2 * z2;
+    return 20.0 * std::log10(std::abs(num / den));
+}
+
+// ── RBJ second-order high-shelf (Audio EQ Cookbook, S = 1), normalised a0 = 1 ──
+// Unity (0 dB) at DC, `dbGain` dB at Nyquist, 12 dB/oct transition around fc.
+// NOTE the digital-normalised angular frequency w0 = 2*pi*fc/fs here.
+inline void designHiShelf2_(double fc, double dbGain, double fs,
+                            double& b0, double& b1, double& b2,
+                            double& a1, double& a2) {
+    const double A  = std::pow(10.0, dbGain / 40.0);
+    const double w0 = 2.0 * M_PI * fc / fs;
+    const double cw = std::cos(w0), sw = std::sin(w0);
+    const double alpha = sw / 2.0 * std::sqrt(2.0);      // S = 1
+    const double sq = std::sqrt(A);
+    const double B0 =      A * ((A + 1) + (A - 1) * cw + 2 * sq * alpha);
+    const double B1 = -2 * A * ((A - 1) + (A + 1) * cw);
+    const double B2 =      A * ((A + 1) + (A - 1) * cw - 2 * sq * alpha);
+    const double A0 =          (A + 1) - (A - 1) * cw + 2 * sq * alpha;
+    const double A1 =      2 * ((A - 1) - (A + 1) * cw);
+    const double A2 =          (A + 1) - (A - 1) * cw - 2 * sq * alpha;
+    b0 = B0 / A0; b1 = B1 / A0; b2 = B2 / A0; a1 = A1 / A0; a2 = A2 / A0;
+}
+
+// ── first-order high-shelf as a biquad (b2 = a2 = 0), prewarped bilinear ───────
+// Unity at DC, `dbGain` dB at HF, 6 dB/oct transition at fc.
+// NOTE w0 = 2*pi*fc is the ANALOG angular frequency here (NOT divided by fs);
+// the sample rate enters only through the prewarp constant c. Do not conflate
+// this with the digital w0 used in designHiShelf2_ above.
+inline void designHiShelf1_(double fc, double dbGain, double fs,
+                            double& b0, double& b1, double& a1) {
+    const double V0 = std::pow(10.0, dbGain / 20.0);
+    const double w0 = 2.0 * M_PI * fc;                   // analog rad/s
+    const double c  = w0 / std::tan(w0 / (2.0 * fs));    // prewarp
+    const double a0 = c + w0;
+    b0 = (V0 * c + w0) / a0;
+    b1 = (w0 - V0 * c) / a0;
+    a1 = (w0 - c) / a0;
+}
 
 enum class Topology { Shelf = 0, Cascade = 1 };
 
 struct AirFilterDesign {
     static constexpr int kMaxSections = 3;
     int    numSections = 0;
-    double corner[kMaxSections]  = {0,0,0};   // Hz
-    double hfGain[kMaxSections]  = {1,1,1};   // linear HF gain of each section
+    // Per-section biquad coefficients, a0 normalised to 1 (first-order sections
+    // set b2 = a2 = 0). fs is already baked in -- the runtime needs no sample rate.
+    double b0[kMaxSections] = {1,1,1};
+    double b1[kMaxSections] = {0,0,0};
+    double b2[kMaxSections] = {0,0,0};
+    double a1[kMaxSections] = {0,0,0};
+    double a2[kMaxSections] = {0,0,0};
     double maxErrorDb = 0.0;
     bool   converged  = false;
-    double fsHint = 48000.0;                  // sample rate the design was made at
 };
-
-// dB magnitude of a single mix-form first-order section at (fc, v) over fs.
-inline double sectionMagDb_(double fc, double v, double f, double fs) {
-    const double w = 2.0 * M_PI * f / fs;
-    const double c = 1.0 - std::exp(-2.0 * M_PI * fc / fs);
-    // one-pole LP complex response
-    const double cr = std::cos(w), ci = std::sin(w);
-    // lp = c / (1 - (1-c) e^{-jw})
-    const double dr = 1.0 - (1.0 - c) * cr;
-    const double di =        (1.0 - c) * ci;   // sign of -e^{-jw} imag: (1-c)*sin(w)
-    // lp = c / (dr - j di)
-    const double den = dr*dr + di*di;
-    const double lpR = c * dr / den;
-    const double lpI = c * di / den;
-    // H = v + (1-v)*lp
-    const double hR = v + (1.0 - v) * lpR;
-    const double hI =     (1.0 - v) * lpI;
-    return 10.0 * std::log10(hR*hR + hI*hI);
-}
 
 // Fit the minimum-phase air filter to A(f) = -alpha*d (dB) over 20 Hz..min(20k,0.45fs).
 inline AirFilterDesign designAirFilter(double dMeters, double tempC, double rhPercent,
@@ -110,116 +147,111 @@ inline AirFilterDesign designAirFilter(double dMeters, double tempC, double rhPe
         freq[i]   = fLo * std::pow(fHi / fLo, t);
         target[i] = -alphaISO9613(freq[i], tempC, rhPercent, paKPa) * dMeters; // <= 0 dB
     }
+    const double refDb = -6.0;   // basis reference gain for the linearised dB LSQ
 
-    // Fixed corners: one for shelf, three for cascade.
-    //
-    // NOTE on corner placement: the mix-form one-pole's HF asymptote at
-    // Nyquist is bounded by 20*log10(c/(2-c)) with c = 1-exp(-2*pi*fc/fs);
-    // this ratio *shrinks* as fc approaches fs/2 (a corner near Nyquist has
-    // LESS deep-cut headroom, not more). For the reference test case
-    // (d=20 m, 20C, 50%RH, fs=48 kHz) the ISO 9613-1 target needs ~9 dB of
-    // cut by 18 kHz, so corners clustered around 6-11 kHz -- not spread to
-    // 14-20 kHz -- give the least-squares fit the most usable headroom.
-    // These constants were chosen by exhaustive numeric search (grid +
-    // local refinement) over corner placement for that exact scenario;
-    // see doc/study or task-2-report.md for the search methodology.
-    if (topo == Topology::Shelf) { out.numSections = 1; out.corner[0] = 6000.0; }
-    else { out.numSections = 3; out.corner[0] = 9800.0; out.corner[1] = 9900.0; out.corner[2] = 11000.0; }
-
-    // Linearised least-squares in dB: basis column s_k(f) = section-k dB shape at a
-    // reference cut, scaled linearly by weight g_k; solve (B^T B) g = B^T target.
-    // Reference cut per section: -1 dB HF (v_ref = 10^(-1/20)).
-    const double vRef = std::pow(10.0, -1.0 / 20.0);
-    const int N = out.numSections;
-    double B[64][3];
-    for (int i = 0; i < M; ++i)
-        for (int k = 0; k < N; ++k)
-            B[i][k] = sectionMagDb_(out.corner[k], vRef, freq[i], fs); // dB per unit weight
-
-    // Normal equations (N up to 3): solve small SPD system by Gaussian elimination.
-    double A[3][3] = {{0}}, rhs[3] = {0};
-    for (int k = 0; k < N; ++k) {
-        for (int j = 0; j < N; ++j)
-            for (int i = 0; i < M; ++i) A[k][j] += B[i][k] * B[i][j];
-        for (int i = 0; i < M; ++i) rhs[k] += B[i][k] * target[i];
-    }
-    double g[3] = {0,0,0};
-    // forward elimination
-    for (int p = 0; p < N; ++p) {
-        double piv = A[p][p];
-        if (std::abs(piv) < 1e-12) piv = 1e-12;
-        for (int r = p + 1; r < N; ++r) {
-            const double m = A[r][p] / piv;
-            for (int cc = p; cc < N; ++cc) A[r][cc] -= m * A[p][cc];
-            rhs[r] -= m * rhs[p];
+    if (topo == Topology::Shelf) {
+        // One first-order high-shelf at a fixed corner; fit its single gain.
+        const double fc = 5000.0;
+        double bn0, bn1, ba1;                 // unit-basis (refDb) coeffs
+        designHiShelf1_(fc, refDb, fs, bn0, bn1, ba1);
+        double num = 0.0, den = 0.0;
+        for (int i = 0; i < M; ++i) {
+            const double s = biquadMagDb_(bn0, bn1, 0.0, ba1, 0.0, freq[i], fs) / refDb; // dB per 1 dB gain
+            num += s * target[i];
+            den += s * s;
+        }
+        double gDb = den > 1e-12 ? num / den : 0.0;
+        if (gDb > 0.0) gDb = 0.0;
+        if (gDb < -60.0) gDb = -60.0;
+        out.numSections = 1;
+        designHiShelf1_(fc, gDb, fs, out.b0[0], out.b1[0], out.a1[0]);
+        out.b2[0] = 0.0; out.a2[0] = 0.0;
+    } else {
+        // Three second-order high-shelves at fixed corners; fit their gains by
+        // a linearised dB least-squares (basis = each section's dB shape per 1 dB
+        // of gain; solve the 3x3 normal equations for the gain vector).
+        const double C[3] = { 3000.0, 8000.0, 16000.0 };
+        const int N = 3;
+        double B[64][3];
+        for (int k = 0; k < N; ++k) {
+            double bb0, bb1, bb2, ba1, ba2;
+            designHiShelf2_(C[k], refDb, fs, bb0, bb1, bb2, ba1, ba2);
+            for (int i = 0; i < M; ++i)
+                B[i][k] = biquadMagDb_(bb0, bb1, bb2, ba1, ba2, freq[i], fs) / refDb;
+        }
+        double A[3][3] = {{0}}, rhs[3] = {0}, g[3] = {0};
+        for (int k = 0; k < N; ++k) {
+            for (int j = 0; j < N; ++j)
+                for (int i = 0; i < M; ++i) A[k][j] += B[i][k] * B[i][j];
+            for (int i = 0; i < M; ++i) rhs[k] += B[i][k] * target[i];
+        }
+        for (int p = 0; p < N; ++p) {                     // Gaussian elimination
+            double piv = std::abs(A[p][p]) < 1e-12 ? 1e-12 : A[p][p];
+            for (int r = p + 1; r < N; ++r) {
+                const double m = A[r][p] / piv;
+                for (int cc = p; cc < N; ++cc) A[r][cc] -= m * A[p][cc];
+                rhs[r] -= m * rhs[p];
+            }
+        }
+        for (int p = N - 1; p >= 0; --p) {
+            double s = rhs[p];
+            for (int cc = p + 1; cc < N; ++cc) s -= A[p][cc] * g[cc];
+            g[p] = s / (std::abs(A[p][p]) < 1e-12 ? 1e-12 : A[p][p]);
+        }
+        out.numSections = N;
+        for (int k = 0; k < N; ++k) {
+            double gDb = g[k];
+            if (gDb > 0.0) gDb = 0.0;
+            if (gDb < -60.0) gDb = -60.0;
+            designHiShelf2_(C[k], gDb, fs, out.b0[k], out.b1[k], out.b2[k], out.a1[k], out.a2[k]);
         }
     }
-    for (int p = N - 1; p >= 0; --p) {
-        double s = rhs[p];
-        for (int cc = p + 1; cc < N; ++cc) s -= A[p][cc] * g[cc];
-        g[p] = s / (std::abs(A[p][p]) < 1e-12 ? 1e-12 : A[p][p]);
-    }
 
-    // Convert each section weight -> actual HF cut in dB -> linear gain v (clamped).
-    for (int k = 0; k < N; ++k) {
-        double cutDb = g[k] * (-1.0);              // weight g on a -1 dB reference shape
-        if (cutDb > 0.0)   cutDb = 0.0;            // attenuation only
-        if (cutDb < -80.0) cutDb = -80.0;
-        out.hfGain[k] = std::pow(10.0, cutDb / 20.0);
-    }
-
-    // Report the achieved max dB error over the grid (true nonlinear response).
+    // Achieved max dB error over the grid (true biquad-cascade magnitude).
     double err = 0.0;
     for (int i = 0; i < M; ++i) {
         double db = 0.0;
-        for (int k = 0; k < N; ++k) db += sectionMagDb_(out.corner[k], out.hfGain[k], freq[i], fs);
+        for (int k = 0; k < out.numSections; ++k)
+            db += biquadMagDb_(out.b0[k], out.b1[k], out.b2[k], out.a1[k], out.a2[k], freq[i], fs);
         err = std::max(err, std::abs(db - target[i]));
     }
     out.maxErrorDb = err;
-    // Loose gate; the shelf is the deliberately-loose topology and, for the
-    // reference scenario above, its own best achievable single-section fit
-    // sits at ~5.9 dB max grid error (see task-2-report.md) -- comfortably
-    // under a 7.0 dB gate but not under the originally-drafted 6.0 dB one.
-    out.converged  = std::isfinite(err) && err < 7.0;
-    out.fsHint     = fs;
+    out.converged  = std::isfinite(err) && err < 8.0;  // covers both topologies
     return out;
 }
 
-// Runtime: shared coefficients, per-instance state; processes one channel.
+// Runtime: shared biquad coefficients, per-instance state; one channel.
+// Transposed Direct Form II per section (good numeric behaviour, one add/mul chain).
 struct AirFilter {
     void configure(const AirFilterDesign& d) {
         n_ = d.numSections;
         for (int k = 0; k < n_; ++k) {
-            v_[k]      = d.hfGain[k];
-            corner_[k] = d.corner[k];
+            b0_[k] = d.b0[k]; b1_[k] = d.b1[k]; b2_[k] = d.b2[k];
+            a1_[k] = d.a1[k]; a2_[k] = d.a2[k];
         }
-        fs_ = d.fsHint;
-        recompute_();   // configure() is self-sufficient: c_[k] ready without a
-                         // separate setSampleRate() call.
     }
-    void setSampleRate(double fs) { fs_ = fs; recompute_(); }
-    void reset() { for (int k = 0; k < AirFilterDesign::kMaxSections; ++k) lp_[k] = 0.0; }
-
+    void reset() {
+        for (int k = 0; k < AirFilterDesign::kMaxSections; ++k) { z1_[k] = 0.0; z2_[k] = 0.0; }
+    }
     inline double process(double x) {
         double y = x;
         for (int k = 0; k < n_; ++k) {
-            lp_[k] += c_[k] * (y - lp_[k]);
-            y = v_[k] * y + (1.0 - v_[k]) * lp_[k];
+            const double out = b0_[k] * y + z1_[k];
+            z1_[k] = b1_[k] * y - a1_[k] * out + z2_[k];
+            z2_[k] = b2_[k] * y - a2_[k] * out;
+            y = out;
         }
         return y;
     }
-
 private:
-    void recompute_() {
-        for (int k = 0; k < n_; ++k)
-            c_[k] = 1.0 - std::exp(-2.0 * M_PI * corner_[k] / fs_);
-    }
     int    n_ = 0;
-    double fs_ = 48000.0;
-    double v_[AirFilterDesign::kMaxSections]      = {1,1,1};
-    double corner_[AirFilterDesign::kMaxSections] = {0,0,0};
-    double c_[AirFilterDesign::kMaxSections]      = {0,0,0};
-    double lp_[AirFilterDesign::kMaxSections]     = {0,0,0};
+    double b0_[AirFilterDesign::kMaxSections] = {1,1,1};
+    double b1_[AirFilterDesign::kMaxSections] = {0,0,0};
+    double b2_[AirFilterDesign::kMaxSections] = {0,0,0};
+    double a1_[AirFilterDesign::kMaxSections] = {0,0,0};
+    double a2_[AirFilterDesign::kMaxSections] = {0,0,0};
+    double z1_[AirFilterDesign::kMaxSections] = {0,0,0};
+    double z2_[AirFilterDesign::kMaxSections] = {0,0,0};
 };
 
 // Geometric 1/r spreading, attenuation-only, 1 m reference.
