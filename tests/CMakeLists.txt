@@ -58,6 +58,16 @@ target_include_directories(hilbert_dsp_test PRIVATE
 target_compile_features(hilbert_dsp_test PRIVATE cxx_std_17)
 add_test(NAME hilbert_dsp_test COMMAND hilbert_dsp_test)
 
+add_executable(seam_airabsorption_test
+    seam_airabsorption_test.cpp
+)
+target_include_directories(seam_airabsorption_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_airabsorption_test PRIVATE cxx_std_17)
+add_test(NAME seam_airabsorption_test COMMAND seam_airabsorption_test)
+
 add_executable(lr2xhgr_dsp_test
     lr2xhgr_dsp_test.cpp
 )
