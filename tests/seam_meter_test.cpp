@@ -47,3 +47,10 @@ TEST_CASE("LevelFollower(Peak) tracks the absolute value") {
     for (int i = 0; i < 48000; ++i) v = f.feed(-0.8);
     CHECK(v == doctest::Approx(0.8).epsilon(1e-3));
 }
+
+TEST_CASE("db2lin: 0 dB is unity, ±20 dB is ×10 / ÷10") {
+    CHECK(db2lin(0.0)   == doctest::Approx(1.0));
+    CHECK(db2lin(20.0)  == doctest::Approx(10.0));
+    CHECK(db2lin(-20.0) == doctest::Approx(0.1));
+    CHECK(db2lin(-6.0)  == doctest::Approx(0.5011872336));
+}
