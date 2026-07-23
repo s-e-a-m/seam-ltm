@@ -11,8 +11,8 @@
 // which are then rotated by Yaw, Pitch, Roll.
 //
 // FAUST REFERENCE (seam.ambisonics.lib): m2xhgr  (Haar via seam.dwt.lib)
-//   m2xhgr = sdw.haarmn(1);   // W lands in ACN channel 0; no reversal needed
-//   process = m2xhgr : rotateYPR(yaw, pitch, roll);
+//   m2xhgr(g1,g2,g3) = sdw.haarmn(1) : hgain(g1,g2,g3);
+//   process = m2xhgr(g1,g2,g3) : rotateYPR(yaw, pitch, roll);
 //─────────────────────────────────────────────────────────────────────────────
 
 #pragma once
@@ -20,6 +20,8 @@
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "pluginterfaces/vst/ivstplugview.h"
 #include "seam_haar.h"
+#include "seam_rotation.h"
+#include "seam_meter.h"
 
 namespace Seam {
 
@@ -56,6 +58,10 @@ private:
     double fYaw   = 0.0;
     double fPitch = 0.0;
     double fRoll  = 0.0;
+
+    double fTrimA1Db = 0.0;   // dB, -12..+12
+    double fTrimA2Db = 0.0;
+    double fTrimA3Db = 0.0;
 };
 
 } // namespace Seam
