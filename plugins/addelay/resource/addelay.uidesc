@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SEAM-LTM ADDELAY — placeholder window. The real window (SETUP/OPS/FINE
+     zones per doc/style/ui-style.md) is a later task; this file exists only
+     so the build gate (Task 4/5) has something to load. It is deliberately
+     minimal but not empty: tools/check-uidesc.py hard-ERRORs on a window with
+     no TitleFont label (check_title) and on any declared colour that is not
+     in the canonical palette (check_palette), so this file declares exactly
+     one TitleFont label reading "SEAM ADDELAY" and two canonical colours. -->
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 420"
+              minSize="460, 420" maxSize="460, 420"
+              background-color="BgDark" background-color-draw-style="filled">
+        <view class="CTextLabel" origin="0, 14" size="460, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM ADDELAY" transparent="true"/>
+    </template>
+</vstgui-ui-description>
