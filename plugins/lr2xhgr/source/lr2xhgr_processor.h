@@ -33,6 +33,8 @@
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "pluginterfaces/vst/ivstplugview.h"
 #include "seam_haar.h"
+#include "lr2xhgr_dsp.h"
+#include "seam_meter.h"
 
 namespace Seam {
 
@@ -73,6 +75,10 @@ private:
     double fYaw        = 0.0;
     double fPitch      = 0.0;
     double fRoll       = 0.0;
+
+    double fTrimA1Db = 0.0;   // dB, -12..+12
+    double fTrimA2Db = 0.0;
+    double fTrimA3Db = 0.0;
 };
 
 } // namespace Seam
