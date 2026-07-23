@@ -207,6 +207,17 @@ target_include_directories(strx_calbus_digest_test PRIVATE
 target_compile_features(strx_calbus_digest_test PRIVATE cxx_std_17)
 add_test(NAME strx_calbus_digest_test COMMAND strx_calbus_digest_test)
 
+add_executable(addelay_dsp_test
+    addelay_dsp_test.cpp
+)
+target_include_directories(addelay_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/addelay/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(addelay_dsp_test PRIVATE cxx_std_17)
+add_test(NAME addelay_dsp_test COMMAND addelay_dsp_test)
+
 # ─── UI standard lint (see doc/style/ui-style.md) ────────────────────────────
 # Two tests: the lint's own rule tests, then the lint over all plugins.
 # Python3 is optional — on a machine without it the tests are skipped rather
