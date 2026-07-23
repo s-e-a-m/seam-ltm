@@ -17,6 +17,11 @@ inline double lin2db(double x, double floorDb = -60.0) {
     return db < floorDb ? floorDb : db;
 }
 
+// dB -> linear amplitude. Inverse of lin2db (unfloored). 0 dB -> 1.0.
+inline double db2lin(double db) {
+    return std::pow(10.0, db / 20.0);
+}
+
 // dB -> normalized [0,1] over [floorDb, 0], clamped. A degenerate floor
 // (floorDb >= 0) has an empty range; return a defined 0/1 instead of NaN.
 inline double db2norm(double db, double floorDb = -60.0) {

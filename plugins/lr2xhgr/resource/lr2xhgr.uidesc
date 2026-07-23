@@ -3,8 +3,9 @@
     <fonts>
         <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
         <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
-        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
-        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="11"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
     </fonts>
     <colors>
         <color name="BgDark" rgba="#292c2fff"/>
@@ -14,62 +15,114 @@
         <color name="SliderDiv" rgba="#c8874aff"/>
     </colors>
 
-    <template name="view" class="CViewContainer" origin="0, 0" size="300, 458"
-              minSize="300, 458" maxSize="300, 458"
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 458"
+              minSize="460, 458" maxSize="460, 458"
               background-color="BgDark" background-color-draw-style="filled">
 
-        <!-- Title block at top -->
-        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+        <!-- ── HEADER ───────────────────────────────────── -->
+        <view class="CTextLabel" origin="0, 18" size="460, 26" font="TitleFont"
               font-color="TextLight" text-alignment="center" title="SEAM LR2XHGR" transparent="true"/>
-        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+        <view class="CTextLabel" origin="0, 46" size="460, 18" font="SubtitleFont"
               font-color="TextLight" text-alignment="center" title="Stereo to AmbiX via Haar" transparent="true"/>
 
-        <!-- Divergence (orange) -->
-        <view class="CTextLabel" origin="20, 80" size="260, 18" font="KnobLabelFont"
+        <!-- ── FINE ── two 180 px columns at x=30 and x=250, 40 px gutter ──
+             ROTATION holds Divergence plus the three Euler angles that steer
+             the AmbiX image (four rows); GAIN holds the three per-band trims
+             (three rows). Slider blocks are label 14 / slider 18 / value 16
+             on a 58 px stride, as in m2xhgr's L window. -->
+        <view class="CTextLabel" origin="30, 96" size="180, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="&#x2014; ROTATION &#x2014;" transparent="true"/>
+        <view class="CTextLabel" origin="250, 96" size="180, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="&#x2014; GAIN &#x2014;" transparent="true"/>
+
+        <!-- Left column: Divergence (unipolar, orange) / Yaw / Pitch / Roll -->
+        <view class="CTextLabel" origin="30, 118" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Divergence" transparent="true"/>
-        <view class="CSlider" origin="20, 100" size="260, 20" control-tag="Divergence" default-value="0.25"
+        <view class="CSlider" origin="30, 132" size="180, 18" control-tag="Divergence" default-value="0.25"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderDiv" draw-value-from-center="false"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="20, 122" size="260, 18" font="ValueFont" control-tag="Divergence"
-              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+        <view class="CTextEdit" origin="30, 150" size="180, 16" font="ValueFont" control-tag="Divergence"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
 
-        <!-- Yaw (Z) -->
-        <view class="CTextLabel" origin="20, 148" size="260, 18" font="KnobLabelFont"
+        <view class="CTextLabel" origin="30, 176" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Yaw (Z)" transparent="true"/>
-        <view class="CSlider" origin="20, 168" size="260, 20" control-tag="Yaw" default-value="0.5"
+        <view class="CSlider" origin="30, 190" size="180, 18" control-tag="Yaw" default-value="0.5"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="20, 190" size="260, 18" font="ValueFont" control-tag="Yaw"
-              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+        <view class="CTextEdit" origin="30, 208" size="180, 16" font="ValueFont" control-tag="Yaw"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
 
-        <!-- Pitch (Y) -->
-        <view class="CTextLabel" origin="20, 216" size="260, 18" font="KnobLabelFont"
+        <view class="CTextLabel" origin="30, 234" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Pitch (Y)" transparent="true"/>
-        <view class="CSlider" origin="20, 236" size="260, 20" control-tag="Pitch" default-value="0.5"
+        <view class="CSlider" origin="30, 248" size="180, 18" control-tag="Pitch" default-value="0.5"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="20, 258" size="260, 18" font="ValueFont" control-tag="Pitch"
-              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+        <view class="CTextEdit" origin="30, 266" size="180, 16" font="ValueFont" control-tag="Pitch"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
 
-        <!-- Roll (X) -->
-        <view class="CTextLabel" origin="20, 284" size="260, 18" font="KnobLabelFont"
+        <view class="CTextLabel" origin="30, 292" size="180, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Roll (X)" transparent="true"/>
-        <view class="CSlider" origin="20, 304" size="260, 20" control-tag="Roll" default-value="0.5"
+        <view class="CSlider" origin="30, 306" size="180, 18" control-tag="Roll" default-value="0.5"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
               draw-frame="true" draw-frame-color="SliderTrack"
               frame-width="1" mode="free click" transparent="false"/>
-        <view class="CTextEdit" origin="20, 326" size="260, 18" font="ValueFont" control-tag="Roll"
-              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+        <view class="CTextEdit" origin="30, 324" size="180, 16" font="ValueFont" control-tag="Roll"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
 
-        <!-- Logo centered at bottom -->
-        <view class="CView" origin="30, 362" size="240, 77" bitmap="logo"/>
+        <!-- Right column: the three per-band trims (bipolar, ±12 dB, 0 dB
+             centred — same draw-value-from-center convention as rotation). -->
+        <view class="CTextLabel" origin="250, 118" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="A1" transparent="true"/>
+        <view class="CSlider" origin="250, 132" size="180, 18" control-tag="TrimA1" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="250, 150" size="180, 16" font="ValueFont" control-tag="TrimA1"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="250, 176" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="A2" transparent="true"/>
+        <view class="CSlider" origin="250, 190" size="180, 18" control-tag="TrimA2" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="250, 208" size="180, 16" font="ValueFont" control-tag="TrimA2"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="250, 234" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="A3" transparent="true"/>
+        <view class="CSlider" origin="250, 248" size="180, 18" control-tag="TrimA3" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive" draw-value-from-center="true"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="250, 266" size="180, 16" font="ValueFont" control-tag="TrimA3"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
+
+        <!-- ── FOOTER ─────────────────────────────────────
+             SEAM logo, native 240x77 (CView does not scale bitmaps), centred
+             at x=(460-240)/2=110 below the taller (left, four-row) column;
+             the left column's last row ends at y=340 (292 + 14 + 18 + 16),
+             so the logo sits at y=360 (20 px clearance) and ends at 437,
+             21 px above the 458 px frame — the same bottom margin m2xhgr
+             uses for this logo. -->
+        <view class="CView" origin="110, 360" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
@@ -78,5 +131,8 @@
         <control-tag name="Yaw" tag="100"/>
         <control-tag name="Pitch" tag="101"/>
         <control-tag name="Roll" tag="102"/>
+        <control-tag name="TrimA1" tag="103"/>
+        <control-tag name="TrimA2" tag="104"/>
+        <control-tag name="TrimA3" tag="105"/>
     </control-tags>
 </vstgui-ui-description>

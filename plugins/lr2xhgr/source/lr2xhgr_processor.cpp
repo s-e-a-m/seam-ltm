@@ -7,6 +7,8 @@
 #include "version.h"
 #include "seam_haar.h"
 #include "seam_rotation.h"
+#include "lr2xhgr_dsp.h"
+#include "seam_meter.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
@@ -68,6 +70,16 @@ tresult PLUGIN_API LR2XHGRProcessor::initialize (FUnknown* context)
         new RangeParameter (STR16 ("Roll (X)"),  kParamRoll,  STR16 ("\u00B0"),
                             -180.0, 180.0, 0.0, 0, ParameterInfo::kCanAutomate));
 
+    parameters.addParameter (
+        new RangeParameter (STR16 ("A1"), kParamTrimA1, STR16 ("dB"),
+                            -12.0, 12.0, 0.0, 0, ParameterInfo::kCanAutomate));
+    parameters.addParameter (
+        new RangeParameter (STR16 ("A2"), kParamTrimA2, STR16 ("dB"),
+                            -12.0, 12.0, 0.0, 0, ParameterInfo::kCanAutomate));
+    parameters.addParameter (
+        new RangeParameter (STR16 ("A3"), kParamTrimA3, STR16 ("dB"),
+                            -12.0, 12.0, 0.0, 0, ParameterInfo::kCanAutomate));
+
     return kResultOk;
 }
 
@@ -128,6 +140,15 @@ tresult PLUGIN_API LR2XHGRProcessor::process (ProcessData& data)
                     case kParamRoll:
                         fRoll = (-180.0 + value * 360.0) * M_PI / 180.0;
                         break;
+                    case kParamTrimA1:
+                        fTrimA1Db = -12.0 + value * 24.0;
+                        break;
+                    case kParamTrimA2:
+                        fTrimA2Db = -12.0 + value * 24.0;
+                        break;
+                    case kParamTrimA3:
+                        fTrimA3Db = -12.0 + value * 24.0;
+                        break;
                 }
             }
         }
@@ -174,17 +195,20 @@ tresult PLUGIN_API LR2XHGRProcessor::process (ProcessData& data)
 }
 
 //─────────────────────────────────────────────────────────────────────────────
-// DSP core — Stereo → Haar decomposition → divergence → global rotation
+// DSP core — Stereo → Haar decomposition → shared harmonic gain trims →
+// divergence → global rotation
 //
 // For each sample:
 //   1. Decompose L and R independently via Haar wavelet (haarmn(1))
-//   2. Rotate L-field by +divergence (yaw only), R-field by -divergence
-//   3. Sum the two 4-channel fields
-//   4. Apply global rotation (Yaw, Pitch, Roll)
+//   2. Route both banks through Seam::lr2xhgr::mix: A1/A2/A3 trims applied
+//      to BOTH banks, then rotate L-field by +divergence, R-field by
+//      -divergence, sum, and apply the global rotation (Yaw, Pitch, Roll)
 //
-// Faust reference: lr2xhgr = par(i,2,m2xhgr) :
+// Faust reference: lr2xhgr(divergence,yaw,pitch,roll,g1,g2,g3) =
+//     par(i,2,m2xhgr(g1,g2,g3)) :
 //     rotateYPR(divergence,pitch,roll),
-//     rotateYPR(0-divergence,pitch,roll) :> si.bus(4);
+//     rotateYPR(0-divergence,pitch,roll) :> si.bus(4) :
+//     rotateYPR(yaw,0,0);
 //─────────────────────────────────────────────────────────────────────────────
 
 template <typename SampleType>
@@ -194,7 +218,10 @@ void LR2XHGRProcessor::processHaarStereo (SampleType** in, SampleType** out, int
     const SampleType yaw    = static_cast<SampleType>(fYaw);
     const SampleType pitch  = static_cast<SampleType>(fPitch);
     const SampleType roll   = static_cast<SampleType>(fRoll);
-    const SampleType zero   = static_cast<SampleType>(0);
+
+    const SampleType g1 = static_cast<SampleType>(seam::meter::db2lin (fTrimA1Db));
+    const SampleType g2 = static_cast<SampleType>(seam::meter::db2lin (fTrimA2Db));
+    const SampleType g3 = static_cast<SampleType>(seam::meter::db2lin (fTrimA3Db));
 
     SampleType* inL  = in[0];
     SampleType* inR  = in[1];
@@ -227,26 +254,13 @@ void LR2XHGRProcessor::processHaarStereo (SampleType** in, SampleType** out, int
         ra2 = static_cast<SampleType>(dra2);
         ra3 = static_cast<SampleType>(dra3);
 
-        // Step 2: Apply divergence as opposing yaw rotations
-        SampleType lOut0, lOut1, lOut2, lOut3;
-        SampleType rOut0, rOut1, rOut2, rOut3;
-        rotateYPR (divYaw, pitch, roll,
-                   la0, la1, la2, la3,
-                   lOut0, lOut1, lOut2, lOut3);
-        rotateYPR (-divYaw, pitch, roll,
-                   ra0, ra1, ra2, ra3,
-                   rOut0, rOut1, rOut2, rOut3);
-
-        // Step 3: Sum the two fields
-        SampleType s0 = lOut0 + rOut0;
-        SampleType s1 = lOut1 + rOut1;
-        SampleType s2 = lOut2 + rOut2;
-        SampleType s3 = lOut3 + rOut3;
-
-        // Step 4: Apply global rotation
-        rotateYPR (yaw, zero, zero,
-                   s0, s1, s2, s3,
-                   out0[i], out1[i], out2[i], out3[i]);
+        // Steps 2-4: shared harmonic gain trims, divergence split, sum,
+        // global rotation — all via the tested lr2xhgr::mix core.
+        const SampleType la[4] = { la0, la1, la2, la3 };
+        const SampleType ra[4] = { ra0, ra1, ra2, ra3 };
+        SampleType o[4];
+        Seam::lr2xhgr::mix (divYaw, yaw, pitch, roll, g1, g2, g3, la, ra, o);
+        out0[i] = o[0]; out1[i] = o[1]; out2[i] = o[2]; out3[i] = o[3];
     }
 }
 
@@ -259,7 +273,7 @@ tresult PLUGIN_API LR2XHGRProcessor::setState (IBStream* state)
     if (!state)
         return kResultFalse;
 
-    double saved[4];
+    double saved[7];
     if (state->read (saved, sizeof (saved)) != kResultOk)
         return kResultFalse;
 
@@ -278,6 +292,13 @@ tresult PLUGIN_API LR2XHGRProcessor::setState (IBStream* state)
     if (auto* p = parameters.getParameter (kParamRoll))
         p->setNormalized (saved[3]);
 
+    fTrimA1Db = -12.0 + saved[4] * 24.0;
+    fTrimA2Db = -12.0 + saved[5] * 24.0;
+    fTrimA3Db = -12.0 + saved[6] * 24.0;
+    if (auto* p = parameters.getParameter (kParamTrimA1)) p->setNormalized (saved[4]);
+    if (auto* p = parameters.getParameter (kParamTrimA2)) p->setNormalized (saved[5]);
+    if (auto* p = parameters.getParameter (kParamTrimA3)) p->setNormalized (saved[6]);
+
     return kResultOk;
 }
 
@@ -286,11 +307,14 @@ tresult PLUGIN_API LR2XHGRProcessor::getState (IBStream* state)
     if (!state)
         return kResultFalse;
 
-    double saved[4];
+    double saved[7];
     saved[0] = parameters.getParameter (kParamDivergence) ? parameters.getParameter (kParamDivergence)->getNormalized () : 0.5;
     saved[1] = parameters.getParameter (kParamYaw)        ? parameters.getParameter (kParamYaw)->getNormalized ()        : 0.5;
     saved[2] = parameters.getParameter (kParamPitch)      ? parameters.getParameter (kParamPitch)->getNormalized ()      : 0.5;
     saved[3] = parameters.getParameter (kParamRoll)       ? parameters.getParameter (kParamRoll)->getNormalized ()       : 0.5;
+    saved[4] = parameters.getParameter (kParamTrimA1)     ? parameters.getParameter (kParamTrimA1)->getNormalized ()     : 0.5;
+    saved[5] = parameters.getParameter (kParamTrimA2)     ? parameters.getParameter (kParamTrimA2)->getNormalized ()     : 0.5;
+    saved[6] = parameters.getParameter (kParamTrimA3)     ? parameters.getParameter (kParamTrimA3)->getNormalized ()     : 0.5;
 
     state->write (saved, sizeof (saved));
     return kResultOk;

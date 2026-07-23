@@ -7,6 +7,7 @@
 #include "version.h"
 #include "seam_haar.h"
 #include "seam_rotation.h"
+#include "seam_meter.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
@@ -59,6 +60,16 @@ tresult PLUGIN_API M2XHGRProcessor::initialize (FUnknown* context)
     parameters.addParameter (
         new RangeParameter (STR16 ("Roll (X)"),  kParamRoll,  STR16 ("\u00B0"),
                             -180.0, 180.0, 0.0, 0, ParameterInfo::kCanAutomate));
+
+    parameters.addParameter (
+        new RangeParameter (STR16 ("A1"), kParamTrimA1, STR16 ("dB"),
+                            -12.0, 12.0, 0.0, 0, ParameterInfo::kCanAutomate));
+    parameters.addParameter (
+        new RangeParameter (STR16 ("A2"), kParamTrimA2, STR16 ("dB"),
+                            -12.0, 12.0, 0.0, 0, ParameterInfo::kCanAutomate));
+    parameters.addParameter (
+        new RangeParameter (STR16 ("A3"), kParamTrimA3, STR16 ("dB"),
+                            -12.0, 12.0, 0.0, 0, ParameterInfo::kCanAutomate));
 
     return kResultOk;
 }
@@ -113,6 +124,15 @@ tresult PLUGIN_API M2XHGRProcessor::process (ProcessData& data)
                     case kParamRoll:
                         fRoll = (-180.0 + value * 360.0) * M_PI / 180.0;
                         break;
+                    case kParamTrimA1:
+                        fTrimA1Db = -12.0 + value * 24.0;
+                        break;
+                    case kParamTrimA2:
+                        fTrimA2Db = -12.0 + value * 24.0;
+                        break;
+                    case kParamTrimA3:
+                        fTrimA3Db = -12.0 + value * 24.0;
+                        break;
                 }
             }
         }
@@ -158,11 +178,12 @@ tresult PLUGIN_API M2XHGRProcessor::process (ProcessData& data)
 }
 
 //─────────────────────────────────────────────────────────────────────────────
-// DSP core — Mono → Haar decomposition → rotation
+// DSP core — Mono → Haar decomposition → harmonic gain trims → rotation
 //
 // For each sample:
 //   1. Haar wavelet decomposition (haarmn(1)) → 4 spatial components
-//   2. rotateYPR → oriented AmbiX output
+//   2. gainRotateYPR → A1/A2/A3 trimmed (A0 fixed), then rotated → oriented
+//      AmbiX output
 //─────────────────────────────────────────────────────────────────────────────
 
 template <typename SampleType>
@@ -171,6 +192,10 @@ void M2XHGRProcessor::processHaarMono (SampleType* in, SampleType** out, int32 n
     const SampleType yaw   = static_cast<SampleType>(fYaw);
     const SampleType pitch = static_cast<SampleType>(fPitch);
     const SampleType roll  = static_cast<SampleType>(fRoll);
+
+    const SampleType g1 = static_cast<SampleType>(seam::meter::db2lin (fTrimA1Db));
+    const SampleType g2 = static_cast<SampleType>(seam::meter::db2lin (fTrimA2Db));
+    const SampleType g3 = static_cast<SampleType>(seam::meter::db2lin (fTrimA3Db));
 
     SampleType* out0 = out[0];
     SampleType* out1 = out[1];
@@ -189,10 +214,10 @@ void M2XHGRProcessor::processHaarMono (SampleType* in, SampleType** out, int32 n
         SampleType a2 = static_cast<SampleType>(da2);
         SampleType a3 = static_cast<SampleType>(da3);
 
-        // Rotate
-        rotateYPR (yaw, pitch, roll,
-                   a0, a1, a2, a3,
-                   out0[i], out1[i], out2[i], out3[i]);
+        // Apply harmonic gain trims, then rotate
+        gainRotateYPR (g1, g2, g3, yaw, pitch, roll,
+                       a0, a1, a2, a3,
+                       out0[i], out1[i], out2[i], out3[i]);
     }
 }
 
@@ -205,7 +230,7 @@ tresult PLUGIN_API M2XHGRProcessor::setState (IBStream* state)
     if (!state)
         return kResultFalse;
 
-    double saved[3];
+    double saved[6];
     if (state->read (saved, sizeof (saved)) != kResultOk)
         return kResultFalse;
 
@@ -220,6 +245,13 @@ tresult PLUGIN_API M2XHGRProcessor::setState (IBStream* state)
     if (auto* p = parameters.getParameter (kParamRoll))
         p->setNormalized (saved[2]);
 
+    fTrimA1Db = -12.0 + saved[3] * 24.0;
+    fTrimA2Db = -12.0 + saved[4] * 24.0;
+    fTrimA3Db = -12.0 + saved[5] * 24.0;
+    if (auto* p = parameters.getParameter (kParamTrimA1)) p->setNormalized (saved[3]);
+    if (auto* p = parameters.getParameter (kParamTrimA2)) p->setNormalized (saved[4]);
+    if (auto* p = parameters.getParameter (kParamTrimA3)) p->setNormalized (saved[5]);
+
     return kResultOk;
 }
 
@@ -228,10 +260,13 @@ tresult PLUGIN_API M2XHGRProcessor::getState (IBStream* state)
     if (!state)
         return kResultFalse;
 
-    double saved[3];
+    double saved[6];
     saved[0] = parameters.getParameter (kParamYaw)   ? parameters.getParameter (kParamYaw)->getNormalized ()   : 0.5;
     saved[1] = parameters.getParameter (kParamPitch) ? parameters.getParameter (kParamPitch)->getNormalized () : 0.5;
     saved[2] = parameters.getParameter (kParamRoll)  ? parameters.getParameter (kParamRoll)->getNormalized ()  : 0.5;
+    saved[3] = parameters.getParameter (kParamTrimA1) ? parameters.getParameter (kParamTrimA1)->getNormalized () : 0.5;
+    saved[4] = parameters.getParameter (kParamTrimA2) ? parameters.getParameter (kParamTrimA2)->getNormalized () : 0.5;
+    saved[5] = parameters.getParameter (kParamTrimA3) ? parameters.getParameter (kParamTrimA3)->getNormalized () : 0.5;
 
     state->write (saved, sizeof (saved));
     return kResultOk;

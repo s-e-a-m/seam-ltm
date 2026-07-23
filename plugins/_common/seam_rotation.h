@@ -47,4 +47,20 @@ inline void rotateYPR (T yaw, T pitch, T roll,
     out3 = a1_rp * std::sin (yaw) + a3_rp * std::cos (yaw);
 }
 
+// Apply per-harmonic gains to A1/A2/A3 (A0 fixed), THEN rotate. The order is
+// deliberate and load-bearing: rotateYPR mixes A1/A2/A3 among themselves, so
+// the gains must precede it to keep naming a fixed component at every angle.
+// This composition is m2xhgr's post-Haar DSP and each of lr2xhgr's per-bank
+// stages.
+template <typename T>
+inline void gainRotateYPR (T g1, T g2, T g3,
+                           T yaw, T pitch, T roll,
+                           T a0, T a1, T a2, T a3,
+                           T& out0, T& out1, T& out2, T& out3)
+{
+    rotateYPR (yaw, pitch, roll,
+               a0, a1 * g1, a2 * g2, a3 * g3,
+               out0, out1, out2, out3);
+}
+
 } // namespace Seam

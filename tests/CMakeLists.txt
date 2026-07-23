@@ -58,6 +58,17 @@ target_include_directories(hilbert_dsp_test PRIVATE
 target_compile_features(hilbert_dsp_test PRIVATE cxx_std_17)
 add_test(NAME hilbert_dsp_test COMMAND hilbert_dsp_test)
 
+add_executable(lr2xhgr_dsp_test
+    lr2xhgr_dsp_test.cpp
+)
+target_include_directories(lr2xhgr_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/lr2xhgr/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(lr2xhgr_dsp_test PRIVATE cxx_std_17)
+add_test(NAME lr2xhgr_dsp_test COMMAND lr2xhgr_dsp_test)
+
 add_executable(ltburst_dsp_test
     ltburst_dsp_test.cpp
 )
@@ -107,6 +118,16 @@ target_include_directories(seam_fft_test PRIVATE
 )
 target_compile_features(seam_fft_test PRIVATE cxx_std_17)
 add_test(NAME seam_fft_test COMMAND seam_fft_test)
+
+add_executable(seam_rotation_test
+    seam_rotation_test.cpp
+)
+target_include_directories(seam_rotation_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_rotation_test PRIVATE cxx_std_17)
+add_test(NAME seam_rotation_test COMMAND seam_rotation_test)
 
 add_executable(strx_dsp_test
     strx_dsp_test.cpp

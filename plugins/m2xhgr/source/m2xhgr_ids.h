@@ -20,6 +20,9 @@ enum M2XHGRParams : Steinberg::Vst::ParamID
     kParamYaw   = 100,
     kParamPitch = 101,
     kParamRoll  = 102,
+    kParamTrimA1 = 103,
+    kParamTrimA2 = 104,
+    kParamTrimA3 = 105,
 };
 
 } // namespace Seam
