@@ -70,6 +70,10 @@ of the three families above.
 |:---:|:---:|:---:|:---:|
 | ![STRX](docs/img/strx.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) |
 
+| ADDELAY |
+|:---:|
+| ![ADDELAY](docs/img/addelay.png) |
+
 ## Installation
 
 Prebuilt VST3 bundles are attached to each
