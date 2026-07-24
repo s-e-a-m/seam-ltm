@@ -48,10 +48,11 @@ Every window follows the same grammar, described in
 | **DSLAR** | mono &rarr; mono | Agostino Di Scipio's LAR homeostatic loop, hand-ported from `LAR.pd`: the feedforward half of a Larsen system whose loop is closed acoustically by the room. Drive, loop delay, decorrelation, target, steepness and control smoothing, with live r (Hann RMS) and g (loop gain) readouts |
 | **DDELAY** | 4ch &rarr; 4ch | Quad Alignment Delay for loudspeaker time-alignment. A distance in metres becomes an integer-sample delay at c = 331.4 m/s, rounded up to the next prime so that several instances stay incommensurable. All four channels share one value |
 | **HILBERT** | mono &rarr; stereo | Wideband Quadrature Transformer: one input becomes an in-phase and a quadrature branch held −90° apart from 20 Hz to 20 kHz. Both outputs are all-pass filtered, since the relationship belongs to the pair rather than to either signal. Two topologies — RBJ biquad cascade and Niemitalo polyphase — are selectable live and redesigned per sample rate by the same `seam_quadrature` engine X2UHJ uses internally |
+| **ADDELAY** | 4ch &rarr; 4ch | Air-Absorption Delay: inherits DDELAY's exact metres-to-samples integer delay (next-prime rounding included) and adds a minimum-phase air-absorption filter fitted to the ISO 9613-1 α·d distance-dependent high-frequency roll-off. Shelf and three-section RBJ high-shelf cascade topologies are switchable live, with an optional 1/r geometric-spreading attenuation. All four channels share one distance, so the inter-channel phase is preserved |
 
 ### Screenshots
 
-All fifteen windows, photographed after the UI standard landed, in the order
+All sixteen windows, photographed after the UI standard landed, in the order
 of the three families above.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |

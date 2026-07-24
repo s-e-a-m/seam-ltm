@@ -107,8 +107,9 @@ tresult PLUGIN_API AddelayProcessor::process(ProcessData& data) {
             if (q->getPoint(np - 1, off, v) == kResultOk)
                 setParamNormalized(q->getParameterId(), v);
         }
-        applyParams();   // one re-design per block at most (dirty-checked)
     }
+    applyParams();   // one re-design per block at most (dirty-checked); also
+                      // picks up a preset recalled via setState() on the UI thread.
 
     if (data.numInputs == 0 || data.numOutputs == 0) return kResultOk;
 
@@ -150,8 +151,9 @@ tresult PLUGIN_API AddelayProcessor::setState(IBStream* state) {
         if (!s.readFloat(v)) break;         // stop on short read, keep remaining defaults
         setParamNormalized(ids[i], v);
     }
+    // Defer the DSP re-configure to the next process() block (audio thread);
+    // never reconfigure from the UI thread.
     lastD_ = lastT_ = lastRh_ = -1e9; lastTopo_ = lastSpread_ = -1;
-    applyParams();
     return kResultOk;
 }
 
