@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SEAM-LTM ADDELAY — S single-column window (300 px wide), the ddelay
+     sibling's format: five controls (Topology, Spreading, Distance,
+     Temperature, Humidity) sit comfortably in one column at the S/L
+     boundary, so this stays S rather than widening to L. Zone order per
+     doc/style/ui-style.md: HEADER, SETUP (Topology, placed like hilbert's),
+     OPS (Spreading, the on/off operational control), FINE (the three
+     physical-parameter sliders), FOOTER (logo). -->
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="Structure" rgba="#888888ff"/>
+    </colors>
+
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 520"
+              minSize="300, 520" maxSize="300, 520"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- ── HEADER ─────────────────────────────────────────────────── -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM ADDELAY" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextLight" text-alignment="center" title="Distance Air-Absorption Delay" transparent="true"/>
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="center"
+              title="ISO 9613-1 &#x3B1;&#xB7;d &#xB7; min-phase shelf/cascade" transparent="true"/>
+
+        <!-- ── SETUP — Topology, placed like hilbert's Topology selector ─ -->
+        <view class="CTextLabel" origin="20, 96" size="260, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Topology" transparent="true"/>
+        <view class="COptionMenu" origin="80, 116" size="140, 20" control-tag="Topology"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- ── OPS — Spreading, the on/off operational control ──────────
+             Self-captioned checkbox, ALL CAPS, the ltglide LOOP pattern:
+             a 100 px box centred in the 300 px window puts the ink at
+             100..200, centred on 150. -->
+        <view class="CCheckBox" origin="100, 150" size="100, 20" control-tag="Spreading"
+              title="SPREADING" font="ValueFont" font-color="TextLight"
+              boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
+              frame-width="1" transparent="true" autosize-to-fit="false"/>
+
+        <!-- ── FINE — one column at x=20 of width 260, label/slider/value ─ -->
+        <view class="CTextLabel" origin="20, 190" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Distance" transparent="true"/>
+        <view class="CSlider" origin="20, 210" size="260, 20" control-tag="Distance" default-value="0"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 232" size="260, 18" font="ValueFont" control-tag="Distance"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="2" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="20, 270" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Temperature" transparent="true"/>
+        <view class="CSlider" origin="20, 290" size="260, 20" control-tag="Temperature" default-value="0.571429"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 312" size="260, 18" font="ValueFont" control-tag="Temperature"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="20, 350" size="260, 18" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Relative Humidity" transparent="true"/>
+        <view class="CSlider" origin="20, 370" size="260, 20" control-tag="Humidity" default-value="0.5"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 392" size="260, 18" font="ValueFont" control-tag="Humidity"
+              font-color="TextLight" text-alignment="center" transparent="true" value-precision="1" style-no-frame="true"/>
+
+        <!-- ── FOOTER — logo (native aspect 240x77, centred) ────────────── -->
+        <view class="CView" origin="30, 430" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Distance"    tag="100"/>
+        <control-tag name="Temperature" tag="101"/>
+        <control-tag name="Humidity"    tag="102"/>
+        <control-tag name="Topology"    tag="103"/>
+        <control-tag name="Spreading"   tag="104"/>
+    </control-tags>
+</vstgui-ui-description>

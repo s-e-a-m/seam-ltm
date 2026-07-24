@@ -1,0 +1,440 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{amsmath,amssymb,graphicx,booktabs,hyperref,siunitx,listings}
+\usepackage[margin=2.5cm]{geometry}
+\graphicspath{{figures/}{../}}
+\DeclareSIUnit\decibel{dB}
+
+\title{ADDELAY: Atmospheric Absorption as a Minimum-Phase Filter\\\large The Mathematics of the SEAM-LTM Addelay Plugin}
+\author{Giuseppe Silvi --- SEAM}
+\date{2026}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+This document derives the mathematics of the \texttt{addelay} plugin step by step.
+It develops the ISO~9613-1 atmospheric absorption coefficient $\alpha(f,T,h_\text{rel})$ that fixes the plugin's magnitude target, and it argues why the filter that renders that target must be minimum-phase.
+It then derives the two minimum-phase topologies the plugin ships, a single first-order high shelf and a cascade of three second-order high shelves at fixed corners, and it explains why the cascade needs second-order sections where the shelf does not.
+It documents the linearised decibel least-squares fit that both topologies share, and it closes with the optional geometric-spreading gain, a separate physical law that the filter leaves untouched.
+Every constant reproduced here is transcribed from \texttt{seam\_airabsorption.h}, the verified C++ implementation, and every worked number in the appendix is recomputed independently from the same formulas for this document.
+\end{abstract}
+\tableofcontents
+
+\section{Introduction and Pedagogical Framing}
+\label{sec:intro}
+
+A sound source at a distance is late and it is also duller, and these are two different consequences of the same distance.
+The \texttt{ddelay} plugin already models the first consequence: it turns a distance in metres into an integer-sample delay at the speed of sound, $c = \SI{331.4}{\meter\per\second}$, and it stops there.
+Time alignment alone makes a far source punctual, and a punctual source with an undimmed top end reads to the ear as near, so the depth illusion collapses without the second consequence.
+\texttt{addelay} is the companion plugin that adds it.
+
+The two consequences split cleanly by phase type, and this split is the organising idea of the whole document.
+Bulk propagation delay is a linear-phase effect: every frequency is delayed by the same number of samples, and \texttt{ddelay}'s exact metres-to-samples core already realises it.
+Atmospheric absorption is a minimum-phase effect: it is a frequency-dependent magnitude loss, and causality links that magnitude loss to a phase response that follows from the magnitude alone, by a Kramers--Kronig relation between attenuation and phase velocity that holds for any causal, stable propagation medium~\cite{ODonnellJaynesMiller1981}.
+\texttt{addelay} therefore does not choose minimum phase as a cheap implementation shortcut; minimum phase is the only phase response consistent with the magnitude that ISO~9613-1 specifies.
+
+\texttt{addelay} inherits \texttt{ddelay}'s delay core unchanged and adds the minimum-phase absorption filter after it, so that the two halves of distance remain two separate, separately correct pieces of physics in series:
+
+\begin{equation}
+x[n] \;\longrightarrow\; \underbrace{z^{-N(d)}}_{\text{linear phase, }c=331.4\,\text{m/s}} \;\longrightarrow\; \underbrace{H_\text{air}(z;\,f,T,h_\text{rel},d)}_{\text{minimum phase, ISO 9613-1}} \;\longrightarrow\; y[n] .
+\end{equation}
+
+Because the filter's magnitude target is physics and its phase is the minimum phase that physics implies, the plugin has no invented layer: the whole signal path is either measured (ISO~9613-1) or derived (minimum phase, the fit).
+The same filter coefficients are applied to all four channels of the plugin's Ambisonic bus, so a shared filter cannot alter the inter-channel phase relationships that carry a spatial image; that preservation is a structural consequence of using one distance for four channels, not a separate design requirement.
+
+\section{The ISO 9613-1 Absorption Coefficient}
+\label{sec:iso}
+
+ISO~9613-1 gives the atmospheric absorption coefficient $\alpha$ in decibels per metre as a function of frequency $f$, temperature $T$, relative humidity $h_\text{rel}$, and atmospheric pressure $p_a$~\cite{ISO9613-1993}.
+The standard's formula rests on the classical (viscosity and heat-conduction) loss together with the vibrational relaxation of oxygen and nitrogen molecules, as characterised by Bass, Sutherland and Zuckerwar~\cite{BassSutherlandZuckerwar1990,BassEtAl1995}.
+Every constant below is transcribed from \texttt{seam\_airabsorption.h}, the plugin's C++ implementation, and it must match that file exactly; this document does not introduce any constant that the code does not already carry.
+
+\subsection{Atmospheric Inputs and the Fixed-Pressure Simplification}
+
+The plugin exposes two atmospheric controls, temperature over $\SI{-20}{\celsius}$ to $\SI{50}{\celsius}$ and relative humidity over $0$ to $\SI{100}{\percent}$, and it fixes the third input, pressure, at one standard atmosphere:
+
+\begin{equation}
+p_a = p_r = \SI{101.325}{\kilo\pascal} .
+\end{equation}
+
+Fixing $p_a = p_r$ collapses the pressure ratio $p_a/p_r$ that appears throughout the ISO formula to unity inside the plugin.
+The formula below keeps the ratio symbolic, because a future revision could expose pressure as a sixth control without touching the rest of the derivation, but every numeric example in this document evaluates it at $p_a/p_r = 1$.
+Fixing pressure is a deliberate simplification, on the same footing as the reference distance in Section~\ref{sec:spreading}: sea-level performances dominate the plugin's intended use, and pressure's effect on $\alpha$ over the plugin's altitude-free scope is small next to temperature's and humidity's.
+
+Two reference temperatures enter the formula and both come from the standard: $T_0 = \SI{293.15}{\kelvin}$ (\SI{20}{\celsius}, the reference temperature for the relaxation terms) and $T_{01} = \SI{273.16}{\kelvin}$ (the triple-point isotherm of water, which anchors the saturation-vapour-pressure fit).
+Write $T = T_\text{celsius} + \SI{273.15}{\kelvin}$ for the working temperature in kelvin, $p_r' = p_a/p_r$ for the pressure ratio, and $T_r = T/T_0$ for the temperature ratio.
+
+\subsection{Water-Vapour Molar Concentration}
+
+Relative humidity alone does not fix the absorption; the formula needs the molar concentration of water vapour $h$, expressed as a percentage, which combines relative humidity with the saturation vapour pressure at the working temperature.
+ISO~9613-1's Annex~B gives the saturation-pressure ratio through an empirical fit in the triple-point ratio:
+
+\begin{equation}
+C = -6.8346 \left(\frac{T_{01}}{T}\right)^{1.261} + 4.6151 ,
+\qquad
+\frac{p_\text{sat}}{p_r} = 10^{C} .
+\end{equation}
+
+The molar concentration of water vapour follows directly:
+
+\begin{equation}
+h = h_\text{rel} \cdot \frac{p_\text{sat}/p_r}{p_r'} .
+\end{equation}
+
+At the plugin's default operating point, $T = \SI{20}{\celsius}$ and $h_\text{rel} = \SI{50}{\percent}$, this evaluates to $p_\text{sat}/p_r \approx 0.02306$ and $h \approx \SI{1.153}{\percent}$; Appendix~\ref{app:numeric} tabulates $h$ across the plugin's full temperature range.
+
+\subsection{Relaxation Frequencies}
+
+Oxygen and nitrogen each relax at a characteristic frequency that depends on $h$, and, for nitrogen, on temperature as well:
+
+\begin{align}
+f_{rO} &= p_r' \left( 24 + 4.04\times10^{4}\, h \, \frac{0.02+h}{0.391+h} \right) , \\
+f_{rN} &= p_r' \, T_r^{-1/2} \left( 9 + 280\, h \, \exp\!\left[-4.170\left(T_r^{-1/3}-1\right)\right] \right) .
+\end{align}
+
+Both relaxation frequencies are in hertz, and both scale with the pressure ratio $p_r'$, which the plugin holds at $1$.
+
+\subsection{The Absorption Coefficient}
+
+The absorption coefficient combines a classical term, which grows with the square of frequency and is negligible in the audio band next to the relaxation terms, with the oxygen and nitrogen relaxation terms:
+
+\begin{equation}
+\alpha(f,T,h_\text{rel}) = 8.686\, f^{2}
+\left\{
+  1.84\times10^{-11} \, \frac{1}{p_r'} \, T_r^{1/2}
+  \;+\;
+  T_r^{-5/2}
+  \left[
+    \frac{0.01275 \, e^{-2239.1/T}}{f_{rO} + f^{2}/f_{rO}}
+    +
+    \frac{0.1068 \, e^{-3352.0/T}}{f_{rN} + f^{2}/f_{rN}}
+  \right]
+\right\}
+\label{eq:alpha}
+\end{equation}
+
+with $\alpha$ in decibels per metre and $f$ in hertz.
+The leading factor $8.686 = 20/\ln 10$ converts the underlying nepers-per-metre attenuation coefficient to decibels per metre, which is why it multiplies the whole bracket rather than any single term.
+Equation~\eqref{eq:alpha} is the complete formula the plugin evaluates; \texttt{alphaISO9613} in \texttt{seam\_airabsorption.h} implements it term for term, including the $8.686$ prefactor and every exponent shown here.
+
+\begin{quote}
+\textit{Provenance note.}
+The constants in Equation~\eqref{eq:alpha} are transcribed from the ISO~9613-1 text as reproduced in \texttt{seam\_airabsorption.h}, and that file's own header records them as pending a constant-by-constant check against the published standard and against Bass, Sutherland and Zuckerwar's papers behind it~\cite{BassSutherlandZuckerwar1990,BassEtAl1995}.
+This document inherits that same status: every number above is sourced and cited, not invented, and Giuseppe Silvi performs the final verification against the standard itself.
+\end{quote}
+
+\section{The Magnitude Target}
+\label{sec:target}
+
+Over a propagation distance $d$ metres, the total attenuation in decibels is
+
+\begin{equation}
+A(f) = \alpha(f,T,h_\text{rel}) \cdot d ,
+\qquad
+A(f) \ge 0 ,
+\end{equation}
+
+and the filter's magnitude target is $-A(f)$ decibels, an attenuation that grows with $d$ and with $f$.
+This target needs no normalisation at either end of the band.
+At low frequency, $f_{rO}$ and $f_{rN}$ dominate their respective fractions and $\alpha \to 0$ as $f \to 0$, so $A(f) \to 0$ and the filter approaches unity gain at DC regardless of distance, temperature or humidity.
+At high frequency, $A(f)$ keeps growing with $f$ and with $d$, so the filter is intrinsically a distance-controlled low-pass: farther sources are darker, with no separate low-pass or gain stage required to keep the response well-behaved at either end of the spectrum.
+
+Table~\ref{tab:alpha20} in Appendix~\ref{app:numeric} tabulates $\alpha(f)$ and $A(f)$ at $d=\SI{30}{\meter}$, $T=\SI{20}{\celsius}$, $h_\text{rel}=\SI{50}{\percent}$ across the audio band, computed directly from Equation~\eqref{eq:alpha}.
+The table makes the low-frequency approach to unity gain and the accelerating high-frequency rolloff concrete: at \SI{20}{\hertz} the attenuation over \SI{30}{\meter} is a fraction of a millidecibel, while at \SI{20}{\kilo\hertz} it exceeds \SI{15}{\decibel}.
+
+\section{Why the Residual Must Be Minimum-Phase}
+\label{sec:minphase}
+
+A minimum-phase discrete system has every pole and every zero inside the unit circle, and among all causal, stable systems that share one magnitude response, the minimum-phase system is the one with the smallest possible group delay at every frequency and the smallest possible phase lag~\cite{OppenheimSchafer2010}.
+Physically, this is the same statement as the Kramers--Kronig relation between attenuation and phase velocity: a causal absorptive medium cannot present an attenuation profile without a matching, uniquely determined phase profile~\cite{ODonnellJaynesMiller1981}.
+Air is such a medium, so the correct phase response for $A(f)$ is not a free design choice; it is the minimum phase that Equation~\eqref{eq:alpha}'s magnitude already implies.
+
+\texttt{addelay} realises this correct phase response by constructing the filter, from the outset, out of a family of sections that are minimum-phase by construction: first-order and second-order shelving filters obtained from the bilinear transform of stable analog prototypes (Sections~\ref{sec:shelf} and \ref{sec:cascade}).
+Both prototypes have their pole and their zero in the left half of the $s$-plane, and the bilinear transform maps the left half-plane into the unit disc, so every realised shelf is minimum-phase for any admissible gain.
+This route to minimum phase costs nothing at runtime: the plugin fits only the gain of each fixed-corner shelf to the target magnitude (Section~\ref{sec:fit}), and the phase comes along for free because the filter family itself never has any other option.
+An alternative route, fitting an arbitrary magnitude curve first and recovering minimum phase afterward by a cepstral or Hilbert-transform construction, is unnecessary here precisely because the shelf family already guarantees the property the alternative route would have to impose.
+
+\subsection{Zero Added Latency, and Why a Linear-Phase FIR Is Rejected}
+
+A linear-phase finite impulse response could also approximate $A(f)$, at the cost of a fixed group delay equal to half the filter length and, for any transition sharp enough to track $A(f)$'s accelerating rolloff, audible pre-ringing ahead of transients.
+\texttt{addelay} rejects that route on physical grounds, not only on cost grounds: air does not pre-ring, and imposing a flat linear phase on the absorption residual would put back exactly the false phase behaviour that minimum phase avoids.
+The minimum-phase IIR sections add no latency beyond their own filter order (a handful of samples of settling, not a designed delay), which keeps \texttt{ddelay}'s exact bulk delay the only deliberate delay in the chain.
+
+\subsection{Inter-Channel Phase Is Preserved by Construction}
+
+\texttt{addelay} applies one distance, one temperature and one humidity to all four channels of the plugin's Ambisonic bus, so all four channels receive the identical filter coefficients.
+A single filter applied identically to several signals cannot alter their relative phase, whatever that filter's own phase response is; this is a property of applying one linear system to many inputs, not a property specific to minimum phase.
+The plugin therefore never needs to reason separately about spatial-image preservation: it falls out of the one-distance, one-filter structure automatically.
+
+\section{Two Topologies Fit to the Same Target}
+\label{sec:topologies}
+
+The plugin ships two topologies, selectable live, and both fit the same target $A(f)$ from Section~\ref{sec:target}.
+Comparing them on the same transiting signal is the plugin's pedagogical payload, in the same spirit as \texttt{hilbert}'s RBJ-versus-polyphase comparison: one topology is a deliberately loose, single-coefficient gesture, and the other is a small multi-band fit that tracks the physics closely.
+
+\subsection{Shelf: One First-Order High Shelf}
+\label{sec:shelf}
+
+The shelf topology is a single first-order high-shelf filter at a fixed corner $f_c = \SI{5000}{\hertz}$, whose only free parameter is its high-frequency gain.
+Its analog prototype is unity at DC and a gain $V_0$ at infinite frequency:
+
+\begin{equation}
+H_a(s) = \frac{V_0 \, s + \omega_0}{s + \omega_0} ,
+\qquad \omega_0 = 2\pi f_c ,
+\end{equation}
+
+a stable, minimum-phase first-order system with its pole at $s=-\omega_0$ and its zero at $s=-\omega_0/V_0$, both in the left half-plane for any $V_0 > 0$.
+The plugin realises this prototype with a prewarped bilinear transform, which maps $s = c\,(1-z^{-1})/(1+z^{-1})$ with the matched constant
+
+\begin{equation}
+c = \frac{\omega_0}{\tan\!\left(\dfrac{\omega_0}{2 f_s}\right)} ,
+\end{equation}
+
+chosen so that the digital corner lands exactly at $f_c$ despite the bilinear transform's frequency warping~\cite{SmithBLT,SmithFreqWarp}.
+Substituting $s = c\,(1-z^{-1})/(1+z^{-1})$ into $H_a(s)$ and clearing denominators gives the first-order digital shelf that \texttt{designHiShelf1\_} computes, with $a_0 = c+\omega_0$:
+
+\begin{equation}
+H(z) = \frac{b_0 + b_1 z^{-1}}{1 + a_1 z^{-1}} ,
+\qquad
+b_0 = \frac{V_0 c + \omega_0}{a_0},
+\qquad
+b_1 = \frac{\omega_0 - V_0 c}{a_0},
+\qquad
+a_1 = \frac{\omega_0 - c}{a_0} .
+\label{eq:shelf1}
+\end{equation}
+
+Evaluating $H(z)$ at $z=1$ and at $z=-1$ confirms the design intent exactly: $H(1) = 1$ (unity at DC, for any $V_0$ and any $f_c$) and $H(-1) = V_0$ (the full gain at Nyquist).
+With $V_0 = 10^{\,\mathit{dbGain}/20}$, this is a one-parameter family whose single free coefficient, $\mathit{dbGain}$, the fit in Section~\ref{sec:fit} determines.
+
+The shelf is a deliberately loose fit: one corner and one gain can capture the gross tilt, "farther sources are darker", but they cannot bend to follow $\alpha(f)$'s continued steepening at high frequency once $\mathit{dbGain}$ is fixed, because a first-order transition's slope saturates rather than accelerating.
+
+\subsection{Cascade: Three Second-Order RBJ High Shelves}
+\label{sec:cascade}
+
+The cascade topology places three second-order high-shelf sections at fixed corners $\{3000, 8000, 16000\}\,\si{\hertz}$, each following the RBJ Audio EQ Cookbook's high-shelf design with shelf slope $S=1$~\cite{RBJCookbook}.
+The general cookbook shelf uses
+
+\begin{equation}
+A = 10^{\,\mathit{dbGain}/40}, \qquad
+\omega_0 = \frac{2\pi f_c}{f_s}, \qquad
+\alpha = \frac{\sin\omega_0}{2}\sqrt{\left(A+\frac{1}{A}\right)\!\left(\frac{1}{S}-1\right)+2} ,
+\end{equation}
+
+and fixing $S=1$ collapses the square root's bracket to $2$, so the plugin's implementation uses the simplified
+
+\begin{equation}
+\alpha = \frac{\sin\omega_0}{2}\sqrt{2} .
+\end{equation}
+
+With $c_\omega = \cos\omega_0$ and $s_\omega=\sin\omega_0$, the unnormalised coefficients are
+
+\begin{align}
+B_0 &= A\big[(A+1) + (A-1)c_\omega + 2\sqrt{A}\,\alpha\big], &
+A_0 &= (A+1) - (A-1)c_\omega + 2\sqrt{A}\,\alpha, \\
+B_1 &= -2A\big[(A-1) + (A+1)c_\omega\big], &
+A_1 &= 2\big[(A-1) - (A+1)c_\omega\big], \\
+B_2 &= A\big[(A+1) + (A-1)c_\omega - 2\sqrt{A}\,\alpha\big], &
+A_2 &= (A+1) - (A-1)c_\omega - 2\sqrt{A}\,\alpha,
+\end{align}
+
+and the normalised biquad is $b_i = B_i/A_0$, $a_i = A_i/A_0$, giving
+
+\begin{equation}
+H(z) = \frac{b_0 + b_1 z^{-1} + b_2 z^{-2}}{1 + a_1 z^{-1} + a_2 z^{-2}} .
+\label{eq:shelf2}
+\end{equation}
+
+This is the same digital biquad shelf that any audio equaliser built on the cookbook uses; \texttt{designHiShelf2\_} computes Equation~\eqref{eq:shelf2} unmodified, at the three fixed corners, and the fit in Section~\ref{sec:fit} determines the three gains $\mathit{dbGain}_k$, one per corner.
+
+\subsection{Why the Cascade Needs Second-Order Sections}
+
+A first-order shelf's magnitude in decibels approaches a fixed asymptote as $f\to\infty$: whatever $\mathit{dbGain}$ is chosen, the curve flattens out once $f$ is well past $f_c$, because the section has one pole and one zero and no more freedom to keep bending.
+$\alpha(f)$ does not flatten across the audio band; Table~\ref{tab:alpha20} shows that its per-octave increment keeps growing (the step from \SI{1}{\kilo\hertz} to \SI{2}{\kilo\hertz} is a fraction of a decibel over \SI{30}{\meter}, while the step from \SI{16}{\kilo\hertz} to \SI{20}{\kilo\hertz} is several decibels), a signature of the $f^2$ dependence in Equation~\eqref{eq:alpha}'s leading factor.
+A single first-order section, tuned to fit the far end of the band, systematically undershoots the near end, and tuned to fit the near end, undershoots the far end; there is no single $(f_c,\mathit{dbGain})$ that tracks an accelerating curve with a saturating one.
+
+Three second-order shelves at successively higher fixed corners avoid this by superposition: in decibels, a cascade's response is the sum of its sections' responses, so as one section's transition flattens out above its own corner, the next section, whose own transition has barely begun, keeps contributing slope.
+The three fixed corners $\{3, 8, 16\}\,\si{\kilo\hertz}$ build an increasing-slope staircase this way, each step handing off to the next roughly where the previous step's slope runs out, and the fitted result tracks $\alpha(f)\cdot d$ far more tightly than any single shelf can, at any distance.
+
+The plugin's design record measured a maximum error under approximately \SI{0.5}{\decibel} for the cascade over \SIrange{20}{20000}{\hertz}, across distances of \SIrange{2}{30}{\meter} and relative humidities of \SIrange{10}{90}{\percent}, against \SIrange{8}{13}{\decibel} for a three-section \emph{first-order} cascade at \SI{30}{\meter}.
+This document does not re-derive that first-order comparison figure independently; it is reported here as a design-time record, on the same transcribed-not-verified footing as the ISO constants of Section~\ref{sec:iso}.
+Appendix~\ref{app:numeric} does independently recompute the shipped shelf and cascade topologies directly from Equations~\eqref{eq:shelf1}--\eqref{eq:shelf2} and the fit of Section~\ref{sec:fit}, and Table~\ref{tab:fitdist} confirms the cascade holds comfortably under one decibel across the plugin's full distance range at the default atmosphere, while the shelf's error grows past six decibels at \SI{30}{\meter}.
+
+\section{The Fit Method}
+\label{sec:fit}
+
+Both topologies fix their corner frequencies and fit only the gain, or gains, of the sections they place there, which turns the design problem into a small linear least-squares solve rather than a general filter-design search.
+
+\subsection{Sampling the Target}
+
+For the current $(d,T,h_\text{rel})$, the fit samples $A(f)$ on $M=48$ points spaced logarithmically from $f_\text{lo}=\SI{20}{\hertz}$ to $f_\text{hi}=\min(\SI{20}{\kilo\hertz},\,0.45 f_s)$, so the grid always respects the Nyquist limit at low sample rates while covering the full audio band at standard rates:
+
+\begin{equation}
+f_i = f_\text{lo}\left(\frac{f_\text{hi}}{f_\text{lo}}\right)^{\!i/(M-1)},
+\qquad
+t_i = -\alpha(f_i,T,h_\text{rel})\cdot d ,
+\qquad i = 0,\dots,M-1 .
+\end{equation}
+
+The target $t_i$ is negative or zero everywhere, an attenuation in decibels, never a boost.
+
+\subsection{Linearising the Gain}
+
+A shelf section's magnitude in decibels is not exactly proportional to its own $\mathit{dbGain}$ parameter, but it is well approximated as such over the gain range the fit needs.
+The fit exploits this by computing each fixed-corner section's magnitude shape once, at a reference gain $g_\text{ref} = \SI{-6}{\decibel}$, and treating the shape as a fixed basis function scaled by the eventual gain:
+
+\begin{equation}
+s_k(f_i) = \frac{\text{MagDb}_k(f_i;\,g_\text{ref})}{g_\text{ref}} ,
+\qquad
+\text{MagDb}_k(f_i;\,g) \approx g \cdot s_k(f_i) .
+\end{equation}
+
+This reference gain is chosen away from zero, so that the shape $s_k$ is well defined and not degenerate, and it is a cut rather than a boost, matching the sign the target always needs.
+
+\subsection{The Least-Squares Solve}
+
+For the shelf topology, $k$ ranges over a single fixed corner, and the fit is the closed-form single-variable least squares
+
+\begin{equation}
+g = \frac{\sum_i s(f_i)\, t_i}{\sum_i s(f_i)^2} ,
+\end{equation}
+
+clamped to $g \in [-60,0]\,\si{\decibel}$ to keep the fit inside the range the filter family can realise sensibly.
+For the cascade topology, $k=1,2,3$ ranges over the three fixed corners, and because a cascade's response is additive in decibels, the joint fit solves the $3\times3$ normal equations
+
+\begin{equation}
+\left(\sum_i s_k(f_i)\,s_j(f_i)\right)_{\!k,j} \mathbf{g} = \left(\sum_i s_k(f_i)\,t_i\right)_{\!k} ,
+\end{equation}
+
+by Gaussian elimination, and clamps each resulting $g_k$ to $[-60,0]\,\si{\decibel}$.
+Both closed-form solves are cheap enough to run at control rate: the plugin redesigns the filter whenever distance, temperature or humidity changes, never inside the audio sample loop, mirroring how \texttt{hilbert} and \texttt{x2uhj} redesign their filters on a sample-rate change rather than per sample.
+Once designed, the coefficients are fixed for the runtime biquad cascade (Section~\ref{sec:cpp}), so the sample loop itself performs no fitting and no trigonometry.
+
+\section{The C++ Runtime}
+\label{sec:cpp}
+
+The following listing is the shared runtime that both topologies drive: a transposed direct-form-II biquad cascade of up to three sections, with $a_0$ already normalised to $1$ by the design step above.
+A first-order section is stored as a biquad with $b_2 = a_2 = 0$, so the shelf and the cascade share one processing loop.
+
+\begin{lstlisting}[language=C++,basicstyle=\small\ttfamily,frame=single]
+    // Transposed Direct Form II, up to 3 sections; a0 normalised to 1.
+    // First-order sections (Shelf) store b2 = a2 = 0.
+    inline double process(double x) {
+        double y = x;
+        for (int k = 0; k < n_; ++k) {
+            const double out = b0_[k] * y + z1_[k];
+            z1_[k] = b1_[k] * y - a1_[k] * out + z2_[k];
+            z2_[k] = b2_[k] * y - a2_[k] * out;
+            y = out;
+        }
+        return y;
+    }
+\end{lstlisting}
+
+The design step (Section~\ref{sec:fit}) runs once per parameter change and fills \texttt{b0\_}, \texttt{b1\_}, \texttt{b2\_}, \texttt{a1\_}, \texttt{a2\_} for each section; the sample loop above never touches $f_c$, $f_s$ or the fit, so the same loop realises either topology from whichever coefficients \texttt{configure()} last stored.
+
+\section{Geometric Spreading}
+\label{sec:spreading}
+
+Distance changes level by two independent physical laws, and the plugin keeps them separate because they are separate physics.
+Geometric spreading is a broadband inverse-distance law, $\SI{-6}{\decibel}$ per doubling of distance at every frequency including DC, and it dominates the level change over the plugin's range.
+Atmospheric absorption, the filter of Sections~\ref{sec:topologies}--\ref{sec:fit}, is a frequency-dependent loss that is approximately $\SI{0}{\decibel}$ at low frequency and grows with $f$, and it dominates the timbre change, not the level change: with spreading off, \texttt{addelay} makes a source duller but never quieter, because the absorption filter alone leaves DC at unity gain for any distance.
+
+The optional spreading gain, referenced to a fixed \SI{1}{\meter} in the same way the pressure is fixed at one atmosphere, is attenuation-only and free of any singularity at $d=0$:
+
+\begin{equation}
+G_\text{spread}(d) = \frac{1}{\max(d,\,\SI{1}{\meter})} ,
+\qquad
+G_\text{spread,dB}(d) = -20\log_{10}\!\left(\frac{\max(d,\,\SI{1}{\meter})}{\SI{1}{\meter}}\right) .
+\end{equation}
+
+This is a real scalar with no frequency dependence and no phase, so it commutes with the minimum-phase filter and it never touches the phase story of Section~\ref{sec:minphase}: applying $G_\text{spread}$ before or after $H_\text{air}(z)$ produces the identical output signal, and applying it identically to all four channels, like the filter itself, leaves inter-channel phase untouched by construction.
+The plugin defaults the toggle off, so a full \SI{1}{\meter}-to-\SI{30}{\meter} traversal, which is close to \SI{-29}{\decibel} of broadband level change, stays available for the student to switch on rather than being imposed by default in a sound-reinforcement context where the composer typically wants presence kept.
+
+\appendix
+
+\section{Numeric Verification}
+\label{app:numeric}
+
+Every table in this appendix is computed by an independent re-implementation of Equations~\eqref{eq:alpha}, \eqref{eq:shelf1}, \eqref{eq:shelf2} and the fit of Section~\ref{sec:fit}, written for this document and checked term for term against \texttt{seam\_airabsorption.h}.
+It is not the plugin's own runtime output; it is a from-formula check that the equations above reproduce the source they are transcribed from.
+
+\begin{table}[h]
+\centering
+\caption{$\alpha(f)$ and $A(f)=\alpha(f)\cdot d$ at $d=\SI{30}{\meter}$, $T=\SI{20}{\celsius}$, $h_\text{rel}=\SI{50}{\percent}$.}
+\label{tab:alpha20}
+\begin{tabular}{@{}rrr@{}}
+\toprule
+$f$ (Hz) & $\alpha$ (dB/m) & $A(30\,\text{m})$ (dB) \\
+\midrule
+20     & 0.0000132 & 0.0004 \\
+100    & 0.000294  & 0.009  \\
+250    & 0.001310  & 0.039  \\
+500    & 0.002728  & 0.082  \\
+1000   & 0.004665  & 0.140  \\
+2000   & 0.009887  & 0.297  \\
+4000   & 0.029666  & 0.890  \\
+8000   & 0.105291  & 3.159  \\
+12000  & 0.220942  & 6.628  \\
+16000  & 0.364541  & 10.936 \\
+20000  & 0.524156  & 15.725 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Saturation-pressure ratio and water-vapour molar concentration $h$ at $h_\text{rel}=\SI{50}{\percent}$, across the plugin's temperature range.}
+\label{tab:humidity}
+\begin{tabular}{@{}rrr@{}}
+\toprule
+$T$ ($\si{\celsius}$) & $p_\text{sat}/p_r$ & $h$ (\%) \\
+\midrule
+$-20$ & 0.001237 & 0.0619 \\
+$0$   & 0.006028 & 0.3014 \\
+$20$  & 0.023061 & 1.1530 \\
+$50$  & 0.121820 & 6.0910 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Fit accuracy versus distance, $T=\SI{20}{\celsius}$, $h_\text{rel}=\SI{50}{\percent}$, $f_s=\SI{48}{\kilo\hertz}$: maximum absolute error over the $M=48$-point log-frequency grid of Section~\ref{sec:fit}.}
+\label{tab:fitdist}
+\begin{tabular}{@{}rrr@{}}
+\toprule
+$d$ (m) & Shelf max err (dB) & Cascade max err (dB) \\
+\midrule
+2  & 0.402 & 0.033 \\
+5  & 1.006 & 0.082 \\
+10 & 2.019 & 0.158 \\
+15 & 3.042 & 0.224 \\
+20 & 4.080 & 0.275 \\
+25 & 5.140 & 0.308 \\
+30 & 6.230 & 0.339 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Fit accuracy versus relative humidity, $d=\SI{30}{\meter}$, $T=\SI{20}{\celsius}$, $f_s=\SI{48}{\kilo\hertz}$.}
+\label{tab:fitrh}
+\begin{tabular}{@{}rrr@{}}
+\toprule
+$h_\text{rel}$ (\%) & Shelf max err (dB) & Cascade max err (dB) \\
+\midrule
+10 & 1.594 & 0.634 \\
+30 & 5.663 & 0.479 \\
+50 & 6.230 & 0.339 \\
+70 & 5.213 & 0.374 \\
+90 & 4.337 & 0.361 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:fitdist} and Table~\ref{tab:fitrh} confirm, independently of the plugin's own runtime, the qualitative claim of Section~\ref{sec:topologies}: the cascade stays within a few tenths of a decibel of the ISO target across the plugin's full distance and humidity range, close to the design record's approximate \SI{0.5}{\decibel} figure, while the single first-order shelf's error grows into several decibels at long range and high humidity, which is exactly the loose "gross tilt" behaviour Section~\ref{sec:shelf} describes it as.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+\end{document}
