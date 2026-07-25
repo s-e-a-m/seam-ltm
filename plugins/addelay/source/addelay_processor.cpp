@@ -33,7 +33,7 @@ tresult PLUGIN_API AddelayProcessor::initialize(FUnknown* context) {
     auto* dist = new RangeParameter(
         STR16("Distance"), kParamDistance, STR16("m"),
         0.0, kAddDistMax, 0.0, 0, ParameterInfo::kCanAutomate);
-    dist->setPrecision(2);                       // metres to the centimetre
+    dist->setPrecision(3);                       // metres to the millimetre (matches ddelay)
     parameters.addParameter(dist);
     auto* temp = new RangeParameter(
         STR16("Temperature"), kParamTemperature, STR16("C"),
