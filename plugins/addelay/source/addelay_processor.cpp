@@ -28,15 +28,23 @@ tresult PLUGIN_API AddelayProcessor::initialize(FUnknown* context) {
     addAudioInput (STR16("Quad In"),  SpeakerArr::kAmbi1stOrderACN);
     addAudioOutput(STR16("Quad Out"), SpeakerArr::kAmbi1stOrderACN);
 
-    parameters.addParameter(new RangeParameter(
+    // setPrecision controls the decimals the host shows in the value readout;
+    // Vst::Parameter defaults to 4, which is more than these quantities carry.
+    auto* dist = new RangeParameter(
         STR16("Distance"), kParamDistance, STR16("m"),
-        0.0, kAddDistMax, 0.0, 0, ParameterInfo::kCanAutomate));
-    parameters.addParameter(new RangeParameter(
+        0.0, kAddDistMax, 0.0, 0, ParameterInfo::kCanAutomate);
+    dist->setPrecision(2);                       // metres to the centimetre
+    parameters.addParameter(dist);
+    auto* temp = new RangeParameter(
         STR16("Temperature"), kParamTemperature, STR16("C"),
-        kAddTempMin, kAddTempMax, 20.0, 0, ParameterInfo::kCanAutomate));
-    parameters.addParameter(new RangeParameter(
+        kAddTempMin, kAddTempMax, 20.0, 0, ParameterInfo::kCanAutomate);
+    temp->setPrecision(1);                       // 0.1 degC
+    parameters.addParameter(temp);
+    auto* humid = new RangeParameter(
         STR16("Humidity"), kParamHumidity, STR16("%"),
-        kAddRhMin, kAddRhMax, 50.0, 0, ParameterInfo::kCanAutomate));
+        kAddRhMin, kAddRhMax, 50.0, 0, ParameterInfo::kCanAutomate);
+    humid->setPrecision(1);                      // 0.1 %
+    parameters.addParameter(humid);
 
     auto* topo = new StringListParameter(STR16("Topology"), kParamTopology);
     topo->appendString(STR16("Shelf"));

@@ -85,10 +85,13 @@ tresult PLUGIN_API DDELAYProcessor::initialize (FUnknown* context)
     // Continuous parameter (stepCount = 0) so the display retains the
     // decimal point. The actual delay value is quantized to the nearest
     // millimetre internally — see updateDelaySamples ().
-    parameters.addParameter (
-        new RangeParameter (STR16 ("Distance"), kParamDistance, STR16 ("m"),
-                            0.0, kMaxDistance, 0.0, 0,
-                            ParameterInfo::kCanAutomate));
+    // setPrecision fixes the host's value readout to millimetre resolution
+    // (matching the mm quantization below); Vst::Parameter defaults to 4 decimals.
+    auto* dist = new RangeParameter (STR16 ("Distance"), kParamDistance, STR16 ("m"),
+                                     0.0, kMaxDistance, 0.0, 0,
+                                     ParameterInfo::kCanAutomate);
+    dist->setPrecision (3);                     // metres to the millimetre
+    parameters.addParameter (dist);
 
     return kResultOk;
 }
