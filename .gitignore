@@ -17,3 +17,7 @@ plugins/x2uhj/_temp/
 
 # Claude Code worktrees (isolated workspaces)
 .claude/worktrees/
+
+# Third-party copyrighted reference material (e.g. ISO standards) kept locally
+# under doc/math/ref/ for verification — never redistribute in this GPL repo.
+plugins/*/doc/math/ref/
