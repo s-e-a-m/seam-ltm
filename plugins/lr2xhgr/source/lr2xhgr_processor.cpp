@@ -9,6 +9,7 @@
 #include "seam_rotation.h"
 #include "lr2xhgr_dsp.h"
 #include "seam_meter.h"
+#include "seam_state.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
@@ -273,9 +274,19 @@ tresult PLUGIN_API LR2XHGRProcessor::setState (IBStream* state)
     if (!state)
         return kResultFalse;
 
+    // Short-read-safe restore (seam_state.h): pre-load registered defaults,
+    // read what the blob actually holds, then apply every field — so a
+    // legacy pre-trim blob (4 doubles) restores divergence + rotation and
+    // identity trims instead of stack garbage.
+    const ParamID ids[7] = { kParamDivergence, kParamYaw, kParamPitch,
+                             kParamRoll, kParamTrimA1, kParamTrimA2,
+                             kParamTrimA3 };
     double saved[7];
-    if (state->read (saved, sizeof (saved)) != kResultOk)
-        return kResultFalse;
+    for (int i = 0; i < 7; ++i) {
+        auto* p = parameters.getParameter (ids[i]);
+        saved[i] = p ? p->getInfo ().defaultNormalizedValue : 0.5;
+    }
+    Seam::readStateDoubles (state, saved, 7);
 
     // Divergence: normalized 0–1 maps to plain 0–360°
     fDivergence = (saved[0] * 360.0 / 2.0) * M_PI / 180.0;
@@ -316,7 +327,9 @@ tresult PLUGIN_API LR2XHGRProcessor::getState (IBStream* state)
     saved[5] = parameters.getParameter (kParamTrimA2)     ? parameters.getParameter (kParamTrimA2)->getNormalized ()     : 0.5;
     saved[6] = parameters.getParameter (kParamTrimA3)     ? parameters.getParameter (kParamTrimA3)->getNormalized ()     : 0.5;
 
-    state->write (saved, sizeof (saved));
+    IBStreamer s (state, kLittleEndian);
+    for (int i = 0; i < 7; ++i)
+        s.writeDouble (saved[i]);
     return kResultOk;
 }
 

@@ -8,6 +8,7 @@
 #include "seam_haar.h"
 #include "seam_rotation.h"
 #include "seam_meter.h"
+#include "seam_state.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
@@ -230,9 +231,18 @@ tresult PLUGIN_API M2XHGRProcessor::setState (IBStream* state)
     if (!state)
         return kResultFalse;
 
+    // Short-read-safe restore (seam_state.h): pre-load registered defaults,
+    // read what the blob actually holds, then apply every field — so a
+    // legacy pre-trim blob (3 doubles) restores its rotation and identity
+    // trims instead of stack garbage.
+    const ParamID ids[6] = { kParamYaw, kParamPitch, kParamRoll,
+                             kParamTrimA1, kParamTrimA2, kParamTrimA3 };
     double saved[6];
-    if (state->read (saved, sizeof (saved)) != kResultOk)
-        return kResultFalse;
+    for (int i = 0; i < 6; ++i) {
+        auto* p = parameters.getParameter (ids[i]);
+        saved[i] = p ? p->getInfo ().defaultNormalizedValue : 0.5;
+    }
+    Seam::readStateDoubles (state, saved, 6);
 
     fYaw   = (-180.0 + saved[0] * 360.0) * M_PI / 180.0;
     fPitch = (-180.0 + saved[1] * 360.0) * M_PI / 180.0;
@@ -268,7 +278,9 @@ tresult PLUGIN_API M2XHGRProcessor::getState (IBStream* state)
     saved[4] = parameters.getParameter (kParamTrimA2) ? parameters.getParameter (kParamTrimA2)->getNormalized () : 0.5;
     saved[5] = parameters.getParameter (kParamTrimA3) ? parameters.getParameter (kParamTrimA3)->getNormalized () : 0.5;
 
-    state->write (saved, sizeof (saved));
+    IBStreamer s (state, kLittleEndian);
+    for (int i = 0; i < 6; ++i)
+        s.writeDouble (saved[i]);
     return kResultOk;
 }
 

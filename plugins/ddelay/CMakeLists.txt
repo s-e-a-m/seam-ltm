@@ -22,6 +22,7 @@ smtg_target_configure_version_file(${target})
 
 target_compile_features(${target} PUBLIC cxx_std_17)
 target_link_libraries(${target} PRIVATE sdk vstgui_support)
+target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../_common)
 
 smtg_target_add_plugin_resources(${target}
     RESOURCES
