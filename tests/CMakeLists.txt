@@ -1,4 +1,5 @@
-# SEAM-LTM unit tests (doctest, SDK-free DSP cores)
+# SEAM-LTM unit tests (doctest; SDK-free DSP cores, except seam_state_test
+# which links the SDK base/common layers to test the IBStream decode rule)
 
 # seam_calbus_test spawns std::thread for its seqlock hammer/churn stress
 # tests. Links fine without this on macOS/libc++ (pthread is pulled in
@@ -233,3 +234,25 @@ if(Python3_Interpreter_FOUND)
 else()
     message(STATUS "Python3 not found — uidesc lint tests will not be registered")
 endif()
+
+# seam_state_test deliberately links the VST3 SDK base/common layers: the
+# unit under test is the suite's IBStream decode rule itself (seam_state.h),
+# exercised against SDK MemoryStream blobs including the legacy layouts.
+add_executable(seam_state_test
+    seam_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(seam_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(seam_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    # CoreFoundation framework needed by base.a's fstring.o (Steinberg SDK)
+    # Must be added via target_link_libraries to ensure correct link order
+    find_library(CORE_FOUNDATION CoreFoundation)
+    target_link_libraries(seam_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(seam_state_test PRIVATE cxx_std_17)
+add_test(NAME seam_state_test COMMAND seam_state_test)
