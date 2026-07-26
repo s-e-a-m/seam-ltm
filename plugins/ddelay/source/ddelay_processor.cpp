@@ -12,6 +12,7 @@
 #include "vstgui/plugin-bindings/vst3editor.h"
 
 #include "pluginterfaces/base/ibstream.h"
+#include "seam_state.h"
 
 #include <cstring>
 #include <cmath>
@@ -266,9 +267,12 @@ tresult PLUGIN_API DDELAYProcessor::setState (IBStream* state)
 {
     if (!state) return kResultFalse;
 
+    // Short-read-safe restore (seam_state.h): pre-load the registered
+    // default, read what the blob actually holds, then apply.
     double saved = 0.0;
-    if (state->read (&saved, sizeof (saved)) != kResultOk)
-        return kResultFalse;
+    if (auto* p = parameters.getParameter (kParamDistance))
+        saved = p->getInfo ().defaultNormalizedValue;
+    Seam::readStateDoubles (state, &saved, 1);
 
     distanceMeters_ = saved * kMaxDistance;
     updateDelaySamples ();
@@ -286,7 +290,8 @@ tresult PLUGIN_API DDELAYProcessor::getState (IBStream* state)
     double saved = parameters.getParameter (kParamDistance)
                  ? parameters.getParameter (kParamDistance)->getNormalized ()
                  : 0.0;
-    state->write (&saved, sizeof (saved));
+    IBStreamer s (state, kLittleEndian);
+    s.writeDouble (saved);
     return kResultOk;
 }
 
