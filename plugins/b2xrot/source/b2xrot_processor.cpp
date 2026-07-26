@@ -7,6 +7,7 @@
 #include "version.h"
 #include "seam_btox.h"
 #include "seam_rotation.h"
+#include "seam_state.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
@@ -204,9 +205,17 @@ tresult PLUGIN_API B2XrotProcessor::setState (IBStream* state)
     if (!state)
         return kResultFalse;
 
+    // Short-read-safe restore (seam_state.h): pre-load registered defaults,
+    // read what the blob actually holds, then apply every field. The layout
+    // never grew, so this guards truncated/corrupt blobs and pre-arms every
+    // future append-only field.
+    const ParamID ids[3] = { kParamYaw, kParamPitch, kParamRoll };
     double saved[3];
-    if (state->read (saved, sizeof (saved)) != kResultOk)
-        return kResultFalse;
+    for (int i = 0; i < 3; ++i) {
+        auto* p = parameters.getParameter (ids[i]);
+        saved[i] = p ? p->getInfo ().defaultNormalizedValue : 0.5;
+    }
+    Seam::readStateDoubles (state, saved, 3);
 
     fYaw   = (-180.0 + saved[0] * 360.0) * M_PI / 180.0;
     fPitch = (-180.0 + saved[1] * 360.0) * M_PI / 180.0;
@@ -232,7 +241,9 @@ tresult PLUGIN_API B2XrotProcessor::getState (IBStream* state)
     saved[1] = parameters.getParameter (kParamPitch) ? parameters.getParameter (kParamPitch)->getNormalized () : 0.5;
     saved[2] = parameters.getParameter (kParamRoll)  ? parameters.getParameter (kParamRoll)->getNormalized ()  : 0.5;
 
-    state->write (saved, sizeof (saved));
+    IBStreamer s (state, kLittleEndian);
+    for (int i = 0; i < 3; ++i)
+        s.writeDouble (saved[i]);
     return kResultOk;
 }
 
