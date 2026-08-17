@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 
 // FAUST REFERENCE (seam.analyzers.lib: an.mth_octave_spectral_level, the
@@ -114,18 +115,61 @@ public:
             c->drawString(buf, CRect(r.left, y - 6, plot.left - 3, y + 6), kRightText);
         }
 
-        // --- Frequency grid (decade lines) + bottom-axis labels. ---
-        struct FLine { double hz; const char* label; };
+        // --- Frequency grid: three tiers of reference lines + labels. ---
+        // The values are the ISO 266 nominal centre frequencies, so the axis
+        // speaks the same vocabulary as the octave / third-octave EQ that
+        // corrects a STONE. Brightness carries the hierarchy: third-octave
+        // hairlines to read where a feature of the curve actually sits,
+        // octave lines for the bands one describes out loud, decade lines as
+        // the coarse anchor. 1 kHz is both an octave centre and a decade, so
+        // it takes the decade brightness and keeps its label.
+        //
+        // Only the octave tier is labelled. The plot is ~526 px over three
+        // decades, which puts octave labels ~53 px apart — comfortable — but
+        // "100" would land 17 px from "125" and "10k" the same distance from
+        // "8k". The decade tier reads as a brightness accent instead of
+        // fighting its neighbours for the label strip.
+        // The third-octave alpha was raised from 25 to 38 after rendering the
+        // grid at true size: 25/255 of Structure over BgDark separates the
+        // hairline from the background by ~10 levels of grey, which is a line
+        // that exists in the code and not on the screen.
+        enum FTier { kThird = 0, kOctave = 1, kDecade = 2 };
+        static constexpr uint8_t kTierAlpha[] = { 38, 70, 110 };
+        struct FLine { double hz; FTier tier; const char* label; };
         static constexpr FLine kFreqLines[] = {
-            { 100.0, "100" }, { 1000.0, "1k" }, { 10000.0, "10k" },
+            {    20.0, kThird,  nullptr }, {    25.0, kThird,  nullptr },
+            {    31.5, kOctave, "31.5"  }, {    40.0, kThird,  nullptr },
+            {    50.0, kThird,  nullptr }, {    63.0, kOctave, "63"    },
+            {    80.0, kThird,  nullptr }, {   100.0, kDecade, nullptr },
+            {   125.0, kOctave, "125"   }, {   160.0, kThird,  nullptr },
+            {   200.0, kThird,  nullptr }, {   250.0, kOctave, "250"   },
+            {   315.0, kThird,  nullptr }, {   400.0, kThird,  nullptr },
+            {   500.0, kOctave, "500"   }, {   630.0, kThird,  nullptr },
+            {   800.0, kThird,  nullptr }, {  1000.0, kDecade, "1k"    },
+            {  1250.0, kThird,  nullptr }, {  1600.0, kThird,  nullptr },
+            {  2000.0, kOctave, "2k"    }, {  2500.0, kThird,  nullptr },
+            {  3150.0, kThird,  nullptr }, {  4000.0, kOctave, "4k"    },
+            {  5000.0, kThird,  nullptr }, {  6300.0, kThird,  nullptr },
+            {  8000.0, kOctave, "8k"    }, { 10000.0, kDecade, nullptr },
+            { 12500.0, kThird,  nullptr }, { 16000.0, kOctave, "16k"   },
+            { 20000.0, kThird,  nullptr },
         };
         for (const FLine& fl : kFreqLines) {
             const CCoord x = xForFreq(fl.hz);
-            c->setFrameColor(grid);
+            CColor line = structureColor_;
+            line.alpha = kTierAlpha[fl.tier];
+            c->setFrameColor(line);
             c->setLineWidth(1.0);
             c->drawLine(CPoint(x, plot.top), CPoint(x, plot.bottom));
+            if (!fl.label) continue;
+            // Centred on its line, except where that would push the box past
+            // the plot — at 31.5 Hz it would otherwise reach into the gutter
+            // the dB labels own.
+            CRect box(x - 15, plot.bottom + 1, x + 15, r.bottom);
+            if (box.left  < plot.left)  box.offset(plot.left  - box.left,  0);
+            if (box.right > plot.right) box.offset(plot.right - box.right, 0);
             c->setFontColor(structureColor_);
-            c->drawString(fl.label, CRect(x - 16, plot.bottom + 1, x + 16, r.bottom), kCenterText);
+            c->drawString(fl.label, box, kCenterText);
         }
 
         // Plot border.
