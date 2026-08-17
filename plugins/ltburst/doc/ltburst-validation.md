@@ -86,3 +86,37 @@ valid for any dwell setting (historical; constant removed in iter2).
 ### DSP core doctests
 
 `build/tests/Debug/ltburst_dsp_test`: 6 test cases, 540520 assertions — **all passed**.
+
+## Bus shape and category change (2026-08-17)
+
+Supersedes the "0 input buses (instrument)" lines recorded above.
+
+`ltburst` used to declare one output bus and no input bus, and to register
+itself as `Instrument|Synth`. Both were wrong for the way the suite is used.
+A host handed a plugin with no input bus has nothing to give it, so it routes
+the track signal *around* the insert: the generator looked like it was passing
+audio through, when in fact it was never in the chain at all. The category
+compounded it by filing the generators under Nuendo's separate Instrument
+list.
+
+The plugin now declares a main mono input bus that it never reads, and
+registers as `Fx|Generator` (the SDK's own description of that constant is
+"Tone Generator, Noise Generator..."). Blocking the input is structural
+rather than conditional: the bus puts the plugin back in the chain, and
+`processBlock` writes every output sample, so whatever arrived is overwritten.
+`setBusArrangements` still accepts zero input buses, which keeps the plugin
+usable on an instrument track.
+
+`process` also clears `data.outputs[0].silenceFlags`. A generator is never
+silent by inheritance, and a host that trusted an inherited flag would skip
+everything downstream.
+
+Re-run: `build/bin/Release/validator build/VST3/Release/ltburst.vst3`
+Result: **47 tests passed, 0 tests failed**.
+
+```
+subCategories = Fx|Generator
+=> Audio Buses: [1 In(s) => 1 Out(s)]
+     In [0]: "Input" (Main-Default Active)
+     Out[0]: "Output" (Main-Default Active)
+```

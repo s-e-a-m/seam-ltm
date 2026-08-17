@@ -214,3 +214,36 @@ peer-aware receiver, phase 3b-ii) are out of scope for this validation
 record; `ltglide` is validated here purely as a standalone generator against
 its own Faust specification (`seam.linkwitz.lib`, `slw.sweepfreq` /
 `slw.glissburst`).
+
+## Bus shape and category change (2026-08-17)
+
+Supersedes the "0 input buses (instrument)" line recorded above, and the note
+that reads "this is an instrument/generator".
+
+The behaviour that motivated the change was observed in Nuendo with
+`multipink` and `ltglide` cascaded on the same insert chain: the incoming
+signal was audible past the generators. The cause was the bus topology. With
+no input bus declared, the host has nothing to hand the plugin and routes the
+track signal *around* the insert, so the generator was never in the chain to
+block anything — `processBlock` had been overwriting its output buffer all
+along. The `Instrument|Synth` registration was the same fact seen from the
+host's side, and put the generators in Nuendo's separate Instrument list.
+
+`ltglide` now declares a main mono input bus that it never reads, and
+registers as `Fx|Generator`. `setBusArrangements` still accepts zero input
+buses, which keeps the plugin usable on an instrument track. `ltburst` and
+`multipink` took the same change on the same day.
+
+`process` also clears `data.outputs[0].silenceFlags` — a host that trusted an
+inherited silence flag would skip every plugin downstream, `strx` included,
+which is the one thing that must never miss a pass.
+
+Re-run: `build/bin/Release/validator build/VST3/Release/ltglide.vst3`
+Result: **47 tests passed, 0 tests failed**.
+
+```
+subCategories = Fx|Generator
+=> Audio Buses: [1 In(s) => 1 Out(s)]
+     In [0]: "Input" (Main-Default Active)
+     Out[0]: "Output" (Main-Default Active)
+```

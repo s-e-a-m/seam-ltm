@@ -55,6 +55,13 @@ tresult PLUGIN_API LTBURSTProcessor::initialize(FUnknown* context) {
     tresult r = SingleComponentEffect::initialize(context);
     if (r != kResultOk) return r;
 
+    // A main input bus we never read. It exists precisely so that the signal
+    // arriving at the insert DIES here: with zero input buses a host has
+    // nothing to hand the plugin, so it routes the track signal AROUND us and
+    // the generator appears to "pass audio through". Declaring the bus puts us
+    // back in the chain, and processBlock() overwrites every output sample —
+    // so blocking the input is a structural consequence, not a runtime branch.
+    addAudioInput (STR16("Input"),  SpeakerArr::kMono);
     addAudioOutput(STR16("Output"), SpeakerArr::kMono);
 
     auto* lv = new RangeParameter(
@@ -107,6 +114,11 @@ tresult PLUGIN_API LTBURSTProcessor::process(ProcessData& data) {
 
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
 
+    // A generator is never silent by inheritance. The buffers can arrive still
+    // flagged silent from whatever fed the insert, and a host that trusts the
+    // flag would skip every plugin downstream of us.
+    data.outputs[0].silenceFlags = 0;
+
     // Apply current parameters to the core (block rate; phase stays continuous).
     burst_.setFrequency(paramFreqHz_.load());
     burst_.setDwell(paramDwellMs_.load());
@@ -128,8 +140,13 @@ tresult PLUGIN_API LTBURSTProcessor::canProcessSampleSize(int32 s) {
 tresult PLUGIN_API LTBURSTProcessor::setBusArrangements(
     SpeakerArrangement* ins, int32 numIns,
     SpeakerArrangement* outs, int32 numOuts) {
-    if (numIns != 0 || numOuts != 1) return kResultFalse;
+    if (numOuts != 1) return kResultFalse;
     if (SpeakerArr::getChannelCount(outs[0]) != 1) return kResultFalse;
+    // The input bus is never read, so the only thing to accept or refuse is a
+    // shape we declared: one mono input (insert on an audio track) or none at
+    // all (instrument track, where the host gives the generator no input).
+    if (numIns > 1) return kResultFalse;
+    if (numIns == 1 && SpeakerArr::getChannelCount(ins[0]) != 1) return kResultFalse;
     return SingleComponentEffect::setBusArrangements(ins, numIns, outs, numOuts);
 }
 
@@ -236,6 +253,6 @@ BEGIN_FACTORY_DEF(stringCompanyName, stringCompanyWeb, stringCompanyEmail)
     DEF_CLASS2(INLINE_UID_FROM_FUID(Seam::LTBURSTProcessorUID),
                PClassInfo::kManyInstances, kVstAudioEffectClass,
                "SEAM LTBURST", Vst::kDistributable,
-               "Instrument|Synth", FULL_VERSION_STR, kVstVersionString,
+               "Fx|Generator", FULL_VERSION_STR, kVstVersionString,
                Seam::LTBURSTProcessor::createInstance)
 END_FACTORY
