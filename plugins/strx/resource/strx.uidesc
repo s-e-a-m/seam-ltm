@@ -17,8 +17,8 @@
         <color name="MeterInv" rgba="#c04040ff"/>
     </colors>
 
-    <template name="editor" class="CViewContainer" origin="0, 0" size="600, 770"
-              minSize="600, 770" maxSize="600, 770"
+    <template name="editor" class="CViewContainer" origin="0, 0" size="600, 910"
+              minSize="600, 910" maxSize="600, 910"
               background-color="BgDark" background-color-draw-style="filled">
 
         <view class="CTextLabel" origin="0, 14" size="600, 26" font="TitleFont"
@@ -47,7 +47,13 @@
         <view class="CView" origin="20, 416" size="560, 240" custom-view-name="StrxSpectrum"
               tooltip="M/S spectra: Welch average for pink, max-hold + live for a sweep"/>
 
-        <view class="CView" origin="180, 670" size="240, 77" bitmap="logo"/>
+        <!-- The pink read-out. Same left/right margins and the same log axis
+             as the spectrum, so a band's bar sits under its own line in the
+             curve above; the numbers are the dB to dial into the amplifier. -->
+        <view class="CView" origin="20, 666" size="560, 134" custom-view-name="StrxBandTable"
+              tooltip="ISO 266 third-octave deviation from pink: dB to dial into the amplifier"/>
+
+        <view class="CView" origin="180, 810" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps>

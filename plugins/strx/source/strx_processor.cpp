@@ -3,6 +3,7 @@
 #include "strx_meters.h"
 #include "strx_goniometer.h"
 #include "strx_spectrum.h"
+#include "strx_bandtable.h"
 #include "strx_status.h"
 #include "version.h"
 
@@ -163,6 +164,19 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
         }
         return new Seam::StrxSpectrum(VSTGUI::CRect(0, 0, 560, 240), this, font,
                                        structure, text, colorM, colorS);
+    }
+    if (name && std::string(name) == kViewBandTable) {
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor structure = VSTGUI::kGreyCColor;
+        VSTGUI::CColor text = VSTGUI::kWhiteCColor;
+        VSTGUI::CColor bar = VSTGUI::kYellowCColor;
+        if (description) {
+            description->getColor("Structure", structure);
+            description->getColor("TextLight", text);
+            description->getColor("MeterFill", bar);
+        }
+        return new Seam::StrxBandTable(VSTGUI::CRect(0, 0, 560, 134), this, font,
+                                        structure, text, bar);
     }
     if (name && std::string(name) == kViewStatus) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;

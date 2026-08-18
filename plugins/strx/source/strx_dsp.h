@@ -3,11 +3,15 @@
 // FAUST REFERENCE:
 //   seam.stereophony.lib : sst.sdmx   — Blumlein M/S sum-and-difference matrix
 //   seam.analyzers.lib   : san.correlation, san.width, san.panorama, san.vectorangle
-//   seam.analyzers.lib   : an.mth_octave_spectral_level (idiomatic spectrum equiv.)
-// The spectral curve here uses a Welch FFT (seam_fft.h) for a finer display,
-// citing the filterbank analyzer as the SR-independent Faust equivalent.
+//   seam.analyzers.lib   : san.thirdoctave_levels_ab, san.pinkcomp — the ISO
+//                          266 band table, ported by hand in strx_bands.h
+// The spectral CURVE uses a Welch FFT (seam_fft.h) for a finer display, where
+// an.mth_octave_spectral_level is the idiomatic SR-independent equivalent. The
+// band TABLE is the filterbank itself, and is a real port rather than a
+// citation — see strx_bands.h.
 #pragma once
 #include "seam_fft.h"
+#include "strx_bands.h"
 #include "seam_meter.h"
 #include <algorithm>
 #include <atomic>
@@ -45,6 +49,13 @@ struct AnalysisFrame {
     float accS[kNumBins] = {};  // dB
     int accPasses = 0;          // completed passes folded so far
     int numBins = 0;
+
+    // ISO 266 third-octave read of a pink measurement: dB to dial into the
+    // amplifier per band, and how far each band has come towards a trustworthy
+    // reading (0..1). Meaningful only while a pink emitter is sounding — the
+    // view decides, the analyser always publishes.
+    float bandComp[kNumBands]   = {};
+    float bandSettle[kNumBands] = {};
 };
 
 class Analyzer {
@@ -60,12 +71,14 @@ public:
         const double tau = glide_ ? kGlideTauSec : kPinkTauSec;
         welchM_.prepare(kFftSize, tau, fs_);
         welchS_.prepare(kFftSize, tau, fs_);
+        bands_.prepare(fs_);
         reset();
     }
     void reset() {
         lvlL_.reset(); lvlR_.reset(); lvlM_.reset(); lvlS_.reset();
         mLR_ = mLL_ = mRR_ = 0.0;
         welchM_.reset(); welchS_.reset();
+        bands_.reset();
         std::fill(accM_, accM_ + AnalysisFrame::kNumBins, -120.0f);
         std::fill(accS_, accS_ + AnalysisFrame::kNumBins, -120.0f);
         accPasses_ = 0;
@@ -85,6 +98,11 @@ public:
         const double tau = on ? kGlideTauSec : kPinkTauSec;
         welchM_.setEmaTau(tau);
         welchS_.setEmaTau(tau);
+        // The band table reads a stationary pink field; a sweep passing
+        // through it would leave a smear that outlives the sweep, since the
+        // low bands average over ten seconds. Every change of source starts a
+        // fresh measurement.
+        bands_.reset();
     }
     bool glideMode() const { return glide_; }
 
@@ -190,6 +208,9 @@ public:
             fr.accM[k]  = accM_[k]; fr.accS[k] = accS_[k];
         }
         fr.accPasses = accPasses_;
+        // ISO 266 band table (san.thirdoctave_levels_ab : san.pinkcomp).
+        bands_.process(L, R, n);
+        bands_.compensation(fr.bandComp, fr.bandSettle);
     }
 
     // Audio thread (producer): fill the working buffer, then publish it by
@@ -233,6 +254,10 @@ private:
     bool glide_ = false;
     seam::meter::LevelFollower lvlL_, lvlR_, lvlM_, lvlS_;
     seam::fft::Welch welchM_, welchS_;
+    // The ISO 266 filterbank: 62 six-pole sections in double, band-outer per
+    // block. Sits beside the Welch analysis rather than replacing it — the
+    // curve is for looking, the bands are for reading numbers off.
+    BandLevels bands_;
     float accM_[AnalysisFrame::kNumBins] = {};
     float accS_[AnalysisFrame::kNumBins] = {};
     int   accPasses_ = 0;

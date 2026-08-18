@@ -256,3 +256,14 @@ if(APPLE)
 endif()
 target_compile_features(seam_state_test PRIVATE cxx_std_17)
 add_test(NAME seam_state_test COMMAND seam_state_test)
+
+add_executable(strx_bands_test
+    strx_bands_test.cpp
+)
+target_include_directories(strx_bands_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/strx/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(strx_bands_test PRIVATE cxx_std_17)
+add_test(NAME strx_bands_test COMMAND strx_bands_test)

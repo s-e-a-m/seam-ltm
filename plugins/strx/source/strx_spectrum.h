@@ -12,11 +12,14 @@
 #include <cstdint>
 #include <cstdio>
 
-// FAUST REFERENCE (seam.analyzers.lib: an.mth_octave_spectral_level, the
-// idiomatic SR-independent filterbank equivalent) / seam_fft.h Welch: renders
+// FAUST REFERENCE (seam_fft.h Welch; an.mth_octave_spectral_level is the
+// idiomatic SR-independent equivalent for a spectrum of this kind): renders
 // the AnalysisFrame::specM/specS Welch magnitude curves that
 // Seam::strx::Analyzer already computes (see strx_dsp.h). This view adds no
 // DSP of its own — it is a read-only render of AnalysisFrame.
+// The filterbank itself is no longer only a citation: StrxBandTable below the
+// curve renders a real hand port of san.thirdoctave_levels_ab (strx_bands.h),
+// on this view's axis constants, so a band's bar sits under its own line.
 
 namespace Seam {
 
