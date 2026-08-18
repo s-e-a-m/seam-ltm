@@ -8,8 +8,9 @@ of a long session is how the numbers went missing from the 2026-08-18 log.
 FORMAT, reverse-engineered 2026-08-18 from `2026-08-13-STONED-BRIDGE-FLAT.preset`
 and checked against a screenshot of the software showing CH1:
 
-    0x00  8 bytes              header; 0x04..0x07 vary per channel and track
-                               the compressor, but the scale is unread
+    0x00  4 bytes              unknown
+    0x04  4 bytes              CHANNEL GAIN, one per channel:
+                                 dB = (byte - 59) / 2, so 59 is 0.0 dB
     0x08  16 zero bytes
     0x18  8 records x 6 bytes  CH1 EQ1..EQ8
     0x48  8 records x 6 bytes  CH2
@@ -18,7 +19,12 @@ and checked against a screenshot of the software showing CH1:
     0xdc  4 records x 8 bytes  crossover, one per channel:
                                  +0 lpType  +1 lpDecade  +2 lpIndex  +3 pad
                                  +4 hpType  +5 hpDecade  +6 hpIndex  +7 pad
-    0xfc  4 records x 5 bytes  per-channel gain (byte 0) and unread fields
+    0xfc  4 records x 5 bytes  COMPRESSOR, one per channel:
+                                 threshold (byte - 100)/2 dB
+                                 ratio     index; 22 = LIMIT
+                                 attack    (byte + 1) * 10 ms
+                                 release   (byte + 1) * 20 ms
+                                 bypass    1 = bypassed, as in the EQ records
     0x110 workmode             0 = four channels, 3 = two bridged pairs
     0x113 4 bytes              input routing per channel
 
@@ -46,10 +52,21 @@ hand-set 100 Hz BE12 high pass decodes to 101.5 Hz, the nearest point on the
 grid. The first reading of this file put the crossovers in the header, where
 two bytes happened to match: the test is what caught it.
 
-NOT resolved: the channel-gain scale (one known point, byte 88 = -15 dB, which
-several scales fit) and the compressor. Those are printed raw rather than
-guessed at -- a decoder that invents numbers for a calibration record is worse
-than one that admits a gap.
+The channel gain was found the same way, and by the same mistake: byte 88 in
+the 0xfc block looked like a gain and was not. The real field is in the header
+and reads (byte - 59)/2 dB, exact on nine independently declared values across
+four presets -- including two channels one step apart, -12.0 and -12.5 dB.
+
+The compressor turned out to live in that same 0xfc block, and its four
+parameters fall out of two readings apiece: threshold -6 and -12.5 dB against
+bytes 88 and 75, attack 100 and 10 ms against 9 and 0, release 300 and 500 ms
+against 14 and 24. The bypass flag keeps the EQ convention, 1 = bypassed.
+
+NOT resolved: the ratio list (an index, of which only two points are known and
+one of them is LIMIT at the top of the scale), the crossover type 21 seen on a
+TEMPO channel, and the noise gate. They are printed raw rather than guessed at
+-- a decoder that invents numbers for a calibration record is worse than one
+that admits a gap.
 """
 import sys
 
@@ -57,7 +74,10 @@ TYPES = {1: "Peak", 2: "LSF", 3: "HSF"}
 XTYPES = {0: "Bypass", 7: "BE12", 11: "BW24"}
 WORKMODE = {0: "four channels", 3: "two bridged pairs"}
 XOVER_BASE = 0xDC
-GAIN_BASE = 0xFC
+GAIN_BASE = 0x04      # header, one byte per channel
+GAIN_ZERO = 59        # the byte that reads 0.0 dB
+COMP_BASE = 0xFC
+COMP_ZERO = 100       # the threshold byte that reads 0.0 dB
 EQ_BASE = 0x18
 CHANNELS = 4
 SLOTS = 8
@@ -73,7 +93,22 @@ def q_factor(raw):
 
 
 def gain_db(raw):
+    """EQ filter gain."""
     return raw / 2.0 - 18.0
+
+
+def channel_gain_db(raw):
+    """Output gain of a channel, a different scale from the EQ gains."""
+    return (raw - GAIN_ZERO) / 2.0
+
+
+def compressor(data, ch):
+    r = data[COMP_BASE + ch * 5: COMP_BASE + ch * 5 + 5]
+    return {"threshold": (r[0] - COMP_ZERO) / 2.0,
+            "ratio": "LIMIT" if r[1] == 22 else "index %d" % r[1],
+            "attack": (r[2] + 1) * 10,
+            "release": (r[3] + 1) * 20,
+            "bypass": bool(r[4])}
 
 
 def channel(data, ch):
@@ -97,10 +132,14 @@ def main(path):
 
     for ch in range(CHANNELS):
         x = data[XOVER_BASE + ch * 8: XOVER_BASE + ch * 8 + 8]
-        print("CH%d  high pass %-6s %9.1f Hz   low pass %-6s %9.1f Hz   gain byte %d"
+        print("CH%d  high pass %-6s %9.1f Hz   low pass %-6s %9.1f Hz   gain %+.1f dB"
               % (ch + 1, XTYPES.get(x[4], "?%d" % x[4]), freq(x[5], x[6]),
                  XTYPES.get(x[0], "?%d" % x[0]), freq(x[1], x[2]),
-                 data[GAIN_BASE + ch * 5]))
+                 channel_gain_db(data[GAIN_BASE + ch])))
+        c = compressor(data, ch)
+        print("     compressor %-8s %+6.1f dB  ratio %-8s attack %3d ms  release %3d ms"
+              % ("bypassed" if c["bypass"] else "ACTIVE", c["threshold"],
+                 c["ratio"], c["attack"], c["release"]))
 
     for ch, rows in enumerate(banks, 1):
         active = [(s, r) for s, r in rows if r[5] == 0]
