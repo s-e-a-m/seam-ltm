@@ -1,10 +1,20 @@
 # Pink-filter literature audit — research brief
 
 Written 2026-08-18, after `multipink` was found to emit a spectrum that is
-**3 dB short at 20 Hz when the session runs at 96 kHz**. The brief below is
-meant to be pasted into a research assistant (Claude web, with search) before
-we commit to a design. The methodology mirrors the quadrature/allpass study,
-where surveying alternatives changed the answer.
+**3 dB short at 20 Hz when the session runs at 96 kHz**. The methodology
+mirrors the quadrature/allpass study, where surveying alternatives changed the
+answer.
+
+**This file is the prompt.** Paste it from the rule below, whole, into a
+research assistant with web search. Everything above the rule is context for
+us; everything below it is addressed to the assistant.
+
+---
+
+You are a research assistant. Use web search. Prefer primary sources -- papers,
+standards, official documentation -- over blogs and forum posts. Answer in
+Italian, leaving titles and the names of techniques in the original. Where a
+question has no answer in the literature, say so instead of filling the gap.
 
 ## What we already know (do not re-derive)
 
@@ -13,6 +23,10 @@ where surveying alternatives changed the answer.
   designed by invfreqz in Octave"* — an IIR fit made **in the z-plane**, so its
   corner frequencies are fractions of the sample rate. Doubling fs moves the
   whole −3 dB/oct region up an octave and the bottom falls off the fit.
+  Measured on the filter's own magnitude response, against ideal pink and
+  referred to 1 kHz: at 96 kHz it is **−3.09 dB at 20 Hz**, −2.27 at 25 Hz,
+  −1.50 at 31.5 Hz, −0.82 at 40 Hz, and correct from 63 Hz up. At 44.1 and
+  48 kHz the same deviations stay within 0.6 dB.
 - GRAME's own documentation already proposes an alternative:
   `fi.spectral_tilt(N, f0, bw, alpha)` with `alpha = −0.5`, whose parameters
   are in **Hz**, and which is therefore sample-rate-correct by construction. It
