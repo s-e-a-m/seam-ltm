@@ -35,8 +35,9 @@ and checked against a screenshot of the software showing CH1:
       gain   gain/2 - 18              -- so 36 = 0.0 dB exactly
       bypass 0 = active, 1 = bypassed
 
-    crossover type: 0 = Bypass, 7 = BE12, 11 = BW24. The frequency uses the
-    same grid as the EQ, and keeps its stored value while bypassed.
+    crossover type: 0 = Bypass, 7 = BE12, 11 = BW24, 21 = BW48. It is a menu
+    index, not a slope, so unknown values are printed raw. The frequency uses
+    the same grid as the EQ, and keeps its stored value while bypassed.
 
 Both scales are 12-tone-equal-temperament grids: the frequency advances by
 1/30 of an octave per step and the Q by a semitone ratio. Checked against nine
@@ -62,16 +63,17 @@ parameters fall out of two readings apiece: threshold -6 and -12.5 dB against
 bytes 88 and 75, attack 100 and 10 ms against 9 and 0, release 300 and 500 ms
 against 14 and 24. The bypass flag keeps the EQ convention, 1 = bypassed.
 
-NOT resolved: the ratio list (an index, of which only two points are known and
-one of them is LIMIT at the top of the scale), the crossover type 21 seen on a
-TEMPO channel, and the noise gate. They are printed raw rather than guessed at
--- a decoder that invents numbers for a calibration record is worse than one
-that admits a gap.
+NOT resolved: the compressor ratio, which is a menu index of which only two
+points are known and one of them is LIMIT at the top of the scale. Printed raw
+rather than guessed at -- a decoder that invents numbers for a calibration
+record is worse than one that admits a gap. The noise gate is not decoded
+either, and deliberately: it is unused in this rig, so no preset exists that
+would show what its bytes do.
 """
 import sys
 
 TYPES = {1: "Peak", 2: "LSF", 3: "HSF"}
-XTYPES = {0: "Bypass", 7: "BE12", 11: "BW24"}
+XTYPES = {0: "Bypass", 7: "BE12", 11: "BW24", 21: "BW48"}
 WORKMODE = {0: "four channels", 3: "two bridged pairs"}
 XOVER_BASE = 0xDC
 GAIN_BASE = 0x04      # header, one byte per channel
