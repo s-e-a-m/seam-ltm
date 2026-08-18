@@ -264,4 +264,49 @@ strx lo vede.
 - [ ] mediana al posto della media per lo zero
 - [ ] una misura a 96 kHz per vedere la banda dei 20 kHz (a 96 k il pink è
       sbagliato **sotto i 63 Hz**, non in alto: per guardare lassù è valido)
-- [ ] pink: decidere se implementare o documentare e chiudere
+- [ ] pink: scegliere A / B / entrambi — con il test di accettazione già pronto
+
+## Test di accettazione SMPTE per il filtro di pinking
+
+Costruito prima di scegliere il filtro, perché la scelta diventi una misura e
+non un'opinione: `tests/multipink_pink_test.cpp` porta la risposta del filtro
+attraverso il banco ISO 266 di `strx_bands.h` e verifica la tolleranza di
+**SMPTE ST 2095-1: ±0,25 dB per terzo d'ottava da 20 Hz a 16 kHz**.
+
+**Analitico, non a rumore.** La tolleranza è ±0,25 dB e un livello di banda
+misurato su rumore porta ±0,6 dB di dispersione a BT=50: un test a rumore non
+potrebbe risolvere ciò che deve giudicare. Con ingresso bianco lo spettro di
+potenza in uscita **è** |H(f)|², quindi l'energia di banda è l'integrale di
+|H|² sulla banda, calcolato esattamente.
+
+| fs | scostamento peggiore | esito |
+|---|---|---|
+| 44,1 kHz | **0,41 dB** | FAIL |
+| 48 kHz | **0,60 dB** | FAIL |
+| 88,2 kHz | 2,40 dB | FAIL |
+| 96 kHz | 2,68 dB | FAIL |
+| 192 kHz | 4,99 dB | FAIL |
+
+**Il risultato che riorienta la questione: fallisce anche alla frequenza a cui
+è stato fittato.** Non è un filtro corretto che si guasta alzando fs — è un
+filtro che non è mai stato di qualità metrologica, e a 96 kHz il difetto
+diventa solo abbastanza grande da vedersi in una misura di sala.
+
+Conseguenza sulla rosa dei candidati: **A (rimappare il fit esistente) non può
+passare a nessuna frequenza**, perché rimappare riproduce la risposta alla
+frequenza di progetto e quella è già fuori tolleranza di 0,41 dB. A resta utile
+solo come *ponte di compatibilità* con le misure vecchie, mai come metodo
+primario. Il campo si stringe su **B** (`fi.spectral_tilt`, ordine da
+determinare col test) — o su un fit nuovo di ordine più alto, che il test
+giudicherebbe allo stesso modo.
+
+Nota sulla severità: la deviazione è calcolata rispetto alla **media** delle
+bande, cioè nell'interpretazione più favorevole (SMPTE fissa un livello
+assoluto per banda; permettere il trim di guadagno complessivo è generoso). I
+numeri sopra sono quindi un **limite inferiore**: il filtro non può fare meglio
+di così nemmeno con il guadagno ottimizzato.
+
+Distinzione da tenere presente: i coefficienti in uso sono il fit **invfreqz a
+3 poli** di GRAME, non i coefficienti "instrumentation grade" di Kellett
+(±0,05 dB dichiarati, filtro diverso e più lungo). Sono due cose che la
+letteratura confonde spesso.

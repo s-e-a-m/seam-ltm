@@ -1,5 +1,7 @@
 #pragma once
 
+#include "multipink_pink.h"
+
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "multipink_ids.h"
 #include "seam_calbus_client.h"
@@ -61,11 +63,11 @@ private:
     // Faust master seed, must match no.multinoise(N) = noise_env(12345).
     static constexpr uint32_t kFaustSeed = 12345;
 
-    // Pink filter coefficients (Paul Kellet, noises.lib:402).
-    static constexpr double kPinkB[4] = {
-         0.049922035, -0.095993537,  0.050612699, -0.004408786 };
-    static constexpr double kPinkA[3] = {
-        -2.494956002,  2.017265875, -0.522189400 };
+    // Pink filter coefficients: now in multipink_pink.h, which is SDK-free so
+    // the response can be judged against a tolerance by a test. One copy, so
+    // the plugin and the acceptance test cannot describe different filters.
+    static constexpr const double* kPinkB = Seam::multipink::kPinkB;
+    static constexpr const double* kPinkA = Seam::multipink::kPinkA;
 
     // Calibration constant — measured 2026-05-07 against a 30 s render at
     // 48 kHz, Reference=-23, Trim=0: sox reported RMS amplitude 0.003370

@@ -278,3 +278,15 @@ target_include_directories(strx_export_test PRIVATE
 )
 target_compile_features(strx_export_test PRIVATE cxx_std_17)
 add_test(NAME strx_export_test COMMAND strx_export_test)
+
+add_executable(multipink_pink_test
+    multipink_pink_test.cpp
+)
+target_include_directories(multipink_pink_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/multipink/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/strx/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(multipink_pink_test PRIVATE cxx_std_17)
+add_test(NAME multipink_pink_test COMMAND multipink_pink_test)
