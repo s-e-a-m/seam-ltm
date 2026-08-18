@@ -113,11 +113,16 @@ aggiunge correzioni puntuali che prima non c'erano: −16 dB stretti a 477 Hz,
 −9,5 a 1382, −6 a 2462, −7,5 a 6498.
 
 **Da chiarire**: su CH2 e CH4 — i lati *schiavi* dei due ponti — resta acceso
-un filtro solo, HSF 125,0 Hz −18,0 dB, che non compare nella pagina di CH1. Se
-il DSP lo applica all'uscita in ponte, nella catena c'è uno shelf in più di
-quanto l'operatore intendesse; se il ponte usa solo il ramo master, è un
-residuo innocuo. In entrambi i casi la misura di strx lo comprendeva, quindi la
-taratura resta valida — ma va deciso prima di replicarla su un altro STONE.
+un filtro solo, HSF 125,0 Hz −18,0 dB, che non compare nella pagina di CH1, e
+il loro passa-alto è a 35,1 Hz invece che a 38,5. Sono residui della voicing
+precedente: il preset del 2023 (`STONE.preset`) porta lo stesso shelf, HSF
+101,5 Hz −16,0 dB, su **tutti e quattro** i canali — ed è esattamente il valore
+annotato a mano nel log del 2026-07-14, il che ha validato la decodifica contro
+una fonte indipendente. Tarando sono stati riscritti CH1 e CH3; sui due schiavi
+è rimasto il vecchio. Se il DSP applica il ramo schiavo all'uscita in ponte
+nella catena c'è uno shelf in più di quanto si intendesse; se il ponte usa solo
+il master, è innocuo. In entrambi i casi la misura di strx lo comprendeva,
+quindi la taratura resta valida — ma va deciso prima di replicarla.
 
 **Non registrato in questa sessione** (da catturare alla prossima):
 - l'ambiente, e la posizione dello STONE al suo interno;

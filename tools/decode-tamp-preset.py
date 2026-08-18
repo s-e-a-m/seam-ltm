@@ -8,23 +8,29 @@ of a long session is how the numbers went missing from the 2026-08-18 log.
 FORMAT, reverse-engineered 2026-08-18 from `2026-08-13-STONED-BRIDGE-FLAT.preset`
 and checked against a screenshot of the software showing CH1:
 
-    0x00  00 00
-    0x02  hpType lpType        crossover slope selectors (2 = BW24)
-    0x04  hpFreq lpFreq        crossover indices, bridge pair A
-    0x06  hpFreq lpFreq        bridge pair B
+    0x00  8 bytes              header; 0x04..0x07 vary per channel and track
+                               the compressor, but the scale is unread
     0x08  16 zero bytes
     0x18  8 records x 6 bytes  CH1 EQ1..EQ8
     0x48  8 records x 6 bytes  CH2
     0x78  8 records x 6 bytes  CH3
     0xa8  8 records x 6 bytes  CH4
-    0xd8  tail: per-channel gain, delay, limiter, routing (only partly read)
+    0xdc  4 records x 8 bytes  crossover, one per channel:
+                                 +0 lpType  +1 lpDecade  +2 lpIndex  +3 pad
+                                 +4 hpType  +5 hpDecade  +6 hpIndex  +7 pad
+    0xfc  4 records x 5 bytes  per-channel gain (byte 0) and unread fields
+    0x110 workmode             0 = four channels, 3 = two bridged pairs
+    0x113 4 bytes              input routing per channel
 
-    record: type, decade, index, q, gain, bypass
+    EQ record: type, decade, index, q, gain, bypass
       type   1 = Peak, 2 = LSF (low shelf), 3 = HSF (high shelf)
       freq   1000 * 2^((100*decade + index - 170)/30)   Hz
       q      2^((q - 16)/12)          -- so 16 = 1.0, 28 = 2.0, 35 = 3.0
       gain   gain/2 - 18              -- so 36 = 0.0 dB exactly
       bypass 0 = active, 1 = bypassed
+
+    crossover type: 0 = Bypass, 7 = BE12, 11 = BW24. The frequency uses the
+    same grid as the EQ, and keeps its stored value while bypassed.
 
 Both scales are 12-tone-equal-temperament grids: the frequency advances by
 1/30 of an octave per step and the Q by a semitone ratio. Checked against nine
@@ -32,14 +38,26 @@ values read off the UI, the frequency model is within 0.07% on seven of them
 and 0.6% on the two the software displays with only three significant digits;
 the Q model is exact on all three known values.
 
-NOT resolved: the low-pass index (bypassed in the sample, and 0x3b does not
-decode to the 20.16 kHz the UI showed), and most of the tail. Those are printed
-raw rather than guessed at -- a decoder that invents numbers for a calibration
-record is worse than one that admits a gap.
+The crossover section was settled by a controlled test (GS, 2026-08-18): five
+presets differing in one parameter each. lp-1k and lp-10.08k differ in a single
+byte, the decade, and decode to exactly 1000.0 and 10079.4 Hz; lp-bypass
+differs from lp-10.08k only in the type byte and keeps its frequency; a
+hand-set 100 Hz BE12 high pass decodes to 101.5 Hz, the nearest point on the
+grid. The first reading of this file put the crossovers in the header, where
+two bytes happened to match: the test is what caught it.
+
+NOT resolved: the channel-gain scale (one known point, byte 88 = -15 dB, which
+several scales fit) and the compressor. Those are printed raw rather than
+guessed at -- a decoder that invents numbers for a calibration record is worse
+than one that admits a gap.
 """
 import sys
 
 TYPES = {1: "Peak", 2: "LSF", 3: "HSF"}
+XTYPES = {0: "Bypass", 7: "BE12", 11: "BW24"}
+WORKMODE = {0: "four channels", 3: "two bridged pairs"}
+XOVER_BASE = 0xDC
+GAIN_BASE = 0xFC
 EQ_BASE = 0x18
 CHANNELS = 4
 SLOTS = 8
@@ -68,8 +86,7 @@ def channel(data, ch):
 def main(path):
     data = open(path, "rb").read()
     print("file       %s (%d bytes)" % (path, len(data)))
-    print("crossover  high pass %.1f Hz (slope byte %d) · low pass index %d raw"
-          % (freq(0, data[0x04]), data[0x02], data[0x05]))
+    print("workmode   %s" % WORKMODE.get(data[0x110], "raw %d" % data[0x110]))
 
     banks = []
     for ch in range(CHANNELS):
@@ -77,6 +94,13 @@ def main(path):
         for slot, r in channel(data, ch):
             rows.append((slot, r))
         banks.append(rows)
+
+    for ch in range(CHANNELS):
+        x = data[XOVER_BASE + ch * 8: XOVER_BASE + ch * 8 + 8]
+        print("CH%d  high pass %-6s %9.1f Hz   low pass %-6s %9.1f Hz   gain byte %d"
+              % (ch + 1, XTYPES.get(x[4], "?%d" % x[4]), freq(x[5], x[6]),
+                 XTYPES.get(x[0], "?%d" % x[0]), freq(x[1], x[2]),
+                 data[GAIN_BASE + ch * 5]))
 
     for ch, rows in enumerate(banks, 1):
         active = [(s, r) for s, r in rows if r[5] == 0]
