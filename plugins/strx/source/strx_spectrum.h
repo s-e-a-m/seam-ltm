@@ -21,7 +21,7 @@
 namespace Seam {
 
 // Third of strx's three custom views (Task 9 of 9): overlaid M/S Welch
-// spectra on a log-frequency x-axis (20 Hz - 20 kHz) and a dB y-axis
+// spectra on a log-frequency x-axis (20 Hz - 24 kHz) and a dB y-axis
 // (-120 .. +6 dB). bin k -> Hz uses fftSize = 2*(numBins-1) (derived from the
 // frame, since numBins is fixed by strx_dsp.h's kFftSize) and
 // StrxProcessor::sampleRate() (config, not per-frame data — safe to read
@@ -36,7 +36,10 @@ public:
 
     // --- Axis ranges ---
     static constexpr double kFMin  = 20.0;     // Hz, x-axis left edge
-    static constexpr double kFMax  = 20000.0;  // Hz, x-axis right edge
+    // 24 kHz, not 20: a STONE radiates well past the top of the audio band
+    // and the measurement has to show it. At 48 kHz this is exactly Nyquist,
+    // so the axis ends where the data does.
+    static constexpr double kFMax  = 24000.0;  // Hz, x-axis right edge
     static constexpr double kDbMin = -120.0;   // y-axis bottom
     static constexpr double kDbMax = 6.0;      // y-axis top
 
@@ -111,7 +114,7 @@ public:
             c->drawLine(CPoint(plot.left, y), CPoint(plot.right, y));
             char buf[8];
             std::snprintf(buf, sizeof buf, "%.0f", db);
-            c->setFontColor(structureColor_);
+            c->setFontColor(textColor_);
             c->drawString(buf, CRect(r.left, y - 6, plot.left - 3, y + 6), kRightText);
         }
 
@@ -124,17 +127,21 @@ public:
         // the coarse anchor. 1 kHz is both an octave centre and a decade, so
         // it takes the decade brightness and keeps its label.
         //
-        // Only the octave tier is labelled. The plot is ~526 px over three
-        // decades, which puts octave labels ~53 px apart — comfortable — but
-        // "100" would land 17 px from "125" and "10k" the same distance from
-        // "8k". The decade tier reads as a brightness accent instead of
-        // fighting its neighbours for the label strip.
-        // The third-octave alpha was raised from 25 to 38 after rendering the
-        // grid at true size: 25/255 of Structure over BgDark separates the
-        // hairline from the background by ~10 levels of grey, which is a line
-        // that exists in the code and not on the screen.
+        // Only the octave tier is labelled, and 16 kHz gives up its label to
+        // 20 kHz: their centres are 16 px apart and three glyphs need 20, so
+        // one of the two has to go, and 20 kHz is the reference a reader wants
+        // at the top of the axis. Same reason the decade tier carries no
+        // labels at all — "100" would land 17 px from "125" — and reads as a
+        // brightness accent instead.
+        // Alphas measured off a screenshot of the running plugin rather than
+        // guessed: 38/70/110 of Structure over BgDark render as greys 58/70/86
+        // against a background of 43, so the whole grid sat in the bottom
+        // eighth of the available contrast while the window's text sat at 252.
+        // Raised to 55/110/170 -> 63/83/105, which keeps the three tiers
+        // ordered and still below the plot border (Structure at full alpha,
+        // 136), so the frame stays the brightest graphic element.
         enum FTier { kThird = 0, kOctave = 1, kDecade = 2 };
-        static constexpr uint8_t kTierAlpha[] = { 38, 70, 110 };
+        static constexpr uint8_t kTierAlpha[] = { 55, 110, 170 };
         struct FLine { double hz; FTier tier; const char* label; };
         static constexpr FLine kFreqLines[] = {
             {    20.0, kThird,  nullptr }, {    25.0, kThird,  nullptr },
@@ -151,8 +158,8 @@ public:
             {  3150.0, kThird,  nullptr }, {  4000.0, kOctave, "4k"    },
             {  5000.0, kThird,  nullptr }, {  6300.0, kThird,  nullptr },
             {  8000.0, kOctave, "8k"    }, { 10000.0, kDecade, nullptr },
-            { 12500.0, kThird,  nullptr }, { 16000.0, kOctave, "16k"   },
-            { 20000.0, kThird,  nullptr },
+            { 12500.0, kThird,  nullptr }, { 16000.0, kOctave, nullptr },
+            { 20000.0, kOctave, "20k"   },
         };
         for (const FLine& fl : kFreqLines) {
             const CCoord x = xForFreq(fl.hz);
@@ -162,13 +169,16 @@ public:
             c->setLineWidth(1.0);
             c->drawLine(CPoint(x, plot.top), CPoint(x, plot.bottom));
             if (!fl.label) continue;
-            // Centred on its line, except where that would push the box past
-            // the plot — at 31.5 Hz it would otherwise reach into the gutter
-            // the dB labels own.
+            // Centred on its line. The left edge stops at the plot because the
+            // dB labels own the gutter beside it; the right edge stops at the
+            // VIEW, not the plot, because the label strip runs under the right
+            // margin where nothing else is drawn — clamping to plot.right
+            // would shove "20k" 1.5 px off its own line, which is precisely
+            // the misalignment this grid is meant not to have.
             CRect box(x - 15, plot.bottom + 1, x + 15, r.bottom);
-            if (box.left  < plot.left)  box.offset(plot.left  - box.left,  0);
-            if (box.right > plot.right) box.offset(plot.right - box.right, 0);
-            c->setFontColor(structureColor_);
+            if (box.left  < plot.left) box.offset(plot.left - box.left,  0);
+            if (box.right > r.right)   box.offset(r.right  - box.right, 0);
+            c->setFontColor(textColor_);
             c->drawString(fl.label, box, kCenterText);
         }
 
@@ -244,7 +254,7 @@ public:
                 drawCurve(heldLiveS_, heldNumBins_, colorS_, /*alpha*/90);
             }
             if (font_) {
-                c->setFontColor(structureColor_);
+                c->setFontColor(textColor_);
                 c->drawString("HELD", CRect(plot.left + 2, plot.top + 2, plot.left + 44, plot.top + 14),
                                kLeftText);
             }
