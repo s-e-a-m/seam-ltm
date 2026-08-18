@@ -154,3 +154,114 @@ coerente con il metodo, non un sintomo.
 - `3ae732e` tabella per bande ISO 266
 - `5297325` griglia a due livelli, 16k, gate di Nyquist
 - faust-libraries: `279037e`, `fc7d707`
+
+---
+
+## Sera: export della tabella, ripetibilità e tre posizioni di microfono
+
+### SAVE TABLE
+
+Aggiunto a strx un bottone che scrive la tabella in `/Volumes/Aleph/strx` come
+file di testo leggibile, con il contesto e non solo i 31 numeri: frequenza di
+campionamento, sorgente dal bus, secondi di integrazione, bande misurabili, e
+per banda la compensazione, il **livello grezzo** e lo stato di assestamento.
+I campi `position` e `note` sono scritti vuoti perché li compili l'operatore.
+
+Al primo uso reale ha mostrato subito un difetto: un file salvato prima che
+l'analizzatore avesse girato dichiarava `bands: 0 of 31` e poi stampava **31
+righe di zeri perfetti** — una misura impeccabile del nulla. Corretto: ora in
+quel caso non c'è tabella, c'è una frase che dice che non c'è misura.
+
+### Ripetibilità dello strumento
+
+Quattro salvataggi consecutivi nella stessa posizione:
+
+| regione | escursione fra salvataggi |
+|---|---|
+| 250 Hz – 16 kHz | **≤ 0,7 dB**, spesso ≤ 0,3 |
+| 63 – 200 Hz | ≤ 1,4 dB |
+| sotto i 50 Hz | 2,3 – 6,4 dB |
+
+**Sotto il passa-alto del finale non c'è misura.** A 20 Hz la tabella chiedeva
++11 dB: è il passa-alto a 38,5 Hz BW24 dell'operatore, misurato fedelmente. Ma
+il livello grezzo (−65,6 dB contro −53) è **12 dB** sotto la media mentre il
+filtro ne toglierebbe ~20: la differenza è il **rumore di fondo della stanza**
+che riempie quelle bande. Sotto i 50 Hz non si misura il diffusore, si misura
+l'ambiente — ed è per questo che oscilla di 6 dB.
+
+Regola operativa: **nessuna banda sotto il passa-alto del finale è una misura.**
+
+### Tre posizioni di microfono
+
+| | posizione | integrazione |
+|---|---|---|
+| A | frontale, 1 m, stessa altezza, lontano dalle pareti | 30–51 s |
+| C | di lato, 1 m, stessa altezza, vicino a una parete | 36–55 s |
+| B | 60 cm dal basso, in faccia a un cono | 116–121 s |
+
+(Fra C e B il contatore non si è azzerato ma sono passati 62 s, contro un 3τ
+massimo di 33 s: della posizione precedente resta lo 0,3%. Le misure sono
+pulite. Se avesse salvato dieci secondi dopo lo spostamento non lo sarebbero
+state — manca un gesto di "riparto pulito".)
+
+**Il risultato principale: A e C concordano entro ±0,7 dB — quasi tutte entro
+0,3 — da 200 Hz a 16 kHz.** Due posizioni completamente diverse, una a ridosso
+di una parete e una in campo libero, danno la stessa risposta su sette ottave.
+È la **sfericità dello STONED misurata**, non affermata: una direttività
+marcata sarebbe emersa ruotando di 90°.
+
+**Sotto i 200 Hz divergono fino a 3,8 dB** (80 Hz: A −1,1 contro C +2,6; 125 e
+160 Hz: C ~3 dB più caldo): è il rinforzo di parete. Quindi **nel tuo studio il
+confine fra "diffusore" e "stanza" cade intorno ai 200 Hz**, misurato e non
+assunto. Sopra si corregge sul finale, sotto è lavoro del futuro stadio di sala.
+
+**La posizione B non è una posizione di taratura.** Differisce da A di −4,3 dB
+a 1,6 kHz e −2,5 a 12,5 kHz, dove A e C concordavano entro 0,3. A 60 cm si è
+nel campo vicino di **un solo cono**: i quattro driver non si sono ancora fusi.
+La trappola è che è la misura **più ripetibile di tutte** (0,2–0,5 dB): misura
+benissimo la cosa sbagliata.
+
+### Lo zero è spostato dal passa-alto
+
+La media che fissa lo zero include le bande a 31,5 e 40 Hz, ~7 dB sotto per via
+del passa-alto: due bande su ventotto tirano giù il riferimento di **~0,7 dB**.
+Con una **mediana** delle sole bande sopra il passa-alto il residuo medio sopra
+i 200 Hz passa da −0,50 a +0,20 dB. Proposta in sospeso: cambiare lo zero di
+strx da media a mediana, in C++ e nella spec Faust.
+
+### Cosa è lo STONED, misurato
+
+Con A e C e zero robusto, sopra i 200 Hz: tutto entro **±1,0 dB** tranne
+**16 kHz, +3,0 dB** — presente in entrambe le posizioni (escursione interna
+0,3, differenza fra posizioni 0,5). È l'unica anomalia reale.
+
+### Proposta per i 16 kHz (non ancora applicata)
+
+Lo shelf esistente (HSF 15277 Hz, +9 dB) dà già +5,2 a 16 k e +8,7 a 20 k, e
+non può fare la forma che serve — il difetto è largo un terzo d'ottava, uno
+shelf sale monotòno. Quantificato:
+
+| mossa sullo shelf | 10k | 12,5k | 16k | 20k |
+|---|---|---|---|---|
+| gain a +15 | +0,6 | +1,6 | +3,3 | **+5,6** (banda non misurabile a 48 kHz) |
+| angolo a 10 k | **+3,9** | **+5,2** | +3,4 | +0,3 |
+
+Proposta: **Peak 16000 Hz, Q 3,03, +3,0 dB** su CH1 e CH3. Entrambi i valori
+cadono esattamente sulla griglia del Quadro 500 (indice 290; Q indice 9).
+Effetto: +2,9 a 16 k, +0,3 a 12,5 k, **+0,1 a 20 k**.
+
+Costo: gli otto slot sono pieni. Il candidato da cedere è EQ3 (198,4 Hz, +1,5
+dB), il più piccolo dell'insieme; senza di lui i 200 Hz leggerebbero ~1,2 dB
+caldi. **Prima però va risolta la domanda su CH2/CH4**: se in ponte quel banco
+è nel percorso del segnale ci sono otto filtri in più e non si cede niente. Si
+verifica mettendo su CH2 un picco vistoso (−12 dB a 1 kHz, Q 1) e guardando se
+strx lo vede.
+
+### Aperto per domani
+
+- [ ] test CH2/CH4: il banco schiavo è nel percorso del segnale?
+- [ ] decidere il picco a 16 kHz (e se cedere EQ3)
+- [ ] mediana al posto della media per lo zero
+- [ ] una misura a 96 kHz per vedere la banda dei 20 kHz (a 96 k il pink è
+      sbagliato **sotto i 63 Hz**, non in alto: per guardare lassù è valido)
+- [ ] pink: decidere se implementare o documentare e chiudere
