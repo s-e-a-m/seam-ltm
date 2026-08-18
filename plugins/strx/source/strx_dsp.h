@@ -56,6 +56,8 @@ struct AnalysisFrame {
     // view decides, the analyser always publishes.
     float bandComp[kNumBands]   = {};
     float bandSettle[kNumBands] = {};
+    // Leading bands this sample rate can measure; the rest are not reported.
+    int   bandCount = 0;
 };
 
 class Analyzer {
@@ -211,6 +213,7 @@ public:
         // ISO 266 band table (san.thirdoctave_levels_ab : san.pinkcomp).
         bands_.process(L, R, n);
         bands_.compensation(fr.bandComp, fr.bandSettle);
+        fr.bandCount = bands_.count();
     }
 
     // Audio thread (producer): fill the working buffer, then publish it by

@@ -178,3 +178,31 @@ TEST_CASE("a spaced pair stays flat — the reason the two capsules are averaged
         CHECK(std::fabs(comp[i]) < 1.2);
     }
 }
+
+TEST_CASE("a band whose passband runs into Nyquist is not reported at all") {
+    // 20 kHz spans 17783..22387 Hz. At 44.1 kHz that upper edge is ABOVE
+    // Nyquist and at 48 kHz it is at 0.93 of it, close enough that the
+    // bilinear transform warps the design: measured on pink, the band read
+    // -3.01 dB at 44.1 kHz and -0.65 dB at 48 kHz with nothing wrong upstream.
+    CHECK(measurableBands(96000.0) == kNumBands);   // 20 kHz is at 0.47, fine
+    CHECK(measurableBands(48000.0) == 30);          // 20 kHz band withheld
+    CHECK(measurableBands(44100.0) == 30);
+    CHECK(bandFuNominal(30) > kNyquistMargin * 0.5 * 48000.0);
+    CHECK(bandFuNominal(29) < kNyquistMargin * 0.5 * 44100.0);
+    BandLevels b;
+    b.prepare(44100.0);
+    CHECK(b.count() == 30);
+    b.prepare(96000.0);
+    CHECK(b.count() == kNumBands);
+}
+
+TEST_CASE("what IS reported at 44.1 kHz is clean") {
+    // The regression this guards: before the Nyquist gate, the top band read
+    // -3 dB on a signal that was exactly pink, and the number looked usable.
+    const auto comp = measure(40.0, 1.0, nullptr, 44100.0);
+    const int nb = measurableBands(44100.0);
+    for (int i = 0; i < nb; ++i) {
+        INFO("band ", i, " (", bandFc(i), " Hz) = ", comp[i], " dB");
+        CHECK(std::fabs(comp[i]) < 1.5);
+    }
+}

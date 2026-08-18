@@ -43,11 +43,36 @@ inline constexpr int kNormNi = 28;
 // ISO 266 prefers; a base-two grid (2^(n/3)) drifts from it by 0.08% a band.
 inline double bandFc(int i) { return 1000.0 * std::pow(10.0, (kBandN0 + i) / 10.0); }
 inline double bandFl(int i) { return bandFc(i) * std::pow(10.0, -0.05); }
+inline double bandFuNominal(int i) { return bandFc(i) * std::pow(10.0, 0.05); }
 // Clamped just under Nyquist so the band count stays fixed across sample
 // rates: at 44.1 kHz the 20 kHz band would otherwise ask for a 22.4 kHz corner
 // that cannot be designed. The top band narrows instead of the bank breaking.
 inline double bandFu(int i, double fs) {
-    return std::min(bandFc(i) * std::pow(10.0, 0.05), 0.49 * fs);
+    return std::min(bandFuNominal(i), 0.49 * fs);
+}
+
+// A band is only measurable when its WHOLE passband sits comfortably below
+// Nyquist. Measured on the running analyser (2026-08-18), reading pink through
+// the bank at three rates, the top band's error against the ratio fu/Nyquist:
+//
+//     fu/Nyquist   0.47   0.74   0.81   0.93   1.02
+//     error (dB)  +0.15  +0.20  -0.12  -0.65  -3.01
+//
+// Past ~0.85 the bilinear transform warps the design enough that the reading
+// describes the sample rate instead of the loudspeaker, so those bands are not
+// reported at all. Dropping them beats clamping them: a clamped band is a
+// narrower band, and a narrower band is a number that looks usable and is not.
+// At 44.1 and 48 kHz this costs the 20 kHz band; at 96 kHz it costs nothing.
+inline constexpr double kNyquistMargin = 0.85;
+inline bool bandMeasurable(int i, double fs) {
+    return bandFuNominal(i) <= kNyquistMargin * 0.5 * fs;
+}
+// Bands are ordered, so measurability is a prefix: [0, measurableBands) is the
+// whole usable table.
+inline int measurableBands(double fs) {
+    int n = 0;
+    while (n < kNumBands && bandMeasurable(n, fs)) ++n;
+    return n;
 }
 
 // Per-band averaging time. Noise-level confidence follows the bandwidth-time
@@ -156,6 +181,7 @@ class BandLevels {
 public:
     void prepare(double fs) {
         fs_ = (fs > 0.0) ? fs : 48000.0;
+        count_ = measurableBands(fs_);
         for (int i = 0; i < kNumBands; ++i) {
             const double fl = bandFl(i), fu = bandFu(i, fs_);
             bpL_[i].design(fl, fu, fs_);
@@ -216,12 +242,15 @@ public:
     }
 
     double secondsObserved() const { return (double)elapsed_ / fs_; }
+    // How many leading bands this sample rate can actually measure.
+    int count() const { return count_; }
 
 private:
     Bandpass6e bpL_[kNumBands], bpR_[kNumBands];
     double msL_[kNumBands] = {}, msR_[kNumBands] = {};
     double pole_[kNumBands] = {}, tau_[kNumBands] = {};
     double fs_ = 48000.0;
+    int count_ = kNumBands;
     int64_t elapsed_ = 0;
 };
 

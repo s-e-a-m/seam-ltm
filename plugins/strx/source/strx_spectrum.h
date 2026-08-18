@@ -124,45 +124,46 @@ public:
         // --- Frequency grid: three tiers of reference lines + labels. ---
         // The values are the ISO 266 nominal centre frequencies, so the axis
         // speaks the same vocabulary as the octave / third-octave EQ that
-        // corrects a STONE. Brightness carries the hierarchy: third-octave
-        // hairlines to read where a feature of the curve actually sits,
-        // octave lines for the bands one describes out loud, decade lines as
-        // the coarse anchor. 1 kHz is both an octave centre and a decade, so
-        // it takes the decade brightness and keeps its label.
+        // corrects a STONE. Two tiers only: third-octave hairlines to read
+        // where a feature of the curve actually sits, and brighter labelled
+        // octave lines for the bands one describes out loud.
         //
-        // Only the octave tier is labelled, and 16 kHz gives up its label to
-        // 20 kHz: their centres are 16 px apart and three glyphs need 20, so
-        // one of the two has to go, and 20 kHz is the reference a reader wants
-        // at the top of the axis. Same reason the decade tier carries no
-        // labels at all — "100" would land 17 px from "125" — and reads as a
-        // brightness accent instead.
+        // A third, brighter tier on the decades was tried and removed (GS,
+        // 2026-08-18). 100 Hz and 10 kHz are not octave centres, so they got a
+        // brighter line with no label, and an unlabelled emphasis in the
+        // middle of a regular sequence reads as an error rather than as an
+        // anchor: it breaks the third-octave rhythm exactly where the eye is
+        // counting. 1 kHz keeps its label because it IS an octave centre.
+        //
+        // The top label stays on 16 kHz rather than moving to 20 kHz, even
+        // though the axis now runs past it: the octave sequence ending
+        // ... 4k, 8k, 16k is symmetric, and a lone 20k after it is not.
         // Alphas measured off a screenshot of the running plugin rather than
-        // guessed: 38/70/110 of Structure over BgDark render as greys 58/70/86
-        // against a background of 43, so the whole grid sat in the bottom
-        // eighth of the available contrast while the window's text sat at 252.
-        // Raised to 55/110/170 -> 63/83/105, which keeps the three tiers
-        // ordered and still below the plot border (Structure at full alpha,
-        // 136), so the frame stays the brightest graphic element.
-        enum FTier { kThird = 0, kOctave = 1, kDecade = 2 };
-        static constexpr uint8_t kTierAlpha[] = { 55, 110, 170 };
+        // guessed: Structure over BgDark renders as 43 + (136-43)*a/255, so
+        // the original 38/70 sat in the bottom eighth of the available
+        // contrast while the window's text sat at 252. 55/110 renders as
+        // 63/83, still below the plot border (Structure at full alpha, 136),
+        // so the frame stays the brightest graphic element.
+        enum FTier { kThird = 0, kOctave = 1 };
+        static constexpr uint8_t kTierAlpha[] = { 55, 110 };
         struct FLine { double hz; FTier tier; const char* label; };
         static constexpr FLine kFreqLines[] = {
             {    20.0, kThird,  nullptr }, {    25.0, kThird,  nullptr },
             {    31.5, kOctave, "31.5"  }, {    40.0, kThird,  nullptr },
             {    50.0, kThird,  nullptr }, {    63.0, kOctave, "63"    },
-            {    80.0, kThird,  nullptr }, {   100.0, kDecade, nullptr },
+            {    80.0, kThird,  nullptr }, {   100.0, kThird,  nullptr },
             {   125.0, kOctave, "125"   }, {   160.0, kThird,  nullptr },
             {   200.0, kThird,  nullptr }, {   250.0, kOctave, "250"   },
             {   315.0, kThird,  nullptr }, {   400.0, kThird,  nullptr },
             {   500.0, kOctave, "500"   }, {   630.0, kThird,  nullptr },
-            {   800.0, kThird,  nullptr }, {  1000.0, kDecade, "1k"    },
+            {   800.0, kThird,  nullptr }, {  1000.0, kOctave, "1k"    },
             {  1250.0, kThird,  nullptr }, {  1600.0, kThird,  nullptr },
             {  2000.0, kOctave, "2k"    }, {  2500.0, kThird,  nullptr },
             {  3150.0, kThird,  nullptr }, {  4000.0, kOctave, "4k"    },
             {  5000.0, kThird,  nullptr }, {  6300.0, kThird,  nullptr },
-            {  8000.0, kOctave, "8k"    }, { 10000.0, kDecade, nullptr },
-            { 12500.0, kThird,  nullptr }, { 16000.0, kOctave, nullptr },
-            { 20000.0, kOctave, "20k"   },
+            {  8000.0, kOctave, "8k"    }, { 10000.0, kThird,  nullptr },
+            { 12500.0, kThird,  nullptr }, { 16000.0, kOctave, "16k"   },
+            { 20000.0, kThird,  nullptr },
         };
         for (const FLine& fl : kFreqLines) {
             const CCoord x = xForFreq(fl.hz);

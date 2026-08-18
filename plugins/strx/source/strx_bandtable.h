@@ -117,14 +117,20 @@ public:
             return;
         }
 
+        // Only the bands this sample rate can measure. At 44.1 and 48 kHz the
+        // 20 kHz band's passband runs into Nyquist and its reading is an
+        // artefact of the rate (-3.0 dB at 44.1 kHz, measured), so it is not
+        // drawn at all rather than drawn wrong.
+        const int nb = std::clamp(frame.bandCount, 0, strx::kNumBands);
+
         // --- One bar per band, from the zero line towards the correction. ---
         // A bar is drawn dim until its own band has had three time constants
         // to converge: the 20 Hz band needs half a minute, the 1 kHz band a
         // second, and a table that hid that difference would invite acting on
         // numbers that are still moving.
-        for (int i = 0; i < strx::kNumBands; ++i) {
+        for (int i = 0; i < nb; ++i) {
             const double fl = strx::bandFl(i);
-            const double fu = strx::bandFc(i) * std::pow(10.0, 0.05);
+            const double fu = strx::bandFuNominal(i);
             const CCoord x0 = xForFreq(fl) + 1.0;
             const CCoord x1 = std::min(xForFreq(fu) - 1.0, bars.right);
             if (x1 <= x0) continue;
@@ -141,12 +147,12 @@ public:
         // Not every band past the threshold: at 17 px a bar is narrower than
         // "+4.1", and a bump spans three bands, so labelling them all would
         // overlap. One number per feature, on the band that leads it.
-        for (int i = 0; i < strx::kNumBands; ++i) {
+        for (int i = 0; i < nb; ++i) {
             const float v = frame.bandComp[i];
             if (std::fabs(v) < kLabelDb) continue;
             if (frame.bandSettle[i] < 0.8f) continue;
-            const float lo = (i > 0) ? std::fabs(frame.bandComp[i-1]) : 0.f;
-            const float hi = (i < strx::kNumBands-1) ? std::fabs(frame.bandComp[i+1]) : 0.f;
+            const float lo = (i > 0)    ? std::fabs(frame.bandComp[i-1]) : 0.f;
+            const float hi = (i < nb-1) ? std::fabs(frame.bandComp[i+1]) : 0.f;
             if (std::fabs(v) < lo || std::fabs(v) < hi) continue;
             char buf[8];
             std::snprintf(buf, sizeof buf, "%+.1f", v);
@@ -163,11 +169,12 @@ public:
         struct OctBand { int index; const char* label; };
         static constexpr OctBand kOct[] = {
             {  2, "31.5" }, {  5, "63"  }, {  8, "125" }, { 11, "250" }, { 14, "500" },
-            { 17, "1k"   }, { 20, "2k"  }, { 23, "4k"  }, { 26, "8k"  }, { 30, "20k" },
+            { 17, "1k"   }, { 20, "2k"  }, { 23, "4k"  }, { 26, "8k"  }, { 29, "16k" },
         };
         const CCoord valueTop = bars.bottom + 1;
         const CCoord labelTop = valueTop + kValueRow;
         for (const OctBand& ob : kOct) {
+            if (ob.index >= nb) continue;
             const CCoord x = xForFreq(strx::bandFc(ob.index));
             auto place = [&](CCoord top, CCoord bot) {
                 CRect box(x - 16, top, x + 16, bot);
