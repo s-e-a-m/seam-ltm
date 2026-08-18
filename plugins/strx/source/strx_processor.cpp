@@ -4,6 +4,7 @@
 #include "strx_goniometer.h"
 #include "strx_spectrum.h"
 #include "strx_bandtable.h"
+#include "strx_savebutton.h"
 #include "strx_status.h"
 #include "version.h"
 
@@ -177,6 +178,20 @@ VSTGUI::CView* PLUGIN_API StrxProcessor::createCustomView(
         }
         return new Seam::StrxBandTable(VSTGUI::CRect(0, 0, 560, 134), this, font,
                                         structure, text, bar);
+    }
+    if (name && std::string(name) == kViewSaveButton) {
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        VSTGUI::CColor structure = VSTGUI::kGreyCColor;
+        VSTGUI::CColor text = VSTGUI::kWhiteCColor;
+        if (description) {
+            description->getColor("Structure", structure);
+            description->getColor("TextLight", text);
+        }
+        // The destination is fixed rather than asked for: a file dialog on a
+        // plugin's GUI thread is a portability problem, and the operator wants
+        // every table of a session in one place anyway.
+        return new Seam::StrxSaveButton(VSTGUI::CRect(0, 0, 560, 26), this, font,
+                                         "/Volumes/Aleph/strx", structure, text);
     }
     if (name && std::string(name) == kViewStatus) {
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;

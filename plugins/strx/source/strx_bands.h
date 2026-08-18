@@ -225,7 +225,7 @@ public:
     // come towards a trustworthy reading (0..1, three time constants).
     // Deliberately NOT the deviation: the sign is the one thing a comment
     // cannot enforce, so it is applied once, here.
-    void compensation(float* comp, float* settle) const {
+    void compensation(float* comp, float* settle, float* levelDb = nullptr) const {
         double lvl[kNumBands];
         for (int i = 0; i < kNumBands; ++i) {
             const double ms = 0.5 * (msL_[i] + msR_[i]);
@@ -238,6 +238,11 @@ public:
         for (int i = 0; i < kNumBands; ++i) {
             comp[i]   = (float)(mean - lvl[i]);
             settle[i] = (float)std::clamp(sec / (3.0 * tau_[i]), 0.0, 1.0);
+            // The raw band level goes out too. It is meaningless in absolute
+            // terms -- microphone sensitivity and distance are unknown -- but
+            // it is what tells a reader whether a band had any signal at all,
+            // and a beautifully flat table measured on noise is still noise.
+            if (levelDb) levelDb[i] = (float)lvl[i];
         }
     }
 

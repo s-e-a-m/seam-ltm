@@ -56,6 +56,8 @@ struct AnalysisFrame {
     // view decides, the analyser always publishes.
     float bandComp[kNumBands]   = {};
     float bandSettle[kNumBands] = {};
+    float bandLevel[kNumBands]  = {};   // raw dB, for judging signal-to-noise
+    float bandSeconds = 0.f;            // integration time behind the table
     // Leading bands this sample rate can measure; the rest are not reported.
     int   bandCount = 0;
 };
@@ -212,8 +214,9 @@ public:
         fr.accPasses = accPasses_;
         // ISO 266 band table (san.thirdoctave_levels_ab : san.pinkcomp).
         bands_.process(L, R, n);
-        bands_.compensation(fr.bandComp, fr.bandSettle);
-        fr.bandCount = bands_.count();
+        bands_.compensation(fr.bandComp, fr.bandSettle, fr.bandLevel);
+        fr.bandCount   = bands_.count();
+        fr.bandSeconds = (float)bands_.secondsObserved();
     }
 
     // Audio thread (producer): fill the working buffer, then publish it by

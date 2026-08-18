@@ -14,9 +14,17 @@ An absent zone is omitted, never moved.
 |---|---|
 | HEADER | title, subtitle, tagline |
 | SETUP | user-entered station identity (STONE id; later, room coordinates) |
-| OPS | operational buttons (POWER, RESET, LOOP) |
+| OPS | operational buttons (POWER, RESET, LOOP, SAVE) |
 | FINE | fine controls: sliders and menus, two columns in L format |
 | FOOTER | runtime readouts, status line, logo |
+
+SAVE joined the vocabulary with strx (2026-08-18), for the button that
+writes a measurement to disk. It differs from the other three in that it is
+not a plugin state the host should ever know about: it is a GUI-thread action
+on a view, with no bound parameter. A momentary parameter would not survive a
+host that coalesces the press and the release into one point, which is why
+ltglide gave up its momentary trigger — and nothing about writing a file needs
+the processor, so nothing about it is exposed.
 
 SETUP precedes OPS because identity is declared once, before working.
 Runtime feedback — slot badges, pool status, meters — is FOOTER content.

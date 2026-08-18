@@ -267,3 +267,14 @@ target_include_directories(strx_bands_test PRIVATE
 )
 target_compile_features(strx_bands_test PRIVATE cxx_std_17)
 add_test(NAME strx_bands_test COMMAND strx_bands_test)
+
+add_executable(strx_export_test
+    strx_export_test.cpp
+)
+target_include_directories(strx_export_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/strx/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(strx_export_test PRIVATE cxx_std_17)
+add_test(NAME strx_export_test COMMAND strx_export_test)

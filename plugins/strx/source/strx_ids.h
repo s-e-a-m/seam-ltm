@@ -25,6 +25,7 @@ static const Steinberg::FUID StrxProcessorUID(
 static const char* kViewGoniometer = "StrxGoniometer";
 static const char* kViewSpectrum   = "StrxSpectrum";
 static const char* kViewBandTable  = "StrxBandTable";
+static const char* kViewSaveButton = "StrxSaveButton";
 static const char* kViewMeters     = "StrxMeters";
 
 // Calibration-bus status line (calbus Task 5, strx_status.h): the one
