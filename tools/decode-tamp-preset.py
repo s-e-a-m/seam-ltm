@@ -21,7 +21,7 @@ and checked against a screenshot of the software showing CH1:
                                  +4 hpType  +5 hpDecade  +6 hpIndex  +7 pad
     0xfc  4 records x 5 bytes  COMPRESSOR, one per channel:
                                  threshold (byte - 100)/2 dB
-                                 ratio     index; 22 = LIMIT
+                                 ratio     index into RATIOS below
                                  attack    (byte + 1) * 10 ms
                                  release   (byte + 1) * 20 ms
                                  bypass    1 = bypassed, as in the EQ records
@@ -63,12 +63,9 @@ parameters fall out of two readings apiece: threshold -6 and -12.5 dB against
 bytes 88 and 75, attack 100 and 10 ms against 9 and 0, release 300 and 500 ms
 against 14 and 24. The bypass flag keeps the EQ convention, 1 = bypassed.
 
-NOT resolved: the compressor ratio, which is a menu index of which only two
-points are known and one of them is LIMIT at the top of the scale. Printed raw
-rather than guessed at -- a decoder that invents numbers for a calibration
-record is worse than one that admits a gap. The noise gate is not decoded
-either, and deliberately: it is unused in this rig, so no preset exists that
-would show what its bytes do.
+NOT decoded: the noise gate, and deliberately -- it is unused in this rig, so
+no preset exists that would show what its bytes do. Everything else the
+software exposes is read.
 """
 import sys
 
@@ -78,6 +75,13 @@ WORKMODE = {0: "four channels", 3: "two bridged pairs"}
 XOVER_BASE = 0xDC
 GAIN_BASE = 0x04      # header, one byte per channel
 GAIN_ZERO = 59        # the byte that reads 0.0 dB
+# The compressor ratio is a menu index, and the menu is an irregular list --
+# read off the software by the operator, not derived. Index 5 is 2.00 and index
+# 22 is LIMIT, which is exactly what the two known presets carry.
+RATIOS = ["1", "1.17", "1.28", "1.47", "1.69", "2.00", "2.17", "2.23", "2.71",
+          "3.03", "3.29", "3.48", "3.89", "4.59", "4.98", "6.06", "6.96",
+          "7.78", "8.22", "8.68", "9.71", "10.08", "LIMIT"]
+
 COMP_BASE = 0xFC
 COMP_ZERO = 100       # the threshold byte that reads 0.0 dB
 EQ_BASE = 0x18
@@ -107,7 +111,7 @@ def channel_gain_db(raw):
 def compressor(data, ch):
     r = data[COMP_BASE + ch * 5: COMP_BASE + ch * 5 + 5]
     return {"threshold": (r[0] - COMP_ZERO) / 2.0,
-            "ratio": "LIMIT" if r[1] == 22 else "index %d" % r[1],
+            "ratio": RATIOS[r[1]] if r[1] < len(RATIOS) else "index %d" % r[1],
             "attack": (r[2] + 1) * 10,
             "release": (r[3] + 1) * 20,
             "bypass": bool(r[4])}
