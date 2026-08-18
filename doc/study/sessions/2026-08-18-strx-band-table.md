@@ -74,9 +74,47 @@ dal finale di potenza**, e il risultato è *"dritto e pulito come non mai"*.
 tabella per bande come strumento di lettura, la convenzione di segno, e la
 scelta di fermarsi alla descrizione lasciando la correzione all'operatore.
 
+### Setup e correzione applicata
+
+- **Diffusore**: STONED, versione in metallo, coni da 8 pollici.
+- **Amplificazione**: due t.amp DSP Quadro 500 (software QUADRO 500 DSP V2
+  v1.7.4), ciascuno **in bridge** su due canali, per arrivare ai 4 canali dello
+  STONE. La correzione è **identica sui due canali** di ogni ponte — verificato
+  sul preset, i due banchi sono uguali byte per byte.
+- Compressore e noise gate in bypass; guadagno di canale −15; passa-basso in
+  bypass.
+
+Il preset è `2026-08-13-STONED-BRIDGE-FLAT.preset` (la data nel nome è
+sbagliata: il file è del 18 agosto). Decodificato con
+`tools/decode-tamp-preset.py`:
+
+| filtro | tipo | frequenza | guadagno | Q (byte grezzo) |
+|---|---|---|---|---|
+| passa-alto | BW24 | 38,6 Hz | — | — |
+| EQ1 | LSF | 90,5 Hz | **+9,0 dB** | 35 (default) |
+| EQ2 | HSF | 119,3 Hz | **−18,0 dB** | 35 (default) |
+| EQ3 | PEQ | 198,0 Hz | +1,5 dB | 28 |
+| EQ4 | PEQ | 475,0 Hz | **−16,0 dB** | 16 (= Q 1.0) |
+| EQ5 | PEQ | 1369,8 Hz | −9,5 dB | 28 |
+| EQ6 | PEQ | 2435,9 Hz | −6,0 dB | 23 |
+| EQ7 | PEQ | 6407,2 Hz | −7,5 dB | 23 |
+| EQ8 | HSF | 15019,8 Hz | +9,0 dB | 35 (default) |
+
+EQ1 ed EQ2 sono stati letti dall'interfaccia e coincidono con la decodifica: è
+la verifica della chiave, non un adattamento. La forma complessiva conferma la
+voicing "musica da camera" del log del 2026-07-14 — forte attenuazione delle
+medio-alte perché il grave emerga — e vi aggiunge correzioni puntuali che prima
+non c'erano.
+
+**Aperto sul preset**: la scala del Q non è ancora determinata (un solo punto
+noto, byte 16 = Q 1.0), e il decoder trova un **decimo filtro attivo** —
+HSF 124,9 Hz, −18,0 dB — che l'operatore non ha enumerato. Da verificare
+sull'interfaccia prima di fidarsi del decoder su preset futuri.
+
 **Non registrato in questa sessione** (da catturare alla prossima):
-- quale STONE, e in quale ambiente;
-- i valori per banda prima e dopo, che avrebbero dato la misura del guadagno;
+- l'ambiente, e la posizione dello STONE al suo interno;
+- i valori per banda **prima** della correzione, che avrebbero dato la misura
+  del guadagno (il preset dice cosa è stato fatto, non da cosa si partiva);
 - il numero di posizioni del microfono e di iterazioni;
 - la frequenza di campionamento della sessione di taratura.
 
