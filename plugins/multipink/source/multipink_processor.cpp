@@ -26,7 +26,17 @@ tresult PLUGIN_API MULTIPINKProcessor::initialize(FUnknown* context) {
     tresult r = SingleComponentEffect::initialize(context);
     if (r != kResultOk) return r;
 
-    // One stereo output bus by default; setBusArrangements may widen it later.
+    // A main input bus we never read. It exists precisely so that the signal
+    // arriving at the insert DIES here: with zero input buses a host has
+    // nothing to hand the plugin, so it routes the track signal AROUND us and
+    // the generator appears to "pass audio through" (observed in Nuendo with
+    // multipink and ltglide cascaded). Declaring the bus puts us back in the
+    // chain, and processBlock() writes or memsets every output channel — so
+    // blocking the input is a structural consequence, not a runtime branch.
+    //
+    // One stereo bus each by default; setBusArrangements may widen them later,
+    // and it keeps the two the same width.
+    addAudioInput (STR16("Input"),  SpeakerArr::kStereo);
     addAudioOutput(STR16("Output"), SpeakerArr::kStereo);
 
     auto* refParam = new StringListParameter(
@@ -169,6 +179,12 @@ tresult PLUGIN_API MULTIPINKProcessor::process(ProcessData& data) {
     }
 
     if (data.numOutputs == 0 || data.numSamples == 0) return kResultOk;
+
+    // A generator is never silent by inheritance. The buffers can arrive still
+    // flagged silent from whatever fed the insert, and a host that trusts the
+    // flag would skip every plugin downstream of us.
+    data.outputs[0].silenceFlags = 0;
+
     int numChannels = data.outputs[0].numChannels;
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
     if (data.symbolicSampleSize == kSample32) {
@@ -189,6 +205,12 @@ tresult PLUGIN_API MULTIPINKProcessor::setBusArrangements(
     if (numOuts != 1) return kResultFalse;
     int channels = SpeakerArr::getChannelCount(outs[0]);
     if (channels < 1 || channels > kPoolSize) return kResultFalse;
+    // The input bus is never read, so the only thing to accept or refuse is a
+    // shape we declared: one input as wide as the output (insert on an audio
+    // track, where the host uses the same width on both sides) or none at all
+    // (instrument track, where the host gives the generator no input).
+    if (numIns > 1) return kResultFalse;
+    if (numIns == 1 && SpeakerArr::getChannelCount(ins[0]) != channels) return kResultFalse;
     activeChannels_ = channels;
     return SingleComponentEffect::setBusArrangements(ins, numIns, outs, numOuts);
 }
@@ -411,6 +433,6 @@ BEGIN_FACTORY_DEF(stringCompanyName, stringCompanyWeb, stringCompanyEmail)
     DEF_CLASS2(INLINE_UID_FROM_FUID(Seam::MULTIPINKProcessorUID),
                PClassInfo::kManyInstances, kVstAudioEffectClass,
                "SEAM MULTIPINK", Vst::kDistributable,
-               "Instrument|Synth", FULL_VERSION_STR, kVstVersionString,
+               "Fx|Generator", FULL_VERSION_STR, kVstVersionString,
                Seam::MULTIPINKProcessor::createInstance)
 END_FACTORY
