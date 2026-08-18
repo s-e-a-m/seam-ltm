@@ -88,28 +88,36 @@ Il preset è `2026-08-13-STONED-BRIDGE-FLAT.preset` (la data nel nome è
 sbagliata: il file è del 18 agosto). Decodificato con
 `tools/decode-tamp-preset.py`:
 
-| filtro | tipo | frequenza | guadagno | Q (byte grezzo) |
+| filtro | tipo | frequenza | Q | guadagno |
 |---|---|---|---|---|
-| passa-alto | BW24 | 38,6 Hz | — | — |
-| EQ1 | LSF | 90,5 Hz | **+9,0 dB** | 35 (default) |
-| EQ2 | HSF | 119,3 Hz | **−18,0 dB** | 35 (default) |
-| EQ3 | PEQ | 198,0 Hz | +1,5 dB | 28 |
-| EQ4 | PEQ | 475,0 Hz | **−16,0 dB** | 16 (= Q 1.0) |
-| EQ5 | PEQ | 1369,8 Hz | −9,5 dB | 28 |
-| EQ6 | PEQ | 2435,9 Hz | −6,0 dB | 23 |
-| EQ7 | PEQ | 6407,2 Hz | −7,5 dB | 23 |
-| EQ8 | HSF | 15019,8 Hz | +9,0 dB | 35 (default) |
+| passa-alto | BW24 | 38,5 Hz | — | — |
+| EQ1 | LSF | 90,5 Hz | — | **+9,0 dB** |
+| EQ2 | HSF | 119,4 Hz | — | **−18,0 dB** |
+| EQ3 | Peak | 198,4 Hz | 2,0 | +1,5 dB |
+| EQ4 | Peak | 477,4 Hz | 1,0 | **−16,0 dB** |
+| EQ5 | Peak | 1381,9 Hz | 2,0 | −9,5 dB |
+| EQ6 | Peak | 2462,3 Hz | 1,5 | −6,0 dB |
+| EQ7 | Peak | 6498,0 Hz | 1,5 | −7,5 dB |
+| EQ8 | HSF | 15277,5 Hz | — | +9,0 dB |
 
-EQ1 ed EQ2 sono stati letti dall'interfaccia e coincidono con la decodifica: è
-la verifica della chiave, non un adattamento. La forma complessiva conferma la
-voicing "musica da camera" del log del 2026-07-14 — forte attenuazione delle
-medio-alte perché il grave emerga — e vi aggiunge correzioni puntuali che prima
-non c'erano.
+Identica su CH1 e CH3, cioè sui due lati "master" dei due ponti. La decodifica
+riproduce riga per riga la schermata del software, verificata su fotografia.
 
-**Aperto sul preset**: la scala del Q non è ancora determinata (un solo punto
-noto, byte 16 = Q 1.0), e il decoder trova un **decimo filtro attivo** —
-HSF 124,9 Hz, −18,0 dB — che l'operatore non ha enumerato. Da verificare
-sull'interfaccia prima di fidarsi del decoder su preset futuri.
+Le due scale del formato sono griglie a temperamento equabile: la frequenza
+avanza di **1/30 di ottava** per passo (ancorata a 1 kHz), il Q di un rapporto
+di **semitono** (byte 16 = Q 1,0, e il default byte 35 cade su 3,0).
+
+La forma complessiva conferma la voicing "musica da camera" del log del
+2026-07-14 — forte attenuazione delle medio-alte perché il grave emerga — e vi
+aggiunge correzioni puntuali che prima non c'erano: −16 dB stretti a 477 Hz,
+−9,5 a 1382, −6 a 2462, −7,5 a 6498.
+
+**Da chiarire**: su CH2 e CH4 — i lati *schiavi* dei due ponti — resta acceso
+un filtro solo, HSF 125,0 Hz −18,0 dB, che non compare nella pagina di CH1. Se
+il DSP lo applica all'uscita in ponte, nella catena c'è uno shelf in più di
+quanto l'operatore intendesse; se il ponte usa solo il ramo master, è un
+residuo innocuo. In entrambi i casi la misura di strx lo comprendeva, quindi la
+taratura resta valida — ma va deciso prima di replicarla su un altro STONE.
 
 **Non registrato in questa sessione** (da catturare alla prossima):
 - l'ambiente, e la posizione dello STONE al suo interno;
