@@ -113,10 +113,20 @@ private:
         localtime_r(&now, &ctx.when);
 #endif
         std::string path, error;
-        if (strx::writeBandTable(directory_, processor_->latestFrame(), ctx, &path, &error)) {
-            ok_ = true;
+        const auto& frame = processor_->latestFrame();
+        if (strx::writeBandTable(directory_, frame, ctx, &path, &error)) {
             const size_t slash = path.find_last_of('/');
-            status_ = "saved  " + (slash == std::string::npos ? path : path.substr(slash + 1));
+            const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
+            // A file was written either way; whether it holds a measurement is
+            // a different question, and the operator should not have to open
+            // it to find out.
+            if (frame.bandCount <= 0 || frame.bandSeconds <= 0.f) {
+                ok_ = false;
+                status_ = "saved " + name + " - BUT THERE WAS NO MEASUREMENT";
+            } else {
+                ok_ = true;
+                status_ = "saved  " + name;
+            }
         } else {
             ok_ = false;
             status_ = error;

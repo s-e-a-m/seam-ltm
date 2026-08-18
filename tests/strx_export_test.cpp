@@ -124,3 +124,18 @@ TEST_CASE("an undeclared STONE is named as such rather than numbered zero") {
     CHECK(contains(path, "stone-undeclared"));
     std::remove(path.c_str());
 }
+
+TEST_CASE("a table with nothing behind it is not written as zeros") {
+    // The first file this export ever wrote said "0 of 31 measurable" and then
+    // printed 31 rows of +0.0 dB: a flawless measurement of nothing. A reader
+    // skimming for the shape of the curve would have believed it.
+    AnalysisFrame empty;                       // never touched by the analyser
+    const std::string t = formatBandTable(empty, makeContext());
+    CHECK(countBandRows(t) == 0);
+    CHECK(contains(t, "NO MEASUREMENT"));
+    CHECK_FALSE(contains(t, "+0.0"));
+
+    AnalysisFrame stalled = makeFrame();       // bands known, but no time yet
+    stalled.bandSeconds = 0.f;
+    CHECK(countBandRows(formatBandTable(stalled, makeContext())) == 0);
+}

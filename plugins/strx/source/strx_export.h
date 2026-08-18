@@ -70,9 +70,22 @@ inline std::string formatBandTable(const AnalysisFrame& fr, const ExportContext&
     // Two decimals on the centre frequency, not one: the 20 Hz band sits at
     // 19.95 Hz and at one decimal it prints as "20.0", which is the nominal
     // name in the column that exists to give the exact value.
+    // No table at all when there is nothing behind it. The first file this
+    // export ever wrote (2026-08-18 18:38) said "0 of 31 measurable" in its
+    // header and then printed 31 rows of perfect zeros, because the row count
+    // fell back to the full band list: a flawless-looking measurement of
+    // nothing, which is the one thing a calibration record must never be.
+    if (fr.bandCount <= 0 || fr.bandSeconds <= 0.0f) {
+        out += "# NO MEASUREMENT. The analyser had not run when this was saved -- no\n";
+        out += "# audio through the plugin, or the table had just been reset. There is\n";
+        out += "# no band table below because there are no numbers, not because they\n";
+        out += "# were zero.\n";
+        return out;
+    }
+
     out += "band          hz   comp_db   level_db   settled\n";
 
-    const int n = (fr.bandCount > 0 && fr.bandCount <= kNumBands) ? fr.bandCount : kNumBands;
+    const int n = (fr.bandCount <= kNumBands) ? fr.bandCount : kNumBands;
     for (int i = 0; i < n; ++i) {
         std::snprintf(line, sizeof line, "%-6s %10.2f  %+8.1f   %8.1f      %4.2f\n",
                       bandName(i), bandFc(i), fr.bandComp[i], fr.bandLevel[i],
