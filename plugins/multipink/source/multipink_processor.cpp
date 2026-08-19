@@ -133,6 +133,10 @@ tresult PLUGIN_API MULTIPINKProcessor::setupProcessing(ProcessSetup& setup) {
     maxBlockSize_ = setup.maxSamplesPerBlock;
     scratch32_.assign((size_t)kPoolSize * maxBlockSize_, 0.0f);
     scratch64_.assign((size_t)kPoolSize * maxBlockSize_, 0.0);
+    // The filter is a function of the sample rate. setupProcessing is called
+    // with the plug-in inactive, so this is the one place it may be designed.
+    pinkDesign_.design(setup.sampleRate);
+    resetPinkFilters();
     return SingleComponentEffect::setupProcessing(setup);
 }
 
@@ -318,10 +322,9 @@ void MULTIPINKProcessor::seedLCGs() {
     }
 }
 void MULTIPINKProcessor::resetPinkFilters() {
-    for (int i = 0; i < kPoolSize; ++i) {
-        for (int k = 0; k < 4; ++k) pinkX_[i][k] = 0.0;
-        for (int k = 0; k < 3; ++k) pinkY_[i][k] = 0.0;
-    }
+    for (int s = 0; s < Seam::multipink::PinkDesign::kMaxSections; ++s)
+        for (int i = 0; i < kPoolSize; ++i)
+            pinkState_[s][i] = 0.0f;
 }
 double MULTIPINKProcessor::computeGainLin() const {
     if (!paramPower_.load()) return 0.0;
@@ -331,7 +334,8 @@ double MULTIPINKProcessor::computeGainLin() const {
     if (idx > kReferenceStepCount - 1) idx = kReferenceStepCount - 1;
     double refDb = kReferenceLevelsDb[idx];
     double trim = paramTrimDb_.load();
-    double db = refDb + trim + kCalibrationOffsetDb;
+    // Rate-dependent, and a load: setupProcessing computed it in design(fs).
+    double db = refDb + trim + pinkDesign_.calibrationOffsetDb();
     return std::pow(10.0, db / 20.0);
 }
 
@@ -377,34 +381,22 @@ void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
     // 1. Advance ALL 64 LCGs into scratch[ch * numSamples + s].
     //    (Reason for "all 64": see spec §2.2 — guarantees slot k's stream
     //    is independent of which other slots are active in this instance.)
+    //    The recurrence itself lives in multipink_pink.h, beside the filter,
+    //    so that a test can drive the real source instead of assuming its
+    //    level: assuming it is what cost 3.01 dB per doubling of fs.
     for (int ch = 0; ch < kPoolSize; ++ch) {
-        uint32_t st = lcgState_[ch];
-        SampleType* row = scratch.data() + (size_t)ch * numSamples;
-        for (int s = 0; s < numSamples; ++s) {
-            st = st * 1103515245u + 12345u;
-            row[s] = (SampleType)((int32_t)st / 2147483648.0);
-        }
-        lcgState_[ch] = st;
+        lcgState_[ch] = Seam::multipink::whiteNoiseRow<SampleType>(
+            lcgState_[ch], scratch.data() + (size_t)ch * numSamples, numSamples);
     }
-    // 2. Pink-shape ALL 64 channels in place (Direct Form I IIR).
-    //    y[n] =  b0*x[n] + b1*x[n-1] + b2*x[n-2] + b3*x[n-3]
-    //          - a1*y[n-1] - a2*y[n-2] - a3*y[n-3]
-    for (int ch = 0; ch < kPoolSize; ++ch) {
-        SampleType* row = scratch.data() + (size_t)ch * numSamples;
-        double x1 = pinkX_[ch][0], x2 = pinkX_[ch][1], x3 = pinkX_[ch][2], x4 = pinkX_[ch][3];
-        double y1 = pinkY_[ch][0], y2 = pinkY_[ch][1], y3 = pinkY_[ch][2];
-        for (int s = 0; s < numSamples; ++s) {
-            double x0 = (double)row[s];
-            double y0 = kPinkB[0]*x0 + kPinkB[1]*x1 + kPinkB[2]*x2 + kPinkB[3]*x3
-                      - kPinkA[0]*y1 - kPinkA[1]*y2 - kPinkA[2]*y3;
-            row[s] = (SampleType)y0;
-            x4 = x3; x3 = x2; x2 = x1; x1 = x0;
-            y3 = y2; y2 = y1; y1 = y0;
-        }
-        pinkX_[ch][0] = x1; pinkX_[ch][1] = x2; pinkX_[ch][2] = x3; pinkX_[ch][3] = x4;
-        pinkY_[ch][0] = y1; pinkY_[ch][1] = y2; pinkY_[ch][2] = y3;
-    }
-    // (void)x4 silences potential unused-warning if optimization is aggressive.
+    // 2. Pink-shape ALL 64 channels in place: a cascade of first-order
+    //    sections, transposed direct form II, one state per section per stream.
+    //      y[n] = b0*x[n] + s ; s = b1*x[n] - a1*y[n]
+    //    The recurrence itself lives in multipink_pink.h, where the tests and
+    //    the tools reach it: this is the only copy that ships, so it must not
+    //    also be the only copy nothing exercises.
+    Seam::multipink::pinkFilterBlock<SampleType>(
+        pinkDesign_, scratch.data(), kPoolSize, numSamples,
+        &pinkState_[0][0], kPoolSize);
     // 3. Slot routing + gain stage.
     if (claimedStart_ < 0 || claimedChannels_ == 0) {
         for (int c = 0; c < numChannels; ++c)

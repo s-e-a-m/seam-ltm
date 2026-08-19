@@ -96,3 +96,152 @@ Requires `faust`, `faust2mathdoc`, `svg2pdf`, and `pdflatex` (with the
 `breqn` package) on the PATH.
 The output is committed documentation, so run it when the Faust
 specification changes, not on every build.
+
+## `decay-from-glide.py` — reverberation time from an `ltglide` pass
+
+Reads T60 out of a recorded `ltglide` pass, so a calibration can state where
+its own measurement stops describing the loudspeaker and starts describing
+the room.
+
+```bash
+.venv/bin/python tools/decay-from-glide.py REC.wav \
+    --t 120 --f0 315 --f1 40 --delta 2.0 --volume 96
+```
+
+Requires `numpy`, `scipy` and `soundfile` (`requirements.txt`); the rest of
+`tools/` is standard-library only.
+
+`ltglide` emits Linkwitz bursts — five cycles under a Hann window — each
+followed by `delta` seconds of silence, so every burst is its own
+interrupted-excitation experiment in the sense of ISO 3382-2.
+A pass therefore yields **T60(f)**, one estimate per burst, which is what
+matters below the Schroeder frequency where decay is individual modes
+ringing rather than a room average.
+
+The burst onsets are **reconstructed, not detected**: the head Dirac fixes
+the timeline and `GlideTransport` puts the glide exactly `kLeadSec` later, so
+the schedule follows from `f0`, `f1`, `T`, `delta` and the two modes — the
+same reasoning the `ltglide` receiver uses to regenerate its reference.
+The measured span is checked against `kLeadSec + T + kTailSec` and a
+mismatch is reported, because wrong parameters otherwise produce a
+plausible-looking table.
+
+The head Dirac's own 5 s of silence is an integrated-impulse-response
+measurement — the ISO 3382 reference method — and is analysed as a second
+opinion per octave band.
+It is gated on both the noise floor and the standard's curvature criterion,
+so it either agrees with the bursts or says nothing; one sample of impulse
+carries little energy, and "nothing resolved" is the ordinary outcome.
+
+Record **through the calibration preset**, at the level the calibration used.
+T60 is a property of the room and does not depend on the source spectrum, but
+the preset's electrical curve is the inverse of the loudspeaker's acoustic
+one, so with it in circuit every burst arrives at the microphone at the same
+SPL and one `ltglide` level clears the noise floor across the whole band.
+Bypassing it restores the raw response, and reaching the weakest band then
+means driving the strongest one tens of dB harder.
+
+Validated against synthetic passes convolved with a known exponentially
+decaying impulse response: true 0.8 / 1.5 / 2.5 s read back as
+0.86 / 1.60 / 2.44 s, so the Schroeder frequency it derives is good to a few
+percent.
+With the noise floor raised to −35 dBFS it declines to estimate at all
+rather than returning the wrong number.
+
+## `bench-pink.cpp` — the pinking filter's CPU cost, and the pole density it settles
+
+Answers one question: does `multipink`'s 64-stream pinking filter cascade
+(`plugins/multipink/source/multipink_pink.h`) cost an amount of CPU that
+justifies its accuracy, and would a denser pole ladder (`kPolesPerOctave`
+1.5 instead of 1.0) still be affordable? It is not wired into the build —
+CPU cost is a design decision made once, not a regression a ctest should
+gate.
+
+```bash
+cd tools && clang++ -O3 -std=c++17 -I../plugins/multipink/source \
+    -o bench-pink bench-pink.cpp && ./bench-pink
+```
+
+It measures two loop orders at two sample rates (48 kHz, 192 kHz), 7 repeats
+each, and reports min/mean/max so the numbers describe a spread, not one
+lucky run.
+Order A is the production code itself — `Seam::multipink::pinkFilterBlock`
+in `plugins/multipink/source/multipink_pink.h`, the function the processor
+calls (section-outer, channel-middle, sample-inner): correct, but 16-18 full
+passes over the 128-256 KB scratch buffer per block, which does not fit
+L1/L2.
+It used to be a hand-copied mirror of the processor's loop; calling the
+shared function instead was checked against the copy it replaced by running
+both binaries alternately, and order A's timings moved no more than order
+B's, whose code did not change at all — so the numbers recorded below still
+mean what they meant.
+Order B interchanges it (channel-outer, sample-middle, section-inner),
+keeping one channel's row resident in L1 and carrying only the ≤18 filter
+state scalars per channel through the inner loop; it is roughly 2x faster
+in every cell measured, and is a candidate for a later change to the
+production loop — this tool only measures, it does not touch
+`multipink_processor.cpp`.
+
+Density is read from whatever `kPolesPerOctave` the included
+`multipink_pink.h` currently has, so comparing densities means editing the
+header and rebuilding.
+On the Intel Core i7-8850H (x86_64) this was measured on, 1.5 poles/octave
+at 192 kHz costs 72-129% of one core depending on loop order — far past the
+5% ceiling that would justify it — so the suite ships `kPolesPerOctave =
+1.0`, which costs 8-88% of one core across the same cells and meets the
+SMPTE ST 2095-1 tolerance with 0.07-0.08 dB of margin against 0.25 dB.
+Full numbers, both loop orders, both rates, both densities:
+`.superpowers/sdd/2026-08-19-pink-filter-mz/task-6-report.md`.
+
+## `faust-pink-ab.sh` — the Faust spec and the C++ port, compared rather than asserted
+
+`multipink_pink.h`'s `PinkDesign` was written before its Faust
+specification (`sfi.pink_filter_mz` in `seam.filters.lib`), which inverts
+the suite's usual "Faust is the spec" order. This script is what closes
+that gap: it feeds a unit impulse through both implementations, at 48 kHz
+and 96 kHz, and diffs the two responses sample by sample. A comparison of
+impulse responses exercises the whole filter — section count, coefficients,
+and the fixed correction section — where a spectral summary could hide a
+disagreement that only shows up at particular frequencies.
+
+```bash
+tools/faust-pink-ab.sh
+```
+
+It compiles `sfi.pink_filter_mz` with `faust -lang cpp` into a scratch
+directory (`mktemp -d`, removed on exit) using the architecture file
+`faust-ab-arch.cpp` — a minimal `main()` that runs one impulse through the
+generated `mydsp` and prints the output, nothing a real plug-in needs. This
+is the suite's one sanctioned use of Faust-generated C++
+(`seam-ltm/CLAUDE.md`, "Core convention"): scratch comparison only, never
+copied into `plugins/*/source/`. The other side, `pink-ir-dump.cpp`, runs
+the same impulse through `PinkDesign::design()` directly, using its own
+`y = b0*x + b1*x[n-1] - a1*y[n-1]` update — the same convention
+`fi.tf1` uses, which is what makes the comparison meaningful rather than an
+apples-to-oranges mismatch of filter forms.
+`faust-ab-arch.cpp` defines `FAUSTFLOAT double` before including
+`faust/dsp/dsp.h`: that header's own `#ifndef FAUSTFLOAT` guard would
+otherwise win the race and leave the I/O buffers in `float` regardless of
+`faust -double`, which only widens the *internal* arithmetic. Defining it
+in the architecture file (rather than as a `clang++ -D` flag) keeps the fix
+attached to the tool that needs it.
+The pass threshold is 1e-12 worst-sample difference and the script does not
+expose a flag to loosen it: measured worst differences are 3.766e-17
+(48 kHz) and 1.637e-17 (96 kHz) — five orders of margin under the gate, and
+close to the ~1e-17 floor double-precision arithmetic sets for a 16-17
+section cascade. A passing run means the two descriptions of the filter
+agree to double-precision rounding, not "close enough".
+
+Requires `faust`, `clang++` (C++17), and `python3` on the PATH; not wired
+into CMake or ctest because it needs the `faust` binary, which the suite
+deliberately does not require to build.
+
+`sfi.pink_filter_mz`'s ladder depth is a function of the sample rate, but
+Faust's `seq`/`par` repeat counts are resolved at compile time, before the
+runtime sample rate (`ma.SR`) is known — so the cascade in
+`seam.filters.lib` is built to a fixed maximum depth (32 sections, mirroring
+`PinkDesign::kMaxSections`) with every section past the sample rate's actual
+requirement switched to the identity pair `(b0=1, b1=0, a1=0)`, an exact
+no-op rather than an approximation. That is a structural difference from
+the C++ (fixed array with a runtime bypass, vs. a variable-length loop) that
+this A/B is what proves does not become a numerical one.

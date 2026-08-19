@@ -24,35 +24,66 @@ using namespace Seam;
 // filter white noise means its output power spectrum IS |H(f)|^2, so the band
 // energy is the integral of |H|^2 over the band -- computed here to a precision
 // the question deserves.
+//
+// CRITERION CHANGE (2026-08-19): the filter under test is now the Hz-anchored
+// matched-Z design of PinkDesign (multipink_pink.h), not a fixed z-plane fit.
+// Two consequences follow. First, SMPTE's own 16 kHz ceiling was a stand-in
+// for "the top band this rig can measure" -- below 48 kHz it is exactly that,
+// because the 20 kHz band's upper edge (22.39 kHz) is not measurable at any
+// rate under 48 kHz, but at 88.2/96/176.4/192 kHz the rig CAN measure well
+// above 16 kHz, so the judged range now follows strx's own measurability rule
+// (nominal upper edge within 0.85*Nyquist) instead of stopping at a fixed
+// frequency. Second, the verdict flips: where the old fixed fit failed the
+// standard at every rate it was tested at, including the one it was fitted to,
+// the new design passes at all six rates tested, with a sentinel tolerance
+// tighter than the standard's to catch regressions the standard itself is too
+// loose to see.
 // ---------------------------------------------------------------------------
 
 namespace {
 
 constexpr double kSmpteToleranceDb = 0.25;
-// SMPTE names 20 Hz to 16 kHz: ISO band indices 0..29 of our 31.
-constexpr int kFirstBand = 0;
-constexpr int kLastBand  = 29;
+constexpr double kSentinelDb       = 0.10;   // regression sentinel, see the spec
 
-// Energy in one ISO 266 band, in dB, for white noise through the filter.
-double bandEnergyDb(int i, double fs) {
-    const double fl = strx::bandFl(i);
-    const double fu = strx::bandFuNominal(i);
+// The judged bands: 20 Hz up to the highest band whose nominal upper edge is
+// within 0.85*Nyquist. This is strx's own measurability rule, and below
+// 48 kHz it coincides exactly with SMPTE's 16 kHz ceiling, because the 20 kHz
+// band's upper edge is 22.39 kHz and is not measurable there at all.
+std::vector<int> judgedBands(double fs) {
+    std::vector<int> v;
+    for (int i = 0; i < 40; ++i) {
+        const double fc = 1000.0 * std::pow(10.0, (strx::kBandN0 + i) / 10.0);
+        const double fu = fc * std::pow(10.0, 0.05);
+        if (fu <= 0.85 * 0.5 * fs) v.push_back(i);
+    }
+    return v;
+}
+
+double bandFcExt(int i) { return 1000.0 * std::pow(10.0, (strx::kBandN0 + i) / 10.0); }
+double bandFlExt(int i) { return bandFcExt(i) * std::pow(10.0, -0.05); }
+double bandFuExt(int i) { return bandFcExt(i) * std::pow(10.0,  0.05); }
+
+// Energy in one band, in dB, for white noise through the filter. Analytic:
+// with white input the output power spectrum IS |H|^2, so this is an integral
+// and not a measurement. A third-octave level taken from noise carries about
+// 0.6 dB of spread at BT = 50 and could not resolve a 0.25 dB tolerance.
+double bandEnergyDb(const Seam::multipink::PinkDesign& d, int i) {
+    const double fl = bandFlExt(i), fu = bandFuExt(i);
     const int kSteps = 8192;
     double sum = 0.0;
     for (int k = 0; k < kSteps; ++k) {
         const double f = fl + (fu - fl) * (k + 0.5) / kSteps;
-        const double m = std::pow(10.0, multipink::magnitudeDb(f, fs) / 20.0);
+        const double m = std::pow(10.0, d.magnitudeDb(f) / 20.0);
         sum += m * m;
     }
     return 10.0 * std::log10(sum * (fu - fl) / kSteps);
 }
 
-// Deviation of each band from the mean of the judged range. Pink carries equal
-// energy in every constant-relative-bandwidth band, so a perfect pinking filter
-// is a flat line here and the absolute level is irrelevant.
 std::vector<double> deviations(double fs) {
+    Seam::multipink::PinkDesign d;
+    d.design(fs);
     std::vector<double> lvl;
-    for (int i = kFirstBand; i <= kLastBand; ++i) lvl.push_back(bandEnergyDb(i, fs));
+    for (int i : judgedBands(fs)) lvl.push_back(bandEnergyDb(d, i));
     double mean = 0.0;
     for (double v : lvl) mean += v;
     mean /= (double)lvl.size();
@@ -75,67 +106,57 @@ TEST_CASE("the acceptance criterion is the standard's, not ours") {
     // same way and the test would say nothing.
     const double fs = 48000.0;
     double widthRatio = 0.0;
-    for (int i = kFirstBand; i <= kLastBand; ++i) {
+    for (int i = 0; i <= 29; ++i) {
         const double r = strx::bandFuNominal(i) / strx::bandFl(i);
-        if (i == kFirstBand) widthRatio = r;
+        if (i == 0) widthRatio = r;
         CHECK(r == doctest::Approx(widthRatio).epsilon(1e-9));   // constant relative bandwidth
     }
     CHECK(strx::bandFc(17) == doctest::Approx(1000.0));
     CHECK(fs > 0);
 }
 
-TEST_CASE("multipink's pinking filter against SMPTE ST 2095-1") {
-    struct Rate { double fs; const char* name; };
+TEST_CASE("the pinking filter meets SMPTE ST 2095-1 at every rate") {
+    struct Rate { double fs; const char* name; int bands; double ceilingHz; };
     static const Rate kRates[] = {
-        {44100.0, "44.1 kHz"}, {48000.0, "48 kHz"}, {88200.0, "88.2 kHz"},
-        {96000.0, "96 kHz"},   {192000.0, "192 kHz"} };
+        {44100.0,  "44.1 kHz",  30, 15848.9}, {48000.0,  "48 kHz",    30, 15848.9},
+        {88200.0,  "88.2 kHz",  33, 31622.8}, {96000.0,  "96 kHz",    33, 31622.8},
+        {176400.0, "176.4 kHz", 36, 63095.7}, {192000.0, "192 kHz",   36, 63095.7} };
 
-    // Printed rather than asserted, because the number a reader wants is the
-    // shape of the failure and not only its size.
-    std::printf("\n  SMPTE ST 2095-1 acceptance, +/-%.2f dB per third-octave, 20 Hz - 16 kHz\n\n",
-                kSmpteToleranceDb);
-    std::printf("  %-10s %8s   %s\n", "rate", "worst", "deviation at 20 / 25 / 31.5 / 40 / 63 Hz ... 16 kHz");
+    std::printf("\n  +/-%.2f dB per third-octave, 20 Hz to 0.85*Nyquist\n\n", kSmpteToleranceDb);
     for (const Rate& r : kRates) {
-        const std::vector<double> d = deviations(r.fs);
-        std::printf("  %-10s %7.2f    %+5.2f %+5.2f %+5.2f %+5.2f %+5.2f  ...  %+5.2f   %s\n",
-                    r.name, worstDeviation(r.fs), d[0], d[1], d[2], d[3], d[5], d[29],
-                    worstDeviation(r.fs) <= kSmpteToleranceDb ? "PASS" : "FAIL");
+        const double w = worstDeviation(r.fs);
+        std::printf("  %-10s %2zu bands, up to %8.0f Hz   %6.3f dB   %s\n",
+                    r.name, judgedBands(r.fs).size(), r.ceilingHz, w,
+                    w <= kSmpteToleranceDb ? "PASS" : "FAIL");
     }
     std::printf("\n");
 
-    // What is true today, recorded as assertions so that a change is caught.
-    // The filter was hand-fitted at one rate: it is close there and degrades
-    // as the rate moves away, which is the whole defect in one line.
-    // Pinned, so that any change to the filter or to the method of judging it
-    // has to be made deliberately rather than noticed later.
-    CHECK(worstDeviation(44100.0)  == doctest::Approx(0.41).epsilon(0.03));
-    CHECK(worstDeviation(48000.0)  == doctest::Approx(0.60).epsilon(0.03));
-    CHECK(worstDeviation(88200.0)  == doctest::Approx(2.40).epsilon(0.03));
-    CHECK(worstDeviation(96000.0)  == doctest::Approx(2.68).epsilon(0.03));
-    CHECK(worstDeviation(192000.0) == doctest::Approx(4.99).epsilon(0.03));
+    for (const Rate& r : kRates) {
+        CHECK((int)judgedBands(r.fs).size() == r.bands);
+        CHECK(bandFcExt(judgedBands(r.fs).back()) == doctest::Approx(r.ceilingHz).epsilon(0.001));
+        CHECK(worstDeviation(r.fs) <= kSmpteToleranceDb);   // the standard
+        CHECK(worstDeviation(r.fs) <= kSentinelDb);         // the sentinel
+    }
 
-    // The finding that reframes the whole question: it fails at the rate it was
-    // fitted at, too. 0.41 dB against a 0.25 dB tolerance means no remapping of
-    // THIS fit can ever pass -- remapping reproduces the design-rate response,
-    // and the design-rate response is already out of tolerance.
-    CHECK(worstDeviation(44100.0) > kSmpteToleranceDb);
-
-    // And the verdict the standard gives, at every rate. This is the assertion
-    // that must flip when a replacement lands.
-    for (const Rate& r : kRates)
-        CHECK(worstDeviation(r.fs) > kSmpteToleranceDb);   // FAILS the standard
+    // Pinned, so that a change has to be deliberate. Measured 2026-08-19 at
+    // one pole per octave; Task 6 measured the cost of 1.5 poles/octave and
+    // kept 1.0 (density-change threshold not met -- see tools/bench-pink.cpp
+    // and doc/study), so these six values are unchanged from the first
+    // measurement. Explicit absolute comparisons, not doctest::Approx: with
+    // Approx's default scale of 1.0, Approx(0.079).epsilon(0.05) is an
+    // ABSOLUTE tolerance of ~0.054 dB (epsilon*(1.0+0.079)), not the ~0.004
+    // dB a reader would expect from "5% of 0.079" -- far looser than these
+    // six pins were meant to be.
+    CHECK(std::fabs(worstDeviation(44100.0)  - 0.079) < 0.005);
+    CHECK(std::fabs(worstDeviation(48000.0)  - 0.071) < 0.005);
+    CHECK(std::fabs(worstDeviation(88200.0)  - 0.080) < 0.005);
+    CHECK(std::fabs(worstDeviation(96000.0)  - 0.072) < 0.005);
+    CHECK(std::fabs(worstDeviation(176400.0) - 0.081) < 0.005);
+    CHECK(std::fabs(worstDeviation(192000.0) - 0.072) < 0.005);
 }
 
-TEST_CASE("the deviation grows monotonically with sample rate, as a z-plane fit must") {
-    // Not a property of this filter but of its KIND: the fit's corners are
-    // fractions of fs, so moving fs away from the design rate can only make it
-    // worse. A candidate that passes this test while failing the previous one
-    // has been fitted at a different rate; one that fails this test is not a
-    // z-plane fit at all.
-    double prev = worstDeviation(48000.0);
-    for (double fs : {88200.0, 96000.0, 192000.0}) {
-        const double w = worstDeviation(fs);
-        CHECK(w > prev);
-        prev = w;
-    }
+TEST_CASE("the error does not grow with the sample rate, as an Hz-anchored design must not") {
+    const double at48  = worstDeviation(48000.0);
+    const double at192 = worstDeviation(192000.0);
+    CHECK(std::fabs(at192 - at48) < 0.05);
 }

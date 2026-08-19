@@ -22,6 +22,11 @@ with a different seed) with a single plugin that:
 - guarantees decorrelation between concurrent instances via a shared logical
   pool of 64 channels;
 - produces RMS-calibrated output referenced to broadcast/cinema standards.
+  **Superseded 2026-08-19**: the calibrated quantity is now the per-third-octave
+  BAND level, held invariant across sample rates, and the pinking filter this
+  spec assumed was replaced. `Reference`'s numeric value is still the total RMS,
+  but only at 48 kHz. See `docs/superpowers/specs/2026-08-19-pink-filter-mz-design.md`
+  and `plugins/multipink/doc/calibration.md`.
 
 ## 2. DSP Core
 

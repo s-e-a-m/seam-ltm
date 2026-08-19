@@ -33,7 +33,7 @@
               font-color="TextLight" text-alignment="center" title="Multichannel Pink Noise" transparent="true"/>
         <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
               font-color="TextLight" text-alignment="center"
-              title="64-slot shared pool &#xB7; RMS-calibrated" transparent="true"/>
+              title="64-slot shared pool &#xB7; band-calibrated" transparent="true"/>
 
         <!-- ── SETUP ──────────────────────────────────────────────────────
              STONE identity for the calibration bus. Declared by hand, never
@@ -63,6 +63,12 @@
              no column dividers to name a group of one. A menu block is label
              14 / menu 20 on a 42 px stride; a slider block is label 14 /
              slider 18 / value 16. -->
+        <!-- "dBFS RMS" is the axis this number is defined on: -23 means a
+             total RMS of -23 dBFS AT 48 kHz. What the calibration holds still
+             across sample rates is the per-third-octave band level, which is
+             why the header above says band-calibrated and not RMS-calibrated;
+             the two coincide at 48 kHz and nowhere else. See
+             plugins/multipink/doc/calibration.md. -->
         <view class="CTextLabel" origin="20, 170" size="260, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="Reference (dBFS RMS)" transparent="true"/>
         <view class="COptionMenu" origin="80, 186" size="140, 20" control-tag="Reference"
