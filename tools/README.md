@@ -186,3 +186,48 @@ at 192 kHz costs 72-129% of one core depending on loop order — far past the
 SMPTE ST 2095-1 tolerance with 0.07-0.08 dB of margin against 0.25 dB.
 Full numbers, both loop orders, both rates, both densities:
 `.superpowers/sdd/2026-08-19-pink-filter-mz/task-6-report.md`.
+
+## `faust-pink-ab.sh` — the Faust spec and the C++ port, compared rather than asserted
+
+`multipink_pink.h`'s `PinkDesign` was written before its Faust
+specification (`sfi.pink_filter_mz` in `seam.filters.lib`), which inverts
+the suite's usual "Faust is the spec" order. This script is what closes
+that gap: it feeds a unit impulse through both implementations, at 48 kHz
+and 96 kHz, and diffs the two responses sample by sample. A comparison of
+impulse responses exercises the whole filter — section count, coefficients,
+and the fixed correction section — where a spectral summary could hide a
+disagreement that only shows up at particular frequencies.
+
+```bash
+tools/faust-pink-ab.sh
+```
+
+It compiles `sfi.pink_filter_mz` with `faust -lang cpp` into a scratch
+directory (`mktemp -d`, removed on exit) using the architecture file
+`faust-ab-arch.cpp` — a minimal `main()` that runs one impulse through the
+generated `mydsp` and prints the output, nothing a real plug-in needs. This
+is the suite's one sanctioned use of Faust-generated C++
+(`seam-ltm/CLAUDE.md`, "Core convention"): scratch comparison only, never
+copied into `plugins/*/source/`. The other side, `pink-ir-dump.cpp`, runs
+the same impulse through `PinkDesign::design()` directly, using its own
+`y = b0*x + b1*x[n-1] - a1*y[n-1]` update — the same convention
+`fi.tf1` uses, which is what makes the comparison meaningful rather than an
+apples-to-oranges mismatch of filter forms.
+The pass threshold is fixed at 1e-9 worst-sample difference and the script
+does not expose a flag to loosen it: a passing run means the two
+descriptions of the filter agree to double-precision rounding, not "close
+enough".
+
+Requires `faust`, `clang++` (C++17), and `python3` on the PATH; not wired
+into CMake or ctest because it needs the `faust` binary, which the suite
+deliberately does not require to build.
+
+`sfi.pink_filter_mz`'s ladder depth is a function of the sample rate, but
+Faust's `seq`/`par` repeat counts are resolved at compile time, before the
+runtime sample rate (`ma.SR`) is known — so the cascade in
+`seam.filters.lib` is built to a fixed maximum depth (32 sections, mirroring
+`PinkDesign::kMaxSections`) with every section past the sample rate's actual
+requirement switched to the identity pair `(b0=1, b1=0, a1=0)`, an exact
+no-op rather than an approximation. That is a structural difference from
+the C++ (fixed array with a runtime bypass, vs. a variable-length loop) that
+this A/B is what proves does not become a numerical one.
