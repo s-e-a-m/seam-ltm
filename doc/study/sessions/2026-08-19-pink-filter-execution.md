@@ -246,6 +246,41 @@ Tre leve, nessuna applicata:
 3. **SIMD fra stream**, che il layout section-major già permette e che
    richiederebbe anche di trasporre lo scratch a `[campione][stream]`.
 
+## La verifica in sala, che è ciò che ha trovato l'errore e ciò che lo chiude
+
+Cinque misure diritte di `multipink` dentro Reaper, senza microfono né
+altoparlante, lette da `strx` attraverso il banco ISO 266.
+
+| | fs | livello medio di banda |
+|---|---|---|
+| prima del fix | 48 kHz | −38,38 dB |
+| prima del fix | 96 kHz | **−41,31 dB** |
+| dopo il fix | 48 kHz | −38,33 |
+| dopo il fix | 96 kHz | −38,33 |
+| dopo il fix | 96 kHz, ripetuta | −38,39 |
+
+Prima: 2,93 dB di caduta raddoppiando il sample rate, dove il progetto ne
+prometteva zero.
+Dopo: 0,00 e −0,06 dB.
+Il valore a 48 kHz non si muove, come deve, perché a 48 kHz il termine di
+correzione vale zero per costruzione.
+
+**Il pavimento di rumore del metodo, misurato.**
+Le due letture a 96 kHz distano sei secondi e guardano lo stesso identico
+segnale: differiscono di 0,20 dB mediani per banda e 1,00 dB nel caso peggiore
+(banda 1,25 k, −37,9 contro −38,9).
+Quindi la dispersione `comp_db` di ±0,5 che compare in queste tabelle è rumore
+di misura, non errore del filtro — che sta a 0,07 dB.
+Le medie delle due ripetizioni invece differiscono di 0,06 dB, circa √31 volte
+meglio della singola banda, che è quanto ci si aspetta mediando 31 bande
+indipendenti: il rumore si comporta da rumore.
+
+La conseguenza metodologica vale più del numero.
+Una misura di questo tipo **valida il sistema**; non può giudicare il filtro,
+perché non lo risolve.
+Il giudizio del filtro resta analitico, ed è per questo che il test di
+accettazione lo è.
+
 ## Aperto
 
 - [x] La lettura della tabella di banda in host — fatta, ed è ciò che ha trovato
