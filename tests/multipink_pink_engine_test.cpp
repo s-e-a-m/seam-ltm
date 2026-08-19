@@ -105,3 +105,16 @@ TEST_CASE("single precision costs under a thousandth of a dB") {
         }
     }
 }
+
+TEST_CASE("the calibration offset is the one the design implies") {
+    // The LCG source's own update and cast (multipink_processor.cpp:381-390)
+    // were run for 5*10^8 samples in a throwaway program outside this suite
+    // and measured -4.7712 dB, within 0.00001 dB of 1/sqrt(3) -- so the
+    // theoretical value below is a confirmed measurement, not an assumption.
+    PinkDesign d;
+    d.design(48000.0);
+    const double kWhiteRmsDb = 20.0 * std::log10(1.0 / std::sqrt(3.0));
+    CHECK(kWhiteRmsDb == doctest::Approx(-4.771).epsilon(0.001));
+    CHECK(d.rmsGainDb() == doctest::Approx(-31.409).epsilon(0.001));
+    CHECK(-(kWhiteRmsDb + d.rmsGainDb()) == doctest::Approx(36.180).epsilon(0.001));
+}
