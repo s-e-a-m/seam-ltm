@@ -11,19 +11,17 @@
 #include <cstdint>
 #include <vector>
 
-// FAUST REFERENCE (seam.noises.lib):
+// FAUST REFERENCE (seam.noises.lib, seam.filters.lib):
 //
-//   multipink(N,g) = no.multinoise(N) : par(i,N,no.pink_filter : *(g));
+//   multipink(N,g) = no.multinoise(N) : par(i,N,sfi.pink_filter_mz : *(g));
 //
-// where no.pink_filter is (noises.lib:402):
-//
-//   pink_filter = fi.iir(
-//       (0.049922035, -0.095993537, 0.050612699, -0.004408786),
-//       (-2.494956002, 2.017265875, -0.522189400));
-//
-// and no.multinoise(N) is N parallel LCGs whose per-channel seeds are
+// where no.multinoise(N) is N parallel LCGs whose per-channel seeds are
 // dispersed by noise_env(12345) so the resulting streams are statistically
-// independent.
+// independent, and sfi.pink_filter_mz / sfi.spectral_tilt_mz are the
+// matched-Z pinking filter designed in multipink_pink.h (which carries the
+// derivation and the reasoning). Those two Faust functions do not exist yet
+// -- this is a forward reference to a later task in this plan, not a claim
+// that seam.filters.lib already has them.
 //
 // This plugin re-implements the above in hand-written C++ (project
 // convention — see seam-ltm/CLAUDE.md). N is fixed at 64 (the shared
