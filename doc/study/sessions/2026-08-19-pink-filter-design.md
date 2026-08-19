@@ -108,8 +108,17 @@ giusta; ma *la curva fra un polo e l'altro* viene valutata alla frequenza
 analogica deformata, e la deformazione cresce verso Nyquist.
 
 È un difetto strutturale, non di parametrizzazione.
-L'audit non poteva vederlo: Smith & Smith (arXiv:1606.06154) progettano
-nell'analogico, e il warping compare solo alla discretizzazione.
+L'articolo di Smith & Smith (arXiv:1606.06154, verificato sul PDF il
+2026-08-19) **tratta** la discretizzazione, in §VII: prescrive la bilineare con
+prewarping, `c = 2π f₁ / tan(π f₁ T)` per mappare esattamente il primo polo e
+`f̂_k = f₁ tan(π f_k T)/tan(π f₁ T)` per gli altri — cioè esattamente ciò che
+Faust implementa.
+Quello che l'articolo non fa è esaminare l'errore che quel warping introduce
+**nell'interno** della banda: discute i poli all'infinito che finiscono in
+z = −1 e il vincolo su N perché f_{N+1} superi Nyquist, non la curva fra un polo
+e l'altro.
+Matched-Z, invarianza all'impulso o qualunque altra mappatura non compaiono nel
+testo.
 
 Nota che spiega il vecchio filtro: il fit invfreqz, pur mediocre, sta a 0,41 dB
 fino a 16 kHz a 44,1 kHz proprio perché **è stato fittato direttamente nel piano

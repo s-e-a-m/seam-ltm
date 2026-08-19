@@ -89,9 +89,20 @@ Faust's prewarping is correct and places every pole at its intended digital
 frequency; what deviates is the curve *between* the poles, which is evaluated at
 the warped analog frequency.
 
-This is structural, not a matter of parameters, and the audit could not have
-seen it: Smith & Smith design in the analog domain, and the warp appears only on
-discretisation.
+This is structural, not a matter of parameters, and it is precisely one section
+of the source paper that we replace.
+Smith & Smith (arXiv:1606.06154, verified against the PDF on 2026-08-19) **do**
+treat discretisation, in §VII: they prescribe the bilinear transform with
+prewarping, `c = 2*pi*f1 / tan(pi*f1*T)` to map the first pole exactly and
+`fhat_k = f1 * tan(pi*fk*T)/tan(pi*f1*T)` for the rest — which is what Faust
+implements.
+What the paper does not do is examine the error that warping leaves in the
+INTERIOR of the band; it discusses the poles at infinity landing on z = −1 and
+the constraint on N so that f_{N+1} exceeds Nyquist, not the curve between one
+pole and the next.
+Matched-Z, impulse invariance and every other mapping are absent from the text.
+Their §VI.C pole and zero placement is adopted here unchanged; their §VII is the
+only part this design replaces.
 It also explains why the old z-plane fit does comparatively well at its top edge
 — it was fitted directly in the z-plane, so the warp is already inside its
 coefficients, paid for with its low-frequency error and its dependence on fs.
