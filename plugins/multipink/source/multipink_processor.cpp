@@ -133,6 +133,10 @@ tresult PLUGIN_API MULTIPINKProcessor::setupProcessing(ProcessSetup& setup) {
     maxBlockSize_ = setup.maxSamplesPerBlock;
     scratch32_.assign((size_t)kPoolSize * maxBlockSize_, 0.0f);
     scratch64_.assign((size_t)kPoolSize * maxBlockSize_, 0.0);
+    // The filter is a function of the sample rate. setupProcessing is called
+    // with the plug-in inactive, so this is the one place it may be designed.
+    pinkDesign_.design(setup.sampleRate);
+    resetPinkFilters();
     return SingleComponentEffect::setupProcessing(setup);
 }
 
@@ -318,10 +322,9 @@ void MULTIPINKProcessor::seedLCGs() {
     }
 }
 void MULTIPINKProcessor::resetPinkFilters() {
-    for (int i = 0; i < kPoolSize; ++i) {
-        for (int k = 0; k < 4; ++k) pinkX_[i][k] = 0.0;
-        for (int k = 0; k < 3; ++k) pinkY_[i][k] = 0.0;
-    }
+    for (int s = 0; s < Seam::multipink::PinkDesign::kMaxSections; ++s)
+        for (int i = 0; i < kPoolSize; ++i)
+            pinkState_[s][i] = 0.0f;
 }
 double MULTIPINKProcessor::computeGainLin() const {
     if (!paramPower_.load()) return 0.0;
@@ -386,25 +389,26 @@ void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
         }
         lcgState_[ch] = st;
     }
-    // 2. Pink-shape ALL 64 channels in place (Direct Form I IIR).
-    //    y[n] =  b0*x[n] + b1*x[n-1] + b2*x[n-2] + b3*x[n-3]
-    //          - a1*y[n-1] - a2*y[n-2] - a3*y[n-3]
-    for (int ch = 0; ch < kPoolSize; ++ch) {
-        SampleType* row = scratch.data() + (size_t)ch * numSamples;
-        double x1 = pinkX_[ch][0], x2 = pinkX_[ch][1], x3 = pinkX_[ch][2], x4 = pinkX_[ch][3];
-        double y1 = pinkY_[ch][0], y2 = pinkY_[ch][1], y3 = pinkY_[ch][2];
-        for (int s = 0; s < numSamples; ++s) {
-            double x0 = (double)row[s];
-            double y0 = kPinkB[0]*x0 + kPinkB[1]*x1 + kPinkB[2]*x2 + kPinkB[3]*x3
-                      - kPinkA[0]*y1 - kPinkA[1]*y2 - kPinkA[2]*y3;
-            row[s] = (SampleType)y0;
-            x4 = x3; x3 = x2; x2 = x1; x1 = x0;
-            y3 = y2; y2 = y1; y1 = y0;
+    // 2. Pink-shape ALL 64 channels in place: a cascade of first-order
+    //    sections, transposed direct form II, one state per section per stream.
+    //      y[n] = b0*x[n] + s ; s = b1*x[n] - a1*y[n]
+    for (int sec = 0; sec < pinkDesign_.numSections; ++sec) {
+        const float b0 = (float)pinkDesign_.b0[sec];
+        const float b1 = (float)pinkDesign_.b1[sec];
+        const float a1 = (float)pinkDesign_.a1[sec];
+        float* state = pinkState_[sec];
+        for (int ch = 0; ch < kPoolSize; ++ch) {
+            SampleType* row = scratch.data() + (size_t)ch * numSamples;
+            float s = state[ch];
+            for (int n = 0; n < numSamples; ++n) {
+                const float x = (float)row[n];
+                const float y = b0 * x + s;
+                s = b1 * x - a1 * y;
+                row[n] = (SampleType)y;
+            }
+            state[ch] = s;
         }
-        pinkX_[ch][0] = x1; pinkX_[ch][1] = x2; pinkX_[ch][2] = x3; pinkX_[ch][3] = x4;
-        pinkY_[ch][0] = y1; pinkY_[ch][1] = y2; pinkY_[ch][2] = y3;
     }
-    // (void)x4 silences potential unused-warning if optimization is aggressive.
     // 3. Slot routing + gain stage.
     if (claimedStart_ < 0 || claimedChannels_ == 0) {
         for (int c = 0; c < numChannels; ++c)

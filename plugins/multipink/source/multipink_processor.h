@@ -63,12 +63,6 @@ private:
     // Faust master seed, must match no.multinoise(N) = noise_env(12345).
     static constexpr uint32_t kFaustSeed = 12345;
 
-    // Pink filter coefficients: now in multipink_pink.h, which is SDK-free so
-    // the response can be judged against a tolerance by a test. One copy, so
-    // the plugin and the acceptance test cannot describe different filters.
-    static constexpr const double* kPinkB = Seam::multipink::kPinkB;
-    static constexpr const double* kPinkA = Seam::multipink::kPinkA;
-
     // Calibration constant — measured 2026-05-07 against a 30 s render at
     // 48 kHz, Reference=-23, Trim=0: sox reported RMS amplitude 0.003370
     // (= -49.45 dBFS RMS). Raw pink RMS at unity gain is therefore
@@ -109,8 +103,18 @@ private:
 
     // DSP state — full pool always advanced.
     uint32_t lcgState_[kPoolSize] = {};
-    double   pinkX_[kPoolSize][4] = {};   // input history (white noise)
-    double   pinkY_[kPoolSize][3] = {};   // output history (pink)
+
+    // The pinking filter, designed for the running sample rate in
+    // setupProcessing. See multipink_pink.h for why it has this shape.
+    Seam::multipink::PinkDesign pinkDesign_;
+
+    // Per-stream filter state, SECTION-MAJOR: state[section][stream].
+    // Section-major so that the 64 streams belonging to one section are
+    // contiguous. Note for a future reader: this layout is a precondition for
+    // advancing eight streams with one SIMD instruction, but not sufficient on
+    // its own -- the scratch buffer would also have to be transposed to
+    // [sample][stream]. No SIMD is written here.
+    float pinkState_[Seam::multipink::PinkDesign::kMaxSections][kPoolSize] = {};
 
     // Scratch buffer for the full pool: shape [kPoolSize][maxBlockSize].
     std::vector<float>  scratch32_;
