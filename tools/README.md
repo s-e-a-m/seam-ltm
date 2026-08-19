@@ -133,10 +133,13 @@ It is gated on both the noise floor and the standard's curvature criterion,
 so it either agrees with the bursts or says nothing; one sample of impulse
 carries little energy, and "nothing resolved" is the ordinary outcome.
 
-Record with the **amplifier EQ bypassed**. T60 is a property of the room and
-does not depend on the source spectrum, but a calibration preset with
-tens of dB of tilt in it leaves no single `ltglide` level that clears the
-noise floor across the band without over-driving one end of it.
+Record **through the calibration preset**, at the level the calibration used.
+T60 is a property of the room and does not depend on the source spectrum, but
+the preset's electrical curve is the inverse of the loudspeaker's acoustic
+one, so with it in circuit every burst arrives at the microphone at the same
+SPL and one `ltglide` level clears the noise floor across the whole band.
+Bypassing it restores the raw response, and reaching the weakest band then
+means driving the strongest one tens of dB harder.
 
 Validated against synthetic passes convolved with a known exponentially
 decaying impulse response: true 0.8 / 1.5 / 2.5 s read back as

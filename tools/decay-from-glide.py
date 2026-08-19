@@ -52,10 +52,22 @@ the second opinion.
 WHAT IS MEASURED, AND WHAT IS NOT
 ---------------------------------
 T60 is a property of the room: how fast energy leaves it. It does not depend on
-the source spectrum, so the amplifier EQ does not change it -- it only changes
-how far each burst starts above the noise floor. Measure with the EQ bypassed
-and one ltglide level works across the band; measure through a calibration
-preset with 27 dB of tilt in it and no single level does.
+the source spectrum, so neither the loudspeaker's response nor the amplifier EQ
+changes it -- they only change how far each burst starts above the noise floor.
+
+Record THROUGH the calibration preset, at the level the calibration used. The
+EQ's electrical curve is the inverse of the loudspeaker's acoustic one -- that
+is what calibrating it means -- so what leaves the cabinet is flat and every
+burst lands at the same SPL. One ltglide level then clears the noise floor
+across the whole band. Bypassing the EQ restores the raw response, and reaching
+the weakest band means driving the strongest one tens of dB harder.
+
+The level is safe by the same reasoning: the calibration itself ran continuous
+pink noise through this EQ, while a gap-mode pass is kN cycles every delta
+seconds -- a duty cycle of a few percent.
+
+Two limits on "flat": it holds at the position that was calibrated, and it is
+only as flat as the pinking filter used to calibrate allowed.
 
 The EQ's own ringing is not a confound: a Q=2 peak at 198 Hz decays in about
 3 ms against a room's 1-2 s.
@@ -428,8 +440,8 @@ def main(argv=None):
             good.append((f, r["t30"] if r["t30"] else r["t20"]))
 
     if not good:
-        print("\nNo usable estimate. Raise the ltglide level, bypass the "
-              "amplifier EQ, or lengthen DELTA.")
+        print("\nNo usable estimate. Raise the ltglide level, keep the "
+              "calibration EQ in circuit, or lengthen DELTA.")
         return 1
 
     print(f"\n{len(good)} of {len(rows)} bursts usable.\n")
