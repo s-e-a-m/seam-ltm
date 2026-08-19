@@ -1,8 +1,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 #include "multipink_pink.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <vector>
 
 using Seam::multipink::PinkDesign;
@@ -136,17 +138,127 @@ TEST_CASE("single precision costs under a thousandth of a dB") {
     }
 }
 
-TEST_CASE("the calibration offset is the one the design implies") {
-    // The LCG source's own update and cast (multipink_processor.cpp:381-390)
-    // were run for 5*10^8 samples in a throwaway program outside this suite
-    // and measured -4.7712 dB, within 0.00001 dB of 1/sqrt(3) -- so the
-    // theoretical value below is a confirmed measurement, not an assumption.
+// ---------------------------------------------------------------------------
+// Calibration.
+//
+// The design claims one thing and one thing only: the per-third-octave BAND
+// level does not move with the sample rate. Everything below tests that claim
+// directly, because the claim is what an amplifier setting depends on.
+//
+// A probe that only counted the FILTER's band integral -- which is genuinely
+// rate-invariant -- shipped a fixed 36.180 dB offset and cost 3.01 dB per
+// doubling of fs. Measured in Reaper through strx over 76 s and 61 s of
+// integration: mean band level -38.4 dB at 48 kHz, -41.3 dB at 96 kHz. The
+// missing term is the SOURCE's spectral density: the LCG's RMS is the same at
+// every rate, but it is spread over 0..fs/2.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr double kWhiteRmsDb = -4.7712125471966244;   // 20*log10(1/sqrt(3))
+
+// 10*log10 of the integral of |H|^2 over one third-octave band, in Hz. Same
+// analytic route as the acceptance test: with white input the output power
+// spectrum IS |H|^2, so the band energy is an integral, not a measurement.
+double bandIntegralDb(const PinkDesign& d, double fc) {
+    const double fl = fc * std::pow(10.0, -0.05);
+    const double fu = fc * std::pow(10.0,  0.05);
+    const int kSteps = 8192;
+    double sum = 0.0;
+    for (int k = 0; k < kSteps; ++k) {
+        const double f = fl + (fu - fl) * (k + 0.5) / kSteps;
+        const double m = std::pow(10.0, d.magnitudeDb(f) / 20.0);
+        sum += m * m;
+    }
+    return 10.0 * std::log10(sum * (fu - fl) / kSteps);
+}
+
+// The level the plugin actually puts into one third-octave band, in dBFS, as
+// the sum of the four terms the calibration is made of:
+//   gain + source RMS + filter band integral - source spectral density.
+double predictedBandLevelDb(const PinkDesign& d, double referenceDb, double fc) {
+    const double gainDb = referenceDb + d.calibrationOffsetDb();
+    return gainDb + kWhiteRmsDb + bandIntegralDb(d, fc)
+         - 10.0 * std::log10(d.sampleRate() * 0.5);
+}
+
+// Total broadband RMS, in dBFS: gain + source RMS + the filter's RMS gain.
+double predictedTotalRmsDb(const PinkDesign& d, double referenceDb) {
+    return referenceDb + d.calibrationOffsetDb() + kWhiteRmsDb + d.rmsGainDb();
+}
+
+} // namespace
+
+TEST_CASE("the offset's base value is the one the design implies at 48 kHz") {
+    // At the reference rate the density term is zero and the offset reduces to
+    // the old derivation, so this is the number the base constant must carry.
+    // The LCG source's own update and cast (multipink_processor.cpp) were run
+    // for 5*10^8 samples in a throwaway program outside this suite and
+    // measured -4.7712 dB, within 0.00001 dB of 1/sqrt(3) -- so the value
+    // above is a confirmed measurement, not an assumption.
     PinkDesign d;
     d.design(48000.0);
-    const double kWhiteRmsDb = 20.0 * std::log10(1.0 / std::sqrt(3.0));
     CHECK(kWhiteRmsDb == doctest::Approx(-4.771).epsilon(0.001));
     CHECK(d.rmsGainDb() == doctest::Approx(-31.409).epsilon(0.001));
     CHECK(-(kWhiteRmsDb + d.rmsGainDb()) == doctest::Approx(36.180).epsilon(0.001));
+    CHECK(PinkDesign::kCalibrationOffsetBaseDb == doctest::Approx(36.180).epsilon(1e-9));
+    CHECK(d.calibrationOffsetDb() == doctest::Approx(36.180).epsilon(1e-9));
+}
+
+TEST_CASE("the offset carries the source's spectral density, 3.01 dB per doubling") {
+    for (double fs : kRates) {
+        PinkDesign d;
+        d.design(fs);
+        CHECK(d.calibrationOffsetDb() ==
+              doctest::Approx(36.180 + 10.0 * std::log10(fs / 48000.0)).epsilon(1e-9));
+    }
+    PinkDesign lo, hi;
+    lo.design(48000.0);
+    hi.design(96000.0);
+    CHECK(hi.calibrationOffsetDb() - lo.calibrationOffsetDb()
+          == doctest::Approx(3.0103).epsilon(0.001));
+}
+
+TEST_CASE("the band level does not move with the sample rate, which is the whole claim") {
+    // The test that would have caught the shipped defect. Without the density
+    // term it goes red by 3.01 dB at 96 kHz and 6.02 dB at 192 kHz.
+    const double fc = 1000.0;             // the calibration anchor's own band
+    double lo = 1e9, hi = -1e9;
+    std::printf("\n  predicted 1 kHz third-octave band level, Reference = -23 dBFS\n\n");
+    for (double fs : kRates) {
+        PinkDesign d;
+        d.design(fs);
+        const double lvl = predictedBandLevelDb(d, -23.0, fc);
+        std::printf("  %8.1f Hz   offset %7.3f dB   band %9.4f dBFS\n",
+                    fs, d.calibrationOffsetDb(), lvl);
+        lo = std::min(lo, lvl);
+        hi = std::max(hi, lvl);
+    }
+    std::printf("\n  spread %.4f dB\n\n", hi - lo);
+    CHECK(hi - lo < 0.01);
+    CHECK(lo == doctest::Approx(-39.49).epsilon(0.001));
+}
+
+TEST_CASE("the total RMS is what holding the band level still implies") {
+    // The other side of the same coin, and the reason the total RMS is NOT
+    // the calibrated quantity: with every band held at the same level, each
+    // extra octave of pink adds a little total energy, so the broadband RMS
+    // rises 0.28 dB per doubling of fs instead of standing still.
+    PinkDesign d48, d96, d192, d441;
+    d441.design(44100.0);
+    d48.design(48000.0);
+    d96.design(96000.0);
+    d192.design(192000.0);
+    CHECK(predictedTotalRmsDb(d48,  -23.0) == doctest::Approx(-23.000).epsilon(0.001));
+    CHECK(predictedTotalRmsDb(d441, -23.0) == doctest::Approx(-23.030).epsilon(0.001));
+    CHECK(predictedTotalRmsDb(d96,  -23.0) == doctest::Approx(-22.718).epsilon(0.001));
+    CHECK(predictedTotalRmsDb(d192, -23.0) == doctest::Approx(-22.453).epsilon(0.001));
+    CHECK(predictedTotalRmsDb(d96, -23.0) - predictedTotalRmsDb(d48, -23.0)
+          == doctest::Approx(0.28).epsilon(0.05));
+    // The offset is filter-intrinsic, not reference-dependent: changing the
+    // reference moves the level by exactly as much.
+    CHECK(predictedTotalRmsDb(d48, -18.0) - predictedTotalRmsDb(d48, -23.0)
+          == doctest::Approx(5.0).epsilon(1e-9));
 }
 
 // ---------------------------------------------------------------------------

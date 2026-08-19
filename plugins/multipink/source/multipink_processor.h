@@ -62,38 +62,30 @@ private:
     // Faust master seed, must match no.multinoise(N) = noise_env(12345).
     static constexpr uint32_t kFaustSeed = 12345;
 
-    // Calibration. The constant fixes the BAND level, not the total RMS: the
-    // filter is anchored in Hz, so its total RMS falls 5.8 dB from 44.1 to
-    // 192 kHz while its band levels stay put, and it is the band levels an
-    // amplifier is calibrated against. The offset is therefore defined once,
-    // at 48 kHz, and deliberately NOT recomputed per sample rate -- recomputing
-    // it is exactly what would make the band level move.
+    // Calibration lives in PinkDesign now -- kCalibrationOffsetBaseDb and
+    // PinkDesign::calibrationOffsetDb(), in multipink_pink.h, which is
+    // SDK-free and therefore readable by a test. It used to be a constant
+    // here, where nothing in tests/ could include it, and the rate-dependent
+    // term it was missing went unnoticed through eight task reviews and a
+    // whole-branch review because no test could see the number at all.
+    // computeGainLin() reads pinkDesign_.calibrationOffsetDb().
     //
-    // Computed, not measured: the LCG source (multipink_processor.cpp,
-    // "st = st * 1103515245u + 12345u; row[s] = (int32_t)st / 2147483648.0")
-    // is a full-period generator uniform on [-1, 1), so its theoretical RMS is
-    // 1/sqrt(3) = -4.771 dB. Measured directly by running that exact update
-    // and cast over 5*10^8 samples (several independent dispersed seeds
-    // checked over 2*10^7 samples each first): -4.7712 dB, within 0.00001 dB
-    // of the theoretical value -- confirmed, not merely assumed.
-    // PinkDesign::rmsGainDb() at 48 kHz is -31.409 dB.
-    // Offset = -(-4.771 + -31.409) = 36.180 dB.
+    // Two facts recorded here belong to the plugin rather than to the design:
     //
     // The 0.39 dB by which the old measured constant (26.45) exceeded the
     // same computation for the old filter (26.06 = -(-4.771 + -21.291)) is
-    // NOT explained by the LCG: the measurement above rules it out to four
-    // decimal places. It was not possible to check the other two suspects
-    // from this task (whether the 2026-05-07 render carried a host fader in
+    // NOT explained by the LCG: the source's RMS was measured over 5*10^8
+    // samples and lands within 0.00001 dB of 1/sqrt(3). The other two
+    // suspects (whether the 2026-05-07 render carried a host fader in
     // addition to the plugin's own gain, and whether `sox stat` integrated a
-    // silent lead-in into that render's RMS) without an audio host, so the
-    // 0.39 dB gap is left open here for a render to settle. It is not folded
-    // into this constant, and this constant is not split with it.
+    // silent lead-in into that render's RMS) still want a render to settle.
+    // The gap is not folded into the constant, and the constant is not split
+    // with it.
     //
     // Against the old filter at equal total RMS the mean band level moves by
     // -1.00 dB. strx reports deviations from the mean of the bands, so no
     // equalisation decision taken before 2026-08-19 changes; only the
     // absolute level of the reference signal does.
-    static constexpr double kCalibrationOffsetDb = 36.180;
 
     // Active output channel count (set by setBusArrangements).
     int activeChannels_ = 2;

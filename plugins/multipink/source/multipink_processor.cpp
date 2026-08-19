@@ -334,7 +334,8 @@ double MULTIPINKProcessor::computeGainLin() const {
     if (idx > kReferenceStepCount - 1) idx = kReferenceStepCount - 1;
     double refDb = kReferenceLevelsDb[idx];
     double trim = paramTrimDb_.load();
-    double db = refDb + trim + kCalibrationOffsetDb;
+    // Rate-dependent, and a load: setupProcessing computed it in design(fs).
+    double db = refDb + trim + pinkDesign_.calibrationOffsetDb();
     return std::pow(10.0, db / 20.0);
 }
 

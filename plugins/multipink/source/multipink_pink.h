@@ -42,6 +42,49 @@ public:
     static constexpr double kCorrZero = -0.250775213;
     static constexpr double kCorrPole = -0.160124183;
 
+    // ---------------------------------------------------------------------
+    // Calibration.
+    //
+    // What the constant fixes is the per-third-octave BAND level, not the
+    // total RMS: a loudspeaker is equalised band by band, and a band level
+    // that moved with the sample rate would invalidate every amplifier
+    // setting derived from it. The total RMS is then free to move, and does.
+    //
+    // The band level of the generator, in dB, is the sum of four terms:
+    //
+    //   gain          referenceDb + calibrationOffsetDb()
+    //   source RMS    20*log10(1/sqrt(3)) = -4.7712 dB, the uniform LCG
+    //   filter        10*log10(integral of |H(f)|^2 over the band)
+    //   DENSITY       -10*log10(fs/2)
+    //
+    // The last term is the one the original derivation forgot, and forgetting
+    // it cost 3.01 dB per doubling of fs. The LCG's RMS is the same at every
+    // rate, but that fixed power is spread over 0..fs/2, so its spectral
+    // DENSITY halves when fs doubles. A filter perfectly anchored in Hz then
+    // still delivers 3.01 dB less into every fixed band. Measured in Reaper
+    // through strx: mean band level -38.4 dB at 48 kHz against -41.3 dB at
+    // 96 kHz, a 2.9 dB fall where the design promised none.
+    //
+    // The offset therefore carries the density term, and only that:
+    //
+    //   offset(fs) = kCalibrationOffsetBaseDb + 10*log10(fs / 48000)
+    //
+    // The base value is the offset AT 48 kHz, where the two definitions
+    // coincide: -(whiteRmsDb + rmsGainDb(48k)) = -(-4.7712 + -31.409)
+    //         = 36.180 dB.
+    // The LCG's RMS is not assumed: its exact update and cast
+    // (multipink_processor.cpp, "st = st * 1103515245u + 12345u;
+    // row[s] = (int32_t)st / 2147483648.0") were run over 5*10^8 samples and
+    // measured -4.7712 dB, within 0.00001 dB of the theoretical 1/sqrt(3).
+    //
+    // With the density term the predicted 1 kHz band level is invariant
+    // within 0.010 dB over 44.1...192 kHz (tests/multipink_pink_engine_test.cpp),
+    // and the total RMS rises 0.28 dB per doubling -- which is correct: every
+    // band holds still, and each new octave of pink adds a little total
+    // energy on top.
+    static constexpr double kCalibrationRefRateHz  = 48000.0;
+    static constexpr double kCalibrationOffsetBaseDb = 36.180;
+
     // y[n] = b0*x[n] + b1*x[n-1] - a1*y[n-1], one section per entry.
     double b0[kMaxSections] = {};
     double b1[kMaxSections] = {};
@@ -50,6 +93,10 @@ public:
 
     void design(double fs) {
         sampleRate_ = fs;
+        // Computed here, once, because computeGainLin() reads it on the audio
+        // thread and must find a load rather than a log10.
+        calibrationOffsetDb_ =
+            kCalibrationOffsetBaseDb + 10.0 * std::log10(fs / kCalibrationRefRateHz);
         const double T  = 1.0 / fs;
         const double f1 = 0.5 * fs;
         const double w0 = 2.0 * M_PI * kLadderF0Hz;
@@ -89,13 +136,20 @@ public:
         return 20.0 * std::log10(std::abs(H));
     }
 
-    // Gain at the calibration anchor. Invariant across sample rates by design,
-    // which is what lets the calibration offset stay a single constant.
+    // Gain at the calibration anchor. Invariant across sample rates by design:
+    // the filter is anchored in Hz, so the offset above has to correct for the
+    // SOURCE's density and for nothing else.
     double anchorGainDb() const { return magnitudeDb(kAnchorHz); }
 
+    // The calibration offset at the rate this design was given. A load, not a
+    // computation: it is read on the audio thread by every gain update.
+    double calibrationOffsetDb() const { return calibrationOffsetDb_; }
+
     // 10*log10 of the mean of |H|^2 over 0..fs/2 — the filter's RMS gain on
-    // white input. Falls with fs, which is the fact the calibration must not
-    // follow. Midpoint rule over a fixed grid: smooth integrand, and the
+    // white input. Falls with fs, and the calibration deliberately does not
+    // follow it: the offset above tracks 10*log10(fs/2) instead, which is what
+    // holds the BAND level still. Midpoint rule over a fixed grid: smooth
+    // integrand, and the
     // value is reported rather than used in the audio path.
     double rmsGainDb() const {
         const int kSteps = 200000;
@@ -111,7 +165,8 @@ public:
     double sampleRate() const { return sampleRate_; }
 
 private:
-    double sampleRate_ = 48000.0;
+    double sampleRate_          = kCalibrationRefRateHz;
+    double calibrationOffsetDb_ = kCalibrationOffsetBaseDb;
 };
 
 // The block operation the audio path performs, in one place so that what
