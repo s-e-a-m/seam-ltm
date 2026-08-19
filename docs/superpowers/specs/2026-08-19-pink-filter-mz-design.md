@@ -191,9 +191,82 @@ its total RMS therefore moves by 5.8 dB from 44.1 to 192 kHz.
 A reference exists so that a loudspeaker can be equalised band by band, and a
 per-band level that moved with the sample rate would invalidate the amplifier
 settings derived from it.
-Measured, the mean judged-band level is invariant within 0.008 dB across all six
-rates, so `kCalibrationOffsetDb` remains a single constant — now because the
-quantity it fixes is genuinely rate-independent.
+That decision stands.
+
+### Corrected 2026-08-19: the offset is a function of fs
+
+This section originally concluded that a single constant achieves it, and the
+implementation shipped `kCalibrationOffsetDb = 36.180` fixed at every rate.
+That is wrong, and the derivation below replaces it.
+
+The band level of the generator is the sum of **four** terms, not three:
+
+```
+band level (dB) = gainDb                                   ; referenceDb + offset(fs)
+                + 20*log10(1/sqrt(3))                      ; the LCG source's RMS, -4.7712 dB
+                + 10*log10( ∫_band |H(f)|² df )            ; the filter over the band
+                - 10*log10(fs/2)                           ; the source's spectral DENSITY
+```
+
+The last term is the one the original derivation forgot.
+The probe behind the old conclusion measured the third term, found it invariant
+across all six rates — which it genuinely is, the filter being anchored in Hz —
+and stopped there.
+It counted the filter and forgot the source.
+The LCG's total RMS is the same at every sample rate, but that fixed power is
+spread over 0…fs/2, so its spectral density halves when fs doubles, and every
+fixed band therefore receives 3.01 dB less per doubling however perfectly the
+filter is anchored.
+
+**Measured in the host**, `multipink` straight into the `strx` analyser, over
+76 s and 61 s of integration:
+
+| | 48 kHz | 96 kHz |
+|---|---|---|
+| mean third-octave band level | −38.4 dB | −41.3 dB |
+
+A 2.9 dB fall where this section promised none, against 3.01 dB predicted from
+the missing term.
+
+The offset therefore carries the density term, and only that:
+
+```
+offset(fs) = 36.180 + 10*log10(fs / 48000)
+```
+
+36.180 dB is the value **at the 48 kHz reference rate**, where the density term
+is zero and the corrected definition coincides with the old one.
+With the term in place the predicted 1 kHz band level is −39.4825 / −39.4891 /
+−39.4847 / −39.4909 / −39.4866 / −39.4923 dBFS at 44.1 / 48 / 88.2 / 96 / 176.4
+/ 192 kHz — a spread of 0.0098 dB.
+Without it: −39.114 / −39.489 / −42.127 / −42.501 / −45.139 / −45.513.
+The total RMS then *rises* 0.28 dB per doubling (−23.030 at 44.1, −23.000 at 48,
+−22.718 at 96, −22.453 at 192, for Reference = −23), which is the correct
+behaviour and not a defect: every band holds still while each additional octave
+of pink adds a little total energy on top.
+
+**Why no review caught it.**
+Eight task reviews and a whole-branch review all passed over this.
+Every one of them checked the code against the spec, and the code did implement
+the spec faithfully — the spec was wrong.
+A review that reads cannot catch an error of physics in the document it is
+reading against; only a measurement of the real signal path can, and that is
+what found it.
+Two structural consequences, both now applied:
+
+1. The constant lived in `multipink_processor.h`, which includes the VST3 SDK,
+   and the test binary cannot include the SDK — so **no test could read the
+   number at all**.
+   It now lives in `multipink_pink.h`, SDK-free, as
+   `PinkDesign::kCalibrationOffsetBaseDb` plus a
+   `calibrationOffsetDb()` accessor computed once in `design(fs)` and read as a
+   load on the audio thread.
+2. The test suite asserted the *derivation* (`-(whiteRmsDb + rmsGainDb)` equals
+   36.180) rather than the *property the design claims*.
+   It now asserts the property directly: the predicted band level for a fixed
+   ISO band is invariant across all six rates within 0.01 dB.
+   Verified by mutation — removing the density term turns it red by 3.010 dB at
+   96 kHz and 6.021 dB at 192 kHz.
 
 It is computed rather than measured.
 The old constant, 26.45 dB, fused the filter's RMS gain with the white source's

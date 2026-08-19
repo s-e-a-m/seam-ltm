@@ -5,31 +5,63 @@ RMS reference levels of the `multipink` plugin.
 
 ## Background
 
-`multipink` claims that with `Reference = -23 dBFS RMS` and `Trim = 0`, its
-long-term per-channel output RMS is exactly -23.0 dBFS. The pink IIR
-attenuates the upstream white noise by an amount that depends on the
-filter coefficients (see `multipink_processor.h`, `Seam::multipink::PinkDesign`
-in `multipink_pink.h`). To make the knob "0 dB" position correspond to a
-real reference RMS, a hard-coded compensation `kCalibrationOffsetDb` is
-applied.
+`multipink` produces a pink reference signal at a stated level. The pink
+IIR attenuates the upstream white noise by an amount that depends on the
+filter coefficients (`Seam::multipink::PinkDesign` in `multipink_pink.h`),
+so to make the `Reference` setting correspond to a real level, a
+compensation offset is applied to the gain.
 
 ## What "Reference" means now (2026-08-19)
 
+**`Reference` sets the per-third-octave BAND level, not the total RMS.**
+
 As of the matched-Z pinking filter (`doc/study/sessions/2026-08-19-pink-filter-design.md`,
 `docs/superpowers/specs/2026-08-19-pink-filter-mz-design.md`), the filter is
-anchored in Hz rather than fit in the z-plane, so its total RMS is no longer
-sample-rate-invariant: it falls 5.8 dB from 44.1 to 192 kHz while its BAND
-levels stay put (within 0.01 dB, measured at 1 kHz). `kCalibrationOffsetDb`
-therefore anchors the BAND level, not the total RMS, and is deliberately
-**not** recomputed per sample rate — recomputing it per rate is exactly what
-would make the band level move.
+anchored in Hz rather than fit in the z-plane. A calibration reference exists
+so that a loudspeaker can be equalised band by band, so the band level is the
+quantity that must not move with the sample rate — an amplifier calibrated at
+48 kHz must stay calibrated at 96 kHz. The total RMS is then free to move, and
+does.
 
-The constant is defined once, at 48 kHz:
-`kCalibrationOffsetDb = 36.180`, in `plugins/multipink/source/multipink_processor.h`.
-It is **derived**, not measured with `sox` — `PinkDesign::rmsGainDb()` at
-48 kHz is -31.409 dB, and the LCG noise source's RMS was measured directly
-(5×10^8 samples, splitmix64-dispersed seeds) at -4.7712 dB against a
-theoretical 1/sqrt(3) = -4.7712 dB, so `offset = -(-4.7712 + -31.409) = 36.180`.
+The offset is therefore a **function of the sample rate**:
+
+```
+offset(fs) = 36.180 + 10*log10(fs / 48000)
+```
+
+`PinkDesign::kCalibrationOffsetBaseDb = 36.180` and the accessor
+`PinkDesign::calibrationOffsetDb()`, in
+`plugins/multipink/source/multipink_pink.h`. It is computed once inside
+`design(fs)` and read as a load by `computeGainLin()` on the audio thread.
+
+The band level is the sum of four terms:
+
+| term | value |
+|---|---|
+| gain | `Reference` + `Trim` + `offset(fs)` |
+| source RMS | `20*log10(1/sqrt(3))` = −4.7712 dB, the uniform LCG |
+| filter | `10*log10(∫ over the band of \|H(f)\|²)` |
+| source density | `−10*log10(fs/2)` |
+
+The last term is why the offset depends on fs. The LCG's total RMS is the same
+at every sample rate, but it is spread over 0…fs/2, so its spectral density
+halves when fs doubles and every fixed band would lose 3.01 dB per doubling if
+the offset did not compensate.
+
+**This corrects an error that shipped between 2026-08-19 and this revision**,
+where the offset was a fixed 36.180 dB at every rate. Measured in Reaper,
+`multipink` straight into `strx` (76 s and 61 s of integration), the mean
+third-octave band level read −38.4 dB at 48 kHz and −41.3 dB at 96 kHz: a
+2.9 dB fall where the design promised none. If you calibrated a rig at a rate
+other than 48 kHz with a build from that window, **the band levels were low by
+`10*log10(fs/48000)` dB** — 3.01 dB at 96 kHz, 6.02 dB at 192 kHz, and 0.37 dB
+*high* at 44.1 kHz — and the rig wants re-reading.
+
+The base value, 36.180 dB, is the offset at 48 kHz, where the density term is
+zero. It is **derived**, not measured with `sox`: `PinkDesign::rmsGainDb()` at
+48 kHz is −31.409 dB, and the LCG noise source's RMS was measured directly
+(5×10^8 samples, splitmix64-dispersed seeds) at −4.7712 dB against a
+theoretical 1/sqrt(3) = −4.7712 dB, so `36.180 = -(-4.7712 + -31.409)`.
 
 This supersedes the old constant, `kCalibrationOffsetDb = 26.45`, which was
 measured with a render and `sox` rather than derived. Reapplying the same
@@ -38,6 +70,25 @@ measured 26.45 that the LCG distribution does not explain (ruled out to four
 decimal places by the same measurement above). The gap is not folded into
 the new constant and is left open for a render to settle — see the header
 comment in `multipink_processor.h` for the full record.
+
+### What the total RMS does
+
+With every band held still, the broadband RMS **rises** 0.28 dB per doubling of
+the sample rate, because each new octave of pink adds a little total energy on
+top of bands that have not moved. For `Reference = -23`, `Trim = 0`, predicted:
+
+| fs | offset | 1 kHz band level | total RMS |
+|---|---|---|---|
+| 44.1 kHz  | 35.812 dB | −39.4825 dBFS | −23.030 dBFS |
+| 48 kHz    | 36.180 dB | −39.4891 dBFS | −23.000 dBFS |
+| 88.2 kHz  | 38.822 dB | −39.4847 dBFS | −22.746 dBFS |
+| 96 kHz    | 39.190 dB | −39.4909 dBFS | −22.718 dBFS |
+| 176.4 kHz | 41.833 dB | −39.4866 dBFS | −22.479 dBFS |
+| 192 kHz   | 42.201 dB | −39.4923 dBFS | −22.453 dBFS |
+
+A render measured with `sox` therefore lands on −23.0 dBFS **at 48 kHz only**;
+at any other rate the expected value is the one in the last column, and a
+reading of exactly −23.0 there would mean the band levels are wrong.
 
 ## Measurement convention — IMPORTANT
 
@@ -91,6 +142,9 @@ the reference signal moves, not the shape `strx` reads.
 
 ## Re-verifying
 
+The total RMS is the convenient check, but it is not the calibrated quantity.
+Read the band level as well whenever the rate is not 48 kHz.
+
 1. Add `multipink` to a stereo track in Reaper.
 2. Set `Reference = -23 dBFS RMS`, `Trim = 0.0`, `Power = on`.
 3. Render 30 s at 48 kHz, 32-bit float WAV, stereo, to `multipink_cal.wav`.
@@ -101,30 +155,56 @@ the reference signal moves, not the shape `strx` reads.
 5. Convert to dBFS: `dB = 20 · log10(RMS_amplitude)`.
 6. Expected: -23.0 ± 0.1 dBFS RMS per channel (sox/AES17 unweighted).
    In AES17-aligned tools this will read as ≈ -20.0.
+   **At a rate other than 48 kHz, expect the value in the table above**, not
+   -23.0 — the RMS is supposed to move.
+
+### Re-verifying the quantity that is actually calibrated
+
+The band level is what `Reference` fixes, so verify it directly: feed
+`multipink` into `strx` on the same track and let the band table integrate for
+at least 60 s. The mean of the judged bands must read the same number at every
+sample rate — it is this comparison, run at 48 and 96 kHz, that found the
+rate-dependence the derivation had missed. A difference of about 3 dB per
+doubling of fs means the offset is not carrying its density term.
 
 ## Recalibrating
 
-Since 2026-08-19 the preferred method is to **derive** the constant, the way
-`kCalibrationOffsetDb = 36.180` was obtained above: call
-`PinkDesign::design(fs)` and then read `PinkDesign::rmsGainDb()`, which
-takes no argument and reports the gain at the rate the design was given,
-and add the noise source's known RMS (1/sqrt(3) = -4.7712 dB for the current LCG). This needs
-no render and no host. The render-and-measure procedure below is the
-fallback for when the noise source itself changes and its RMS is not known
-in closed form:
+The preferred method is to **derive** the base constant, not to measure it:
+call `PinkDesign::design(48000.0)` and read `PinkDesign::rmsGainDb()`, then add
+the noise source's known RMS (1/sqrt(3) = -4.7712 dB for the current LCG):
 
-If the measured value drifts outside ±0.1 dB (e.g., after a coefficient
-change in the pink filter), update the constant:
+```
+kCalibrationOffsetBaseDb = -(whiteRmsDb + rmsGainDb(48000))
+```
 
-1. With `kCalibrationOffsetDb = 0.0`, render and measure as above. Call
-   the measurement `M` (in dBFS).
-2. Set `kCalibrationOffsetDb = -23.0 - M` in
-   `plugins/multipink/source/multipink_processor.h`.
+in `plugins/multipink/source/multipink_pink.h`. This needs no render and no
+host. Recompute it whenever the filter's coefficients change — the base value
+is filter-intrinsic.
+
+**Do not touch the `10*log10(fs/48000)` term while recalibrating.** It belongs
+to the noise source's spectral density, not to the filter, and it is the term
+that holds the band level still across sample rates. Changing the filter does
+not change it; changing the noise source's spectrum would.
+
+The render-and-measure procedure is the fallback for when the noise source
+itself changes and its RMS is not known in closed form:
+
+1. With `kCalibrationOffsetBaseDb = 0.0`, render **at 48 kHz** and measure as
+   above. Call the measurement `M` (in dBFS).
+2. Set `kCalibrationOffsetBaseDb = -23.0 - M` in
+   `plugins/multipink/source/multipink_pink.h`.
 3. Rebuild.
-4. Re-render and re-measure. Expect -23.0 ±0.1.
+4. Re-render at 48 kHz and re-measure. Expect -23.0 ±0.1.
 5. Verify the same constant works for Reference = -20 and -18 (the offset
    is filter-intrinsic, not reference-dependent — all three should land
    within ±0.1 dB of their nominal values).
+6. Verify at a second sample rate that the *band* level has not moved, per the
+   section above. Step 4's number will have moved, and should have.
+
+`tests/multipink_pink_engine_test.cpp` asserts all of this analytically — the
+base value at 48 kHz, the density term, the band-level invariance across the
+six rates, and the total-RMS behaviour — so a regression fails `ctest` before
+it reaches a render.
 
 ## Why long-term RMS
 

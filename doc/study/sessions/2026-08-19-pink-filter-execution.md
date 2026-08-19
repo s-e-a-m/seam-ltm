@@ -1,4 +1,4 @@
-# L'esecuzione del piano, e le quattro cose che ha trovato la revisione
+# L'esecuzione del piano, e le cinque cose che ha trovato — quattro leggendo, una misurando
 
 Diario dell'esecuzione di `docs/superpowers/plans/2026-08-19-pink-filter-mz.md`,
 otto task, ciascuno implementato e revisionato separatamente, più una revisione
@@ -10,6 +10,7 @@ solo ciò che è emerso *eseguendo*, e che nessun commit racconta per intero.
 
 Vale la pena elencarli insieme, perché sono tutti dello stesso tipo: cose
 plausibili che nessuno aveva motivo di mettere in dubbio.
+Il quinto, in fondo, è di un tipo diverso — e nessuna lettura poteva trovarlo.
 
 **1. La tolleranza che non era una tolleranza.**
 `doctest::Approx(0.079).epsilon(0.05)` sembra ±5% di 0,079.
@@ -56,6 +57,87 @@ Verificato: scambiare gli indici `[sezione][stream]`, invertire il segno di
 Ora la ricorrenza vive una volta sola, in `pinkFilterBlock`, e tutti e quattro i
 chiamanti la usano.
 
+## Il quinto difetto, e l'unico che solo una misura poteva trovare
+
+**5. La calibrazione contava il filtro e dimenticava la sorgente.**
+Il più grave dei cinque, trovato *dopo* otto revisioni di task e una revisione
+sull'intero ramo, con il plugin già in host: `multipink` direttamente dentro
+`strx`, 76 s di integrazione a 48 kHz e 61 s a 96 kHz.
+
+| | 48 kHz | 96 kHz |
+|---|---|---|
+| livello medio di banda di terzo d'ottava | −38,4 dB | −41,3 dB |
+
+Due virgola nove dB di caduta dove il progetto **prometteva zero**: la decisione
+di ancorare il livello di BANDA (e non l'RMS totale) esisteva proprio perché un
+amplificatore tarato a una frequenza di campionamento restasse tarato a
+un'altra.
+
+La sonda che aveva giustificato la costante fissa `kCalibrationOffsetDb = 36,180`
+misurava l'integrale di |H|² del filtro sulla banda, lo trovava invariante — e lo
+**è**, il filtro è ancorato in Hz e la misura era corretta.
+Solo che il livello di banda ha quattro termini, non tre:
+
+```
+livello di banda = guadagno + RMS della sorgente
+                 + 10*log10( ∫_banda |H(f)|² df )
+                 - 10*log10(fs/2)          ← la DENSITÀ della sorgente
+```
+
+L'ultimo termine è quello dimenticato.
+L'RMS del generatore LCG è lo stesso a ogni frequenza di campionamento, ma quella
+potenza è distribuita su 0…fs/2: la sua **densità spettrale** si dimezza quando
+fs raddoppia, e ogni banda fissa perde 3,01 dB per raddoppio per quanto
+perfettamente il filtro sia ancorato.
+Previsto 3,01 dB, misurato 2,9 dB.
+
+Corretto: `offset(fs) = 36,180 + 10*log10(fs / 48000)`, dove 36,180 è il valore
+**a 48 kHz**, la frequenza di riferimento in cui il termine di densità è nullo.
+Il livello previsto della banda di 1 kHz passa da
+−39,114 / −39,489 / −42,127 / −42,501 / −45,139 / −45,513 dBFS a
+−39,4825 / −39,4891 / −39,4847 / −39,4909 / −39,4866 / −39,4923 dBFS
+(44,1 / 48 / 88,2 / 96 / 176,4 / 192 kHz): 0,0098 dB di dispersione.
+L'RMS totale, di conseguenza, **sale** di 0,28 dB per raddoppio — ed è giusto
+così: se ogni banda sta ferma, ogni ottava in più aggiunge un po' di energia
+totale.
+
+Il filtro non è stato toccato: le sei deviazioni di accettazione restano
+0,079 / 0,071 / 0,080 / 0,072 / 0,081 / 0,072 dB.
+
+### Perché nessuna revisione poteva vederlo
+
+Nove revisioni sono passate sopra questo numero.
+Non hanno sbagliato: **ognuna ha verificato il codice contro la specifica, e il
+codice implementava la specifica fedelmente.**
+Era la specifica a essere sbagliata — un errore di fisica, non di trascrizione, e
+una revisione che *legge* non può trovare un errore di fisica nel documento
+contro cui sta leggendo.
+Poteva trovarlo solo una misura del percorso di segnale reale, ed è ciò che l'ha
+trovato.
+
+Due cause strutturali, entrambe rimosse:
+
+1. **La costante viveva dove nessun test poteva leggerla.**
+   Stava in `multipink_processor.h`, che include l'SDK VST3, e il binario dei
+   test non può includere l'SDK.
+   Ora sta in `multipink_pink.h`, che è SDK-free, come
+   `PinkDesign::kCalibrationOffsetBaseDb` più l'accessore
+   `calibrationOffsetDb()` calcolato una volta in `design(fs)` e letto come load
+   sul thread audio.
+2. **Il test asseriva la derivazione, non la proprietà.**
+   `-(whiteRmsDb + rmsGainDb) == 36,180` è vera per costruzione e non dice nulla
+   su ciò che il progetto promette.
+   Ora il test asserisce la promessa: il livello previsto di una banda ISO fissa
+   è invariante sulle sei frequenze entro 0,01 dB.
+   Verificato per mutazione — togliendo il termine di densità diventa rosso di
+   3,010 dB a 96 kHz e 6,021 dB a 192 kHz.
+
+La regola, che vale oltre questo caso: **una sonda che conferma la specifica non
+la sta mettendo alla prova.**
+La sonda misurava il filtro perché la specifica parlava del filtro.
+Il segnale che esce dal plugin non è il filtro: è il filtro *per* la sorgente, e
+nessuno l'ha misurato finché non l'ha misurato l'analizzatore in host.
+
 ## Perché un test sull'uscita non bastava
 
 Lo scambio degli indici è il caso istruttivo.
@@ -98,8 +180,11 @@ Tre leve, nessuna applicata:
 
 ## Aperto
 
-- [ ] Il render con `sox` e la lettura della tabella in sala: le due verifiche
-      che richiedono un host, e che chiudono i 0,39 dB della vecchia costante.
+- [x] La lettura della tabella di banda in host — fatta, ed è ciò che ha trovato
+      il difetto 5.
+- [ ] Il render con `sox`, che resta aperto e che chiude i 0,39 dB della vecchia
+      costante. Da fare **a 48 kHz**: è l'unica frequenza in cui l'RMS totale
+      atteso è ancora −23,0 dBFS.
 - [ ] Un banco di prova per il processore, collegato all'SDK come
       `seam_state_test`: senza di esso, cancellare `design()` da
       `setupProcessing` resta invisibile ai test, e il plugin emetterebbe rumore
