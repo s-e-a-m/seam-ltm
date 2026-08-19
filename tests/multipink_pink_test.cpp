@@ -139,13 +139,20 @@ TEST_CASE("the pinking filter meets SMPTE ST 2095-1 at every rate") {
     }
 
     // Pinned, so that a change has to be deliberate. Measured 2026-08-19 at
-    // one pole per octave; Task 6 may move these by changing kPolesPerOctave.
-    CHECK(worstDeviation(44100.0)  == doctest::Approx(0.079).epsilon(0.05));
-    CHECK(worstDeviation(48000.0)  == doctest::Approx(0.071).epsilon(0.05));
-    CHECK(worstDeviation(88200.0)  == doctest::Approx(0.080).epsilon(0.05));
-    CHECK(worstDeviation(96000.0)  == doctest::Approx(0.072).epsilon(0.05));
-    CHECK(worstDeviation(176400.0) == doctest::Approx(0.081).epsilon(0.05));
-    CHECK(worstDeviation(192000.0) == doctest::Approx(0.072).epsilon(0.05));
+    // one pole per octave; Task 6 measured the cost of 1.5 poles/octave and
+    // kept 1.0 (density-change threshold not met -- see tools/bench-pink.cpp
+    // and doc/study), so these six values are unchanged from the first
+    // measurement. Explicit absolute comparisons, not doctest::Approx: with
+    // Approx's default scale of 1.0, Approx(0.079).epsilon(0.05) is an
+    // ABSOLUTE tolerance of ~0.054 dB (epsilon*(1.0+0.079)), not the ~0.004
+    // dB a reader would expect from "5% of 0.079" -- far looser than these
+    // six pins were meant to be.
+    CHECK(std::fabs(worstDeviation(44100.0)  - 0.079) < 0.005);
+    CHECK(std::fabs(worstDeviation(48000.0)  - 0.071) < 0.005);
+    CHECK(std::fabs(worstDeviation(88200.0)  - 0.080) < 0.005);
+    CHECK(std::fabs(worstDeviation(96000.0)  - 0.072) < 0.005);
+    CHECK(std::fabs(worstDeviation(176400.0) - 0.081) < 0.005);
+    CHECK(std::fabs(worstDeviation(192000.0) - 0.072) < 0.005);
 }
 
 TEST_CASE("the error does not grow with the sample rate, as an Hz-anchored design must not") {

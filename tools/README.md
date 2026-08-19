@@ -144,3 +144,42 @@ decaying impulse response: true 0.8 / 1.5 / 2.5 s read back as
 percent.
 With the noise floor raised to −35 dBFS it declines to estimate at all
 rather than returning the wrong number.
+
+## `bench-pink.cpp` — the pinking filter's CPU cost, and the pole density it settles
+
+Answers one question: does `multipink`'s 64-stream pinking filter cascade
+(`plugins/multipink/source/multipink_pink.h`) cost an amount of CPU that
+justifies its accuracy, and would a denser pole ladder (`kPolesPerOctave`
+1.5 instead of 1.0) still be affordable? It is not wired into the build —
+CPU cost is a design decision made once, not a regression a ctest should
+gate.
+
+```bash
+cd tools && clang++ -O3 -std=c++17 -I../plugins/multipink/source \
+    -o bench-pink bench-pink.cpp && ./bench-pink
+```
+
+It measures two loop orders at two sample rates (48 kHz, 192 kHz), 7 repeats
+each, and reports min/mean/max so the numbers describe a spread, not one
+lucky run.
+Order A is the production loop order in
+`plugins/multipink/source/multipink_processor.cpp` (section-outer,
+channel-middle, sample-inner): correct, but 16-18 full passes over the
+128-256 KB scratch buffer per block, which does not fit L1/L2.
+Order B interchanges it (channel-outer, sample-middle, section-inner),
+keeping one channel's row resident in L1 and carrying only the ≤18 filter
+state scalars per channel through the inner loop; it is roughly 2x faster
+in every cell measured, and is a candidate for a later change to the
+production loop — this tool only measures, it does not touch
+`multipink_processor.cpp`.
+
+Density is read from whatever `kPolesPerOctave` the included
+`multipink_pink.h` currently has, so comparing densities means editing the
+header and rebuilding.
+On the Intel Core i7-8850H (x86_64) this was measured on, 1.5 poles/octave
+at 192 kHz costs 72-129% of one core depending on loop order — far past the
+5% ceiling that would justify it — so the suite ships `kPolesPerOctave =
+1.0`, which costs 8-88% of one core across the same cells and meets the
+SMPTE ST 2095-1 tolerance with 0.07-0.08 dB of margin against 0.25 dB.
+Full numbers, both loop orders, both rates, both densities:
+`.superpowers/sdd/2026-08-19-pink-filter-mz/task-6-report.md`.
