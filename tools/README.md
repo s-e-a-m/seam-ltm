@@ -96,3 +96,51 @@ Requires `faust`, `faust2mathdoc`, `svg2pdf`, and `pdflatex` (with the
 `breqn` package) on the PATH.
 The output is committed documentation, so run it when the Faust
 specification changes, not on every build.
+
+## `decay-from-glide.py` — reverberation time from an `ltglide` pass
+
+Reads T60 out of a recorded `ltglide` pass, so a calibration can state where
+its own measurement stops describing the loudspeaker and starts describing
+the room.
+
+```bash
+.venv/bin/python tools/decay-from-glide.py REC.wav \
+    --t 120 --f0 315 --f1 40 --delta 2.0 --volume 96
+```
+
+Requires `numpy`, `scipy` and `soundfile` (`requirements.txt`); the rest of
+`tools/` is standard-library only.
+
+`ltglide` emits Linkwitz bursts — five cycles under a Hann window — each
+followed by `delta` seconds of silence, so every burst is its own
+interrupted-excitation experiment in the sense of ISO 3382-2.
+A pass therefore yields **T60(f)**, one estimate per burst, which is what
+matters below the Schroeder frequency where decay is individual modes
+ringing rather than a room average.
+
+The burst onsets are **reconstructed, not detected**: the head Dirac fixes
+the timeline and `GlideTransport` puts the glide exactly `kLeadSec` later, so
+the schedule follows from `f0`, `f1`, `T`, `delta` and the two modes — the
+same reasoning the `ltglide` receiver uses to regenerate its reference.
+The measured span is checked against `kLeadSec + T + kTailSec` and a
+mismatch is reported, because wrong parameters otherwise produce a
+plausible-looking table.
+
+The head Dirac's own 5 s of silence is an integrated-impulse-response
+measurement — the ISO 3382 reference method — and is analysed as a second
+opinion per octave band.
+It is gated on both the noise floor and the standard's curvature criterion,
+so it either agrees with the bursts or says nothing; one sample of impulse
+carries little energy, and "nothing resolved" is the ordinary outcome.
+
+Record with the **amplifier EQ bypassed**. T60 is a property of the room and
+does not depend on the source spectrum, but a calibration preset with
+tens of dB of tilt in it leaves no single `ltglide` level that clears the
+noise floor across the band without over-driving one end of it.
+
+Validated against synthetic passes convolved with a known exponentially
+decaying impulse response: true 0.8 / 1.5 / 2.5 s read back as
+0.86 / 1.60 / 2.44 s, so the Schroeder frequency it derives is good to a few
+percent.
+With the noise floor raised to −35 dBFS it declines to estimate at all
+rather than returning the wrong number.
