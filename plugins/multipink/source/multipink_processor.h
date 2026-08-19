@@ -19,9 +19,10 @@
 // dispersed by noise_env(12345) so the resulting streams are statistically
 // independent, and sfi.pink_filter_mz / sfi.spectral_tilt_mz are the
 // matched-Z pinking filter designed in multipink_pink.h (which carries the
-// derivation and the reasoning). Those two Faust functions do not exist yet
-// -- this is a forward reference to a later task in this plan, not a claim
-// that seam.filters.lib already has them.
+// derivation and the reasoning). Both functions live in seam.filters.lib
+// as of 2026-08-19 -- see that library's PINKING FILTER section, which
+// cross-references this plugin, tests/multipink_pink_test.cpp, and
+// docs/superpowers/specs/2026-08-19-pink-filter-mz-design.md back.
 //
 // This plugin re-implements the above in hand-written C++ (project
 // convention — see seam-ltm/CLAUDE.md). N is fixed at 64 (the shared

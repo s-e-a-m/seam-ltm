@@ -225,12 +225,61 @@ La costante attuale include entrambi i contributi (l'LCG uniforme porta 1/√3,
 cioè −4,77 dB), ed è questa fusione che l'aveva costretta a essere misurata
 invece che calcolata.
 
+## Il costo misurato, e la domanda che il piano non si è fatto
+
+Il piano fissava una regola di decisione su un solo confronto: 1,5 poli per
+ottava entra nel 5% di un core a 192 kHz?
+La misura (macchina Intel Core i7-8850H) risponde no — 63,7–149,4% a seconda
+dell'ordine dei cicli e della statistica — quindi la densità resta 1,0, come
+registrato sopra nella tabella dei risultati.
+
+Quello che il piano non ha mai chiesto è se **1,0** poli per ottava, la
+densità che resta in uso, stia in quel budget.
+Non ci sta.
+Misurato nell'ordine dei cicli del plug-in in produzione: **16,5–20,1% di un
+core a 48 kHz e 77,8–87,7% a 192 kHz**.
+A 192 kHz il solo stadio di pinking, con tutti i 64 stream sempre avanzati,
+si mangia quasi un intero core.
+
+Tre leve potrebbero abbassarlo, nessuna delle tre è stata tirata:
+
+1. **Scambiare l'ordine dei cicli.**
+   L'ordine B misurato (canale esterno, campione medio, sezione interna)
+   corre 2,1–2,3 volte più veloce dell'ordine A in produzione (sezione
+   esterna, canale medio, campione interno), a parità di aritmetica e di
+   stato — 7,2–8,8% a 48 kHz e 35,3–40,6% a 192 kHz.
+   È un cambiamento meccanico, senza conseguenze numeriche.
+2. **Filtrare solo le righe CLAIMED del pool, non tutte e 64.**
+   La sorgente di rumore deve avanzare tutti e 64 gli stream per restare
+   deterministica — il pool è condiviso e peer-aware, e un'altra istanza può
+   contare sul fatto che lo stream N esista sempre allo stesso stato — ma i
+   filtri per-stream sono indipendenti l'uno dall'altro: uno stream non
+   reclamato non deve necessariamente essere filtrato.
+   Il guadagno potenziale è 8–32 volte (il numero di canali realmente
+   reclamati contro 64), ma va verificato contro la semantica peer-aware del
+   pool descritta in `multipink_pool.h` prima di toccare il codice.
+3. **SIMD fra stream.**
+   Il layout dello stato è già section-major (`state[section][stream]`)
+   proprio per permetterlo, come annotato nel codice.
+   Non basta da solo: servirebbe anche trasporre il buffer di scratch a
+   `[sample][stream]`.
+
+Nessuna delle tre leve è stata applicata in questo piano: la densità di 1,0
+resta quella in produzione, con il costo misurato sopra.
+
 ## Aperto
 
-- [ ] sezione 2 del progetto: stato DSP, layout di memoria, `prepare(fs)`
-- [ ] sezione 3: `kCalibrationOffsetDb` calcolato, e convenzione di metering
-      (dBFS RMS vs dBFS(AES17), 3,01 dB di differenza)
-- [ ] costo CPU misurato: ~17 sezioni per stream contro 7 moltiplicazioni, per
-      64 stream
-- [ ] la funzione Faust nuova, e se proporla a monte in GRAME
-- [ ] estensione della griglia di `strx` sopra i 20 kHz (perimetro separato)
+- [x] sezione 2 del progetto: stato DSP, layout di memoria, `prepare(fs)` —
+      Task 4, cascata section-major in `multipink_processor.h/.cpp`.
+- [x] sezione 3: `kCalibrationOffsetDb` calcolato, e convenzione di metering
+      (dBFS RMS vs dBFS(AES17), 3,01 dB di differenza) — Task 5,
+      `kCalibrationOffsetDb = 36.180`; vedi
+      `plugins/multipink/doc/calibration.md`.
+- [x] costo CPU misurato — Task 6; risultato e le tre leve non tirate sopra.
+- [x] la funzione Faust nuova — Task 7, `sfi.spectral_tilt_mz` e
+      `sfi.pink_filter_mz` in `seam.filters.lib`. Se proporla a monte in
+      GRAME resta una domanda aperta, non affrontata da nessuno dei sette
+      task.
+- [ ] estensione della griglia di `strx` sopra i 20 kHz — perimetro separato,
+      non toccato da questo piano; vedi anche l'apertura equivalente nel
+      diario del 2026-08-18.

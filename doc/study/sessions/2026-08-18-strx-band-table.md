@@ -137,14 +137,17 @@ coerente con il metodo, non un sintomo.
 
 ## Aperto
 
-- **Filtro di pinking di multipink** — indagine avviata; vedi
-  `doc/study/2026-08-18-pink-filter-literature-audit.md`. Qualunque strada si
-  scelga **invalida la taratura** (`kCalibrationOffsetDb`, procedura sox in
-  `plugins/multipink/doc/calibration.md`): un pinking diverso ha
-  un'attenuazione RMS diversa.
+- **Filtro di pinking di multipink** — RISOLTO il 2026-08-19: progettato un
+  nuovo filtro matched-Z che sostituisce nettamente il vecchio fit, passa il
+  test SMPTE a tutte le fs. La taratura è stata infatti rifatta —
+  `kCalibrationOffsetDb` ricalcolato (Task 5), non più misurato con sox — vedi
+  `doc/study/sessions/2026-08-19-pink-filter-design.md` e
+  `plugins/multipink/doc/calibration.md`.
 - **Il campo di misura utile** finisce a 16 kHz a 44,1 e 48 kHz. Per leggere i
-  20 kHz serve lavorare a 88,2/96 — dove però il pink oggi è sbagliato in
-  basso. Le due cose si sbloccano insieme.
+  20 kHz serve lavorare a 88,2/96, e da qui il pink non è più il blocco: il
+  filtro nuovo del 2026-08-19 è corretto anche in basso a quelle fs. Resta
+  aperta solo l'estensione della griglia di `strx` sopra i 20 kHz, un
+  perimetro a sé, non toccato dal lavoro sul pinking.
 
 ## Commit
 
@@ -264,7 +267,15 @@ strx lo vede.
 - [ ] mediana al posto della media per lo zero
 - [ ] una misura a 96 kHz per vedere la banda dei 20 kHz (a 96 k il pink è
       sbagliato **sotto i 63 Hz**, non in alto: per guardare lassù è valido)
-- [ ] pink: scegliere A / B / entrambi — con il test di accettazione già pronto
+- [x] pink: sostituzione netta, non A/B. Né il fit invfreqz a 3 poli (A) né
+      `fi.spectral_tilt` (B) passano il test di accettazione a nessuna fs —
+      A perché il fit di partenza è già fuori tolleranza, B per il warping
+      della trasformazione bilineare. Progettato un nuovo filtro matched-Z
+      (scala di poli/zeri anchorata in Hz più una sezione di correzione a
+      coefficienti fissi) che passa a tutte le sei fs, 0,071–0,081 dB contro
+      0,25 dB di tolleranza. Spec:
+      `docs/superpowers/specs/2026-08-19-pink-filter-mz-design.md`; diario:
+      `doc/study/sessions/2026-08-19-pink-filter-design.md`.
 
 ## Test di accettazione SMPTE per il filtro di pinking
 
