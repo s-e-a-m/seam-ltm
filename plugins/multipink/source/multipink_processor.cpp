@@ -392,26 +392,12 @@ void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
     // 2. Pink-shape ALL 64 channels in place: a cascade of first-order
     //    sections, transposed direct form II, one state per section per stream.
     //      y[n] = b0*x[n] + s ; s = b1*x[n] - a1*y[n]
-    for (int sec = 0; sec < pinkDesign_.numSections; ++sec) {
-        const float b0 = (float)pinkDesign_.b0[sec];
-        const float b1 = (float)pinkDesign_.b1[sec];
-        const float a1 = (float)pinkDesign_.a1[sec];
-        float* state = pinkState_[sec];
-        for (int ch = 0; ch < kPoolSize; ++ch) {
-            SampleType* row = scratch.data() + (size_t)ch * numSamples;
-            float s = state[ch];
-            for (int n = 0; n < numSamples; ++n) {
-                // Single precision even under kSample64: the filter runs in
-                // float at both sample sizes, and the cost measured against a
-                // double-state run is 0.0008 dB (multipink_pink_engine_test).
-                const float x = (float)row[n];
-                const float y = b0 * x + s;
-                s = b1 * x - a1 * y;
-                row[n] = (SampleType)y;
-            }
-            state[ch] = s;
-        }
-    }
+    //    The recurrence itself lives in multipink_pink.h, where the tests and
+    //    the tools reach it: this is the only copy that ships, so it must not
+    //    also be the only copy nothing exercises.
+    Seam::multipink::pinkFilterBlock<SampleType>(
+        pinkDesign_, scratch.data(), kPoolSize, numSamples,
+        &pinkState_[0][0], kPoolSize);
     // 3. Slot routing + gain stage.
     if (claimedStart_ < 0 || claimedChannels_ == 0) {
         for (int c = 0; c < numChannels; ++c)

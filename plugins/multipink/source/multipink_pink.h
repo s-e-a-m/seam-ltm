@@ -23,6 +23,7 @@
 
 #include <cmath>
 #include <complex>
+#include <cstddef>
 
 namespace Seam { namespace multipink {
 
@@ -112,5 +113,57 @@ public:
 private:
     double sampleRate_ = 48000.0;
 };
+
+// The block operation the audio path performs, in one place so that what
+// ships and what is tested are the same code. Before this existed the
+// recurrence lived four times over -- processor, test, IR dump, benchmark --
+// and a whole-branch review showed that swapping the state indices, flipping
+// the sign of a1 or dropping the state write-back in the shipped copy left
+// the suite entirely green.
+//
+// scratch holds numStreams rows of numSamples samples, row r at
+// scratch[r*numSamples]; every row is filtered IN PLACE.
+//
+// state is SECTION-MAJOR -- state[sec*stateStride + stream] -- because the
+// processor's own state array is [kMaxSections][kPoolSize] and the layout is
+// a precondition for a later SIMD pass over the 64 streams of one section.
+// It must hold at least d.numSections*stateStride entries, and stateStride
+// must be >= numStreams. Zero it to start from silence.
+//
+// The loop order is section-outer, channel-middle, sample-inner: the
+// production order, deliberately kept. tools/bench-pink.cpp measures an
+// interchanged order that is faster; adopting it is separate work.
+//
+// State defaults to float, which is what the plug-in uses at BOTH sample
+// sizes; the double instantiation exists for the tools and for the test that
+// measures what single precision costs.
+//
+// No allocation, no locking, no design() call: safe on the audio thread.
+template <typename Sample, typename State = float>
+inline void pinkFilterBlock(const PinkDesign& d,
+                            Sample* scratch, int numStreams, int numSamples,
+                            State* state, int stateStride) {
+    for (int sec = 0; sec < d.numSections; ++sec) {
+        const State b0 = (State)d.b0[sec];
+        const State b1 = (State)d.b1[sec];
+        const State a1 = (State)d.a1[sec];
+        State* st = state + (size_t)sec * (size_t)stateStride;
+        for (int ch = 0; ch < numStreams; ++ch) {
+            Sample* row = scratch + (size_t)ch * (size_t)numSamples;
+            State s = st[ch];
+            for (int n = 0; n < numSamples; ++n) {
+                // Single precision even under kSample64: State is float on the
+                // audio path at both sample sizes, and the cost measured
+                // against a double-state run is 0.0008 dB
+                // (multipink_pink_engine_test).
+                const State x = (State)row[n];
+                const State y = b0 * x + s;
+                s = b1 * x - a1 * y;
+                row[n] = (Sample)y;
+            }
+            st[ch] = s;
+        }
+    }
+}
 
 } } // namespace Seam::multipink

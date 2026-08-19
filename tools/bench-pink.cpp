@@ -5,7 +5,8 @@
 // with a different value in the header to compare densities).
 //
 //   Order A — section-outer, channel-middle, sample-inner.
-//     This is the production order (multipink_processor.cpp:393-411): one
+//     This is the production code itself, Seam::multipink::pinkFilterBlock
+//     in multipink_pink.h, which is what the processor calls: one
 //     coefficient triple loaded once per section, but ~16-18 full passes
 //     over the whole 128-256 KB scratch buffer per block, which does not
 //     fit L1/L2 and is cache-pessimistic.
@@ -33,7 +34,10 @@ constexpr int kPool = 64, kBlock = 512, kBlocks = 4000;
 constexpr int kRepeats = 7;   // repetitions per (order, fs) cell, for spread
 
 // Order A — the production loop order: section-outer, channel-middle,
-// sample-inner. Mirrors multipink_processor.cpp:393-411 exactly.
+// sample-inner. Not a mirror of the production loop any more but the very
+// same code, Seam::multipink::pinkFilterBlock, which is what the processor
+// calls. Timings re-measured after the switch and unchanged within the
+// run-to-run spread, so the recorded numbers still mean what they meant.
 double runOrderA(const Seam::multipink::PinkDesign& d,
                   std::vector<float>& scratch, std::vector<float>& state) {
     using namespace std::chrono;
@@ -41,20 +45,8 @@ double runOrderA(const Seam::multipink::PinkDesign& d,
     std::fill(state.begin(), state.end(), 0.0f);
     const auto t0 = steady_clock::now();
     for (int b = 0; b < kBlocks; ++b)
-        for (int sec = 0; sec < d.numSections; ++sec) {
-            const float b0 = (float)d.b0[sec], b1 = (float)d.b1[sec], a1 = (float)d.a1[sec];
-            float* st = state.data() + (size_t)sec * kPool;
-            for (int ch = 0; ch < kPool; ++ch) {
-                float* row = scratch.data() + (size_t)ch * kBlock;
-                float s = st[ch];
-                for (int n = 0; n < kBlock; ++n) {
-                    const float x = row[n], y = b0 * x + s;
-                    s = b1 * x - a1 * y;
-                    row[n] = y;
-                }
-                st[ch] = s;
-            }
-        }
+        Seam::multipink::pinkFilterBlock<float>(d, scratch.data(), kPool, kBlock,
+                                                state.data(), kPool);
     return duration<double>(steady_clock::now() - t0).count();
 }
 

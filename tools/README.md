@@ -165,10 +165,16 @@ cd tools && clang++ -O3 -std=c++17 -I../plugins/multipink/source \
 It measures two loop orders at two sample rates (48 kHz, 192 kHz), 7 repeats
 each, and reports min/mean/max so the numbers describe a spread, not one
 lucky run.
-Order A is the production loop order in
-`plugins/multipink/source/multipink_processor.cpp` (section-outer,
-channel-middle, sample-inner): correct, but 16-18 full passes over the
-128-256 KB scratch buffer per block, which does not fit L1/L2.
+Order A is the production code itself — `Seam::multipink::pinkFilterBlock`
+in `plugins/multipink/source/multipink_pink.h`, the function the processor
+calls (section-outer, channel-middle, sample-inner): correct, but 16-18 full
+passes over the 128-256 KB scratch buffer per block, which does not fit
+L1/L2.
+It used to be a hand-copied mirror of the processor's loop; calling the
+shared function instead was checked against the copy it replaced by running
+both binaries alternately, and order A's timings moved no more than order
+B's, whose code did not change at all — so the numbers recorded below still
+mean what they meant.
 Order B interchanges it (channel-outer, sample-middle, section-inner),
 keeping one channel's row resident in L1 and carrying only the ≤18 filter
 state scalars per channel through the inner loop; it is roughly 2x faster

@@ -9,15 +9,13 @@ int main(int argc, char* argv[]) {
     const int    n  = (argc > 2) ? atoi(argv[2]) : 4096;
     Seam::multipink::PinkDesign d;
     d.design(fs);
+    // The recurrence is not written out here: it is the shipped one,
+    // Seam::multipink::pinkFilterBlock, run over a single stream in double so
+    // that the A/B compares the design and not a transcription of it.
+    std::vector<double> ir((size_t)n, 0.0);
+    if (n > 0) ir[0] = 1.0;
     std::vector<double> s((size_t)d.numSections, 0.0);
-    for (int k = 0; k < n; ++k) {
-        double x = (k == 0) ? 1.0 : 0.0;
-        for (int i = 0; i < d.numSections; ++i) {
-            const double y = d.b0[i] * x + s[(size_t)i];
-            s[(size_t)i] = d.b1[i] * x - d.a1[i] * y;
-            x = y;
-        }
-        printf("%.17g\n", x);
-    }
+    Seam::multipink::pinkFilterBlock<double, double>(d, ir.data(), 1, n, s.data(), 1);
+    for (int k = 0; k < n; ++k) printf("%.17g\n", ir[(size_t)k]);
     return 0;
 }
