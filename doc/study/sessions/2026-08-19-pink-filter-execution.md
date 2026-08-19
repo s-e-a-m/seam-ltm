@@ -285,9 +285,21 @@ accettazione lo è.
 
 - [x] La lettura della tabella di banda in host — fatta, ed è ciò che ha trovato
       il difetto 5.
-- [ ] Il render con `sox`, che resta aperto e che chiude i 0,39 dB della vecchia
-      costante. Da fare **a 48 kHz**: è l'unica frequenza in cui l'RMS totale
-      atteso è ancora −23,0 dBFS.
+- [x] Il render con `sox` — fatti due, offline, misurati **per canale**:
+      −22,997 dBFS a 48 kHz contro un previsto −23,000, e −22,721 a 96 kHz
+      contro −22,718. Tre millidecibel a entrambi i rate, e la salita fra i due
+      misura +0,276 dB contro il +0,2825 previsto. Il modello a quattro termini
+      — guadagno, RMS della sorgente, integrale di banda, densità della
+      sorgente — descrive il segnale vero.
+      Si misura un canale solo: `sox stat` sul render a 4 canali media stream
+      che su 31 s si disperdono di qualche centesimo di dB, e legge −23,024.
+      Quindi i 0,39 dB stavano nella misura del 7 maggio, non nel calcolo, ma
+      **la causa non è determinata**: un lead-in silenzioso, un canale non a
+      livello dentro una media multicanale o un fader la produrrebbero tutti, e
+      di come fu fatto quel render non resta traccia.
+      Conseguenza retroattiva: con 26,45 il vecchio `multipink` emetteva 0,39 dB
+      sopra il livello dichiarato, con un bias comune a tutte le bande e quindi
+      ininfluente sulle decisioni di equalizzazione.
 - [ ] Un banco di prova per il processore, collegato all'SDK come
       `seam_state_test`: senza di esso, cancellare `design()` da
       `setupProcessing` resta invisibile ai test, e il plugin emetterebbe rumore

@@ -70,17 +70,26 @@ private:
     // whole-branch review because no test could see the number at all.
     // computeGainLin() reads pinkDesign_.calibrationOffsetDb().
     //
-    // Two facts recorded here belong to the plugin rather than to the design:
+    // Two facts recorded here belong to the plug-in rather than to the design:
     //
     // The 0.39 dB by which the old measured constant (26.45) exceeded the
-    // same computation for the old filter (26.06 = -(-4.771 + -21.291)) is
-    // NOT explained by the LCG: the source's RMS was measured over 5*10^8
-    // samples and lands within 0.00001 dB of 1/sqrt(3). The other two
-    // suspects (whether the 2026-05-07 render carried a host fader in
-    // addition to the plugin's own gain, and whether `sox stat` integrated a
-    // silent lead-in into that render's RMS) still want a render to settle.
-    // The gap is not folded into the constant, and the constant is not split
-    // with it.
+    // same computation for the old filter (26.06 = -(-4.771 + -21.291)) was
+    // SETTLED on 2026-08-19 by two offline renders, measured per channel:
+    // -22.997 dBFS at 48 kHz against a predicted -23.000, and -22.721 at
+    // 96 kHz against -22.718. Three millidecibels at both rates, with the
+    // predicted +0.2825 dB rise between them measuring +0.276. Measure ONE
+    // channel: `sox stat` over the 4-channel render averages streams that
+    // scatter a few hundredths of a dB over 31 s, and reads -23.024.
+    //
+    // So the 0.39 dB was in the 2026-05-07 measurement, not in this
+    // arithmetic. Its cause is NOT determined: that render's RMS came out
+    // low, which a silent lead-in, a channel not at level in a multichannel
+    // average, or a fader would each do, and nothing records how it was made.
+    // The LCG had already been cleared to 0.00001 dB over 5*10^8 samples.
+    //
+    // Retroactively, then: with 26.45 the old plug-in emitted 0.39 dB above
+    // the level it announced. The bias is common to every band, so it moved
+    // no equalisation decision -- only the absolute level of the reference.
     //
     // Against the old filter at equal total RMS the mean band level moves by
     // -1.00 dB. strx reports deviations from the mean of the bands, so no

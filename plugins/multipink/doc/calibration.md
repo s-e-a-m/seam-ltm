@@ -79,9 +79,40 @@ This supersedes the old constant, `kCalibrationOffsetDb = 26.45`, which was
 measured with a render and `sox` rather than derived. Reapplying the same
 derivation to the *old* filter gives 26.06 dB, a 0.39 dB gap against the
 measured 26.45 that the LCG distribution does not explain (ruled out to four
-decimal places by the same measurement above). The gap is not folded into
-the new constant and is left open for a render to settle — see the header
-comment in `multipink_processor.h` for the full record.
+decimal places by the same measurement above). The gap was deliberately not
+folded into the new constant.
+
+**Settled 2026-08-19 by render, at both rates.** Two 31 s offline renders,
+`Reference = -23`, `Trim = 0`, measured per channel with
+`sox … remix 1 trim 1 stat`:
+
+| fs | predicted total RMS | measured (channel 1) |
+|---|---|---|
+| 48 kHz | −23.000 dBFS | **−22.997 dBFS** |
+| 96 kHz | −22.718 dBFS | **−22.721 dBFS** |
+
+Three millidecibels at both rates, and the rise between them measures
++0.276 dB against a predicted +0.2825. The derived constant is right and the
+four-term model — gain, source RMS, band integral, source density — describes
+the real signal.
+
+Measure per channel, not across the file: `sox stat` on the 4-channel render
+averages all four, and independent streams scatter by a few hundredths of a dB
+over 31 s because the lowest bands carry few cycles in that time. That average
+reads −23.024, which is the scatter and not an error.
+
+The 0.39 dB was therefore in the 2026-05-07 measurement and never in this
+arithmetic. **Its cause is not determined.** The measured RMS of that render
+came out 0.39 dB low; anything that pulls a whole-file average down does it —
+a silent lead-in, a channel not at level in a multichannel average, a fader in
+the path. The renders above were produced offline, which makes a lead-in
+unlikely for them, and nothing records how the May render was made.
+
+The retroactive consequence is worth stating plainly: with `26.45` the old
+plug-in emitted **0.39 dB above** the level it announced. Every measurement
+taken with it carries that bias — common to all bands, so no equalisation
+decision derived from a band table is affected, only the absolute level of the
+reference signal.
 
 ### What the total RMS does
 
