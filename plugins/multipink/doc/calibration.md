@@ -105,9 +105,10 @@ the reference signal moves, not the shape `strx` reads.
 ## Recalibrating
 
 Since 2026-08-19 the preferred method is to **derive** the constant, the way
-`kCalibrationOffsetDb = 36.180` was obtained above: compute
-`PinkDesign::rmsGainDb(fs)` from the filter design and add the noise
-source's known RMS (1/sqrt(3) = -4.7712 dB for the current LCG). This needs
+`kCalibrationOffsetDb = 36.180` was obtained above: call
+`PinkDesign::design(fs)` and then read `PinkDesign::rmsGainDb()`, which
+takes no argument and reports the gain at the rate the design was given,
+and add the noise source's known RMS (1/sqrt(3) = -4.7712 dB for the current LCG). This needs
 no render and no host. The render-and-measure procedure below is the
 fallback for when the noise source itself changes and its RMS is not known
 in closed form:

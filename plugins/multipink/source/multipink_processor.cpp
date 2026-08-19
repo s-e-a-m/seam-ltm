@@ -401,6 +401,9 @@ void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
             SampleType* row = scratch.data() + (size_t)ch * numSamples;
             float s = state[ch];
             for (int n = 0; n < numSamples; ++n) {
+                // Single precision even under kSample64: the filter runs in
+                // float at both sample sizes, and the cost measured against a
+                // double-state run is 0.0008 dB (multipink_pink_engine_test).
                 const float x = (float)row[n];
                 const float y = b0 * x + s;
                 s = b1 * x - a1 * y;

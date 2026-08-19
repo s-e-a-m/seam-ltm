@@ -30,6 +30,9 @@ class PinkDesign {
 public:
     static constexpr int    kMaxSections    = 32;
     static constexpr double kLadderF0Hz     = 2.0;
+    // Changing this desynchronises sfi.pink_filter_mz in seam.filters.lib,
+    // which hardcodes one pole per octave; tools/faust-pink-ab.sh is what
+    // will tell you.
     static constexpr double kPolesPerOctave = 1.0;
     static constexpr double kAnchorHz       = 1000.0;
 
@@ -91,8 +94,8 @@ public:
 
     // 10*log10 of the mean of |H|^2 over 0..fs/2 — the filter's RMS gain on
     // white input. Falls with fs, which is the fact the calibration must not
-    // follow. Trapezoid over a fixed grid: smooth integrand, and the value is
-    // reported rather than used in the audio path.
+    // follow. Midpoint rule over a fixed grid: smooth integrand, and the
+    // value is reported rather than used in the audio path.
     double rmsGainDb() const {
         const int kSteps = 200000;
         double sum = 0.0;
