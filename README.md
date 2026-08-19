@@ -38,7 +38,7 @@ Every window follows the same grammar, described in
 |---|---|---|
 | **LTBURST** | none &rarr; mono | Linkwitz shaped tone-burst: N = 5 cycles of a sine under a Hann window, repeated at a fixed frequency. Frequency, Dwell and Level are the whole interface |
 | **LTGLIDE** | none &rarr; mono | Linkwitz glissando tone-burst: the carrier of each N = 5 grain is latched from a linear or exponential sweep F0 &rarr; F1 spread over a Sweep Time, with grains spaced in step or gap timing. It loops, declares a STONE id, and publishes what it is playing on the calibration bus |
-| **MULTIPINK** | none &rarr; 1..64ch | Multichannel pink noise drawn from a shared 64-slot logical pool, so that separate instances never emit the same stream. Layout-adaptive from mono to 64 channels, RMS-calibrated (-23/-20/-18 dBFS RMS reference, ±6 dB trim), with a POWER switch, a STONE id, and a calibration-bus announcement |
+| **MULTIPINK** | none &rarr; 1..64ch | Multichannel pink noise drawn from a shared 64-slot logical pool, so that separate instances never emit the same stream. Layout-adaptive from mono to 64 channels, band-calibrated (-23/-20/-18 dBFS reference, read as the total RMS at 48 kHz, ±6 dB trim) so that the per-third-octave level an amplifier is set against holds still when the sample rate changes, with a POWER switch, a STONE id, and a calibration-bus announcement |
 
 ### Measurement and processing
 
