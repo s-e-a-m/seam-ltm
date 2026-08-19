@@ -1,6 +1,17 @@
 // Architecture file for the Faust/C++ A/B. Not a plug-in architecture:
 // it feeds one impulse and prints the response, so two implementations can be
 // compared sample by sample.
+//
+// FAUSTFLOAT must be `double`, defined before faust/dsp/dsp.h is included:
+// that header's own `#ifndef FAUSTFLOAT #define FAUSTFLOAT float #endif`
+// (faust/dsp/dsp.h) would otherwise satisfy the generated class's identical
+// guard first, leaving the I/O buffers and the final
+// `output0[i0] = static_cast<FAUSTFLOAT>(...)` in single precision even
+// though `-double` was passed to `faust` -- `-double` only widens the
+// INTERNAL arithmetic. Defined here, in the architecture file, rather than
+// as a `-D` on the compiler invocation, so the fix travels with the tool
+// and cannot be dropped by a future edit to faust-pink-ab.sh.
+#define FAUSTFLOAT double
 #include <cstdio>
 #include <cstdlib>
 #include "faust/dsp/dsp.h"

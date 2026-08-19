@@ -213,10 +213,18 @@ the same impulse through `PinkDesign::design()` directly, using its own
 `y = b0*x + b1*x[n-1] - a1*y[n-1]` update — the same convention
 `fi.tf1` uses, which is what makes the comparison meaningful rather than an
 apples-to-oranges mismatch of filter forms.
-The pass threshold is fixed at 1e-9 worst-sample difference and the script
-does not expose a flag to loosen it: a passing run means the two
-descriptions of the filter agree to double-precision rounding, not "close
-enough".
+`faust-ab-arch.cpp` defines `FAUSTFLOAT double` before including
+`faust/dsp/dsp.h`: that header's own `#ifndef FAUSTFLOAT` guard would
+otherwise win the race and leave the I/O buffers in `float` regardless of
+`faust -double`, which only widens the *internal* arithmetic. Defining it
+in the architecture file (rather than as a `clang++ -D` flag) keeps the fix
+attached to the tool that needs it.
+The pass threshold is 1e-12 worst-sample difference and the script does not
+expose a flag to loosen it: measured worst differences are 3.766e-17
+(48 kHz) and 1.637e-17 (96 kHz) — five orders of margin under the gate, and
+close to the ~1e-17 floor double-precision arithmetic sets for a 16-17
+section cascade. A passing run means the two descriptions of the filter
+agree to double-precision rounding, not "close enough".
 
 Requires `faust`, `clang++` (C++17), and `python3` on the PATH; not wired
 into CMake or ctest because it needs the `faust` binary, which the suite

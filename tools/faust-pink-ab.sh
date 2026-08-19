@@ -27,8 +27,8 @@ b=[float(x) for x in open(sys.argv[2])]
 assert len(a)==len(b), "different lengths: %d vs %d" % (len(a),len(b))
 worst=max(abs(x-y) for x,y in zip(a,b))
 print("fs=%s  worst |faust-cpp| over 4096 samples: %.3e  %s"
-      % (sys.argv[3], worst, "PASS" if worst < 1e-9 else "FAIL"))
-sys.exit(0 if worst < 1e-9 else 1)
+      % (sys.argv[3], worst, "PASS" if worst < 1e-12 else "FAIL"))
+sys.exit(0 if worst < 1e-12 else 1)
 PY
 done
 exit $status
