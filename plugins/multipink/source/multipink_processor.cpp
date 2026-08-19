@@ -381,14 +381,12 @@ void MULTIPINKProcessor::processBlock(SampleType** outputs, int numChannels,
     // 1. Advance ALL 64 LCGs into scratch[ch * numSamples + s].
     //    (Reason for "all 64": see spec §2.2 — guarantees slot k's stream
     //    is independent of which other slots are active in this instance.)
+    //    The recurrence itself lives in multipink_pink.h, beside the filter,
+    //    so that a test can drive the real source instead of assuming its
+    //    level: assuming it is what cost 3.01 dB per doubling of fs.
     for (int ch = 0; ch < kPoolSize; ++ch) {
-        uint32_t st = lcgState_[ch];
-        SampleType* row = scratch.data() + (size_t)ch * numSamples;
-        for (int s = 0; s < numSamples; ++s) {
-            st = st * 1103515245u + 12345u;
-            row[s] = (SampleType)((int32_t)st / 2147483648.0);
-        }
-        lcgState_[ch] = st;
+        lcgState_[ch] = Seam::multipink::whiteNoiseRow<SampleType>(
+            lcgState_[ch], scratch.data() + (size_t)ch * numSamples, numSamples);
     }
     // 2. Pink-shape ALL 64 channels in place: a cascade of first-order
     //    sections, transposed direct form II, one state per section per stream.

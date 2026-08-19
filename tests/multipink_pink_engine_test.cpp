@@ -3,6 +3,7 @@
 #include "multipink_pink.h"
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <cstdio>
 #include <vector>
@@ -34,9 +35,20 @@ TEST_CASE("the interior slope is pink, -3.01 dB per octave") {
 }
 
 TEST_CASE("the anchor does not move with the sample rate") {
-    // This is what makes the calibration constant a constant: the filter is
-    // anchored in Hz, so its gain at 1 kHz must be the same at every rate.
-    // Measured spread across the six rates is under 0.01 dB.
+    // A property of the FILTER, and of the filter alone: it is anchored in Hz,
+    // so its gain at 1 kHz is the same at every rate. Measured spread across
+    // the six rates is under 0.01 dB.
+    //
+    // Reading that as a property of the OUTPUT is what cost this project
+    // 3.01 dB per doubling of fs. A rate-invariant gain at 1 kHz delivers a
+    // rate-invariant band level only if what it multiplies is also
+    // rate-invariant, and the source's spectral DENSITY is not: the LCG's RMS
+    // is fixed but spread over 0..fs/2, so it halves when fs doubles. The
+    // filter stood still and the band level fell anyway. What corrects it is
+    // the density term in calibrationOffsetDb(); what tests it is the
+    // end-to-end case at the bottom of this file, which measures the band
+    // level of the real source through the real filter rather than assuming
+    // the source's contribution.
     double first = 0.0;
     for (int k = 0; k < 6; ++k) {
         PinkDesign d;
@@ -104,13 +116,11 @@ void referenceStream(const PinkDesign& d, float* row, int numSamples,
 
 // A reproducible, per-stream-distinct excitation. Distinct matters: with all
 // 64 rows identical, mixing one stream's state into another's is invisible.
+// One continuous run of the shipped source, so the rows differ by construction
+// and this file holds no second copy of the recurrence.
 std::vector<float> excitation(int numStreams, int numSamples) {
     std::vector<float> v((size_t)numStreams * (size_t)numSamples);
-    uint32_t st = 0x9E3779B9u;
-    for (size_t i = 0; i < v.size(); ++i) {
-        st = st * 1103515245u + 12345u;
-        v[i] = (float)((int32_t)st / 2147483648.0);
-    }
+    Seam::multipink::whiteNoiseRow<float>(0x9E3779B9u, v.data(), (int)v.size());
     return v;
 }
 
@@ -225,11 +235,16 @@ TEST_CASE("the offset carries the source's spectral density, 3.01 dB per doublin
 // FLOOR -- invariance can never be tighter than the filter's own band ripple.
 // Each rate designs its own ladder, with its own section count and its own
 // geometric ratio, so a given band sits at a slightly different point of the
-// ripple at each rate. multipink_pink_test measures that ripple as a worst
-// deviation from the mean of 0.071 to 0.081 dB per rate, which bounds the
-// difference between two rates at the same band by twice that, ~0.16 dB.
-// Measured over every band measurable at all six rates, the worst spread is
-// 0.084 dB, at the 15.85 kHz band where the correction section is weakest.
+// ripple at each rate. The load-bearing number is the MEASURED one: over
+// every band measurable at all six rates, the worst spread is 0.0837 dB, at
+// the 15.85 kHz band where the correction section is weakest.
+//
+// multipink_pink_test's per-rate acceptance ripple -- worst deviation from the
+// mean, 0.071 to 0.081 dB -- is CONSISTENT WITH that, and no more. It is not a
+// bound on it: the acceptance figure is a deviation from a per-rate mean over
+// a per-rate set of judged bands, while this test compares absolute levels at
+// one fixed band across rates. Doubling the one to get ~0.16 dB is a heuristic
+// that happens to bracket the measurement, not a derivation of it.
 //
 // CEILING -- the smallest error this test exists to catch is one doubling of
 // the sample rate with the source's density term missing: 3.01 dB.
@@ -292,7 +307,9 @@ TEST_CASE("the total RMS is what holding the band level still implies") {
     // The other side of the same coin, and the reason the total RMS is NOT
     // the calibrated quantity: with every band held at the same level, each
     // extra octave of pink adds a little total energy, so the broadband RMS
-    // rises 0.28 dB per doubling of fs instead of standing still.
+    // rises about 0.27-0.28 dB per doubling of fs instead of standing still.
+    // It is not one number: 0.2825 dB from 48 to 96 kHz, 0.2844 from 44.1 to
+    // 88.2, 0.2652 from 96 to 192, because the ladder's top section moves.
     PinkDesign d48, d96, d192, d441;
     d441.design(44100.0);
     d48.design(48000.0);
@@ -302,8 +319,13 @@ TEST_CASE("the total RMS is what holding the band level still implies") {
     CHECK(predictedTotalRmsDb(d441, -23.0) == doctest::Approx(-23.030).epsilon(0.001));
     CHECK(predictedTotalRmsDb(d96,  -23.0) == doctest::Approx(-22.718).epsilon(0.001));
     CHECK(predictedTotalRmsDb(d192, -23.0) == doctest::Approx(-22.453).epsilon(0.001));
-    CHECK(predictedTotalRmsDb(d96, -23.0) - predictedTotalRmsDb(d48, -23.0)
-          == doctest::Approx(0.28).epsilon(0.05));
+    // Absolute, like the six pinned acceptance values and unlike what this
+    // line used to be: Approx(0.28).epsilon(0.05) compares against
+    // eps*(1 + max(|a|,|b|)), so on a value well under 1 it admitted +/-0.064,
+    // which is +/-23% -- the same relative-tolerance trap this branch already
+    // had to fix once. The step is 0.2825 dB; 0.005 dB is a real tolerance.
+    CHECK(std::fabs((predictedTotalRmsDb(d96, -23.0) - predictedTotalRmsDb(d48, -23.0))
+                    - 0.2825) < 0.005);
     // The offset is filter-intrinsic, not reference-dependent: changing the
     // reference moves the level by exactly as much.
     CHECK(predictedTotalRmsDb(d48, -18.0) - predictedTotalRmsDb(d48, -23.0)
@@ -480,4 +502,199 @@ TEST_CASE("the state lands where the contract says it does") {
             if (state[(size_t)sec * kStride + ch] != refState[(size_t)sec]) ++bad;
     }
     CHECK(bad == 0);
+}
+
+// ---------------------------------------------------------------------------
+// END TO END: the SOURCE, measured rather than assumed.
+//
+// Everything above this line is analytic. predictedBandLevelDb() computes the
+// filter term from magnitudeDb() and takes the source's contribution as a
+// GIVEN: -4.7712 dB of RMS, flat, spread over 0..fs/2. That assumption is
+// correct, and it is also exactly the term the original derivation forgot --
+// so the suite that was meant to protect the calibration could not have
+// caught its own defect. Change the LCG multiplier, change the cast divisor,
+// add a DC offset, and all 41 analytic assertions stay green while every
+// plug-in in the room is miscalibrated.
+//
+// This case closes that hole by running the real chain, in the order the
+// audio thread runs it:
+//
+//   whiteNoiseRow  ->  pinkFilterBlock  ->  x gain
+//
+// and reading the third-octave band level back out of the samples. Nothing
+// about the source is assumed; if the source changes, this goes red.
+//
+// HOW THE BAND LEVEL IS MEASURED. Welch: Hann-windowed segments of 16384 with
+// 50% overlap, averaged, normalised so that the sum over all bins of one
+// segment recovers the signal's mean square (2*|X[k]|^2 / (L * sum w^2)).
+// The band is the SAME ideal rectangle the analytic prediction integrates
+// over -- [fc*10^-0.05, fc*10^0.05] -- and bins straddling an edge are
+// weighted by the fraction of their width that falls inside it, so the
+// comparison is not limited by bin quantisation (0.4% of the band width at
+// 1 kHz, which alone would be 0.02 dB). A real third-octave filter would have
+// been the wrong instrument here: its skirts make its effective bandwidth
+// something other than the rectangle the prediction assumes.
+//
+// HOW MUCH SIGNAL, AND WHY. 120 seconds at each rate: 5,760,000 samples at
+// 48 kHz and 11,520,000 at 96 kHz. This is a measurement on noise, so its
+// precision is set by the band-time product. The 1 kHz third-octave band is
+// 230.8 Hz wide, so BT = 230.8 * 120 = 27,700, and the standard deviation of
+// a chi-square-distributed band-power estimate is 10*log10(e)/sqrt(BT) =
+// 4.34/166 = 0.026 dB. The 0.10 dB tolerance is therefore about 3.8 sigma.
+// That figure is not just arithmetic: run over ten independent seeds at half
+// this length the measured spread was 0.039 dB at 1 kHz and 0.012 dB at
+// 4 kHz, which is what 0.026 and 0.008 at full length come from, and the mean
+// deviation from the prediction was +0.000 dB -- the estimator is unbiased.
+//
+// WHICH BANDS. 1 kHz and 4 kHz. BT falls with the band's width, so the same
+// 120 s buys only BT = 6,900 at 250 Hz (sigma 0.052 dB, measured 0.075 dB at
+// half length) and the tolerance would have to be loosened to about 0.2 dB to
+// stay honest -- which is the analytic tests' job and not this one's. What
+// this case exists to catch is a wrong SOURCE, and a wrong source is wrong at
+// every band at once: the mutation it is written against, a cast divisor of
+// 2^30 instead of 2^31, is 6.02 dB.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Iterative radix-2 FFT, in double, with the twiddles precomputed once.
+void fftInPlace(std::complex<double>* a, int n, const std::complex<double>* tw) {
+    for (int i = 1, j = 0; i < n; ++i) {
+        int bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) std::swap(a[i], a[j]);
+    }
+    for (int len = 2; len <= n; len <<= 1) {
+        const int half = len / 2, step = n / len;
+        for (int i = 0; i < n; i += len)
+            for (int k = 0; k < half; ++k) {
+                const std::complex<double> u = a[i + k];
+                const std::complex<double> v = a[i + k + half] * tw[k * step];
+                a[i + k]        = u + v;
+                a[i + k + half] = u - v;
+            }
+    }
+}
+
+constexpr int    kWelchLen     = 16384;
+constexpr double kMeasureSecs  = 120.0;
+constexpr double kEndToEndDb   = 0.10;
+
+// Run the shipped chain for kMeasureSecs and return the averaged one-sided
+// power spectrum, bin k centred on k*fs/kWelchLen.
+std::vector<double> measureSpectrum(const PinkDesign& d, double referenceDb,
+                                    uint32_t seed) {
+    const double fs  = d.sampleRate();
+    // The gain stage, written exactly as MULTIPINKProcessor::computeGainLin
+    // writes it: Reference + Trim + offset(fs), with Trim at 0.
+    const double gain = std::pow(10.0, (referenceDb + d.calibrationOffsetDb()) / 20.0);
+    const long   n    = (long)(kMeasureSecs * fs);
+    const int    hop  = kWelchLen / 2;
+
+    std::vector<double> w((size_t)kWelchLen);
+    double sumW2 = 0.0;
+    for (int i = 0; i < kWelchLen; ++i) {
+        w[(size_t)i] = 0.5 - 0.5 * std::cos(2.0 * M_PI * i / kWelchLen);
+        sumW2 += w[(size_t)i] * w[(size_t)i];
+    }
+    std::vector<std::complex<double>> tw((size_t)kWelchLen / 2);
+    for (int k = 0; k < kWelchLen / 2; ++k)
+        tw[(size_t)k] = std::complex<double>(std::cos(-2.0 * M_PI * k / kWelchLen),
+                                             std::sin(-2.0 * M_PI * k / kWelchLen));
+
+    // One stream, float state and float samples: what the plug-in runs at both
+    // sample sizes. The filter state carries across calls, so producing the
+    // signal a block at a time is the same signal the processor would emit.
+    std::vector<float> state((size_t)d.numSections, 0.0f);
+    uint32_t lcg = seed;
+    std::vector<float> buf((size_t)kWelchLen, 0.0f);
+    auto produce = [&](float* p, int count) {
+        lcg = Seam::multipink::whiteNoiseRow<float>(lcg, p, count);
+        Seam::multipink::pinkFilterBlock<float>(d, p, 1, count, state.data(), 1);
+        for (int i = 0; i < count; ++i) p[i] = (float)(p[i] * gain);
+    };
+
+    std::vector<std::complex<double>> seg((size_t)kWelchLen);
+    std::vector<double> acc((size_t)kWelchLen / 2, 0.0);
+    int segments = 0;
+    produce(buf.data(), kWelchLen);
+    for (long produced = kWelchLen; ; produced += hop) {
+        for (int i = 0; i < kWelchLen; ++i)
+            seg[(size_t)i] = std::complex<double>(buf[(size_t)i] * w[(size_t)i], 0.0);
+        fftInPlace(seg.data(), kWelchLen, tw.data());
+        for (int k = 0; k < kWelchLen / 2; ++k)
+            acc[(size_t)k] += std::norm(seg[(size_t)k]);
+        ++segments;
+        if (produced + hop > n) break;
+        for (int i = 0; i < kWelchLen - hop; ++i) buf[(size_t)i] = buf[(size_t)(i + hop)];
+        produce(buf.data() + (kWelchLen - hop), hop);
+    }
+    for (double& v : acc) v /= (double)segments;
+    return acc;
+}
+
+// Integrate the measured spectrum over one third-octave band, edge bins
+// weighted by the fraction of their width inside the band.
+double measuredBandLevelDb(const std::vector<double>& spectrum, double fs, double fc) {
+    const double fl = fc * std::pow(10.0, -0.05);
+    const double fu = fc * std::pow(10.0,  0.05);
+    const double df = fs / kWelchLen;
+    double sumW2 = 0.0;
+    for (int i = 0; i < kWelchLen; ++i) {
+        const double v = 0.5 - 0.5 * std::cos(2.0 * M_PI * i / kWelchLen);
+        sumW2 += v * v;
+    }
+    double power = 0.0;
+    for (int k = 1; k < kWelchLen / 2; ++k) {
+        const double lo = (k - 0.5) * df, hi = (k + 0.5) * df;
+        const double overlap = std::min(hi, fu) - std::max(lo, fl);
+        if (overlap <= 0.0) continue;
+        power += (overlap / df) * 2.0 * spectrum[(size_t)k]
+               / ((double)kWelchLen * sumW2);
+    }
+    return 10.0 * std::log10(power);
+}
+
+} // namespace
+
+TEST_CASE("the band level the plugin really emits is the one the design predicts") {
+    // The seed only sets where in the LCG's 2^32-long period the stream
+    // starts; the calibration claim is a property of the source's statistics
+    // and holds for any seed, which was checked over ten of them.
+    constexpr uint32_t kSeed = 0x9E3779B9u;
+    const double kBands[] = {1000.0, 4000.0};
+
+    PinkDesign d48, d96;
+    d48.design(48000.0);
+    d96.design(96000.0);
+
+    const std::vector<double> s48 = measureSpectrum(d48, -23.0, kSeed);
+    const std::vector<double> s96 = measureSpectrum(d96, -23.0, kSeed);
+
+    std::printf("\n  end to end: whiteNoiseRow -> pinkFilterBlock -> gain,\n");
+    std::printf("  %.0f s per rate, Reference = -23 dBFS, tolerance %.2f dB\n\n",
+                kMeasureSecs, kEndToEndDb);
+
+    for (double fc : kBands) {
+        const double m48 = measuredBandLevelDb(s48, 48000.0, fc);
+        const double m96 = measuredBandLevelDb(s96, 96000.0, fc);
+        const double p48 = predictedBandLevelDb(d48, -23.0, fc);
+        const double p96 = predictedBandLevelDb(d96, -23.0, fc);
+        std::printf("  %7.1f Hz   48 kHz measured %9.4f  predicted %9.4f  diff %+7.4f\n",
+                    fc, m48, p48, m48 - p48);
+        std::printf("  %7.1f Hz   96 kHz measured %9.4f  predicted %9.4f  diff %+7.4f\n",
+                    fc, m96, p96, m96 - p96);
+        std::printf("  %7.1f Hz   96 kHz - 48 kHz measured %+7.4f dB\n\n", fc, m96 - m48);
+
+        // The measurement agrees with the analytic prediction. This is what a
+        // wrong source breaks: the prediction reads the source's level off a
+        // constant, the measurement reads it off the samples.
+        CHECK(std::fabs(m48 - p48) < kEndToEndDb);
+        CHECK(std::fabs(m96 - p96) < kEndToEndDb);
+        // And the two rates agree with each other, which is the claim itself,
+        // now made on measured signal rather than on integrals. Without the
+        // density term in calibrationOffsetDb() this difference is -3.01 dB.
+        CHECK(std::fabs(m96 - m48) < kEndToEndDb);
+    }
 }

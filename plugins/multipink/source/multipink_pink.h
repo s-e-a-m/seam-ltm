@@ -24,6 +24,7 @@
 #include <cmath>
 #include <complex>
 #include <cstddef>
+#include <cstdint>
 
 namespace Seam { namespace multipink {
 
@@ -72,19 +73,23 @@ public:
     // The base value is the offset AT 48 kHz, where the two definitions
     // coincide: -(whiteRmsDb + rmsGainDb(48k)) = -(-4.7712 + -31.409)
     //         = 36.180 dB.
-    // The LCG's RMS is not assumed: its exact update and cast
-    // (multipink_processor.cpp, "st = st * 1103515245u + 12345u;
-    // row[s] = (int32_t)st / 2147483648.0") were run over 5*10^8 samples and
-    // measured -4.7712 dB, within 0.00001 dB of the theoretical 1/sqrt(3).
+    // The LCG's RMS is not assumed: whiteNoiseRow() below -- the source the
+    // plug-in actually runs -- was run over 5*10^8 samples and measured
+    // -4.7712 dB, within 0.00001 dB of the theoretical 1/sqrt(3). And it is
+    // no longer only measured offline: the end-to-end test in
+    // tests/multipink_pink_engine_test.cpp drives that same function into
+    // pinkFilterBlock and reads the band level back out, so an edit to the
+    // source turns a test red instead of silently moving the calibration.
     //
     // With the density term the predicted band level is invariant across
     // 44.1...192 kHz for every band measurable at all six rates: 0.0098 dB at
     // 1 kHz, 0.0837 dB worst case at 15.85 kHz, against a 0.20 dB threshold
     // derived in tests/multipink_pink_engine_test.cpp from the filter's own
     // ripple below and the 3.01 dB error above,
-    // and the total RMS rises 0.28 dB per doubling -- which is correct: every
-    // band holds still, and each new octave of pink adds a little total
-    // energy on top.
+    // and the total RMS rises about 0.27-0.28 dB per doubling (0.2825 dB from
+    // 48 to 96 kHz, 0.2652 from 96 to 192) -- which is correct: every band
+    // holds still, and each new octave of pink adds a little total energy on
+    // top.
     static constexpr double kCalibrationRefRateHz  = 48000.0;
     static constexpr double kCalibrationOffsetBaseDb = 36.180;
 
@@ -171,6 +176,36 @@ private:
     double sampleRate_          = kCalibrationRefRateHz;
     double calibrationOffsetDb_ = kCalibrationOffsetBaseDb;
 };
+
+// The noise SOURCE, in the same header as the filter and for the same reason.
+//
+// It lived inline in the processor, where no test could reach it, and that is
+// exactly where the calibration error hid: every assertion in the suite took
+// the source's contribution as an assumed constant (-4.7712 dB, flat, over
+// 0..fs/2) and tested only the filter. Change the multiplier, change the cast
+// divisor, add a DC offset, and the whole analytic suite stayed green while
+// the plug-in was miscalibrated. The term the derivation forgot has to be the
+// term the tests can run.
+//
+// The recurrence is the C standard's own LCG, st = st*1103515245 + 12345 over
+// uint32_t, read as a signed 32-bit integer and scaled by 2^31: uniform on
+// [-1, 1), RMS 1/sqrt(3) = -4.7712 dB, measured over 5*10^8 samples to within
+// 0.00001 dB of that. The division is written in double at BOTH sample sizes
+// and only then narrowed, which is what the shipped inline loop did; the
+// streams are seeded deterministically (MULTIPINKProcessor::seedLCGs) and the
+// plug-in's output is required to stay bit-identical, so neither the type of
+// the divisor nor the order of the two operations may be touched.
+//
+// Fills one row of numSamples and returns the state to store back. No
+// allocation, no locking: safe on the audio thread.
+template <typename Sample>
+inline uint32_t whiteNoiseRow(uint32_t state, Sample* row, int numSamples) {
+    for (int n = 0; n < numSamples; ++n) {
+        state = state * 1103515245u + 12345u;
+        row[n] = (Sample)((int32_t)state / 2147483648.0);
+    }
+    return state;
+}
 
 // The block operation the audio path performs, in one place so that what
 // ships and what is tested are the same code. Before this existed the
