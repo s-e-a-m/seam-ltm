@@ -11,7 +11,7 @@ static const Steinberg::FUID MULTIPINKProcessorUID(
     0x5E4D0008, 0xA1B2C3D4, 0x4D554C54, 0x49504E4B);
 
 enum MULTIPINKParams : Steinberg::Vst::ParamID {
-    kParamReference   = 100,   // 0=-23, 1=-20, 2=-18 dBFS RMS  (stepped)
+    kParamReference   = 100,   // 0=-23, 1=-20, 2=-18 dBFS         (stepped)
     kParamTrim        = 101,   // -6.0 … +6.0 dB                (continuous)
     kParamPower       = 102,   // 0 = silent / 1 = sounding      (bool)
     kParamStoneId     = 103,   // 0=undeclared, 1..8            (stepped)
@@ -31,7 +31,14 @@ static constexpr Steinberg::int32 kStoneIdStepCount = 9;   // "?" + 1..8
 // processor to decode the normalized [0,1] parameter into an enum index.
 static constexpr Steinberg::int32 kReferenceStepCount = 3;
 
-// The reference levels in dBFS RMS, indexed by the stepped parameter value.
+// The reference levels, in dBFS, indexed by the stepped parameter value.
+//
+// What the number MEANS: it is defined as the generator's total RMS at
+// 48 kHz. What the calibration HOLDS INVARIANT across sample rates is the
+// per-third-octave band level, not that RMS -- so at 96 kHz the total RMS of
+// a -23 setting reads -22.718 dBFS while every band stays where it was. The
+// two definitions coincide at 48 kHz and nowhere else; see
+// plugins/multipink/doc/calibration.md.
 static constexpr double kReferenceLevelsDb[kReferenceStepCount] = {
     -23.0, -20.0, -18.0
 };

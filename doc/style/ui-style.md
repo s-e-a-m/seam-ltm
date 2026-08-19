@@ -110,7 +110,7 @@ member of either group, and a full-width block (label across the window,
 - Tagline: the lowercase technical gloss under the subtitle, naming the
   mechanism in the plugin's own vocabulary rather than describing it again.
   `N=5 grains · swept · looped` (ltglide), `64-slot shared pool ·
-  RMS-calibrated` (multipink), `c = 331.4 m/s · nextprime · 4ch sync`
+  band-calibrated` (multipink), `c = 331.4 m/s · nextprime · 4ch sync`
   (ddelay), `quadrature ±90° · mono → I/Q` (hilbert).
   Facts are separated by a middle dot, and no casing rule is imposed on it:
   symbols, units, channel names and proper names keep the capitalisation the

@@ -1,7 +1,9 @@
 # multipink — Calibration Procedure
 
 This document explains how to verify (and, if needed, recalibrate) the
-RMS reference levels of the `multipink` plugin.
+reference levels of the `multipink` plugin — both the total RMS, which is what
+`Reference`'s number is defined as, and the per-third-octave band level, which
+is what the calibration holds invariant across sample rates.
 
 ## Background
 
@@ -13,7 +15,17 @@ compensation offset is applied to the gain.
 
 ## What "Reference" means now (2026-08-19)
 
-**`Reference` sets the per-third-octave BAND level, not the total RMS.**
+**`Reference`'s numeric value is defined as the total RMS at 48 kHz. What the
+offset holds invariant across sample rates is the per-third-octave BAND
+level.**
+
+Both halves matter, and the earlier wording of this section — "`Reference` sets
+the BAND level, not the total RMS" — got the first one wrong: `Reference = -23`
+gives a band level of −39.489 dBFS and a total RMS of −23.000 dBFS at 48 kHz,
+so the number on the menu is the RMS, not the band level. The band level is
+39.489 − 23 = 16.489 dB below it, a figure that depends on how many bands the
+rate makes room for. What is *calibrated* — held still when the sample rate
+changes — is the band level.
 
 As of the matched-Z pinking filter (`doc/study/sessions/2026-08-19-pink-filter-design.md`,
 `docs/superpowers/specs/2026-08-19-pink-filter-mz-design.md`), the filter is
@@ -73,8 +85,10 @@ comment in `multipink_processor.h` for the full record.
 
 ### What the total RMS does
 
-With every band held still, the broadband RMS **rises** 0.28 dB per doubling of
-the sample rate, because each new octave of pink adds a little total energy on
+With every band held still, the broadband RMS **rises** by about 0.27–0.28 dB
+per doubling of the sample rate (0.2825 dB from 48 to 96 kHz, 0.2844 from 44.1
+to 88.2, 0.2652 from 96 to 192 — it is not one number, because the ladder's top
+section moves), because each new octave of pink adds a little total energy on
 top of bands that have not moved. For `Reference = -23`, `Trim = 0`, predicted:
 
 | fs | offset | 1 kHz band level | total RMS |
@@ -153,7 +167,9 @@ Read the band level as well whenever the rate is not 48 kHz.
    sox multipink_cal.wav -n stat 2>&1 | grep "RMS amplitude"
    ```
 5. Convert to dBFS: `dB = 20 · log10(RMS_amplitude)`.
-6. Expected: -23.0 ± 0.1 dBFS RMS per channel (sox/AES17 unweighted).
+6. Expected at 48 kHz: -23.0 ± 0.1 dBFS RMS per channel (sox/AES17
+   unweighted) — this is the rate at which `Reference`'s number is defined,
+   and the only rate at which the total RMS reads it back.
    In AES17-aligned tools this will read as ≈ -20.0.
    **At a rate other than 48 kHz, expect the value in the table above**, not
    -23.0 — the RMS is supposed to move.

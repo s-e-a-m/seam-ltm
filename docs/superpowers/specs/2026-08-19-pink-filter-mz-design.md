@@ -242,9 +242,11 @@ With the term in place the predicted 1 kHz band level is −39.4825 / −39.4891
 Over every band measurable at all six rates the worst spread is 0.0837 dB, at
 the 15.85 kHz band.
 Without it: −39.114 / −39.489 / −42.127 / −42.501 / −45.139 / −45.513.
-The total RMS then *rises* 0.28 dB per doubling (−23.030 at 44.1, −23.000 at 48,
-−22.718 at 96, −22.453 at 192, for Reference = −23), which is the correct
-behaviour and not a defect: every band holds still while each additional octave
+The total RMS then *rises* by about 0.27–0.28 dB per doubling (0.2825 dB from
+48 to 96 kHz, 0.2844 from 44.1 to 88.2, 0.2652 from 96 to 192 — it is not one
+number, because the ladder's top section moves): −23.030 at 44.1, −23.000 at
+48, −22.718 at 96, −22.453 at 192, for Reference = −23.
+This is the correct behaviour and not a defect: every band holds still while each additional octave
 of pink adds a little total energy on top.
 
 **Why no review caught it.**
@@ -271,9 +273,14 @@ Two structural consequences, both now applied:
    The threshold is derived rather than chosen: below it lies the filter's own
    band ripple, which invariance can never beat because each rate designs its
    own ladder and places a given band at a slightly different point of the
-   ripple (0.071–0.081 dB per rate in the acceptance test, 0.0837 dB worst
-   observed as an inter-rate spread); above it lies the 3.01 dB per doubling
-   this test exists to catch.
+   ripple; above it lies the 3.01 dB per doubling this test exists to catch.
+   The load-bearing number for the floor is the **measured** inter-rate spread,
+   0.0837 dB worst case at the 15.85 kHz band.
+   The acceptance test's per-rate figure (0.071–0.081 dB) is *consistent with*
+   that and does not imply it: the acceptance ripple is a deviation from a
+   per-rate mean over a per-rate set of judged bands, while the invariance test
+   compares absolute levels at one fixed band across rates, so doubling the one
+   to bound the other is a heuristic that happens to bracket the measurement.
    0.20 dB is 2.4× above the measured floor, 15× below the smallest error, and
    under SMPTE's own ±0.25 dB uniformity tolerance, so drift this test tolerates
    cannot by itself push a band out of the standard.
@@ -317,7 +324,12 @@ function is a candidate to offer upstream to GRAME, as `pdclone.env` is.
 4. Single-versus-double conditioning pinned at 0.001 dB, making the audit's
    pass/fail criterion a number in the build.
 5. The computed calibration constant checked against a render measured with
-   `sox`, the same method that produced 26.45.
+   `sox`, the same method that produced 26.45 — **at 48 kHz**, and only there.
+   48 kHz is the rate at which `Reference`'s number is defined as the total RMS,
+   so it is the only rate at which a `sox` reading of −23.0 dBFS is the expected
+   answer; at any other rate the total RMS is supposed to have moved (−23.030 at
+   44.1, −22.718 at 96, −22.453 at 192) and a reading of −23.0 would mean the
+   band levels are wrong. The study diary already said so; this list did not.
 6. A CPU measurement of the block loop at 64 streams and 192 kHz, which decides
    1.0 against 1.5 poles per octave.
 7. A magnitude A/B between the Faust function and the C++ engine, which is how

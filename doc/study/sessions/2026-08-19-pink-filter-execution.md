@@ -21,6 +21,13 @@ Su valori molto minori di uno, la `scale` domina il termine relativo e il
 confronto smette di essere relativo.
 I sei valori pinnati sono ora confronti assoluti.
 
+Ed è ricomparso: `doctest::Approx(0.28).epsilon(0.05)` sul passo di RMS totale
+fra 48 e 96 kHz ammetteva ±0,064 dB, cioè ±23%, sopravvivendo alla stessa
+revisione che aveva corretto i sei.
+Anche quello è ora un confronto assoluto (0,2825 ± 0,005 dB).
+La lezione operativa: `Approx().epsilon()` è sicuro solo su valori dell'ordine
+dell'unità o più grandi; sotto, va scritto `fabs(a - b) < tol`.
+
 **2. L'A/B Faust↔C++ confrontava 24 bit, non 53.**
 Il file di architettura includeva `faust/dsp/dsp.h` prima della classe generata,
 e quell'header fa `#ifndef FAUSTFLOAT / #define FAUSTFLOAT float`: la guardia
@@ -98,7 +105,9 @@ Il livello previsto della banda di 1 kHz passa da
 −39,4825 / −39,4891 / −39,4847 / −39,4909 / −39,4866 / −39,4923 dBFS
 (44,1 / 48 / 88,2 / 96 / 176,4 / 192 kHz): 0,0098 dB di dispersione, e 0,0837 dB
 nel caso peggiore su tutte e trenta le bande misurabili a ogni frequenza.
-L'RMS totale, di conseguenza, **sale** di 0,28 dB per raddoppio — ed è giusto
+L'RMS totale, di conseguenza, **sale** di circa 0,27–0,28 dB per raddoppio
+(0,2825 dB da 48 a 96 kHz, 0,2844 da 44,1 a 88,2, 0,2652 da 96 a 192: non è un
+numero solo, perché la sezione più alta della scala si sposta) — ed è giusto
 così: se ogni banda sta ferma, ogni ottava in più aggiunge un po' di energia
 totale.
 
@@ -133,9 +142,17 @@ Due cause strutturali, entrambe rimosse:
    0,20 dB.
    La soglia è **derivata**, non scelta: sotto c'è il ripple del filtro stesso,
    che l'invarianza non può battere perché ogni frequenza progetta la propria
-   scala e colloca una data banda in un punto leggermente diverso del ripple
-   (0,071–0,081 dB per frequenza nel test di accettazione, 0,0837 dB di
-   dispersione fra frequenze); sopra c'è l'errore da 3,01 dB per raddoppio.
+   scala e colloca una data banda in un punto leggermente diverso del ripple;
+   sopra c'è l'errore da 3,01 dB per raddoppio.
+   Il numero che regge il pavimento è quello **misurato**: 0,0837 dB di
+   dispersione fra frequenze, sulla banda di 15,85 kHz.
+   I 0,071–0,081 dB per frequenza del test di accettazione sono *coerenti* con
+   quel valore e non lo implicano: il ripple di accettazione è uno scostamento
+   dalla media *della singola frequenza*, su un insieme di bande giudicate che
+   cambia con la frequenza, mentre il test di invarianza confronta livelli
+   assoluti a banda fissa fra frequenze diverse. Raddoppiarlo per ottenere un
+   presunto limite di ~0,16 dB è un'euristica che per fortuna racchiude la
+   misura, non una derivazione.
    Una soglia di 0,01 dB, come nella prima stesura, passava per 2% di margine e
    sarebbe fallita se qualcuno l'avesse riscritta sulla banda di 15,85 kHz: un
    numero senza derivazione è un numero che il prossimo sposterà tirando a
@@ -148,6 +165,46 @@ la sta mettendo alla prova.**
 La sonda misurava il filtro perché la specifica parlava del filtro.
 Il segnale che esce dal plugin non è il filtro: è il filtro *per* la sorgente, e
 nessuno l'ha misurato finché non l'ha misurato l'analizzatore in host.
+
+### La stessa confusione, due volte
+
+Ma quella regola, da sola, è ancora troppo comoda: descrive *come* l'errore è
+sfuggito, non *che cosa* fosse.
+Perché questo progetto lo stesso errore l'ha fatto **due volte**, a una sonda di
+distanza, e il diario di progetto lo registra in cima a sé stesso.
+
+`2026-08-19-pink-filter-design.md`, § «**Errore 1 — densità invece di energia**»:
+la prima sonda dava scostamenti di 14–20 dB, e nell'integrale di banda mancava
+il fattore di larghezza (fu − fl).
+Misuravo la densità media di potenza invece dell'energia. Nel **filtro**.
+
+L'errore corretto oggi è lo stesso: densità invece di energia in una banda.
+Nella **sorgente**.
+La prima volta mancava (fu − fl) nell'integrale del filtro; la seconda mancava
+1/(fs/2) nella densità della sorgente. È la stessa quantità dimenticata nello
+stesso punto dell'espressione, su due fattori diversi dello stesso prodotto.
+
+La regola vera, quindi, non è solo che una sonda compiacente non prova nulla.
+È questa: **un integrale di banda ha una larghezza dentro, ovunque compaia.**
+Un livello di banda è sempre una densità moltiplicata per una larghezza, e ogni
+fattore del segnale — il filtro *e* la sorgente — porta la propria.
+Quando se ne dimentica una, il conto resta dimensionalmente muto: dB contro dB,
+nessun compilatore protesta, e il risultato ha ancora un ordine di grandezza
+plausibile.
+Entrambe le volte è stata la **plausibilità** a proteggere l'errore — 14–20 dB
+sembravano un filtro mal fittato, 3 dB sembravano tolleranza di misura — e
+entrambe le volte a smascherarlo è stata una misura del percorso completo, non
+una rilettura.
+
+Il seguito operativo sta nel test: la sorgente non è più un termine assunto.
+`Seam::multipink::whiteNoiseRow` vive accanto a `pinkFilterBlock` in
+`multipink_pink.h`, e il caso end-to-end in
+`tests/multipink_pink_engine_test.cpp` genera con la sorgente vera, filtra con
+il filtro vero, applica il guadagno vero e legge il livello di banda dai
+campioni, a 48 e a 96 kHz.
+Verificato per mutazione: cambiando il divisore del cast da 2³¹ a 2³⁰ quel caso
+diventa rosso di 6,02 dB mentre le altre 203 asserzioni restano verdi — che è
+esattamente il contrasto che prima non esisteva.
 
 ## Perché un test sull'uscita non bastava
 

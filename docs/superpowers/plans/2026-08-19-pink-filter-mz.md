@@ -76,6 +76,10 @@ TEST_CASE("the interior slope is pink, -3.01 dB per octave") {
 }
 
 TEST_CASE("the anchor does not move with the sample rate") {
+    // SUPERSEDED — see the spec's Calibration section. The comment below is
+    // the false inference itself: the anchor's rate-invariance is a property
+    // of the FILTER, and reading it as a property of the OUTPUT is what cost
+    // 3.01 dB per doubling of fs.
     // This is what makes the calibration constant a constant: the filter is
     // anchored in Hz, so its gain at 1 kHz must be the same at every rate.
     // Measured spread across the six rates is under 0.01 dB.
@@ -220,6 +224,9 @@ public:
 
     // Gain at the calibration anchor. Invariant across sample rates by design,
     // which is what lets the calibration offset stay a single constant.
+    // SUPERSEDED — see the spec's Calibration section: that second sentence
+    // does not follow. The invariance is the FILTER's; the offset is a
+    // function of fs because the SOURCE's spectral density is not invariant.
     double anchorGainDb() const { return magnitudeDb(kAnchorHz); }
 
     // 10*log10 of the mean of |H|^2 over 0..fs/2 — the filter's RMS gain on
@@ -616,6 +623,15 @@ git commit -m "feat(multipink): the plug-in runs the designed filter, section-ma
 
 ### Task 5: The calibration constant, computed and reconciled
 
+> **SUPERSEDED — see the spec's Calibration section**
+> (`docs/superpowers/specs/2026-08-19-pink-filter-mz-design.md`).
+> This task shipped a single fixed offset and the comment "deliberately NOT
+> recomputed per sample rate". That is wrong: the offset must carry the
+> source's spectral density, `offset(fs) = 36.180 + 10*log10(fs / 48000)`, and
+> the fixed constant cost 3.01 dB of band level per doubling of fs. Everything
+> below is kept as the record of what was executed; **do not re-execute it as
+> written.**
+
 **Files:**
 - Modify: `plugins/multipink/source/multipink_processor.h` (the `kCalibrationOffsetDb` block)
 - Modify: `tests/multipink_pink_engine_test.cpp` (append one test)
@@ -646,6 +662,10 @@ Write the finding into the header comment as part of Step 3, whatever it turns o
 
 - [ ] **Step 3: Write the constant with its derivation**
 
+> SUPERSEDED — see the spec's Calibration section. The block below is the one
+> that shipped the defect: "deliberately NOT recomputed per sample rate" is the
+> false inference, and the constant is a function of fs.
+
 ```cpp
     // Calibration. The constant fixes the BAND level, not the total RMS: the
     // filter is anchored in Hz, so its total RMS falls 5.8 dB from 44.1 to
@@ -669,6 +689,10 @@ Write the finding into the header comment as part of Step 3, whatever it turns o
 ```
 
 - [ ] **Step 4: Assert it in the test**
+
+> SUPERSEDED — see the spec's Calibration section. This assertion is the
+> derivation restated (`-(whiteRmsDb + rmsGainDb) == 36.180` is true by
+> construction) and says nothing about the property the design claims.
 
 ```cpp
 TEST_CASE("the calibration offset is the one the design implies") {

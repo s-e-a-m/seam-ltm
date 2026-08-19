@@ -218,6 +218,9 @@ Un filtro ancorato in Hz conserva le frequenze (−27,71 dB a 1 kHz ovunque, ent
 
 Conseguenza diretta: `kCalibrationOffsetDb = 26.45`, misurato una volta a
 48 kHz con un render e `sox`, **deve diventare una funzione di fs**.
+(Previsione corretta, e non seguita fino in fondo: il Task 5 l'ha implementata
+come un numero fisso. Il seguito è in fondo a questa pagina, alla voce
+«sezione 3» di *Aperto*.)
 Il motore di progetto può calcolarselo esattamente, perché l'RMS del filtro è
 l'integrale di |H|² che il progetto già conosce, e l'RMS della sorgente bianca è
 noto in forma chiusa.
@@ -275,6 +278,21 @@ resta quella in produzione, con il costo misurato sopra.
       (dBFS RMS vs dBFS(AES17), 3,01 dB di differenza) — Task 5,
       `kCalibrationOffsetDb = 36.180`; vedi
       `plugins/multipink/doc/calibration.md`.
+      **Esito corretto dopo la stesura di questo diario: la costante non è una
+      costante.** Poche righe sopra (§ «Le due colonne raccontano il difetto in
+      una forma nuova») questo stesso diario aveva già scritto che l'offset
+      «deve diventare una funzione di fs»; il Task 5 l'ha poi implementata come
+      un solo numero fisso, perché la sonda che l'ha validata misurava
+      l'integrale di banda del *filtro* — che è davvero invariante — e dava per
+      assunto il contributo della *sorgente*. La previsione era giusta e la
+      conclusione no. La forma corretta è
+      `offset(fs) = 36.180 + 10·log10(fs/48000)`: il termine mancante è la
+      densità spettrale della sorgente, e costava 3,01 dB per raddoppio di fs.
+      Misurato in Reaper attraverso `strx`: livello medio di banda −38,4 dB a
+      48 kHz contro −41,3 dB a 96 kHz. Vedi
+      `doc/study/sessions/2026-08-19-pink-filter-execution.md` (§ «La stessa
+      confusione, due volte») e la sezione Calibration di
+      `plugins/multipink/source/multipink_pink.h`.
 - [x] costo CPU misurato — Task 6; risultato e le tre leve non tirate sopra.
 - [x] la funzione Faust nuova — Task 7, `sfi.spectral_tilt_mz` e
       `sfi.pink_filter_mz` in `seam.filters.lib`. Se proporla a monte in
