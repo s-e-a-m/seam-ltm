@@ -542,9 +542,12 @@ TEST_CASE("the state lands where the contract says it does") {
 // a chi-square-distributed band-power estimate is 10*log10(e)/sqrt(BT) =
 // 4.34/166 = 0.026 dB. The 0.10 dB tolerance is therefore about 3.8 sigma.
 // That figure is not just arithmetic: run over ten independent seeds at half
-// this length the measured spread was 0.039 dB at 1 kHz and 0.012 dB at
-// 4 kHz, which is what 0.026 and 0.008 at full length come from, and the mean
-// deviation from the prediction was +0.000 dB -- the estimator is unbiased.
+// this length the measured spread was 0.0388 dB at 1 kHz and 0.0124 dB at
+// 4 kHz at 48 kHz, and 0.0374 / 0.0247 dB at 96 kHz -- consistent with the
+// 0.037 and 0.013 that BT predicts at that length, and halving to 0.026 at
+// 1 kHz here. The mean deviation from the analytic prediction over those ten
+// seeds was +0.000 dB at 1 kHz: the estimator is unbiased, so the tolerance
+// is spent on spread and not on a systematic offset.
 //
 // WHICH BANDS. 1 kHz and 4 kHz. BT falls with the band's width, so the same
 // 120 s buys only BT = 6,900 at 250 Hz (sigma 0.052 dB, measured 0.075 dB at
