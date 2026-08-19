@@ -77,8 +77,11 @@ public:
     // row[s] = (int32_t)st / 2147483648.0") were run over 5*10^8 samples and
     // measured -4.7712 dB, within 0.00001 dB of the theoretical 1/sqrt(3).
     //
-    // With the density term the predicted 1 kHz band level is invariant
-    // within 0.010 dB over 44.1...192 kHz (tests/multipink_pink_engine_test.cpp),
+    // With the density term the predicted band level is invariant across
+    // 44.1...192 kHz for every band measurable at all six rates: 0.0098 dB at
+    // 1 kHz, 0.0837 dB worst case at 15.85 kHz, against a 0.20 dB threshold
+    // derived in tests/multipink_pink_engine_test.cpp from the filter's own
+    // ripple below and the 3.01 dB error above,
     // and the total RMS rises 0.28 dB per doubling -- which is correct: every
     // band holds still, and each new octave of pink adds a little total
     // energy on top.

@@ -239,6 +239,8 @@ is zero and the corrected definition coincides with the old one.
 With the term in place the predicted 1 kHz band level is −39.4825 / −39.4891 /
 −39.4847 / −39.4909 / −39.4866 / −39.4923 dBFS at 44.1 / 48 / 88.2 / 96 / 176.4
 / 192 kHz — a spread of 0.0098 dB.
+Over every band measurable at all six rates the worst spread is 0.0837 dB, at
+the 15.85 kHz band.
 Without it: −39.114 / −39.489 / −42.127 / −42.501 / −45.139 / −45.513.
 The total RMS then *rises* 0.28 dB per doubling (−23.030 at 44.1, −23.000 at 48,
 −22.718 at 96, −22.453 at 192, for Reference = −23), which is the correct
@@ -264,7 +266,17 @@ Two structural consequences, both now applied:
 2. The test suite asserted the *derivation* (`-(whiteRmsDb + rmsGainDb)` equals
    36.180) rather than the *property the design claims*.
    It now asserts the property directly: the predicted band level for a fixed
-   ISO band is invariant across all six rates within 0.01 dB.
+   ISO band is invariant across all six rates, over all 30 bands measurable at
+   every rate, within **0.20 dB**.
+   The threshold is derived rather than chosen: below it lies the filter's own
+   band ripple, which invariance can never beat because each rate designs its
+   own ladder and places a given band at a slightly different point of the
+   ripple (0.071–0.081 dB per rate in the acceptance test, 0.0837 dB worst
+   observed as an inter-rate spread); above it lies the 3.01 dB per doubling
+   this test exists to catch.
+   0.20 dB is 2.4× above the measured floor, 15× below the smallest error, and
+   under SMPTE's own ±0.25 dB uniformity tolerance, so drift this test tolerates
+   cannot by itself push a band out of the standard.
    Verified by mutation — removing the density term turns it red by 3.010 dB at
    96 kHz and 6.021 dB at 192 kHz.
 

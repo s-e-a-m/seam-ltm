@@ -96,7 +96,8 @@ Corretto: `offset(fs) = 36,180 + 10*log10(fs / 48000)`, dove 36,180 è il valore
 Il livello previsto della banda di 1 kHz passa da
 −39,114 / −39,489 / −42,127 / −42,501 / −45,139 / −45,513 dBFS a
 −39,4825 / −39,4891 / −39,4847 / −39,4909 / −39,4866 / −39,4923 dBFS
-(44,1 / 48 / 88,2 / 96 / 176,4 / 192 kHz): 0,0098 dB di dispersione.
+(44,1 / 48 / 88,2 / 96 / 176,4 / 192 kHz): 0,0098 dB di dispersione, e 0,0837 dB
+nel caso peggiore su tutte e trenta le bande misurabili a ogni frequenza.
 L'RMS totale, di conseguenza, **sale** di 0,28 dB per raddoppio — ed è giusto
 così: se ogni banda sta ferma, ogni ottava in più aggiunge un po' di energia
 totale.
@@ -127,8 +128,18 @@ Due cause strutturali, entrambe rimosse:
 2. **Il test asseriva la derivazione, non la proprietà.**
    `-(whiteRmsDb + rmsGainDb) == 36,180` è vera per costruzione e non dice nulla
    su ciò che il progetto promette.
-   Ora il test asserisce la promessa: il livello previsto di una banda ISO fissa
-   è invariante sulle sei frequenze entro 0,01 dB.
+   Ora il test asserisce la promessa: il livello previsto è invariante sulle sei
+   frequenze, su tutte e trenta le bande misurabili a ogni frequenza, entro
+   0,20 dB.
+   La soglia è **derivata**, non scelta: sotto c'è il ripple del filtro stesso,
+   che l'invarianza non può battere perché ogni frequenza progetta la propria
+   scala e colloca una data banda in un punto leggermente diverso del ripple
+   (0,071–0,081 dB per frequenza nel test di accettazione, 0,0837 dB di
+   dispersione fra frequenze); sopra c'è l'errore da 3,01 dB per raddoppio.
+   Una soglia di 0,01 dB, come nella prima stesura, passava per 2% di margine e
+   sarebbe fallita se qualcuno l'avesse riscritta sulla banda di 15,85 kHz: un
+   numero senza derivazione è un numero che il prossimo sposterà tirando a
+   indovinare.
    Verificato per mutazione — togliendo il termine di densità diventa rosso di
    3,010 dB a 96 kHz e 6,021 dB a 192 kHz.
 

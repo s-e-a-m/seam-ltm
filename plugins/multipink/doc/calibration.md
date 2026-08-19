@@ -203,8 +203,11 @@ itself changes and its RMS is not known in closed form:
 
 `tests/multipink_pink_engine_test.cpp` asserts all of this analytically — the
 base value at 48 kHz, the density term, the band-level invariance across the
-six rates, and the total-RMS behaviour — so a regression fails `ctest` before
-it reaches a render.
+six rates over all 30 bands measurable at every rate, and the total-RMS
+behaviour — so a regression fails `ctest` before it reaches a render. The
+invariance threshold there is 0.20 dB, derived from the filter's own ripple
+below (0.0837 dB worst observed) and the 3.01 dB per doubling above; the
+comment on `kBandInvarianceDb` carries the argument.
 
 ## Why long-term RMS
 

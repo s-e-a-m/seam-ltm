@@ -219,24 +219,73 @@ TEST_CASE("the offset carries the source's spectral density, 3.01 dB per doublin
           == doctest::Approx(3.0103).epsilon(0.001));
 }
 
+// The threshold for band-level invariance across sample rates, derived from
+// the two bounds that actually constrain it rather than chosen round.
+//
+// FLOOR -- invariance can never be tighter than the filter's own band ripple.
+// Each rate designs its own ladder, with its own section count and its own
+// geometric ratio, so a given band sits at a slightly different point of the
+// ripple at each rate. multipink_pink_test measures that ripple as a worst
+// deviation from the mean of 0.071 to 0.081 dB per rate, which bounds the
+// difference between two rates at the same band by twice that, ~0.16 dB.
+// Measured over every band measurable at all six rates, the worst spread is
+// 0.084 dB, at the 15.85 kHz band where the correction section is weakest.
+//
+// CEILING -- the smallest error this test exists to catch is one doubling of
+// the sample rate with the source's density term missing: 3.01 dB.
+//
+// 0.20 dB sits between them with an argument on each side: 2.4x above the
+// measured floor, 15x below the smallest error it must detect, and below
+// SMPTE ST 2095-1's own +/-0.25 dB uniformity tolerance -- so any drift this
+// test tolerates cannot by itself push a band out of the standard. It is a
+// property of the design, not of whichever band a test happens to pick.
+constexpr double kBandInvarianceDb = 0.20;
+
 TEST_CASE("the band level does not move with the sample rate, which is the whole claim") {
     // The test that would have caught the shipped defect. Without the density
-    // term it goes red by 3.01 dB at 96 kHz and 6.02 dB at 192 kHz.
-    const double fc = 1000.0;             // the calibration anchor's own band
-    double lo = 1e9, hi = -1e9;
-    std::printf("\n  predicted 1 kHz third-octave band level, Reference = -23 dBFS\n\n");
-    for (double fs : kRates) {
-        PinkDesign d;
-        d.design(fs);
-        const double lvl = predictedBandLevelDb(d, -23.0, fc);
-        std::printf("  %8.1f Hz   offset %7.3f dB   band %9.4f dBFS\n",
-                    fs, d.calibrationOffsetDb(), lvl);
-        lo = std::min(lo, lvl);
-        hi = std::max(hi, lvl);
+    // term it goes red by 3.01 dB per doubling: 3.01 dB at 96 kHz and 6.02 dB
+    // at 192 kHz against 48 kHz.
+    //
+    // Run over EVERY third-octave band measurable at all six rates, not one
+    // chosen band: the design claims the property for the whole spectrum, so a
+    // test that held only at 1 kHz would be reporting a coincidence. The band
+    // is a parameter throughout (predictedBandLevelDb takes fc), and the ceiling
+    // is the highest band whose upper edge is inside 0.85*Nyquist at 44.1 kHz,
+    // which is the tightest of the six.
+    PinkDesign d[6];
+    for (int r = 0; r < 6; ++r) d[r].design(kRates[r]);
+
+    std::printf("\n  predicted third-octave band level, Reference = -23 dBFS\n");
+    std::printf("  spread across 44.1 ... 192 kHz, threshold %.2f dB\n\n",
+                kBandInvarianceDb);
+    for (int r = 0; r < 6; ++r)
+        std::printf("  %8.1f Hz   offset %7.3f dB   1 kHz band %9.4f dBFS\n",
+                    kRates[r], d[r].calibrationOffsetDb(),
+                    predictedBandLevelDb(d[r], -23.0, 1000.0));
+    std::printf("\n");
+
+    double worst = 0.0, worstFc = 0.0;
+    int bands = 0;
+    for (int n = -17; n <= 40; ++n) {
+        const double fc = 1000.0 * std::pow(10.0, n / 10.0);
+        if (fc * std::pow(10.0, 0.05) > 0.85 * 0.5 * 44100.0) break;
+        double lo = 1e9, hi = -1e9;
+        for (int r = 0; r < 6; ++r) {
+            const double lvl = predictedBandLevelDb(d[r], -23.0, fc);
+            lo = std::min(lo, lvl);
+            hi = std::max(hi, lvl);
+        }
+        ++bands;
+        if (hi - lo > worst) { worst = hi - lo; worstFc = fc; }
+        CHECK(hi - lo < kBandInvarianceDb);
     }
-    std::printf("\n  spread %.4f dB\n\n", hi - lo);
-    CHECK(hi - lo < 0.01);
-    CHECK(lo == doctest::Approx(-39.49).epsilon(0.001));
+    std::printf("  %d bands judged, worst spread %.4f dB at %.1f Hz\n\n",
+                bands, worst, worstFc);
+    CHECK(bands == 30);
+    CHECK(worst < kBandInvarianceDb);
+    // The anchor band's absolute level, pinned so a uniform shift is deliberate.
+    CHECK(predictedBandLevelDb(d[1], -23.0, 1000.0)
+          == doctest::Approx(-39.489).epsilon(0.0002));
 }
 
 TEST_CASE("the total RMS is what holding the band level still implies") {
