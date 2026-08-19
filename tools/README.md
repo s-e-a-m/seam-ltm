@@ -83,6 +83,25 @@ XML validity leads for a reason: no part of the build parses a `.uidesc`.
 On 2026-07-21 a `--` inside a comment produced an empty editor in the host
 while the compiler and the VST3 validator both reported success.
 
+### `--dat` — the filter bank as a pgfplots table
+
+```bash
+python3 tools/decode-tamp-preset.py PRESET --dat bank.dat --channel 1
+```
+
+Writes one column per active filter plus their sum, on a 400-point log grid
+from 20 Hz to 20 kHz, so a figure of the correction descends from the preset
+instead of being transcribed from it.
+
+The per-filter columns are **exact**: they follow only from decoded
+parameters. The **total is provisional** — the amplifier's topology is not
+published, so the sum assumes the RBJ Audio EQ Cookbook forms as digital
+biquads at 48 kHz (`--dsp-fs` to change it) and Butterworth cascades for the
+BW slopes. Until it has been checked against the curve the QUADRO 500
+software draws for the same preset, plot the total as a hypothesis.
+Bessel (BE) slopes are deliberately not modelled and are excluded from the
+sum rather than guessed.
+
 ## `gen-faust-doc.sh` — Faust reference documentation
 
 Regenerates, per plugin, the `-svg/` block diagrams and the mathdoc PDF

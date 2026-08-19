@@ -67,6 +67,9 @@ NOT decoded: the noise gate, and deliberately -- it is unused in this rig, so
 no preset exists that would show what its bytes do. Everything else the
 software exposes is read.
 """
+import argparse
+import cmath
+import math
 import sys
 
 TYPES = {1: "Peak", 2: "LSF", 3: "HSF"}
@@ -124,7 +127,144 @@ def channel(data, ch):
         yield i + 1, r
 
 
-def main(path):
+# ---------------------------------------------------------------------------
+# Response model -- what the filter bank does, drawn from what the preset says.
+#
+# The amplifier's own topology is not published, so this assumes the RBJ Audio
+# EQ Cookbook forms (peaking, low shelf and high shelf with S=1) evaluated as
+# digital biquads at kDspFs, and cascaded Butterworth sections for the BW
+# crossover slopes. That assumption is DECLARED, not established: the
+# per-filter curves are exact, since they follow only from decoded parameters,
+# but the SUM is provisional until it has been checked against the curve the
+# QUADRO 500 software draws for the same preset.
+#
+# Bessel (BE) slopes are not modelled: their alignment is a different filter
+# family, and guessing it would put an invented curve next to measured ones.
+# ---------------------------------------------------------------------------
+
+kDspFs = 48000.0          # assumed sample rate of the amplifier's DSP
+
+
+def _biquad_db(b, a, f, fs):
+    """20*log10|H(e^jw)| of one biquad section at frequency f."""
+    w = 2.0 * math.pi * f / fs
+    z1 = cmath.exp(-1j * w)
+    num = b[0] + b[1] * z1 + b[2] * z1 * z1
+    den = a[0] + a[1] * z1 + a[2] * z1 * z1
+    if den == 0:
+        return float("-inf")
+    m = abs(num / den)
+    return 20.0 * math.log10(m) if m > 0 else float("-inf")
+
+
+def _rbj(kind, f0, q, gain, fs):
+    """RBJ Audio EQ Cookbook coefficients, normalised to a0 = 1."""
+    w0 = 2.0 * math.pi * f0 / fs
+    cw, sw = math.cos(w0), math.sin(w0)
+    if kind == "peak":
+        A = 10.0 ** (gain / 40.0)
+        al = sw / (2.0 * q)
+        b = [1 + al * A, -2 * cw, 1 - al * A]
+        a = [1 + al / A, -2 * cw, 1 - al / A]
+    elif kind in ("lowshelf", "highshelf"):
+        A = 10.0 ** (gain / 40.0)
+        al = sw / 2.0 * math.sqrt(2.0)          # S = 1, the standard slope
+        tsa = 2.0 * math.sqrt(A) * al
+        if kind == "lowshelf":
+            b = [A * ((A + 1) - (A - 1) * cw + tsa),
+                 2 * A * ((A - 1) - (A + 1) * cw),
+                 A * ((A + 1) - (A - 1) * cw - tsa)]
+            a = [(A + 1) + (A - 1) * cw + tsa,
+                 -2 * ((A - 1) + (A + 1) * cw),
+                 (A + 1) + (A - 1) * cw - tsa]
+        else:
+            b = [A * ((A + 1) + (A - 1) * cw + tsa),
+                 -2 * A * ((A - 1) + (A + 1) * cw),
+                 A * ((A + 1) + (A - 1) * cw - tsa)]
+            a = [(A + 1) - (A - 1) * cw + tsa,
+                 2 * ((A - 1) - (A + 1) * cw),
+                 (A + 1) - (A - 1) * cw - tsa]
+    elif kind == "highpass":
+        al = sw / (2.0 * q)
+        b = [(1 + cw) / 2.0, -(1 + cw), (1 + cw) / 2.0]
+        a = [1 + al, -2 * cw, 1 - al]
+    else:
+        raise ValueError(kind)
+    return [x / a[0] for x in b], [x / a[0] for x in a]
+
+
+def butterworth_qs(order):
+    """Section Qs of a Butterworth cascade of even order."""
+    return [1.0 / (2.0 * math.cos(math.pi * (2 * k + 1) / (2 * order)))
+            for k in range(order // 2)]
+
+
+BW_ORDER = {"BW12": 2, "BW24": 4, "BW48": 8}
+
+
+def eq_response_db(rec, f):
+    """dB of one EQ slot at f. rec is the raw 6-byte record."""
+    kind = {1: "peak", 2: "lowshelf", 3: "highshelf"}.get(rec[0])
+    if kind is None:
+        return 0.0
+    q = q_factor(rec[3]) if kind == "peak" else 1.0
+    b, a = _rbj(kind, freq(rec[1], rec[2]), q, gain_db(rec[4]), kDspFs)
+    return _biquad_db(b, a, f, kDspFs)
+
+
+def highpass_response_db(xtype, f0, f):
+    """dB of the channel high pass, or None when the slope is not modelled."""
+    order = BW_ORDER.get(xtype)
+    if order is None:
+        return None
+    return sum(_biquad_db(*_rbj("highpass", f0, q, 0.0, kDspFs), f, kDspFs)
+               for q in butterworth_qs(order))
+
+
+def log_grid(f_lo=20.0, f_hi=20000.0, points=400):
+    step = (math.log10(f_hi) - math.log10(f_lo)) / (points - 1)
+    return [10.0 ** (math.log10(f_lo) + i * step) for i in range(points)]
+
+
+def write_dat(path, data, ch):
+    """Emit a pgfplots table: one column per active filter, plus the sum."""
+    base = EQ_BASE + (ch - 1) * SLOTS * 6
+    slots = [(i + 1, data[base + i * 6: base + i * 6 + 6]) for i in range(SLOTS)]
+    slots = [(s, r) for s, r in slots if r[5] == 0]
+
+    x = data[XOVER_BASE + (ch - 1) * 8: XOVER_BASE + (ch - 1) * 8 + 8]
+    hp_type = XTYPES.get(x[4], "?%d" % x[4])
+    hp_f0 = freq(x[5], x[6])
+    hp_on = hp_type in BW_ORDER
+
+    cols = (["hp"] if hp_on else []) + ["eq%d" % s for s, _ in slots] + ["total"]
+    with open(path, "w") as fh:
+        fh.write("# SEAM -- t.amp filter bank, decoded from the preset\n")
+        fh.write("# channel %d, RBJ biquads at %g Hz (assumed DSP rate)\n"
+                 % (ch, kDspFs))
+        if hp_on:
+            fh.write("# high pass %s at %.1f Hz, order %d Butterworth cascade\n"
+                     % (hp_type, hp_f0, BW_ORDER[hp_type]))
+        else:
+            fh.write("# high pass %s NOT modelled, and NOT in the total\n" % hp_type)
+        for s, r in slots:
+            q = "%.2f" % q_factor(r[3]) if r[0] == 1 else "-"
+            fh.write("# eq%d %-4s %8.1f Hz  Q %-5s %+.1f dB\n"
+                     % (s, TYPES.get(r[0], "?"), freq(r[1], r[2]), q, gain_db(r[4])))
+        fh.write("# per-filter columns are exact; the total assumes the RBJ "
+                 "forms and is provisional\n")
+        fh.write("freq " + " ".join(cols) + "\n")
+        for f in log_grid():
+            vals = []
+            if hp_on:
+                vals.append(highpass_response_db(hp_type, hp_f0, f))
+            vals += [eq_response_db(r, f) for _, r in slots]
+            vals.append(sum(vals))
+            fh.write("%.4f " % f + " ".join("%.4f" % v for v in vals) + "\n")
+    return cols, hp_type, hp_on
+
+
+def main(path, dat=None, dat_channel=1):
     data = open(path, "rb").read()
     print("file       %s (%d bytes)" % (path, len(data)))
     print("workmode   %s" % WORKMODE.get(data[0x110], "raw %d" % data[0x110]))
@@ -165,7 +305,24 @@ def main(path):
                   % (slot, TYPES.get(r[0], "?%d" % r[0]),
                      freq(r[1], r[2]), q, gain_db(r[4])))
 
+    if dat:
+        cols, hp_type, hp_on = write_dat(dat, data, dat_channel)
+        print("\nwrote %s -- CH%d, columns: %s" % (dat, dat_channel, " ".join(cols)))
+        if not hp_on:
+            print("  the %s high pass is not modelled, and is absent from the total"
+                  % hp_type)
+        print("  per-filter curves are exact; the total assumes RBJ forms and is\n"
+              "  provisional until checked against the software's own curve")
+
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else
-         "/Users/giuseppe/Desktop/2026-08-13-STONED-BRIDGE-FLAT.preset")
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("preset")
+    ap.add_argument("--dat", help="write a pgfplots table of the filter curves here")
+    ap.add_argument("--channel", type=int, default=1,
+                    help="channel whose bank the --dat table describes (default 1)")
+    ap.add_argument("--dsp-fs", type=float, default=kDspFs,
+                    help="assumed sample rate of the amplifier DSP (default 48000)")
+    args = ap.parse_args()
+    kDspFs = args.dsp_fs
+    main(args.preset, args.dat, args.channel)
