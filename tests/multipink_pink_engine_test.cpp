@@ -2,6 +2,7 @@
 #include "doctest/doctest.h"
 #include "multipink_pink.h"
 #include <cmath>
+#include <vector>
 
 using Seam::multipink::PinkDesign;
 
@@ -54,4 +55,53 @@ TEST_CASE("the RMS gain falls with the sample rate, and by how much") {
     CHECK(lo.rmsGainDb() == doctest::Approx(-31.07).epsilon(0.01));
     CHECK(hi.rmsGainDb() == doctest::Approx(-36.88).epsilon(0.01));
     CHECK(lo.rmsGainDb() - hi.rmsGainDb() == doctest::Approx(5.81).epsilon(0.02));
+}
+
+namespace {
+
+// Run the actual difference equation, transposed direct form II, one state per
+// section — the form the processor uses. Templated on the state type so that
+// float and double answer the same question.
+template <typename T>
+double measuredDb(const PinkDesign& d, double f, double fs) {
+    std::vector<T> s((size_t)d.numSections, (T)0);
+    const long n = 400000;
+    double re = 0.0, im = 0.0;
+    const double w = 2.0 * M_PI * f / fs;
+    for (long k = 0; k < n; ++k) {
+        T x = (T)std::sin(w * (double)k);
+        for (int i = 0; i < d.numSections; ++i) {
+            const T y = (T)d.b0[i] * x + s[(size_t)i];
+            s[(size_t)i] = (T)d.b1[i] * x - (T)d.a1[i] * y;
+            x = y;
+        }
+        if (k > n / 4) { re += (double)x * std::cos(w * (double)k);
+                         im += (double)x * std::sin(w * (double)k); }
+    }
+    const double m = (double)(n - n / 4);
+    return 20.0 * std::log10(2.0 * std::sqrt(re * re + im * im) / m);
+}
+
+} // namespace
+
+TEST_CASE("the running filter matches its own analytic response") {
+    PinkDesign d;
+    d.design(48000.0);
+    for (double f : {20.0, 1000.0, 16000.0})
+        CHECK(measuredDb<double>(d, f, 48000.0) == doctest::Approx(d.magnitudeDb(f)).epsilon(0.002));
+}
+
+TEST_CASE("single precision costs under a thousandth of a dB") {
+    // The opposite of the third-octave filterbank, where float put every band
+    // below 160 Hz on the epsilon floor. Same frequencies, same f/fs, other
+    // topology: first-order real poles instead of a sixth-order narrowband
+    // section in direct form. Worst case here is 192 kHz at 20 Hz.
+    for (double fs : {48000.0, 192000.0}) {
+        PinkDesign d;
+        d.design(fs);
+        for (double f : {20.0, 31.5, 1000.0}) {
+            const double diff = measuredDb<float>(d, f, fs) - measuredDb<double>(d, f, fs);
+            CHECK(std::fabs(diff) < 0.001);
+        }
+    }
 }
