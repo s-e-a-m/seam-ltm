@@ -280,6 +280,20 @@ live electronics:
 
 GPL-3.0 — see [LICENSE](LICENSE).
 
+## Online documentation
+
+The plugin suite is presented at <https://s-e-a-m.github.io/seam-ltm/>.
+
+The single source for both this README and that page is `doc/plugins.toml`.
+Edit the registry, then regenerate:
+
+    make -C doc doc        # rewrites the tables in this README
+    make -C doc publish    # regenerates the site page and copies the screenshots
+    make -C doc test       # checks the registry, the README and the page
+
+The plugin tables above sit between `<!-- BEGIN plugins -->` and `<!-- END plugins -->` and are generated: edit the registry, not the tables.
+Build instructions, the VST3 SDK and installation paths deliberately stay here and do not go on the site — they age with the code, and a stale copy on a website is worse than no copy.
+
 ## Author
 
 Giuseppe Silvi — [s-e-a-m](https://github.com/s-e-a-m)
