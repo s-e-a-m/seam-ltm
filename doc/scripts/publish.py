@@ -65,11 +65,13 @@ for fam in families:
     for p in fam["plugin"]:
         out.append(f"### {p['name']}")
         out.append("")
-        out.append(f'<img src="/assets/seam-ltm/img/{p["screenshot"]}" alt="{p["name"]}" class="ltm-shot">')
-        out.append("")
+        # prima cosa fa, poi com'e fatto: l'immagine fra il titolo e l'I/O
+        # allontanava il nome del plugin dall'informazione che lo qualifica
         out.append(f"**{p['io']}**")
         out.append("")
         out.append(p["description"].strip())
+        out.append("")
+        out.append(f'<img src="/assets/seam-ltm/img/{p["screenshot"]}" alt="{p["name"]}" class="ltm-shot">')
         if p.get("faust"):
             lib = p["faust"]
             url = f"https://github.com/s-e-a-m/faust-libraries/blob/master/src/{lib}"
