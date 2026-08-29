@@ -19,36 +19,38 @@ Every window follows the same grammar, described in
 [doc/style/ui-style.md](doc/style/ui-style.md) and enforced by
 `tools/check-uidesc.py` as part of `ctest`.
 
+<!-- BEGIN plugins (generato da doc/plugins.toml — non modificare a mano) -->
+
 ### Format converters and rotators
 
 | Plugin | I/O | Description |
 |---|---|---|
-| **SDMX** | stereo &rarr; stereo | Sum and Difference Matrix (Blumlein M/S). The matrix is involutory (A = A⁻¹), so one instance encodes LR &rarr; MS and a second one decodes MS &rarr; LR |
-| **B2XROT** | B-format 4ch &rarr; AmbiX 4ch | B-format (FuMa) to AmbiX with rotation: W is scaled by √2, channels are reordered to ACN/SN3D, then Yaw/Pitch/Roll is applied |
-| **XYPRROT** | AmbiX 4ch &rarr; AmbiX 4ch | First-order AmbiX rotation (Yaw, Pitch, Roll). Channel A0 is omnidirectional and passes through untouched |
-| **M2XHGR** | mono &rarr; AmbiX 4ch | Mono to AmbiX via Haar Decomposition: the Haar QMF bank `haarmn(1)` spreads one channel across four spatial components, which are then rotated by Yaw/Pitch/Roll |
-| **LR2XHGR** | stereo &rarr; AmbiX 4ch | Stereo to AmbiX via Haar (Silvi's method): each channel is Haar-decomposed, placed by a Divergence half-angle, summed, and finally oriented by a global Yaw/Pitch/Roll |
-| **ABMODULEX** | A-format 4ch &rarr; AmbiX 4ch | Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD &rarr; A0 A1 A2 A3. Pure matrix, involutory (M² = I), the inverse of BAMODULEX, and the front end of the TETRAREC chain |
-| **BAMODULEX** | AmbiX 4ch &rarr; tetrahedral 4ch | Gerzon's BA-module in the AmbiX domain: a decoder to the LFU · RFD · RBU · LBD vertices, which are the four drivers of a STONE loudspeaker. The Gerzon compensation shelves are omitted by design — the STONE amplifier corrects HF/LF downstream |
-| **X2UHJ** | AmbiX 4ch &rarr; UHJ C-format 4ch | First-order AmbiX (ACN/SN3D) to UHJ C-format (L, R, T, Q) — the "UHJ decoder" that makes an Ambisonic mix audible on two channels. The ±90° quadrature pair is designed live at the host sample rate by the shared `seam_quadrature` engine, and the GUI reads out the resulting coefficients together with the achieved maximum phase error |
+| **SDMX** | stereo → stereo | Sum and Difference Matrix (Blumlein M/S). The matrix is involutory (A = A⁻¹), so one instance encodes LR → MS and a second one decodes MS → LR |
+| **B2XROT** | B-format 4ch → AmbiX 4ch | B-format (FuMa) to AmbiX with rotation: W is scaled by √2, channels are reordered to ACN/SN3D, then Yaw/Pitch/Roll is applied |
+| **XYPRROT** | AmbiX 4ch → AmbiX 4ch | First-order AmbiX rotation (Yaw, Pitch, Roll). Channel A0 is omnidirectional and passes through untouched |
+| **M2XHGR** | mono → AmbiX 4ch | Mono to AmbiX via Haar Decomposition: the Haar QMF bank `haarmn(1)` spreads one channel across four spatial components, which are then rotated by Yaw/Pitch/Roll |
+| **LR2XHGR** | stereo → AmbiX 4ch | Stereo to AmbiX via Haar (Silvi's method): each channel is Haar-decomposed, placed by a Divergence half-angle, summed, and finally oriented by a global Yaw/Pitch/Roll |
+| **ABMODULEX** | A-format 4ch → AmbiX 4ch | Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD → A0 A1 A2 A3. Pure matrix, involutory (M² = I), the inverse of BAMODULEX, and the front end of the TETRAREC chain |
+| **BAMODULEX** | AmbiX 4ch → tetrahedral 4ch | Gerzon's BA-module in the AmbiX domain: a decoder to the LFU · RFD · RBU · LBD vertices, which are the four drivers of a STONE loudspeaker. The Gerzon compensation shelves are omitted by design — the STONE amplifier corrects HF/LF downstream |
+| **X2UHJ** | AmbiX 4ch → UHJ C-format 4ch | First-order AmbiX (ACN/SN3D) to UHJ C-format (L, R, T, Q) — the "UHJ decoder" that makes an Ambisonic mix audible on two channels. The ±90° quadrature pair is designed live at the host sample rate by the shared `seam_quadrature` engine, and the GUI reads out the resulting coefficients together with the achieved maximum phase error |
 
 ### Signal generators
 
 | Plugin | I/O | Description |
 |---|---|---|
-| **LTBURST** | none &rarr; mono | Linkwitz shaped tone-burst: N = 5 cycles of a sine under a Hann window, repeated at a fixed frequency. Frequency, Dwell and Level are the whole interface |
-| **LTGLIDE** | none &rarr; mono | Linkwitz glissando tone-burst: the carrier of each N = 5 grain is latched from a linear or exponential sweep F0 &rarr; F1 spread over a Sweep Time, with grains spaced in step or gap timing. It loops, declares a STONE id, and publishes what it is playing on the calibration bus |
-| **MULTIPINK** | none &rarr; 1..64ch | Multichannel pink noise drawn from a shared 64-slot logical pool, so that separate instances never emit the same stream. Layout-adaptive from mono to 64 channels, band-calibrated (-23/-20/-18 dBFS reference, read as the total RMS at 48 kHz, ±6 dB trim) so that the per-third-octave level an amplifier is set against holds still when the sample rate changes, with a POWER switch, a STONE id, and a calibration-bus announcement |
+| **LTBURST** | none → mono | Linkwitz shaped tone-burst: N = 5 cycles of a sine under a Hann window, repeated at a fixed frequency. Frequency, Dwell and Level are the whole interface |
+| **LTGLIDE** | none → mono | Linkwitz glissando tone-burst: the carrier of each N = 5 grain is latched from a linear or exponential sweep F0 → F1 spread over a Sweep Time, with grains spaced in step or gap timing. It loops, declares a STONE id, and publishes what it is playing on the calibration bus |
+| **MULTIPINK** | none → 1..64ch | Multichannel pink noise drawn from a shared 64-slot logical pool, so that separate instances never emit the same stream. Layout-adaptive from mono to 64 channels, band-calibrated (-23/-20/-18 dBFS reference, read as the total RMS at 48 kHz, ±6 dB trim) so that the per-third-octave level an amplifier is set against holds still when the sample rate changes, with a POWER switch, a STONE id, and a calibration-bus announcement |
 
 ### Measurement and processing
 
 | Plugin | I/O | Description |
 |---|---|---|
-| **STRX** | stereo &rarr; stereo | Stereo M/S Analyser: goniometer, overlaid M/S Welch spectra, and In L / In R / M / S / Width meters, plus a status line fed by the calibration bus. It observes only — the audio is passed through unchanged and there are no automatable parameters |
-| **DSLAR** | mono &rarr; mono | Agostino Di Scipio's LAR homeostatic loop, hand-ported from `LAR.pd`: the feedforward half of a Larsen system whose loop is closed acoustically by the room. Drive, loop delay, decorrelation, target, steepness and control smoothing, with live r (Hann RMS) and g (loop gain) readouts |
-| **DDELAY** | 4ch &rarr; 4ch | Quad Alignment Delay for loudspeaker time-alignment. A distance in metres becomes an integer-sample delay at c = 331.4 m/s, rounded up to the next prime so that several instances stay incommensurable. All four channels share one value |
-| **HILBERT** | mono &rarr; stereo | Wideband Quadrature Transformer: one input becomes an in-phase and a quadrature branch held −90° apart from 20 Hz to 20 kHz. Both outputs are all-pass filtered, since the relationship belongs to the pair rather than to either signal. Two topologies — RBJ biquad cascade and Niemitalo polyphase — are selectable live and redesigned per sample rate by the same `seam_quadrature` engine X2UHJ uses internally |
-| **ADDELAY** | 4ch &rarr; 4ch | Air-Absorption Delay: inherits DDELAY's exact metres-to-samples integer delay (next-prime rounding included) and adds a minimum-phase air-absorption filter fitted to the ISO 9613-1 α·d distance-dependent high-frequency roll-off. Shelf and three-section RBJ high-shelf cascade topologies are switchable live, with an optional 1/r geometric-spreading attenuation. All four channels share one distance, so the inter-channel phase is preserved |
+| **STRX** | stereo → stereo | Stereo M/S Analyser: goniometer, overlaid M/S Welch spectra, and In L / In R / M / S / Width meters, plus a status line fed by the calibration bus. It observes only — the audio is passed through unchanged and there are no automatable parameters |
+| **DSLAR** | mono → mono | Agostino Di Scipio's LAR homeostatic loop, hand-ported from `LAR.pd`: the feedforward half of a Larsen system whose loop is closed acoustically by the room. Drive, loop delay, decorrelation, target, steepness and control smoothing, with live r (Hann RMS) and g (loop gain) readouts |
+| **DDELAY** | 4ch → 4ch | Quad Alignment Delay for loudspeaker time-alignment. A distance in metres becomes an integer-sample delay at c = 331.4 m/s, rounded up to the next prime so that several instances stay incommensurable. All four channels share one value |
+| **HILBERT** | mono → stereo | Wideband Quadrature Transformer: one input becomes an in-phase and a quadrature branch held −90° apart from 20 Hz to 20 kHz. Both outputs are all-pass filtered, since the relationship belongs to the pair rather than to either signal. Two topologies — RBJ biquad cascade and Niemitalo polyphase — are selectable live and redesigned per sample rate by the same `seam_quadrature` engine X2UHJ uses internally |
+| **ADDELAY** | 4ch → 4ch | Air-Absorption Delay: inherits DDELAY's exact metres-to-samples integer delay (next-prime rounding included) and adds a minimum-phase air-absorption filter fitted to the ISO 9613-1 α·d distance-dependent high-frequency roll-off. Shelf and three-section RBJ high-shelf cascade topologies are switchable live, with an optional 1/r geometric-spreading attenuation. All four channels share one distance, so the inter-channel phase is preserved |
 
 ### Screenshots
 
@@ -63,17 +65,15 @@ of the three families above.
 |:---:|:---:|:---:|:---:|
 | ![LR2XHGR](docs/img/lr2xhgr.png) | ![ABMODULEX](docs/img/abmodulex.png) | ![BAMODULEX](docs/img/bamodulex.png) | ![X2UHJ](docs/img/x2uhj.png) |
 
-| LTBURST | LTGLIDE | MULTIPINK |
-|:---:|:---:|:---:|
-| ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) |
-
-| STRX | DSLAR | DDELAY | HILBERT |
+| LTBURST | LTGLIDE | MULTIPINK | STRX |
 |:---:|:---:|:---:|:---:|
-| ![STRX](docs/img/strx.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) |
+| ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) | ![STRX](docs/img/strx.png) |
 
-| ADDELAY |
-|:---:|
-| ![ADDELAY](docs/img/addelay.png) |
+| DSLAR | DDELAY | HILBERT | ADDELAY |
+|:---:|:---:|:---:|:---:|
+| ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) | ![ADDELAY](docs/img/addelay.png) |
+
+<!-- END plugins -->
 
 ## Installation
 
@@ -279,6 +279,20 @@ live electronics:
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).
+
+## Online documentation
+
+The plugin suite is presented at <https://s-e-a-m.github.io/seam-ltm/>.
+
+The single source for both this README and that page is `doc/plugins.toml`.
+Edit the registry, then regenerate:
+
+    make -C doc doc        # rewrites the tables in this README
+    make -C doc publish    # regenerates the site page and copies the screenshots
+    make -C doc test       # checks the registry, the README and the page
+
+The plugin tables above sit between `<!-- BEGIN plugins -->` and `<!-- END plugins -->` and are generated: edit the registry, not the tables.
+Build instructions, the VST3 SDK and installation paths deliberately stay here and do not go on the site — they age with the code, and a stale copy on a website is worse than no copy.
 
 ## Author
 

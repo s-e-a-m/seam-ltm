@@ -1,0 +1,143 @@
+# Registro dei plugin — la fonte unica per il README e per il sito.
+# Modificare qui, poi rigenerare con:  make doc
+#
+# Ogni plugin: name, io, description, screenshot, faust (la libreria Faust
+# corrispondente, dove esiste: molti plugin sono la controparte C++ di un
+# algoritmo che vive anche in Faust).
+
+[[family]]
+title = "Format converters and rotators"
+
+  [[family.plugin]]
+  name = "SDMX"
+  io = "stereo → stereo"
+  screenshot = "sdmx.png"
+  faust = "seam.stereophony.lib"
+  description = """
+Sum and Difference Matrix (Blumlein M/S). The matrix is involutory (A = A⁻¹), so one instance encodes LR → MS and a second one decodes MS → LR"""
+
+  [[family.plugin]]
+  name = "B2XROT"
+  io = "B-format 4ch → AmbiX 4ch"
+  screenshot = "b2xrot.png"
+  faust = ""
+  description = """
+B-format (FuMa) to AmbiX with rotation: W is scaled by √2, channels are reordered to ACN/SN3D, then Yaw/Pitch/Roll is applied"""
+
+  [[family.plugin]]
+  name = "XYPRROT"
+  io = "AmbiX 4ch → AmbiX 4ch"
+  screenshot = "xyprrot.png"
+  faust = ""
+  description = """
+First-order AmbiX rotation (Yaw, Pitch, Roll). Channel A0 is omnidirectional and passes through untouched"""
+
+  [[family.plugin]]
+  name = "M2XHGR"
+  io = "mono → AmbiX 4ch"
+  screenshot = "m2xhgr.png"
+  faust = "seam.ambisonics.lib"
+  description = """
+Mono to AmbiX via Haar Decomposition: the Haar QMF bank `haarmn(1)` spreads one channel across four spatial components, which are then rotated by Yaw/Pitch/Roll"""
+
+  [[family.plugin]]
+  name = "LR2XHGR"
+  io = "stereo → AmbiX 4ch"
+  screenshot = "lr2xhgr.png"
+  faust = "seam.ambisonics.lib"
+  description = """
+Stereo to AmbiX via Haar (Silvi's method): each channel is Haar-decomposed, placed by a Divergence half-angle, summed, and finally oriented by a global Yaw/Pitch/Roll"""
+
+  [[family.plugin]]
+  name = "ABMODULEX"
+  io = "A-format 4ch → AmbiX 4ch"
+  screenshot = "abmodulex.png"
+  faust = "seam.ambisonics.lib"
+  description = """
+Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD → A0 A1 A2 A3. Pure matrix, involutory (M² = I), the inverse of BAMODULEX, and the front end of the TETRAREC chain"""
+
+  [[family.plugin]]
+  name = "BAMODULEX"
+  io = "AmbiX 4ch → tetrahedral 4ch"
+  screenshot = "bamodulex.png"
+  faust = "seam.ambisonics.lib"
+  description = """
+Gerzon's BA-module in the AmbiX domain: a decoder to the LFU · RFD · RBU · LBD vertices, which are the four drivers of a STONE loudspeaker. The Gerzon compensation shelves are omitted by design — the STONE amplifier corrects HF/LF downstream"""
+
+  [[family.plugin]]
+  name = "X2UHJ"
+  io = "AmbiX 4ch → UHJ C-format 4ch"
+  screenshot = "x2uhj.png"
+  faust = "seam.ambisonics.lib"
+  description = """
+First-order AmbiX (ACN/SN3D) to UHJ C-format (L, R, T, Q) — the "UHJ decoder" that makes an Ambisonic mix audible on two channels. The ±90° quadrature pair is designed live at the host sample rate by the shared `seam_quadrature` engine, and the GUI reads out the resulting coefficients together with the achieved maximum phase error"""
+
+[[family]]
+title = "Signal generators"
+
+  [[family.plugin]]
+  name = "LTBURST"
+  io = "none → mono"
+  screenshot = "ltburst.png"
+  faust = "seam.linkwitz.lib"
+  description = """
+Linkwitz shaped tone-burst: N = 5 cycles of a sine under a Hann window, repeated at a fixed frequency. Frequency, Dwell and Level are the whole interface"""
+
+  [[family.plugin]]
+  name = "LTGLIDE"
+  io = "none → mono"
+  screenshot = "ltglide.png"
+  faust = "seam.linkwitz.lib"
+  description = """
+Linkwitz glissando tone-burst: the carrier of each N = 5 grain is latched from a linear or exponential sweep F0 → F1 spread over a Sweep Time, with grains spaced in step or gap timing. It loops, declares a STONE id, and publishes what it is playing on the calibration bus"""
+
+  [[family.plugin]]
+  name = "MULTIPINK"
+  io = "none → 1..64ch"
+  screenshot = "multipink.png"
+  faust = "seam.filters.lib"
+  description = """
+Multichannel pink noise drawn from a shared 64-slot logical pool, so that separate instances never emit the same stream. Layout-adaptive from mono to 64 channels, band-calibrated (-23/-20/-18 dBFS reference, read as the total RMS at 48 kHz, ±6 dB trim) so that the per-third-octave level an amplifier is set against holds still when the sample rate changes, with a POWER switch, a STONE id, and a calibration-bus announcement"""
+
+[[family]]
+title = "Measurement and processing"
+
+  [[family.plugin]]
+  name = "STRX"
+  io = "stereo → stereo"
+  screenshot = "strx.png"
+  faust = "seam.analyzers.lib"
+  description = """
+Stereo M/S Analyser: goniometer, overlaid M/S Welch spectra, and In L / In R / M / S / Width meters, plus a status line fed by the calibration bus. It observes only — the audio is passed through unchanged and there are no automatable parameters"""
+
+  [[family.plugin]]
+  name = "DSLAR"
+  io = "mono → mono"
+  screenshot = "dslar.png"
+  faust = "seam.discipio.lib"
+  description = """
+Agostino Di Scipio's LAR homeostatic loop, hand-ported from `LAR.pd`: the feedforward half of a Larsen system whose loop is closed acoustically by the room. Drive, loop delay, decorrelation, target, steepness and control smoothing, with live r (Hann RMS) and g (loop gain) readouts"""
+
+  [[family.plugin]]
+  name = "DDELAY"
+  io = "4ch → 4ch"
+  screenshot = "ddelay.png"
+  faust = ""
+  description = """
+Quad Alignment Delay for loudspeaker time-alignment. A distance in metres becomes an integer-sample delay at c = 331.4 m/s, rounded up to the next prime so that several instances stay incommensurable. All four channels share one value"""
+
+  [[family.plugin]]
+  name = "HILBERT"
+  io = "mono → stereo"
+  screenshot = "hilbert.png"
+  faust = "seam.filters.lib"
+  description = """
+Wideband Quadrature Transformer: one input becomes an in-phase and a quadrature branch held −90° apart from 20 Hz to 20 kHz. Both outputs are all-pass filtered, since the relationship belongs to the pair rather than to either signal. Two topologies — RBJ biquad cascade and Niemitalo polyphase — are selectable live and redesigned per sample rate by the same `seam_quadrature` engine X2UHJ uses internally"""
+
+  [[family.plugin]]
+  name = "ADDELAY"
+  io = "4ch → 4ch"
+  screenshot = "addelay.png"
+  faust = "seam.filters.lib"
+  description = """
+Air-Absorption Delay: inherits DDELAY's exact metres-to-samples integer delay (next-prime rounding included) and adds a minimum-phase air-absorption filter fitted to the ISO 9613-1 α·d distance-dependent high-frequency roll-off. Shelf and three-section RBJ high-shelf cascade topologies are switchable live, with an optional 1/r geometric-spreading attenuation. All four channels share one distance, so the inter-channel phase is preserved"""
