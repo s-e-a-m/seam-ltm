@@ -102,6 +102,37 @@ software draws for the same preset, plot the total as a hypothesis.
 Bessel (BE) slopes are deliberately not modelled and are excluded from the
 sum rather than guessed.
 
+## `check-minos.py` — minimum-macOS lint
+
+Reads the `LC_BUILD_VERSION` load command out of every built bundle and out of
+`libseamcalbus.dylib`, one slice of the universal binary at a time, and fails
+when any of them declares a minimum macOS newer than the floor the suite ships
+for.
+
+Run by hand over a build tree:
+
+```bash
+python3 tools/check-minos.py build/VST3/Release
+```
+
+It is registered as the `minos_lint` ctest on macOS, pointed at this build
+tree's `VST3/<config>` directory and at the calibration bus.
+
+Left to itself CMake initialises `CMAKE_OSX_DEPLOYMENT_TARGET` from the macOS
+of the machine running the build, and the binaries then refuse to load on
+anything older — with no build warning, no host error, and nothing visible
+but a prohibitory badge on the bundle in the Finder. It is invisible to the
+person who compiled them, because their own machine always satisfies its own
+version. v0.2.0 and v0.3.0 both shipped pinned to macOS 15.7 this way. The
+root `CMakeLists.txt` now sets the floor explicitly, and this lint is what
+notices if that ever stops being true.
+
+The ceiling lives in the script as `MAX_MINOS`, deliberately **not** read from
+`CMAKE_OSX_DEPLOYMENT_TARGET`: a check whose threshold comes from the variable
+it is checking rises with it and can never fail. For the same reason the script
+exits non-zero when it finds no Mach-O at all, rather than reporting a clean
+run over nothing.
+
 ## `gen-faust-doc.sh` — Faust reference documentation
 
 Regenerates, per plugin, the `-svg/` block diagrams and the mathdoc PDF

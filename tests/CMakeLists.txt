@@ -231,6 +231,19 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME uidesc_lint
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-uidesc.py)
+
+    # ─── Minimum macOS the built binaries declare ────────────────────────────
+    # Reads the bundles and the calibration bus as they come out of this build
+    # tree, so the thing checked is the artefact a release ships and not the
+    # CMake variable that was meant to shape it. See the deployment-target
+    # block in the root CMakeLists.txt for what this catches.
+    if(APPLE)
+        add_test(NAME minos_lint
+                 COMMAND ${Python3_EXECUTABLE}
+                         ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-minos.py
+                         ${CMAKE_BINARY_DIR}/VST3/$<CONFIG>
+                         $<TARGET_FILE:seam_calbus>)
+    endif()
 else()
     message(STATUS "Python3 not found — uidesc lint tests will not be registered")
 endif()

@@ -17,8 +17,23 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
         CACHE STRING "macOS build architecture (defaults to host)")
 endif()
 
+# ─── macOS deployment target ────────────────────────────────────────────────
+# Left unset, CMake initialises this from the macOS of the machine running the
+# build, and every binary refuses to load on anything older — silently, with a
+# prohibitory badge in the Finder and no diagnostic anywhere. v0.2.0 and v0.3.0
+# both shipped pinned to 15.7 that way, unusable on a colleague's 15.6.1.
+# 11.0 is the floor the suite ships for: the arm64 slice of a universal binary
+# cannot go below it, and the VST3 SDK supports macOS 10.13-15.
+# `tools/check-minos.py` holds the same number independently and fails the test
+# suite if a build ever declares a newer one.
+# Must be set BEFORE project(), like the architecture above.
+if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0"
+        CACHE STRING "Minimum macOS the binaries run on")
+endif()
+
 project(seam-ltm
-    VERSION 0.3.0
+    VERSION 0.3.1
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
 )
 

@@ -79,7 +79,8 @@ of the three families above.
 
 Prebuilt VST3 bundles are attached to each
 [release](https://github.com/s-e-a-m/seam-ltm/releases/latest). The macOS
-builds are **universal binaries** (Intel `x86_64` + Apple Silicon `arm64`).
+builds are **universal binaries** (Intel `x86_64` + Apple Silicon `arm64`)
+and run on **macOS 11 Big Sur and later**.
 Each plugin has its own `*.vst3.zip`, and
 `seam-ltm-<version>-macOS-all.zip` carries the whole suite together with the
 calibration bus described below.
