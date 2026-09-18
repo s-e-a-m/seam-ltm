@@ -80,6 +80,9 @@ of the three families above.
 Prebuilt VST3 bundles are attached to each
 [release](https://github.com/s-e-a-m/seam-ltm/releases/latest). The macOS
 builds are **universal binaries** (Intel `x86_64` + Apple Silicon `arm64`).
+Each plugin has its own `*.vst3.zip`, and
+`seam-ltm-<version>-macOS-all.zip` carries the whole suite together with the
+calibration bus described below.
 
 > To build from source instead, skip to [Requirements](#requirements).
 
@@ -119,6 +122,30 @@ xattr -l ~/Library/Audio/Plug-Ins/VST3/multipink.vst3
 Alternatively, after the first blocked load attempt you can authorize each
 plugin via **System Settings → Privacy & Security → "Open Anyway"** — but the
 `xattr` route is faster and covers every plugin in one command.
+
+#### The calibration bus
+
+**MULTIPINK**, **LTGLIDE** and **STRX** reach each other through
+`libseamcalbus.dylib`, a small shared library that lives outside the bundles.
+Static state stops at the edge of a `.vst3` module, so three separate bundles
+need one shared object to hold the bus — see
+`plugins/_common/calbus/seam_calbus.h` for the full rationale.
+
+A source build installs it automatically. Installing from a release, copy it
+by hand from `seam-ltm-<version>-macOS-all.zip`:
+
+```bash
+mkdir -p ~/Library/Application\ Support/SEAM
+cp libseamcalbus.dylib ~/Library/Application\ Support/SEAM/
+xattr -dr com.apple.quarantine ~/Library/Application\ Support/SEAM/libseamcalbus.dylib
+```
+
+The client looks in `~/Library/Application Support/SEAM` first and in
+`/Library/Application Support/SEAM` second. Setting `SEAM_CALBUS_PATH`
+overrides both: it then becomes the only location tried, so that an
+explicitly pointed-at library is the one that loads.
+When the library is missing the three plugins still load and play, and STRX
+reports `calbus unavailable` on its status line.
 
 ### Linux
 
