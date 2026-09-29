@@ -206,6 +206,19 @@ Decision: B, Davide's own line on the current libraries, and the port goes on wi
 A, C, C3 and C2 stay in the study and in the renders, so that the choice can be argued with Davide before it is called settled.
 
 
+### First entry of `seam.tedesco.lib`
+`faust-libraries/src/seam.tedesco.lib`, prefix `sdt`, registered in `seam.lib` under a new "composer specific literature" heading.
+- `sdt.lmoband(f)`: the original's HP24 : LP24 line, unchanged, on the current libraries (SVF sections).
+- `sdt.lmo(N, f)`: `no.multinoise(N)` through `lmoband`, channel `i` at `f + i` Hz as in the original.
+
+Verified by compiling: the `compute()` of `sdt.lmoband` is identical to the original line on current faustlibraries, and differs on the libraries bundled with Faust 2.88.0 (Homebrew), which still carry the direct form.
+The library therefore requires `-I <faustlibraries clone>`, and says so in its header.
+
+Left out, waiting for Davide: the second oscillator (it doubles the first: the frequency formula `freq + (i+1)·1.03·freq/(i+1)` is 2.03·freq for every `i`, and the seed is fixed), the 1.015 factor, the high-passed direct noise, the output stage.
+The per-channel `+ i` Hz offset is kept as in the original, not yet discussed.
+
+Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
+
 ## Open
 Questions for Davide:
 1. The double feed into `stunedrev`: intended or residual?
