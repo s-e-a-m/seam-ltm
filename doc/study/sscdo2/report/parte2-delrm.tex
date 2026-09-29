@@ -1,3 +1,48 @@
-% parte2-delrm.tex
-\chapter{delRM}
-Questo capitolo raccoglie le schede di delRM.
+% parte2-delrm.tex -- chapter delRM.
+\chapter{delRM}\label{cap:delrm}
+delRM (\texttt{delRM\_duet}) lavora su quattro canali, e ciascuno elabora soltanto il proprio ingresso dalla TETRAREC.
+I canali 1 e 3 sono un filtro a pettine: il segnale più se stesso ritardato di D, $x + x[n-D]$.
+I canali 2 e 4 moltiplicano tre segnali, il ritardato, il diretto e il suo integrale, $10 \cdot x[n-D] \cdot x \cdot \int x$, e passano il prodotto a un compressore.
+Il ritardo D è quello del plugin DDELAY: una distanza in metri, convertita alla velocità del suono di \misurau{331.4}{\metre\per\second}{delrm-delay} e portata al primo successivo, secondo l'accordo con Davide (\S\ref{sec:principio-genealogia}).
+La specifica Faust di DDELAY è verificata valore per valore contro il plugin (\studio{delrm-delay}).
+Nella libreria SEAM i blocchi sono \texttt{sdt.delrmcomb}, \texttt{sdt.delrmint}, \texttt{sdt.delrmrm} e \texttt{sdt.delrmdyn}.
+
+\scheda{delrm-distanza}{Distanza (ritardo D)}
+{da 0 a \qty{30}{\metre}; si regola durante il montaggio e resta ferma nel brano, e il piccolo click di un cambio è accettato}
+{\misurau{7.291}{\metre}{delrm-comb}, cioè \misura{2113}{delrm-comb} campioni a \qty{96}{\kilo\hertz}: i \qty{22}{\milli\second} di Davide}
+{il pettine alza e scava i parziali del suono secondo la distanza: a 7,291 m rinforza il terzo parziale del clarinetto contrabbasso di \misura{+6.0}{delrm-comb} dB e scava il settimo di \misura{-7.3}{delrm-comb} dB; a 10 m alza la fondamentale di \misura{+5.5}{delrm-comb} dB e toglie il quinto parziale, \misura{-17.3}{delrm-comb} dB; regolare il ritardo è regolare un timbro}
+{l'originale usava secondi con \texttt{de.delay}; il porting usa il ritardo primo di DDELAY, in metri, così lo stesso strumento serve a SSCDO\#4; \S\ref{sec:principio-primi}}
+{\daprovare}
+{\studio{delrm-comb}: la nota del clarinetto a 5, 7,291 e 10 m, e la nota senza effetto}
+
+\scheda{delrm-volume}{Volume (CC82)}
+{fader lineare}
+{come nel patch}
+{nessuna}
+{invariato}
+{\daprovare}
+{}
+
+\scheda{delrm-dinamica}{Canali 2 e 4: la finestra dinamica}
+{dipende dal guadagno dell'ASP880, cioè dal livello con cui il suono entra}
+{da trovare in sala}
+{il prodotto di tre segnali è cubico: 6 dB in più all'ingresso diventano 18 dB in più prima del compressore; sotto la soglia l'effetto cresce in fretta, sopra il compressore 11:1 lavora come un limitatore; circa 15 dB di dinamica del suonare separano l'effetto assente da quello saturo; i transitori superano l'attacco di 30 ms e toccano 0 dBFS con \misurau{+6}{\decibel}{delrm-rm} all'ingresso, prima del master}
+{il compressore è quello dell'originale, con gli stessi parametri}
+{\daprovare}
+{\studio{delrm-rm}: ascolti del prodotto triplo dopo il compressore}
+
+\scheda{delrm-integratore}{L'integratore}
+{fisso}
+{---}
+{l'integratore originale sommava tutto dall'accensione e trascinava la componente continua: una nota che arrivava dopo cinque minuti produceva un prodotto triplo più forte di \misurau{7.3}{\decibel}{delrm-rm} e simile per \misura{0.88}{delrm-rm} di correlazione a una semplice automodulazione; con l'integratore SEAM l'effetto resta quello dell'accensione per tutto il brano}
+{integratore con perdita sotto 1 Hz, molto al di sotto della fondamentale del clarinetto, scalato per 96000 perché il suono sia quello che Davide sentiva a \qty{96}{\kilo\hertz}; \S\ref{sec:principio-96k}}
+{\deciso}
+{\studio{delrm-rm}: la nota all'accensione e dopo cinque minuti, nell'originale e nel porting}
+
+\scheda{delrm-dcblocker}{I DC blocker}
+{due in serie nell'originale: uno alla fine di ogni canale, uno dopo il volume}
+{assenti nel porting}
+{con l'integratore SEAM non c'è componente continua da trattenere; a \qty{96}{\kilo\hertz} i DC blocker erano passa-alto a \misurau{76.59}{\hertz}{delrm-dcblock}, e in serie toglievano \misurau{17.6}{\decibel}{delrm-dcblock} alla fondamentale del clarinetto: il basso della performance era più sottile}
+{tolti perché il loro problema non esiste più (\S\ref{sec:principio-processo}); se Davide vuole quel basso più sottile, rientra come un passa-alto dichiarato, \texttt{fi.dcblockerat(76.59)}}
+{\domanda}
+{\studio{delrm-dcblock}: A/B della nota senza e con i due DC blocker}
