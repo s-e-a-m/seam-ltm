@@ -162,25 +162,24 @@ Its comments state briefly when and why the SEAM version was written and what th
 At the end of the session, the SEAM integrations (matched-Z pink filter, Hilbert pair, and whatever this port produces) are to be weighed as proposals to GRAME.
 
 ### First block: the LMO noise source
-Premise checked before writing: SEAM's correction of multichannel noise exists only in C++ (`multipink`: splitmix64 seeds and the 64-slot pool).
-On the Faust side `sno.multipink` still calls the standard `no.multinoise`, and the pink filter plays no part in the LMO, whose noise is white.
-So the corrected noise source does not exist yet in `faust-libraries`: the first block is a new SEAM function, and `sdt` refers to it.
+Decision: the standard `no.multinoise` stays, and no SEAM alternative is written.
 
-The standard generator is `y[n] = 1103515245·y[n−1] + seed` in 32-bit integers, starting from zero, with `seed = 12345` fixed.
-Measured over 10⁵ samples, correlation against the stream of seed 12345:
+The LMO's noise is white; the pink filter plays no part in it.
+Within one call, `no.multinoise(N)` gives N decorrelated streams (max |r| 0.002 over 120 pairs, at chance level), which is all a tetrahedral source needs: one `multinoise(4)` feeds LFU, RFD, RBU, LBD with independent noise, as `sno.multipink(4)` already does.
 
-| Seed | r |
+The fixed seed makes two streams identical only in two cases.
+Two calls in one DSP: in the LMO the second call feeds a second oscillator that duplicates the first, so the remedy belongs to the oscillator block, not to the generator.
+Two plugin instances: a matter of the C++ instance, which the specification cannot see, and which `multipink` already solves with splitmix64 seeds and the pool.
+
+Measured on the way, and kept as a warning for whoever introduces seeds: the generator is `y[n] = 1103515245·y[n−1] + seed` in 32-bit integers from zero, so seeds in a small integer ratio give streams in the same ratio modulo 2³².
+
+| Seed against 12345 | r |
 |---|---|
 | 12346 (+1) | −0.005 |
 | 24690 (×2) | −0.249 |
 | 37035 (×3) | +0.337 |
 | 61725 (×5) | +0.201 |
-| hash(1) | +0.001 |
-| hash(2) | +0.003 |
-
-With the additive seed, two seeds in a small integer ratio give streams in the same ratio modulo 2³², and the correlation reaches 0.34.
-A seed parameter exposed as it is would invite exactly the naive choice `seed·(i+1)`.
-The seed must pass through a hash before it reaches the generator: the Faust counterpart of the rule already applied in `multipink`.
+| hash(1), hash(2) | +0.001, +0.003 |
 
 ## Open
 Questions for Davide:
