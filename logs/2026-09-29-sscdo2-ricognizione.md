@@ -290,6 +290,14 @@ On the note at varied input levels (`doc/study/sscdo2/delrm-rm/results.md`, bloc
 About 15 dB of playing dynamics separate absent from saturated: a fact for the operational table, since the ASP880's gain places the performance inside that window.
 Transients pass the 30 ms attack: output peaks 16 dB above the RMS, reaching 0 dBFS at +6 dB of input, before the master volume.
 
+### Open: the delay lines are in the wrong library
+Giuseppe, at the end of the day: `sma.imnpdelay` uses `de.delay`, so it is a stateful DSP, not a mathematical function, and does not belong in `seam.math.lib` (nor does `sma.imdelay`, whose comment already called it "the one stateful function in this library").
+To do first at the next session:
+- create `seam.delays.lib`, prefix `sdl`, extending the standard `delays.lib` (only what upstream lacks), and move `imdelay` and `imnpdelay` there; the conversions `isos`, `imt2samp`, `imt2npsamp` stay in `seam.math.lib`;
+- update the callers: `sdt.delrmrm`, `doc/study/sscdo2/delrm-rm/probe.dsp`, the `FAUST REFERENCE` in `plugins/ddelay/source/ddelay_processor.h`, `plugins/ddelay/doc/ddelay.dsp`, `plugins/addelay/doc/addelay.dsp`, `plugins/README.md`;
+- `ddelay.dsp` calls itself the canonical DSP but still uses `imdelay`, without primes: move it to `sdl.imnpdelay` and regenerate its documentation with `tools/gen-faust-doc.sh`;
+- rerun the `delrm-rm` self-test and the `delrm-delay` check.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
