@@ -351,4 +351,5 @@ Davide's `apf(SRM,t,g)` is `sjm.apf` from `seam.moorer.lib` with the buffer turn
 Schroeder's library already had the variable form `sms.apfv(md,t,g)`, Moorer's did not; faust-libraries dec24d8 adds `sjm.apfv(md,t,g)`, and `sjm.apf` becomes `apfv(ma.SR,t,g)` with an unchanged impulse response.
 Moorer's form is the one kept: one multiplier, all-pass by structure for any rounded g, and nestable (`sjm.apfo`); Schroeder's sums a direct path and a comb with three coefficients (-g, g, 1-g²) and is all-pass by cancellation.
 Measured on 42 sections in double: Davide's chain against `sjm.apfv` differs by 0, `sjm.apfv(md,t,g)` against `fi.allpass_comb(md,t,-g)` by 2.7e-16; flipping g's sign turns the first check red (0.40).
-Open: extend `comb` and `apfo` with the same `md` parameter; the float gap between the two forms over 42 sections is not measured.
+Open: extend `comb` and `apfo` with the same `md` parameter.
+Precision: the VST computes in double whatever the host's I/O format (the `addelay` pattern: one templated `process`, state in `std::vector<double>`), so the gap between the two forms matters only in Faust compiled in float, the online IDE's default; over 42 sections it is not measured.
