@@ -8,3 +8,7 @@
 ## Repository structure
 
 - [ ] ([#11](https://github.com/s-e-a-m/seam-ltm/issues/11)) The repository has both `doc/` (style, study, the plugin registry) and `docs/` (screenshots, audio, superpowers). The workspace convention keeps one `docs/` for documentation source and `refs/` for reference material. Decide the final layout and move things once, rather than adding to both.
+
+## Studies
+
+- [ ] ([#12](https://github.com/s-e-a-m/seam-ltm/issues/12)) Quadrature pair: the same RBJ all-pass sections realised in direct form (`fi.tf2`, as `seam.filters.lib` does now) and as SVFs (`fi.svf.ap`), after GRAME moved `filters.lib` to SVF sections for float accuracy (#261, #262). Phase error in float and double from 44.1 to 192 kHz, CPU. A necessary step before proposing SEAM work to GRAME.
