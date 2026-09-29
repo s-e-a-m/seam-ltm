@@ -217,6 +217,11 @@ The library therefore requires `-I <faustlibraries clone>`, and says so in its h
 Left out, waiting for Davide: the second oscillator (it doubles the first: the frequency formula `freq + (i+1)·1.03·freq/(i+1)` is 2.03·freq for every `i`, and the seed is fixed), the 1.015 factor, the high-passed direct noise, the output stage.
 The per-channel `+ i` Hz offset is kept as in the original, not yet discussed.
 
+Giuseppe's listening test of one against two oscillators (`doc/study/sscdo2/lmo-streams/`): his `lmo(N, M, f)` spreads N noise streams over the channels, and at N = 2 he heard more complex phases and a widening, with no change of intonation.
+Read and measured: `<:` repeats the streams cyclically, so the two blocks are identical (difference exactly 0) and `/(N)` restores the level; what changes is that channels 0 and 1 no longer share a stream (r from 0.998 to −0.02).
+The widening is the decorrelation of the channels, which the original already has with one `multinoise` stream per channel; the `+ i` Hz offsets separate nothing on their own (1 Hz against a 73 Hz band at 1 kHz).
+Recorded in `sdt.lmo`'s comment; the library now also cites Davide's GitLab repository.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
