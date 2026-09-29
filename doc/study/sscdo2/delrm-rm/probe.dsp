@@ -18,11 +18,17 @@
 //   selfrm 10 * x[n-D] * x, the product without the integral (what I0 degenerates into
 //          when a large drift turns the integral into a constant)
 //
-// Controls: mt (DDELAY distance, m), fc (I1's corner, Hz).
+//   dyn    input gain g, then sdt.delrmrm(mt) : sdt.delrmdyn (blocks 3 and 4 from the library)
+//   cmp1   input gain g, then the probe's triple(I1) (x10 included) into the compressor:
+//          must equal dyn
+//   pre1g  input gain g, then triple(I1): the compressor's input
+//
+// Controls: mt (DDELAY distance, m), fc (I1's corner, Hz), g (linear input gain).
 import("seam.lib");
 
 mt = hslider("mt", 7.291, 0, 30, 0.001);
 fc = hslider("fc", 1, 0.01, 20, 0.01);
+g  = hslider("g", 1, 0, 100, 0.000001);
 
 xD = sma.imnpdelay(1 << 15, mt);
 
@@ -38,5 +44,8 @@ int1 = I1;  pre1 = triple(I1);  post1 = pre1 : stage;
 int2 = I2;  pre2 = triple(I2);  post2 = pre2 : stage;
 selfrm = _ <: xD, _ : * : *(10);
 lib    = sdt.delrmrm(mt) : *(10);
+dyn    = *(g) : sdt.delrmrm(mt) : sdt.delrmdyn;
+cmp1   = *(g) : triple(I1) : co.compressor_mono(11, -24, 0.03, 0.04);
+pre1g  = *(g) : triple(I1);
 
 process = pre0;

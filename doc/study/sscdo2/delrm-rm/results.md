@@ -103,3 +103,25 @@ Chosen with Giuseppe: the sound, anchored at 96 kHz, so that delRM behaves the s
 ### Renders
 `render()` writes, at 96 kHz and −20 dBFS RMS: the dry note; for I0, I1 and I2 the output after the compressor on a fresh start and after five minutes of floor; and the plain self-ring-modulation, for comparison with `post_I0-original_after5min`.
 They are committed, with Giuseppe's agreement to publish the recording.
+
+## Block 4 — the compressor (hand-run, 96 kHz, D = 7.291 m, I1)
+`sdt.delrmdyn = *(10) : co.compressor_mono(11, −24, 0.03, 0.04)`, the original's stage, standard and rate-independent.
+The library chain `sdt.delrmrm : sdt.delrmdyn` equals the probe's `triple(I1)` into the compressor sample for sample (probes `dyn`, `cmp1`); a 1 % change of input gain is caught (max diff 0.097).
+
+The note's input level was varied around the recording (track 1 at 1 m, steady RMS −16.6 dBFS); RMS on the steady part, gain reduction as the median over 50 ms windows:
+
+| input re recording | input RMS dBFS | compressor input RMS | output RMS | output peak | gain reduction |
+|---|---|---|---|---|---|
+| −40 dB | −56.6 | −99.4 | −99.4 | −81.9 | 0.0 dB |
+| −30 dB | −46.6 | −69.4 | −69.4 | −51.9 | 0.0 |
+| −20 dB | −36.6 | −39.4 | −39.4 | −21.9 | 0.0 |
+| −12 dB | −28.6 | −15.4 | −20.9 | −4.9 | 5.4 |
+| −6 dB | −22.6 | +2.6 | −19.2 | −3.2 | 21.7 |
+| 0 dB | −16.6 | +20.6 | −17.6 | −1.6 | 38.1 |
+| +6 dB | −10.6 | +38.6 | −16.0 | 0.0 | 54.4 |
+
+The triple product is cubic: below the threshold, 10 dB more from the clarinet is 30 dB more out of delRM, so channels 2 and 4 behave as an expander and stay silent on soft playing (−39 dBFS at −20 dB from the recording's level).
+Above it, the 11:1 compressor turns them into a limiter: from −12 to +6 dB of input the output rises by less than 5 dB, and at the recording's level the compressor already works 38 dB deep.
+Between the two, a window of about 15 dB of playing dynamics decides whether the effect is absent, emerging or saturated.
+The 30 ms attack lets transients through: the output peaks sit 16 dB above its RMS and reach 0 dBFS at +6 dB of input, before the master volume.
+The input level in the performance depends on the ASP880's gain, not on this recording; the table is a shape, to be placed by the setup.

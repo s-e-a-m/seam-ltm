@@ -284,6 +284,12 @@ Giuseppe agreed to publish the renders made from the recording (comb and triple 
 Giuseppe asked why not `*(ma.SR)`: it cancels the normalisation and gives back a stable sum of samples, identical at 96 kHz; at 48 kHz it is 6.00 dB lower before the compressor and −0.21 dB after it, so the compressor absorbs the level but works 6 dB less hard.
 Kept at 96000: the specification is the sound as Davide heard it, and delRM should behave the same at any session rate.
 
+### delRM block 4: the compressor
+`sdt.delrmdyn = *(10) : co.compressor_mono(11, −24, 0.03, 0.04)`, the standard compressor as in the original; `sdt.delrmrm : sdt.delrmdyn` equals the probe chain sample for sample.
+On the note at varied input levels (`doc/study/sscdo2/delrm-rm/results.md`, block 4): the cubic product makes channels 2 and 4 an expander below threshold (+30 dB out per +10 dB in) and the 11:1 compressor a limiter above it (under 5 dB out over 18 dB in, 38 dB of gain reduction at the recording's level).
+About 15 dB of playing dynamics separate absent from saturated: a fact for the operational table, since the ASP880's gain places the performance inside that window.
+Transients pass the 30 ms attack: output peaks 16 dB above the RMS, reaching 0 dBFS at +6 dB of input, before the master volume.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
