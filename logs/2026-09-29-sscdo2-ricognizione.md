@@ -230,6 +230,14 @@ Agreed with Davide: the delay uses DDELAY's prime rounding, so that the tool is 
 At 0 Hz apart they share the frequency and are decorrelated; at a distance Δ each moves by Δ/2 from the reference band centre (10 Hz apart: −5 and +5 Hz).
 The distance slider stays narrow, in the range of beats up to about the critical band.
 
+**Decisions.**
+- delRM delay: DDELAY as it is — distance in metres, conversion at c = 331.4 m/s, rounded up to the next prime, integer samples, with the value shown in ms in the UI.
+  The delay is dynamic while the setup is tuned and static during the piece, so the click on a change is acceptable: Davide's standard `de.delay` clicked in the same way.
+- LMO second oscillator: 2N streams from one `no.multinoise(2N)` call; streams 0 … N−1 feed the band at fc − Δ/2 + k, streams N … 2N−1 the band at fc + Δ/2 + k, and channel k sums the two.
+  The per-channel offset k cancels in the difference, so every channel beats at the same Δ.
+  Two independent noises sum in power, so the level compensation is 1/√2.
+  The range of the Δ slider is set by a listening study (`doc/study/sscdo2/lmo-beats/`).
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
