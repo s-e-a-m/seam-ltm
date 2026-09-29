@@ -368,6 +368,23 @@ Next, block 3: the chain, 42 `sjm.apfv` in series with g = 1/√2, and each sect
 `sdt.stline(k,ms)`: 42 `sjm.apfv` in series, g = 1/√2, delay `sdt.stdel`, buffer `sdt.stmd(k,i) = int(100·(i+1)·k·SR/1000) + 150`; `sdt.stunedrev(t1..t4)` puts the four lines side by side (faust-libraries, commit after fa12cae).
 The margin of 150 covers the largest prime gap below the longest delay at 192 kHz (148) and the half sample of rounding; checked over every rate, time and section, the delay stays at least 62 samples inside the buffer.
 Measured at 96 kHz on noise: 0 against Davide's `apf` with SEAM's delays, 0 against his `stunedrev.dsp` where the primes agree (17, 3, 19, 7 ms); the check goes red with g = 0.7.
-At the starting 33 ms the SEAM version differs from the original on 6 of 168 sections (√2: 4, φ: 0, e: 1, π: 1), each by one prime.
+At 33 ms, the `.dsp` slider's default, the SEAM version differs from the original on 6 of 168 sections; at the Pd patch's starting times (83, 47, 7, 71 ms, corrected below) on 7 (√2: 3, φ: 0, e: 3, π: 1).
 Memory of the generated C++ in double: 3.94 GiB original, 1.66 GiB SEAM, 1.15 GiB with `-dlt 4096` (exact sizes at 192 kHz, output unchanged); the C++ plugin sized in `prepare(96000)` needs 588 MiB.
-Next: the listening A/B of the six sections at 33 ms, if wanted; then the C++ plugin, or the fourth DSP (choir).
+Next: the documentation of every survey (below), then the C++ plugin, or the fourth DSP (choir).
+
+### stunedrev: starting times, lineage, a long memory
+Correction: the Pd patch starts the four lines at 83, 47, 7 and 71 ms (see "What sounds in the performance"); 33 is only the `.dsp` slider's default, and "33 at the start" in the first draft of `sdt.stdel`/`sdt.stline` was wrong (faust-libraries 51e0463).
+Lineage: stunedrev descends from Giuseppe's in-phi-rev (*Canto alla durata*, `gitlab/gs/canto-alla-durata/src/faust/in-phi-rev/`): Schroeder's form, one ratio φ, 81 sections, times in samples; Davide and Giuseppe gave each face of STONED its own step, and Davide moved to Moorer's form and to milliseconds.
+in-phi-rev is not in SEAM; depositing it is a candidate, not acted on.
+Measured: each all-pass section delays the energy on average by its own t, so a line's energy arrives on average after the sum of its 42 delays, 106, 69, 17 and 201 s at the starting times (17.19 s measured on the e line); the direct path is -126 dB.
+Giuseppe: intended, and correct; each face returns the sound on its own time scale.
+
+### Documentation of the surveys (`doc/study/sscdo2/`)
+Giuseppe asked for every survey to be documented, with reference audio where the block has a sound, before the C++.
+- `README.md`, new: the index of the studies, the method, the audio policy, how to run.
+- `stunedrev-allpass/`, `stunedrev-delays/`, `stunedrev-chain/`, new: blocks 1–3 with probes, `run.sh`, checks and mutations; every number of this log's stunedrev entries is reproduced by them.
+- stunedrev-allpass closes the open float question: in float both forms stay within 0.00025 dB of their double spectrum over 42 sections; Schroeder's loses 26 times more energy (1.4e-6 against 5.4e-8), inaudible.
+- `stunedrev-chain/render.py`: the clarinet note through the four lines at the starting times, each until 99.9 % of the energy has returned (44 s on e, 604 s on π, 330 MB); regenerated, not committed, as Giuseppe asked, with the committed `delrm-comb/renders/ccb_dry.wav` as default source so that Davide can run it; no render of Davide's original.
+- `lmo-streams/render.py`: the A/B of one noise stream against several (four channels and a headphone pair), 5 s, committed.
+- The shared harness (`lmo-bandfilter/harness/arch.cpp`) now builds the DSP on the heap: stunedrev's buffers overflowed the stack (segmentation fault); `delrm-comb` re-run, unchanged.
+Not documented as a study, by nature: the survey itself (this log), and the delay-library decision, a refactor recorded above.

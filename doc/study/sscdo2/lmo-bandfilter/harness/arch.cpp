@@ -40,7 +40,8 @@ int main(int argc, char** argv) {
     else if (k == "pre") pre = atof(v.c_str()); else if (k == "bench") bench = atoi(v.c_str());
     else params.push_back({k, atof(v.c_str())});
   }
-  mydsp d; d.init(sr); MapUI ui; d.buildUserInterface(&ui);
+  // on the heap: a DSP with large delay lines as members overflows the stack
+  mydsp& d = *new mydsp; d.init(sr); MapUI ui; d.buildUserInterface(&ui);
   for (auto& kv : params) {
     // reject names the DSP does not have, so a typo cannot pass silently
     if (!ui.getLabelMap().count(kv.first) && !ui.getShortnameMap().count(kv.first) && !ui.getFullpathMap().count(kv.first)) {

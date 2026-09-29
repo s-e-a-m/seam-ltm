@@ -36,11 +36,24 @@ All probes sit within 0.3 dB of −35.5 dBFS RMS per channel.
 The `+ i` Hz offsets do not separate channels fed by the same noise: at 1 kHz the band is 73 Hz wide, and 1 Hz moves it by 1.4 % of its width.
 Separation comes from independent streams, which the original already has, one `multinoise(8)` stream per channel.
 
+## Listening
+`render.py` writes 5 s of each probe, as four channels (LFU, RFD, RBU, LBD) and as channels 0 and 1 in a stereo pair for headphones, with one gain for all, −20 dBFS RMS (`renders/render-log.md`).
+
+| files | probe | r(0,1) |
+|---|---|---|
+| `lmo_gs1_4ch.wav`, `lmo_gs1_ch01_stereo.wav` | Giuseppe's `lmo(1,4,1000)`: one stream | +0.998 |
+| `lmo_gs2_4ch.wav`, `lmo_gs2_ch01_stereo.wav` | Giuseppe's `lmo(2,4,1000)`: two streams, cyclic | −0.032 |
+| `lmo_dav_4ch.wav`, `lmo_dav_ch01_stereo.wav` | `sdt.lmoosc(4,1000)`: one stream per channel, as in the original | +0.017 |
+
+On headphones r(0,1) near 1 gives a centred image and near 0 a wide one, the widening Giuseppe heard at `N = 2`; on four channels only `dav` separates all of them, since `gs2` repeats stream 0 on channels 0 and 2 and stream 1 on 1 and 3 (r = 0.991).
+The correlations of 5 s differ a little from the table above, measured on 20 s.
+
 ## Files
 | file | what it is |
 |---|---|
 | `probes.dsp` | Giuseppe's expression verbatim (`gs1`, `gs2`), its eight signals before the merge (`pre2`), and `sdt.lmoosc` (`dav`); `ch` selects the output |
 | `run.sh` | builds the probes with the offline harness of `../lmo-bandfilter/` and runs `measure.py` |
 | `measure.py` | renders every channel and prints the table above |
+| `render.py` | the listening files in `renders/` (committed: 12 MB) |
 
 Requirements as for `../lmo-bandfilter/` (faust, a C++17 compiler, the seam-ltm `.venv`, a faustlibraries clone in `NEW_LIBS`).
