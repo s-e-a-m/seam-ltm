@@ -238,6 +238,13 @@ The distance slider stays narrow, in the range of beats up to about the critical
   Two independent noises sum in power, so the level compensation is 1/√2.
   The range of the Δ slider is set by a listening study (`doc/study/sscdo2/lmo-beats/`).
 
+**The two-oscillator study** (`doc/study/sscdo2/lmo-beats/`), at f = 97.44 Hz: the design holds (level within 0.2 dB of one oscillator at every d, bands independent, channels uncorrelated).
+A band of noise already fluctuates, with an envelope spectrum that falls 10 dB by 11.5 Hz; the beat of two bands is a broad bump at d riding on it.
+Excess at d over d = 0: +0.1 dB at 3 Hz, +0.9 at 7, +3.0 at 10, +15.8 at 20, +34.5 at 40.
+So the beat emerges from about 10–15 Hz; below, a second band widens the sound without beating.
+Renders for listening at d = 0, 3, 7, 10, 20, 40 Hz (mono and four-channel) and a sweep of d from 0 to 40 Hz.
+The slider's range is left to that listening.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open

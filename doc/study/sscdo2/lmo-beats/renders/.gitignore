@@ -1,0 +1,2 @@
+# The root .gitignore excludes *.wav; these renders are committed so they can be heard without building.
+!*.wav
