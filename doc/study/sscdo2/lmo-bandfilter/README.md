@@ -44,6 +44,10 @@ The OLD tree is a copy of the faustlibraries shipped with Faust 2.72.14; the NEW
 
 ## Running it end to end
 
+Requirements: the `faust` compiler on the PATH (the results were produced with 2.88), a C++17 compiler, Python ≥ 3.11, and a clone of [grame-cncm/faustlibraries](https://github.com/grame-cncm/faustlibraries).
+Set `NEW_LIBS` to that clone if it is not at `/Users/giuseppe/Documents/github/grame/faustlibraries`.
+The libraries of Faust 2.72.14 (commit `d28c51f6`) are extracted from the same clone's history into `build/libs-old` on the first build, so nothing else has to be fetched.
+
 From the seam-ltm root, create the analysis venv once:
 
 ```bash
@@ -61,6 +65,20 @@ Then, from this folder:
 
 `analyze.py all` runs the three steps in order and stops if the self-test fails.
 `build.sh` skips a binary newer than every source; `FORCE=1 ./build.sh all` rebuilds everything.
+
+The WAVs land in `renders/` (git-ignored), with their gains in `renders/render-log.md` and a shuffled copy in `renders/blind/` whose key is `renders/blind/KEY.txt`.
+Each run of `render` draws a new shuffle.
+
+## Adding a variant
+
+A candidate is four lines in three files:
+
+1. `dsp/cands.dsp`: a new process name, e.g. `bp4 = fi.bandpass(4, F / rl, F * ru) * 0.5;`.
+2. `build.sh`: a `build_one bp4 new double` line in the `all` block.
+3. `analyze.py`: an entry in `CANDS` (process name, library set `old` or `new`, description), its key in `ORDER` for the tables and in `RENDER_CANDS` for the WAVs.
+   A key starting with `C` receives A's measured −3 dB edges through `rl` and `ru`; the blind set has letters for up to five candidates.
+
+Then `./build.sh all` and `analyze.py all` regenerate every table and every render.
 
 ## What each step does
 

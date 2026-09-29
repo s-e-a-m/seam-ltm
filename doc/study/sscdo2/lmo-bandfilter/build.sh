@@ -12,10 +12,15 @@
 set -euo pipefail
 
 # ---- paths (edit these on another machine) ---------------------------------
-# OLD: the faustlibraries shipped with Faust 2.72.14 (Davide's Pd externals).
-OLD_LIBS=${OLD_LIBS:-/private/tmp/claude-501/-Users-giuseppe-Documents-github-seam-librerie-seam-ltm/943b2221-f69a-45ad-90e9-56298368f7a5/scratchpad/audit/old}
-# NEW: current faustlibraries (after 0965ea2 / #262 and 4b251bf / #261).
+# NEW: a clone of https://github.com/grame-cncm/faustlibraries, used as is
+#      (the results in results.md were measured at 9c42142, after 0965ea2 / #262
+#      and 4b251bf / #261).
 NEW_LIBS=${NEW_LIBS:-/Users/giuseppe/Documents/github/grame/faustlibraries}
+# OLD: the faustlibraries shipped with Faust 2.72.14, which built Davide's Pd
+#      externals. The compiler pins it as its `libraries` submodule
+#      (git -C <faust> ls-tree 2.72.14 libraries -> d28c51f6, 2024-03-20).
+#      Extracted once from the NEW clone's history into build/libs-old.
+OLD_COMMIT=${OLD_COMMIT:-d28c51f6}
 FAUST=${FAUST:-faust}
 CXX=${CXX:-c++}
 # ----------------------------------------------------------------------------
@@ -23,6 +28,12 @@ CXX=${CXX:-c++}
 HERE=$(cd "$(dirname "$0")" && pwd)
 BIN=$HERE/build/bin
 mkdir -p "$BIN"
+OLD_LIBS=${OLD_LIBS:-$HERE/build/libs-old}
+if [ ! -f "$OLD_LIBS/stdfaust.lib" ]; then
+  mkdir -p "$OLD_LIBS"
+  git -C "$NEW_LIBS" archive "$OLD_COMMIT" | tar -x -C "$OLD_LIBS"
+  echo "extracted faustlibraries $OLD_COMMIT into $OLD_LIBS"
+fi
 
 build_one() {
   local proc=$1 lib=$2 prec=$3 opt=${4:-O2}
