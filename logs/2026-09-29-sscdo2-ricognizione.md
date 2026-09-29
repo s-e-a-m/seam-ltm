@@ -344,3 +344,4 @@ Memory, measured on the generated code: the Pd external (Faust 2.72.14, `-vec -d
 Four causes add up: every all-pass of a line gets the buffer of the longest one (`de.delay(SRM*ma.SR, ...)`, SRM = 6, 7, 12, 14 s), sized for 192 kHz (the cap of `ma.SR`), rounded to a power of two, and made resident by `instanceClear`, which zeroes it all.
 The i-th all-pass of the line with ratio k needs at most `0.1 · (i+1) · k · fs` samples; sized exactly at 96 kHz the four lines need 588 MiB in double, 294 MiB in float.
 The sound does not change, only the space reserved and never read.
+Next, block by block at 96 kHz: (1) the all-pass, the original's Moorer `apf` against `fi.allpass_comb`, `sms.apfs`, `sms.apfv`, sized per all-pass; (2) the delays, ms → samples · (i+1) · k (√2, φ, e, π) → `sff.np`; (3) the chain, 42 in series with g = 1/√2 on four independent lines.
