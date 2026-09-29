@@ -84,7 +84,7 @@ The LMO's two "oscillators" share seed and frequency, so they sum to one signal 
 The four choir instances share the same `multinoise` seed; channel differences come only from f and a.
 
 **Memory in the reverb.**
-Faust rounds every `de.delay` buffer to the next power of two, about 1 GB of doubles at 48 kHz; the patch carries a note asking for 32 GB of RAM.
+Faust rounds every `de.delay` buffer to the next power of two; the patch carries a note asking for 32 GB of RAM (the figure first written here, about 1 GB, was wrong: see "stunedrev: memory" below).
 The longest delay in use is about 71 ms · 42 · π ≈ 9.4 s.
 
 **Sample-rate dependence.**
@@ -337,3 +337,10 @@ delRM in `seam.tedesco.lib` therefore ends at the compressor, and the library sa
 The side effect was timbral: the pole 0.995 is a high-pass at 76.59 Hz at 96 kHz, and the two in series took 17.6 dB from the 29.7 Hz fundamental.
 A/B renders (clean, and with the two DC blockers of the performance) are in the study for Davide; if he keeps the thinner low end it enters as a declared `fi.dcblockerat(76.59)`.
 Block 6 (master volume, `si.smoo`) is standard.
+
+### stunedrev: decisions and memory
+Giuseppe's decisions: the reference is the version used in Pure Data (`stunedrev.dsp`, 42 all-passes per line), not `stunedrev_online_compile.dsp`; the ms → samples → next prime conversion, which gives a different set of primes at each rate, is a feature of the SEAM system (incommensurable delays), not a dependence to remove; the time sliders keep the original's 1–100 ms.
+Memory, measured on the generated code: the Pd external (Faust 2.72.14, `-vec -double`) allocates 15.2 GiB, and the same `.dsp` with Faust 2.88 in scalar mode 3.9 GiB.
+Four causes add up: every all-pass of a line gets the buffer of the longest one (`de.delay(SRM*ma.SR, ...)`, SRM = 6, 7, 12, 14 s), sized for 192 kHz (the cap of `ma.SR`), rounded to a power of two, and made resident by `instanceClear`, which zeroes it all.
+The i-th all-pass of the line with ratio k needs at most `0.1 · (i+1) · k · fs` samples; sized exactly at 96 kHz the four lines need 588 MiB in double, 294 MiB in float.
+The sound does not change, only the space reserved and never read.
