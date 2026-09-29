@@ -194,8 +194,17 @@ Measured in `doc/study/sscdo2/lmo-bandfilter/` on three candidates, at 48 kHz in
   On a step B has no overshoot, where A overshoots by 1.3 dB.
 - C shares A's −3 dB band and has near-vertical skirts, but its slowest poles have Q ≈ 208 against A's 7.6: 4.95 s to decay by 60 dB against 0.31 s, and 0.68 s of group delay against 117 ms (checked analytically: T60 ≈ 4.7 s).
 - The leakage the #262 commit warns about is present in both forms at about −124 dBFS, inaudible.
+- `Nh` was read correctly: C has as many sections as A.
+  The band-pass lays its skirts out in bandwidths (7 Hz), Davide's HP : LP in ratios of fc (97 Hz), so the same order falls about fc/BW ≈ 14 times faster.
+  No order reproduces A: its rounded peak, the product of two overlapping skirts, lies outside the Butterworth band-pass family, whose top is flat.
+- At Giuseppe's request the orders nearest A were added, as reasoning material for Davide: C3 (`Nh` = 3) and C2 (`Nh` = 2), same edges and peak.
+  At ¼ / ½ / 1 octave: A −36 / −72 / −145 dB, C3 −47 / −65 / −85, C2 −33 / −45 / −58.
+  Decay to −60 dB (energy): A 0.31 s, C3 0.64 s, C2 0.47 s, C 4.95 s.
 
-Decision pending the listening of the loudness-matched renders (steady 96 Hz, the full glissando, a step, and a blind set).
+Giuseppe listened to all renders.
+Decision: B, Davide's own line on the current libraries, and the port goes on with it.
+A, C, C3 and C2 stay in the study and in the renders, so that the choice can be argued with Davide before it is called settled.
+
 
 ## Open
 Questions for Davide:

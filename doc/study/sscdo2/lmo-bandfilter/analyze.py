@@ -34,8 +34,10 @@ CANDS = {
     "A": ("hplp", "old", "OLD libs: fi.highpass(24,F) : fi.lowpass(24,F-0.0001), direct-form tf2s"),
     "B": ("hplp", "new", "NEW libs: same expression, TPT SVF sections (0965ea2)"),
     "C": ("bp24", "new", "NEW libs: fi.bandpass(24, fl, fu) x0.5, 24 SVF sections, fl/fu = A's -3 dB edges"),
+    "C3": ("bp3", "new", "NEW libs: fi.bandpass(3, fl, fu) x0.5, 3 SVF sections, fl/fu = A's -3 dB edges"),
+    "C2": ("bp2", "new", "NEW libs: fi.bandpass(2, fl, fu) x0.5, 2 SVF sections, fl/fu = A's -3 dB edges"),
 }
-ORDER = ["A", "B", "C"]
+ORDER = ["A", "B", "C", "C3", "C2"]
 
 K1015 = 1.015                       # F = 1.015 * slider (Davide)
 RE = (3 + 2 * math.sqrt(2)) ** (1 / 48)   # A's -3 dB edge ratio (warped domain)
@@ -112,7 +114,7 @@ def edges(sr, F):
 
 def cparams(key, sr, F):
     fl, fu, _ = edges(sr, F)
-    if key == "C":
+    if key.startswith("C"):
         return {"rl": f"{F / fl:.9f}", "ru": f"{fu / F:.9f}"}
     return {}
 
@@ -264,6 +266,12 @@ def selftest():
     p = cparams("C", sr, F)
     h, _ = impulse_response("C", sr, F, fparams={"rl": p["rl"], "ru": float(p["ru"]) + 1.0 / F})
     expect("C with fu +1 Hz", check_matched(response_metrics(h, sr, F), mA), True)
+    for key in ("C3", "C2"):
+        h, _ = impulse_response(key, sr, F)
+        expect(f"{key} matched to A", check_matched(response_metrics(h, sr, F), mA), False)
+    p = cparams("C3", sr, F)
+    h, _ = impulse_response("C3", sr, F, fparams={"rl": p["rl"], "ru": float(p["ru"]) + 1.0 / F})
+    expect("C3 with fu +1 Hz", check_matched(response_metrics(h, sr, F), mA), True)
     # the OLD and NEW builds must really be different code (the -I order took effect)
     d = np.max(np.abs(hA - hB))
     good = d > 0
@@ -406,13 +414,15 @@ def theory_row(sr, F):
     t = math.tan(math.pi * F / sr)
     fl, fu = analytic_edges(sr, F)
     wl, wu = math.tan(math.pi * fl / sr) / t, math.tan(math.pi * fu / sr) / t
-    a, c = [], []
+    a, c, c3, c2 = [], [], [], []
     for o in (-0.25, 0.25, -0.5, 0.5, -1, 1, -2, 2):
         r = math.tan(math.pi * F * 2 ** o / sr) / t
         a.append(-10 * math.log10(2 + r ** 48 + r ** -48))
         x = (r - 1 / r) / (wu - wl)       # Butterworth bandpass prototype frequency
         c.append(-6.0206 - 10 * math.log10(1 + x ** 48))
-    return {"A/B (HP24·LP24)": a, "C (Butterworth BP, Nh 24)": c}
+        c3.append(-6.0206 - 10 * math.log10(1 + x ** 6))
+        c2.append(-6.0206 - 10 * math.log10(1 + x ** 4))
+    return {"A/B (HP24·LP24)": a, "C (Butterworth BP, Nh 24)": c, "C3 (Nh 3)": c3, "C2 (Nh 2)": c2}
 
 
 def octcell(o, k):
@@ -429,7 +439,7 @@ def write_results_md(R):
     A("Commands: `./build.sh all`, then `.venv/bin/python analyze.py measure` from this folder with the seam-ltm venv.")
     A("F is the filter centre, F = 1.015 × slider: 97.44 Hz is slider 96 (cue 1), 112.665 Hz is slider 111 (end of cue 2).")
     A("Sample rate 48 kHz, double precision, for every number below.")
-    A("Levels are absolute dB of the filter response: A peaks at −6.02 dB with a rounded top; C is scaled by 0.5 so its maximally flat passband sits at the same −6.02 dB.")
+    A("Levels are absolute dB of the filter response: A peaks at −6.02 dB with a rounded top; C, C3 and C2 are scaled by 0.5 so their maximally flat passbands sit at the same −6.02 dB.")
     A("")
     A("Candidates:")
     A("")
@@ -553,7 +563,7 @@ RENDER_SCEN = {
     "gliss": (125.0, SCEN["gliss"]["kw"], PRE),
     "step": (10.0, SCEN["step"]["kw"], PRE),
 }
-RENDER_CANDS = ["A", "B", "C"]
+RENDER_CANDS = ["A", "B", "C", "C3", "C2"]
 
 
 def fade(y, sr):
@@ -602,7 +612,7 @@ def render():
     rng = random.SystemRandom()
     key_lines = ["# Blind key -- do not open before listening.", ""]
     for scen in RENDER_SCEN:
-        letters = list("XYZ")[: len(RENDER_CANDS)]
+        letters = list("VWXYZ")[: len(RENDER_CANDS)]
         rng.shuffle(letters)
         for key, let in zip(RENDER_CANDS, letters):
             src = os.path.join(RENDERS, made[(scen, key)])

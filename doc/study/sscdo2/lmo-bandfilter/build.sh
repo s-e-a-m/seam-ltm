@@ -2,7 +2,7 @@
 # build.sh -- compile one LMO band-filter candidate to an offline binary.
 #
 # usage: ./build.sh PROC LIBSET PREC [OPT]
-#   PROC    process name in dsp/cands.dsp (hplp, davide, bp24, noise0)
+#   PROC    process name in dsp/cands.dsp (hplp, davide, bp24, bp3, bp2, noise0)
 #   LIBSET  old | new     which faustlibraries tree to import stdfaust.lib from
 #   PREC    single | double
 #   OPT     C++ optimisation level (default O2)
@@ -44,6 +44,8 @@ if [ "${1:-}" = all ]; then
   build_one davide old double    # A at Davide's true level
   build_one hplp new double      # B
   build_one bp24 new double      # C (slow: about 4 minutes of Faust compilation)
+  build_one bp3 new double       # C3
+  build_one bp2 new double       # C2
   exit 0
 fi
 
