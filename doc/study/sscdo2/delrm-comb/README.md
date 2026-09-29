@@ -52,4 +52,4 @@ The comb recolours the note partial by partial, and the distance chosen during t
 At Davide's initial 7.291 m the comb reinforces the third partial and hollows the seventh; at 10 m it lifts the fundamental and removes the fifth.
 Tuning delRM's delay is tuning a timbre, not only a time.
 
-The WAVs carry a recorded performance and are kept local until its publication is agreed.
+The WAVs are committed, with Giuseppe's agreement to publish the recording.

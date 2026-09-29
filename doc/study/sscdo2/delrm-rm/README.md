@@ -9,15 +9,15 @@ This study measures what that does, on a recording of the contrabass clarinet an
 | | integrator |
 |---|---|
 | I0 | `fi.integrator`, the original |
-| I1 | leaky and normalised: y = (48000/SR)·x + a·y[n−1], a = exp(−2π·fc/SR) |
+| I1 | `sfi.leakyint(fc) : *(96000)`: leaky, normalised to time, scaled to the original at 96 kHz, the rate SSCDO#2 is played at |
 | I2 | `fi.dcblockerat(5)` then `fi.integrator`, the obvious remedy |
 
 ## Files
 | file | what it is |
 |---|---|
-| `probe.dsp` | the three integrators, the triple product before (`pre`) and after (`post`) the original's compressor stage, and the product without the integral (`selfrm`) |
+| `probe.dsp` | the three integrators, the triple product before (`pre`) and after (`post`) the original's compressor stage, the product without the integral (`selfrm`), and `sdt.delrmrm` (`lib`) |
 | `build.sh` | compiles every probe with the harness of `../lmo-bandfilter/` |
-| `analyze.py` | `selftest`, `measure` (writes `results.md`), `render` (writes `renders/`, local) |
+| `analyze.py` | `selftest`, `measure` (writes `results.md`), `render` (writes `renders/`) |
 | `results.md` | the tables, regenerated, and the hand-written observations below them |
 
 ## Running it

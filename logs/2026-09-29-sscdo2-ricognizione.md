@@ -269,7 +269,7 @@ The prime rounding makes the spacing differ by 0.4 % between rates (45.24 agains
 On a recording Giuseppe provided (`CCB_petalonio_oriz_DO.wav`: eight microphones around the contrabass clarinet on its low C, 96 kHz, 3.56 s; track 1 at 1 m, fundamental 29.7 Hz, mainly odd partials) the comb's gain on each partial matches 2·|cos(π·f·M/SR)| within 0.2 dB outside the deepest notches.
 The distance decides which partials it lifts: at 7.291 m it reinforces the third (+6.0 dB) and hollows the seventh (−7.3 dB); at 10 m it lifts the fundamental (+5.5) and removes the fifth (−17.3).
 Tuning delRM's delay is tuning a timbre.
-The renders stay local until the publication of the recorded performance is agreed.
+The renders are published (agreed later the same day).
 
 ### delRM block 3: the triple product (`doc/study/sscdo2/delrm-rm/`)
 Measured on the clarinet's note and on ten minutes of floor noise at −70 dBFS plus the DC of track 1 (3.22e-6):
@@ -277,15 +277,17 @@ Measured on the clarinet's note and on ten minutes of floor noise at −70 dBFS 
 - its level before the compressor rises by 6.00 dB from 48 to 96 kHz;
 - a DC blocker in front of the integrator stops the drift, because its zero cancels the integrator's pole and leaves a leaky integrator (identical state to a 5 Hz leak), but keeps the 6 dB rate dependence;
 - a leaky integrator normalised to time, y = (48000/SR)·x + a·y[n−1] with fc = 1 Hz, is bounded, flat across rates (−0.01 dB), and within 0.3 dB of the original at 48 kHz on a fresh start.
-The 48 kHz anchor waits for the performance rate from Davide.
-Renders local, as for the comb.
+**SSCDO#2 is played at 96 kHz** (Giuseppe, 2026-09-29): open question 2 is closed, and every rate anchor of the port is 96 kHz.
+The leaky integrator becomes a general SEAM function, `sfi.leakyint(fc)` in `seam.filters.lib` (the integral in seconds, built on the standard `fi.pole`), reused by `sdt.delrmint = sfi.leakyint(1) : *(96000)` and `sdt.delrmrm(mt)`, the triple product.
+The self-test checks that `sdt.delrmrm` equals the measured probe sample for sample, and that at 96 kHz it matches the original's level.
+Giuseppe agreed to publish the renders made from the recording (comb and triple product).
 
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
 Questions for Davide:
 1. The double feed into `stunedrev`: intended or residual?
-2. The performance sample rate.
+2. The performance sample rate. **Answered: 96 kHz.**
 3. Which cue output and side carries each of LFU, RFD, RBU, LBD.
    (Inputs 5–8 and the output busses are now known: see Technical setup.)
 4. The shared noise seeds in LMO and choir: a sound to keep, or an oversight?

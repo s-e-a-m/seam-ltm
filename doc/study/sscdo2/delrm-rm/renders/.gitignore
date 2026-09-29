@@ -1,2 +1,2 @@
-# The root .gitignore excludes *.wav. These renders carry a recorded performance:
-# they stay local until its publication is agreed.
+# The root .gitignore excludes *.wav; these are the exception.
+!*.wav
