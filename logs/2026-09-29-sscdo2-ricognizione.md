@@ -271,6 +271,15 @@ The distance decides which partials it lifts: at 7.291 m it reinforces the third
 Tuning delRM's delay is tuning a timbre.
 The renders stay local until the publication of the recorded performance is agreed.
 
+### delRM block 3: the triple product (`doc/study/sscdo2/delrm-rm/`)
+Measured on the clarinet's note and on ten minutes of floor noise at −70 dBFS plus the DC of track 1 (3.22e-6):
+- the original `fi.integrator` drifts linearly (state 95 after ten minutes at 48 kHz, 187 at 96 kHz, against 33 for the note's own integral); a note arriving after five minutes finds its triple product 7 dB louder and 0.88 correlated with the plain self-ring-modulation 10·x[n−D]·x: in Pd, channels 2 and 4 changed effect with the time the patch had been running;
+- its level before the compressor rises by 6.00 dB from 48 to 96 kHz;
+- a DC blocker in front of the integrator stops the drift, because its zero cancels the integrator's pole and leaves a leaky integrator (identical state to a 5 Hz leak), but keeps the 6 dB rate dependence;
+- a leaky integrator normalised to time, y = (48000/SR)·x + a·y[n−1] with fc = 1 Hz, is bounded, flat across rates (−0.01 dB), and within 0.3 dB of the original at 48 kHz on a fresh start.
+The 48 kHz anchor waits for the performance rate from Davide.
+Renders local, as for the comb.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
