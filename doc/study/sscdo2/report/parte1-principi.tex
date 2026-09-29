@@ -1,3 +1,132 @@
-% parte1-principi.tex
-\chapter{Principi}
-Questo capitolo raccoglie i principi del porting.
+% parte1-principi.tex -- Part I: the principles of the port.
+\chapter{Principi}\label{cap:principi}
+Questo capitolo espone una sola volta le regole che hanno guidato il porting.
+Ogni principio ha quattro voci: l'enunciato, la ragione, i punti del brano dove si è applicato, e un numero che lo rende concreto.
+Le schede della seconda parte rimandano qui invece di ripetere le ragioni.
+
+\section{Il porting ragiona, non copia}\label{sec:principio-ragiona}
+\paragraph{Enunciato.}
+Ogni blocco della patch originale si capisce, si discute e si riscrive con la soluzione migliore disponibile.
+L'ordine di preferenza è la versione corretta presente in SEAM, poi la libreria standard di Faust quando è solida, e infine codice nuovo solo per un difetto rilevato.
+Il riferimento è la versione suonata in Pure Data: per stunedrev è \texttt{stunedrev.dsp} con 42 sezioni per linea, e la variante per l'IDE online con 81 sezioni resta fuori.
+
+\paragraph{Perché.}
+I blocchi corretti di SEAM modificano già l'originale, quindi una copia fedele non esiste come punto di partenza.
+Lo scopo del porting è il ragionamento sul brano: ogni scelta resta scritta e argomentata, così Davide può rivederla.
+Una voce di \texttt{seam.tedesco.lib} può essere un solo rimando a una funzione SEAM, con un commento che dice quando e perché quella funzione è nata e che cosa usava l'originale.
+
+\paragraph{Dove.}
+Il filtro di banda di LMO usa la riga di Davide sulle librerie aggiornate; il ritardo di delRM è quello di DDELAY; l'all-pass di stunedrev è la forma di Moorer già presente in SEAM (\texttt{sjm.apfv}).
+
+\paragraph{Un numero.}
+Dove i numeri primi coincidono, la linea SEAM di stunedrev è identica a quella di Davide campione per campione; ai tempi iniziali cambiano 7 sezioni su 168, ciascuna di un solo primo (\studio{stunedrev-delays}).
+
+\section{Un blocco alla volta, verificato per mutazione}\label{sec:principio-blocchi}
+\paragraph{Enunciato.}
+Ogni macchina si divide in blocchi funzionali, e ogni blocco si discute, si decide e si valida prima del successivo.
+Ogni verifica si mette alla prova rompendo di proposito il codice: una verifica vale solo se vede il guasto introdotto.
+
+\paragraph{Perché.}
+Un test che passa sempre non dimostra nulla.
+La mutazione separa le verifiche che misurano davvero da quelle che confermano soltanto ciò che si aspetta.
+
+\paragraph{Dove.}
+In ogni studio di \texttt{doc/study/sscdo2/}: il ritardo di delRM, il comb, il prodotto triplo, le tre parti di stunedrev.
+
+\paragraph{Un numero.}
+Nell'all-pass di stunedrev, invertire il segno del guadagno sposta la risposta all'impulso di \misura{0.0311}{stunedrev-allpass}, e la verifica lo segnala (\studio{stunedrev-allpass}).
+
+\section{96 kHz è la frequenza del brano}\label{sec:principio-96k}
+\paragraph{Enunciato.}
+SSCDO\#2 si suona a \qty{96}{\kilo\hertz}.
+Le costanti che dipendono dalla frequenza di campionamento si ancorano a quel valore, così il comportamento resta lo stesso a qualunque frequenza della sessione.
+
+\paragraph{Perché.}
+Una costante espressa in campioni cambia significato quando la frequenza cambia: un tempo si accorcia, un filtro si sposta, un livello sale.
+Ancorarla alla frequenza del brano conserva il suono che Davide ha ascoltato, anche in una prova a \qty{48}{\kilo\hertz}.
+
+\paragraph{Dove.}
+L'integratore di delRM è \texttt{sdt.delrmint = sfi.leakyint(1) : *(96000)}.
+Con \texttt{*(ma.SR)} al posto di 96000, a \qty{48}{\kilo\hertz} il livello prima del compressore scenderebbe di \misurau{6.00}{\decibel}{log}, e il compressore lavorerebbe meno.
+L'eccezione è voluta: i ritardi primi di delRM e stunedrev seguono la frequenza della sessione (\S\ref{sec:principio-primi}).
+
+\paragraph{Un numero.}
+Il filtro passa-alto dei DC blocker originali ha un polo fisso in campioni, 0,995, che a \qty{96}{\kilo\hertz} diventa una frequenza di taglio di \misurau{76.59}{\hertz}{delrm-dcblock}: il doppio che a \qty{48}{\kilo\hertz}.
+
+\section{Primi e incommensurabilità}\label{sec:principio-primi}
+\paragraph{Enunciato.}
+Un ritardo espresso in tempo o in distanza si converte in campioni, si arrotonda al campione più vicino e si sposta al primo numero primo strettamente maggiore (la funzione \texttt{sff.np} di SEAM).
+Ogni frequenza di campionamento dà il proprio insieme di primi, e ogni insieme resta incommensurabile: è una scelta del sistema SEAM.
+
+\paragraph{Perché.}
+Nelle 42 sezioni di una linea di stunedrev i ritardi sono multipli dello stesso passo, cioè una serie armonica.
+Due ritardi con un fattore comune producono echi che coincidono; due primi distinti non ne hanno mai.
+Sulla linea $\sqrt{2}$ a \qty{83}{\milli\second}, prima del primo 313 coppie su 861 hanno un fattore comune, dopo nessuna (\studio{stunedrev-delays}).
+
+\paragraph{Dove.}
+Il ritardo di delRM, in metri, e i ritardi di stunedrev, in millisecondi.
+La regola scavalca un valore arrotondato che è già primo e passa al successivo: lo spostamento arriva a \misura{96}{stunedrev-delays} campioni, un millisecondo a \qty{96}{\kilo\hertz}.
+Giuseppe ha mantenuto \texttt{sff.np} per coerenza con il resto di SEAM: il ritardo è sempre più lungo del tempo esatto.
+
+\paragraph{Un numero.}
+Nessuna regola di arrotondamento produce due primi uguali nella stessa linea, perché la distanza è geometrica: le sezioni più vicine distano \misura{135.8}{stunedrev-delays} campioni, e sotto 1,3 milioni la distanza massima tra due primi consecutivi è \misura{114}{stunedrev-delays}.
+
+\section{Processo, non rimedi locali}\label{sec:principio-processo}
+\paragraph{Enunciato.}
+Il porting trasferisce ciò che fa il processo e il timbro, e lascia i rimedi che l'originale usava per problemi locali che la nuova catena non ha più.
+Quando un rimedio aveva un effetto sul suono, quell'effetto diventa una scelta dichiarata e si decide all'ascolto.
+
+\paragraph{Perché.}
+Un rimedio copiato senza il suo problema lascia solo l'effetto collaterale.
+
+\paragraph{Dove.}
+I due DC blocker di delRM trattenevano la componente continua dell'integratore originale, che dopo cinque minuti arrivava a \misurau{9.6}{\decibel}{delrm-dcblock} sotto il segnale.
+Con l'integratore SEAM la componente continua resta \misurau{66.5}{\decibel}{delrm-dcblock} sotto il segnale, e delRM termina al compressore.
+
+\paragraph{Un numero.}
+L'effetto collaterale era timbrico: i due DC blocker in serie toglievano \misurau{17.6}{\decibel}{delrm-dcblock} alla fondamentale del clarinetto contrabbasso, a \qty{29.7}{\hertz}.
+Tenere quel basso più sottile è una decisione di Davide (scheda~\ref{scheda:delrm-dcblocker}).
+
+\section{I livelli si fissano suonando}\label{sec:principio-livelli}
+\paragraph{Enunciato.}
+Il porting normalizza i livelli dove l'originale aveva un'anomalia, senza compensazioni per restare compatibile con il suono precedente.
+Il livello giusto si trova in sala, con i fader.
+
+\paragraph{Perché.}
+Una compensazione di compatibilità riprodurrebbe l'anomalia sotto un altro nome.
+
+\paragraph{Dove.}
+In LMO il secondo oscillatore originale duplicava il primo e alzava il livello di \qty{6}{\decibel}; la versione SEAM ha due oscillatori indipendenti e nessun guadagno aggiunto (scheda~\ref{scheda:lmo-volume}).
+
+\paragraph{Un numero.}
+Due rumori indipendenti si sommano in potenza, quindi la somma dei due oscillatori si compensa con $1/\sqrt{2}$: il livello resta quello di un oscillatore solo (\studio{lmo-beats}).
+
+\section{Precisione}\label{sec:principio-precisione}
+\paragraph{Enunciato.}
+I plugin calcolano in doppia precisione (double), qualunque sia il formato dei buffer dell'host.
+La precisione singola (float) riguarda solo Faust compilato nell'IDE online, che la usa come impostazione predefinita.
+
+\paragraph{Perché.}
+Filtri di ordine alto a frequenze basse e catene lunghe accumulano errori in float; in double quegli errori restano lontani dall'udibile.
+
+\paragraph{Dove.}
+I plugin più recenti della suite, come ADDELAY e DSLAR, tengono lo stato in double e convertono solo all'ingresso e all'uscita; stunedrev seguirà lo stesso schema.
+Gli external di Davide per Pd erano già compilati in double.
+
+\paragraph{Un numero.}
+In float, sulle 42 sezioni di una linea di stunedrev, sia la forma di Moorer sia quella di Schroeder restano entro \misurau{0.00025}{\decibel}{stunedrev-allpass} dal risultato in double.
+
+\section{Genealogia}\label{sec:principio-genealogia}
+\paragraph{Enunciato.}
+Le macchine del brano hanno una storia dentro SEAM, e il porting la rende esplicita.
+
+\paragraph{Perché.}
+Sapere da dove viene una macchina spiega le sue scelte e le lega agli altri lavori che la usano.
+
+\paragraph{Dove.}
+stunedrev discende da in-phi-rev di Giuseppe, scritto per \emph{Canto alla durata}: la forma di Schroeder, un solo rapporto $\varphi$, 81 sezioni, tempi in campioni.
+Davide e Giuseppe hanno dato a ogni faccia di STONED un passo proprio, i quattro rapporti $\sqrt{2}$, $\varphi$, $e$, $\pi$, e Davide è passato alla forma di Moorer e ai millisecondi (\studio{stunedrev-allpass}).
+Il ritardo di delRM è quello del plugin DDELAY, scelto con Davide perché lo stesso strumento serva a \emph{Studio sul Corpo d'Ombra \#4}, con due sorgenti (\studio{delrm-delay}).
+
+\paragraph{Un numero.}
+Il valore iniziale di Davide per delRM, \qty{22}{\milli\second}, diventa una distanza di \misurau{7.291}{\metre}{delrm-delay}.
