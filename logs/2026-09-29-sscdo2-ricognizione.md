@@ -222,6 +222,14 @@ Read and measured: `<:` repeats the streams cyclically, so the two blocks are id
 The widening is the decorrelation of the channels, which the original already has with one `multinoise` stream per channel; the `+ i` Hz offsets separate nothing on their own (1 Hz against a 73 Hz band at 1 kHz).
 Recorded in `sdt.lmo`'s comment; the library now also cites Davide's GitLab repository.
 
+### Davide's answers (via Giuseppe, 2026-09-29)
+**delRM delay.** 22 ms is the initial value; the delay is calibrated during the performance.
+Agreed with Davide: the delay uses DDELAY's prime rounding, so that the tool is ready for *Studio sul Corpo d'Ombra #4*, with two sources, which will use the same system.
+
+**LMO second oscillator.** The intention: two oscillators that can beat.
+At 0 Hz apart they share the frequency and are decorrelated; at a distance Δ each moves by Δ/2 from the reference band centre (10 Hz apart: −5 and +5 Hz).
+The distance slider stays narrow, in the range of beats up to about the critical band.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
