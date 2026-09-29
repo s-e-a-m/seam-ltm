@@ -262,6 +262,12 @@ DDELAY's `FAUST REFERENCE` now cites them.
 Davide's 22 ms is 7.291 m: 1061 samples at 48 kHz, 22.10 ms.
 The comb of block 2 is the standard `fi.ff_comb(maxdel, M, 1, 1)`, which is x + x[n−M]: nothing to write in `seam.filters.lib`.
 
+### delRM block 2: the comb
+`sdt.delrmcomb(mt) = fi.ff_comb(1 << 15, sma.imt2npsamp(mt), 1, 1)`, the first delRM entry of `seam.tedesco.lib`.
+Checked in `doc/study/sscdo2/delrm-comb/` at 48 and 96 kHz: identical to the original structure on noise, impulse response 1 at 0 and at M, peaks +6.02 dB every SR/M Hz, notches below −280 dB, +3.0 dB on white noise; a one-sample mutation is caught.
+The prime rounding makes the spacing differ by 0.4 % between rates (45.24 against 45.43 Hz).
+Renders wait for a recording of the contrabass clarinet, which Giuseppe will provide.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
