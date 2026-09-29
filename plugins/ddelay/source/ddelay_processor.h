@@ -22,7 +22,15 @@
 //
 // FAUST REFERENCE (seam.math.lib):
 //   isos = 331.4;
-//   imt2samp(mt) = int(mt*ma.SR/isos);
+//   imt2npsamp(mt) = select2(n < 2, n : sff.np, n)
+//   with {
+//       mm = floor(mt*1000 + 0.5)/1000;              // millimetre
+//       n  = int(floor(mm*ma.SR/isos + 0.5));        // nearest sample
+//   };
+//   imnpdelay(maxdel, mt) = de.delay(maxdel, imt2npsamp(mt));
+// Written after this plugin, to match it (the earlier imt2samp truncated and
+// had no primes); verified value by value over 0-30 m at four rates in
+// doc/study/sscdo2/delrm-delay/.
 //
 //─────────────────────────────────────────────────────────────────────────────
 

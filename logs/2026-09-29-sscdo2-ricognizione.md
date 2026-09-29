@@ -255,6 +255,13 @@ Giuseppe widened the Δ range to 0–50 Hz, for experiment, and agreed with the 
 `seam.tedesco.lib` now has `sdt.lmoband`, `sdt.lmoosc` (one oscillator, formerly `sdt.lmo`) and `sdt.lmo(N, f, d)`, the two beating oscillators.
 The `lmo-beats` self-test checks that `sdt.lmo` equals the measured prototype sample for sample, and catches a 1 Hz change of d.
 
+### delRM block 1: the delay
+DDELAY's Faust specification had drifted from the plugin: `sma.imdelay` truncates `mt·SR/331.4` and has no primes, while the C++ rounds to the millimetre, to the nearest sample, and to the next prime strictly above.
+`sma.imt2npsamp(mt)` and `sma.imnpdelay(maxdel, mt)` in `seam.math.lib` now specify what the plugin does, verified value by value against the lines of `updateDelaySamples`: 300 001 distances from 0 to 30 m, 0 mismatches at 44.1, 48, 96 and 192 kHz; a 1 mm mutation gives 5 940 (`doc/study/sscdo2/delrm-delay/`).
+DDELAY's `FAUST REFERENCE` now cites them.
+Davide's 22 ms is 7.291 m: 1061 samples at 48 kHz, 22.10 ms.
+The comb of block 2 is the standard `fi.ff_comb(maxdel, M, 1, 1)`, which is x + x[n−M]: nothing to write in `seam.filters.lib`.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open
