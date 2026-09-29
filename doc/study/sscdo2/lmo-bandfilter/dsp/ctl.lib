@@ -1,0 +1,31 @@
+// ctl.lib -- control path shared by every LMO band-filter candidate.
+//
+// Reproduces the frequency path of Davide Tedesco's liveMultiOscs_30000_plain:
+//   freqSlider = hslider(...) : si.smoo;
+//   F = freqSlider/2 + (i+1)*1.03*(freqSlider/2)/(i+1) = 1.015 * freqSlider
+// The slider itself is driven here by a scenario generator, so that a
+// glissando, a sweep or a step are sample-accurate and identical for every
+// candidate. The scenario is chosen at run time through the harness:
+//   mode 0  steady      slider = f0
+//   mode 1  ramp        slider = f0 -> f1 linearly over [t0, t0+dur] seconds
+//   mode 2  sweep       slider = exponential sine sweep between f0 and f1 at `rate` Hz
+//   mode 3  step        slider = f0 before t0, f1 from t0 on
+// smoo = 1 applies si.smoo after the scenario (Davide's chain); 0 bypasses it.
+
+mode = hslider("mode", 0, 0, 3, 1);
+f0   = hslider("f0", 96, 1, 20000, 0.0001);
+f1   = hslider("f1", 111, 1, 20000, 0.0001);
+t0   = hslider("t0", 0, 0, 10000, 0.0001);
+dur  = hslider("dur", 120, 0.001, 10000, 0.0001);
+rate = hslider("rate", 2, 0, 1000, 0.0001);
+smon = hslider("smoo", 1, 0, 1, 1);
+
+tsec = ba.time / ma.SR;
+
+ramp  = f0 + (f1 - f0) * max(0, min(1, (tsec - t0) / dur));
+sweep = sqrt(f0 * f1) * pow(f1 / f0, 0.5 * sin(2 * ma.PI * rate * tsec));
+step  = select2(tsec >= t0, f0, f1);
+
+slider = ba.selectn(4, mode, f0, ramp, sweep, step);
+
+F = select2(smon, slider, slider : si.smoo) * 1.015;

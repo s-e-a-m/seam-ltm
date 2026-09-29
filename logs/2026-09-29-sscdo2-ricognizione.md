@@ -181,6 +181,22 @@ Measured on the way, and kept as a warning for whoever introduces seeds: the gen
 | 61725 (×5) | +0.201 |
 | hash(1), hash(2) | +0.001, +0.003 |
 
+### Second block: the LMO band filter
+Why the standard library changed: faustlibraries `0965ea2` (issue #262) computes the Butterworth sections of `fi.lowpass`/`fi.highpass` as trapezoidal SVFs instead of direct-form biquads.
+The transfer function is the same; in float the direct form misplaced its poles near z = 1 at low fc/SR, and at 192 kHz `fi.lowpass(3, 10.1)` became unstable.
+Davide's externals are compiled in double, so in Pd his filter was already accurate.
+
+What the filter is: HP24 : LP24 at the same fc gives |H|² = 1/(2 + r⁴⁸ + r⁻⁴⁸), a band-pass peaking at −6.02 dB with a −3 dB band of 7.35 % of fc (Q ≈ 13.6), −72 dB at ±½ octave.
+The −0.0001 Hz offset plays no part.
+
+Measured in `doc/study/sscdo2/lmo-bandfilter/` on three candidates, at 48 kHz in double: A (the original on the 2.72.14 libraries), B (the same expression on the current SVF libraries), C (`fi.bandpass(24, fl, fu)` with A's half-power edges, scaled to A's peak).
+- A and B match the analytic response to 2·10⁻⁴ dB; on the cue-2 glissando B − A is −74.7 dB RMS, with no transient.
+  On a step B has no overshoot, where A overshoots by 1.3 dB.
+- C shares A's −3 dB band and has near-vertical skirts, but its slowest poles have Q ≈ 208 against A's 7.6: 4.95 s to decay by 60 dB against 0.31 s, and 0.68 s of group delay against 117 ms (checked analytically: T60 ≈ 4.7 s).
+- The leakage the #262 commit warns about is present in both forms at about −124 dBFS, inaudible.
+
+Decision pending the listening of the loudness-matched renders (steady 96 Hz, the full glissando, a step, and a blind set).
+
 ## Open
 Questions for Davide:
 1. The double feed into `stunedrev`: intended or residual?
