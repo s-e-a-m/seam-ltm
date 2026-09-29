@@ -22,6 +22,7 @@ All candidates are mono: one noise input, one output, centred on F.
 - **C** — `fi.bandpass(24, fl, fu)` against the NEW libraries, with fl and fu set to A's measured −3 dB edges, scaled by 0.5.
   `Nh = 24` is half the order (48) and the number of SVF second-order sections (12 `tf2sb`, two sections each), so C has as many sections as A and B (12 + 12) and a comparable skirt order.
   C has a maximally flat 0 dB passband; the 0.5 puts it at A's −6.02 dB peak, and the renders are loudness-matched anyway.
+- **C3**, **C2** — the same design at `Nh = 3` and `Nh = 2`, same edges and scaling: the orders whose skirts come nearest A's within a quarter octave, added as material for reasoning with Davide.
 
 A hand-written cascade of `svf.bp` and a single `svf.bp` were considered and dropped from the study: the suite does not hand-write what the standard library already provides.
 
@@ -30,7 +31,7 @@ A hand-written cascade of `svf.bp` and a single `svf.bp` were considered and dro
 | file | role |
 |---|---|
 | `dsp/ctl.lib` | the control path: scenario generator (steady, ramp, sweep, step) → slider → optional `si.smoo` → F = 1.015 × slider |
-| `dsp/cands.dsp` | the candidates, one process name each (`hplp`, `davide`, `bp24`, `noise0`) |
+| `dsp/cands.dsp` | the candidates, one process name each (`hplp`, `davide`, `bp24`, `bp3`, `bp2`, `noise0`) |
 | `harness/arch.cpp` | offline Faust architecture: impulse, tone or file input, raw float64 output, pre-roll |
 | `build.sh` | compiles one candidate against the OLD or NEW library tree; `./build.sh all` builds what the study needs |
 | `analyze.py` | self-test, measurements, results tables, listening renders |
@@ -63,14 +64,14 @@ Then, from this folder:
 
 ## What each step does
 
-`selftest` measures A, B and C at F = 97.44 Hz and checks peak level, peak frequency, bandwidth and the ±½ octave attenuation against the analytic response.
-It then breaks the filters on purpose (A mistuned by 1 Hz, A's lowpass moved 1 Hz above the highpass, C's upper edge moved by 1 Hz) and passes only if the checks catch every mutation.
+`selftest` measures A, B, C, C3 and C2 at F = 97.44 Hz and checks peak level, peak frequency, bandwidth and the ±½ octave attenuation against the analytic response.
+It then breaks the filters on purpose (A mistuned by 1 Hz, A's lowpass moved 1 Hz above the highpass, C's and C3's upper edge moved by 1 Hz) and passes only if the checks catch every mutation.
 It also verifies that A and B produce different impulse responses, which proves the two library trees are really in use.
 
 `measure` runs M1 (magnitude response from a long impulse response, at slider 96 and 111), M2 (group delay and decay of the same impulse responses) and M4 (the cue-2 glissando and, as a secondary check, a step, with noise and with an out-of-band tone that probes the #262 leakage).
 It writes `build/work/results.json` and regenerates the tables in `results.md`.
 
-`render` writes 48 kHz 24-bit mono WAVs from `no.multinoise` stream 0: `steady96` (20 s), `gliss` (125 s: 2 s at 96, the 120 s glissando, 3 s at 111) and `step` (10 s, step at 5 s) for A, B and C, loudness-matched to −20 dBFS RMS with 50 ms fades.
+`render` writes 48 kHz 24-bit mono WAVs from `no.multinoise` stream 0: `steady96` (20 s), `gliss` (125 s: 2 s at 96, the 120 s glissando, 3 s at 111) and `step` (10 s, step at 5 s) for A, B, C, C3 and C2, loudness-matched to −20 dBFS RMS with 50 ms fades.
 It also writes `steady96_A_davide_level.wav`, unmatched, at Davide's true level (A doubled by the two identical oscillators, then `fi.dcblockerat(20)`), and a blind set in `renders/blind/` with shuffled names and a `KEY.txt`.
 
 ## How it fits
