@@ -209,6 +209,27 @@ A gets its narrow band from two 24th-order skirts overlapping at the same fc, so
 C gets it from a lowpass prototype of width 7.16 Hz mapped to 97 Hz, so its slowest pole pair has a Q of about 208 (the same sin(π/48) damping, applied to a 7.16 Hz width instead of a 97 Hz cutoff).
 On noise, C should therefore sound more like a sustained tone with a slow, smeared attack; this is a prediction from the numbers, and the renders exist to test it by ear.
 
+### No order of `fi.bandpass` reproduces A
+`Nh` was read correctly: `fi.bandpass(24, …)` has 24 second-order sections and order 48, the same as A's 12 + 12.
+Equal order gives a different filter because the two designs scale their skirts to different widths.
+In A, each Butterworth skirt is laid out in ratios of fc (about 97 Hz), so a quarter octave is only r = 1.19 away from the cutoff.
+In C, the lowpass prototype is laid out in units of the bandwidth (7.16 Hz), and a quarter octave above F is already Ω ≈ 4.7 bandwidths away: the same order falls about fc/BW ≈ 14 times faster.
+
+Analytic response relative to the peak (analog prototype, warping neglected at 97 Hz), and T60 of the slowest pole pair:
+
+| | A | Nh = 24 | Nh = 12 | Nh = 3 | Nh = 2 | Nh = 1 |
+|---|---|---|---|---|---|---|
+| +0.1 oct | −8.7 | −132.5 | −66.3 | −16.7 | −11.4 | −6.6 |
+| +¼ oct | −30.1 | −324.4 | −162.2 | −40.6 | −27.0 | −13.7 |
+| +½ oct | −66.2 | −472.0 | −236.0 | −59.0 | −39.3 | −19.7 |
+| +1 oct | −138.5 | −628.8 | −314.4 | −78.6 | −52.4 | −26.2 |
+| T60 (s) | 0.17 | 4.70 | 2.35 | 0.61 | 0.43 | 0.31 |
+
+Halving the order to 12 still leaves a wall.
+Around `Nh` = 2–3 the skirts come near A's within a quarter octave, but they fall more slowly beyond it and ring two to four times longer.
+A's rounded peak, the product of two overlapping skirts, lies outside the Butterworth band-pass family, whose top is flat by construction.
+`fi.bandpass` is a different instrument, whatever its order.
+
 ### The glissando (cue 2)
 
 On the real glissando, 15 Hz in 120 s through si.smoo, A and B differ by −74.7 dB RMS and −73.2 dB in the worst 1 s window, with no transient: the two structures behave alike under slow modulation.
