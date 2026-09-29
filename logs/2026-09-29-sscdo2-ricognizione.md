@@ -353,3 +353,13 @@ Moorer's form is the one kept: one multiplier, all-pass by structure for any rou
 Measured on 42 sections in double: Davide's chain against `sjm.apfv` differs by 0, `sjm.apfv(md,t,g)` against `fi.allpass_comb(md,t,-g)` by 2.7e-16; flipping g's sign turns the first check red (0.40).
 Open: extend `comb` and `apfo` with the same `md` parameter.
 Precision: the VST computes in double whatever the host's I/O format (the `addelay` pattern: one templated `process`, state in `std::vector<double>`), so the gap between the two forms matters only in Faust compiled in float, the online IDE's default; over 42 sections it is not measured.
+
+### stunedrev block 2: the delays
+`sdt.stdel(k,i,ms) = sma.ms2npsamp(ms*(i+1)*k)` and the new stateless `sma.ms2npsamp` (faust-libraries fa12cae): round to the nearest sample, then `sff.np`, SEAM's rule as in `sma.imt2npsamp`.
+Davide's `nextprime.h` equals SEAM's for every n up to 3 000 000; his chain truncated instead of rounding.
+Measured at 96 kHz over the slider's range (16 800 delays): 0 mismatches against an independent Python reference, 813 against Davide's chain.
+A first proposal said the moves were under 0.1 ms: wrong, they reach a whole prime gap (96 samples, 1 ms), because `sff.np` steps over a rounded value that is already prime.
+"Prime ≥ exact value" was proposed as the alternative; Giuseppe kept `sff.np` for the coherence of SEAM: the delay is always longer than the exact time.
+Distinctness does not depend on the rule: no duplicate within a line with any of the three rules measured (spacing ≥ 135.8 samples, largest prime gap below 1.3 M is 114); across lines about 5% of slider pairs share a prime with every rule.
+Candidate, not acted on: the same step-over exists in `sma.imt2npsamp` and DDELAY's C++.
+Next, block 3: the chain, 42 `sjm.apfv` in series with g = 1/√2, and each section's `md` written without the prime (maximum time × maximum rate + a margin for the gap).
