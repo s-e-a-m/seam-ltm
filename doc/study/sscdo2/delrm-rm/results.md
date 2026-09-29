@@ -87,6 +87,19 @@ It is flat across rates (−0.01 dB from 48 to 96 kHz), bounded, and on a fresh 
 Its corner sits far below the clarinet's 29.7 Hz fundamental, so above it the integral is the original's.
 It is `sdt.delrmint`, and the triple product is `sdt.delrmrm`.
 
+### Why 96000 and not `ma.SR`
+Scaling by `ma.SR` instead of 96000 cancels the `/SR` inside `sfi.leakyint` and gives back a sum of samples: Davide's mechanism, made stable, identical at 96 kHz.
+At another rate it differs, measured on the note with the original sum of samples:
+
+| | 48 kHz | 96 kHz | difference |
+|---|---|---|---|
+| before the compressor | +14.32 dBFS | +20.32 dBFS | +6.00 dB |
+| after the compressor | −19.31 dBFS | −19.52 dBFS | −0.21 dB |
+
+The 11:1 compressor absorbs the level but not the depth of its work: with 6 dB less at its input it reduces less, and the envelope of the triple product is shaped differently.
+The question is what the specification is: the mechanism (a sum of samples) or the sound as Davide heard it at 96 kHz.
+Chosen with Giuseppe: the sound, anchored at 96 kHz, so that delRM behaves the same in a 48 kHz rehearsal, in *Studio sul Corpo d'Ombra #4*, or in a student's session — the rule already applied to Di Scipio's constants at 44.1 kHz.
+
 ### Renders
 `render()` writes, at 96 kHz and −20 dBFS RMS: the dry note; for I0, I1 and I2 the output after the compressor on a fresh start and after five minutes of floor; and the plain self-ring-modulation, for comparison with `post_I0-original_after5min`.
 They are committed, with Giuseppe's agreement to publish the recording.

@@ -281,6 +281,8 @@ Measured on the clarinet's note and on ten minutes of floor noise at −70 dBFS 
 The leaky integrator becomes a general SEAM function, `sfi.leakyint(fc)` in `seam.filters.lib` (the integral in seconds, built on the standard `fi.pole`), reused by `sdt.delrmint = sfi.leakyint(1) : *(96000)` and `sdt.delrmrm(mt)`, the triple product.
 The self-test checks that `sdt.delrmrm` equals the measured probe sample for sample, and that at 96 kHz it matches the original's level.
 Giuseppe agreed to publish the renders made from the recording (comb and triple product).
+Giuseppe asked why not `*(ma.SR)`: it cancels the normalisation and gives back a stable sum of samples, identical at 96 kHz; at 48 kHz it is 6.00 dB lower before the compressor and −0.21 dB after it, so the compressor absorbs the level but works 6 dB less hard.
+Kept at 96000: the specification is the sound as Davide heard it, and delRM should behave the same at any session rate.
 
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
