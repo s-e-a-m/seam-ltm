@@ -10,7 +10,8 @@
 //           two independent noises add in power.
 //   osc     the 2N bands before the sum (ch 0..7: A0..A3, B0..B3), to check
 //           that A_k and B_k are independent.
-//   one     sdt.lmo(4, f): the single oscillator, the level reference.
+//   one     sdt.lmoosc(4, f): the single oscillator, the level reference.
+//   lib     sdt.lmo(4, f, d) from seam.tedesco.lib: must equal lmo2 sample for sample.
 //   twocall MUTATION for the self-test: the two oscillators from two separate
 //           no.multinoise(N) calls, which the fixed seed makes identical.
 //
@@ -39,7 +40,8 @@ lmo2(N, f, d) = no.multinoise(2*N) : bandsA(N, f, d), bandsB(N, f, d)
 
 lmo2_ch    = lmo2(4, f, d) : ba.selectn(4, ch);
 osc_ch     = no.multinoise(8) : bandsA(4, f, d), bandsB(4, f, d) : ba.selectn(8, ch);
-one_ch     = sdt.lmo(4, f) : ba.selectn(4, ch);
+one_ch     = sdt.lmoosc(4, f) : ba.selectn(4, ch);
+lib_ch     = sdt.lmo(4, f, d) : ba.selectn(4, ch);
 twocall_ch = (no.multinoise(4) : bandsA(4, f, d)), (no.multinoise(4) : bandsB(4, f, d))
            :> par(i, 4, /(sqrt(2))) : ba.selectn(4, ch);
 

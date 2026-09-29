@@ -14,7 +14,7 @@ CXX=${CXX:-c++}
 # ----------------------------------------------------------------------------
 ARCH=$HERE/../lmo-bandfilter/harness/arch.cpp
 BIN=$HERE/build/bin; mkdir -p "$BIN"
-for p in lmo2_ch osc_ch one_ch twocall_ch; do
+for p in lmo2_ch osc_ch one_ch lib_ch twocall_ch; do
   out=$BIN/$p
   if [ -z "${FORCE:-}" ] && [ -x "$out" ] && [ "$out" -nt "$HERE/dsp/probes.dsp" ] && [ "$out" -nt "$SEAM_LIBS/seam.tedesco.lib" ]; then
     echo "up to date $p"; continue; fi

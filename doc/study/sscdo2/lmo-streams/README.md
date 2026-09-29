@@ -28,7 +28,7 @@ The widening is real, and its cause is the decorrelation of the channels, not a 
 |---|---|---|---|---|
 | `gs1`: Giuseppe's `lmo(1,4,1000)` | 0.998 | 0.991 | 0.991 | 0.998 |
 | `gs2`: Giuseppe's `lmo(2,4,1000)` | −0.021 | 0.991 | 0.991 | −0.023 |
-| `dav`: `sdt.lmo(4,1000)`, one stream per channel as in the original | −0.007 | 0.001 | −0.021 | 0.001 |
+| `dav`: `sdt.lmoosc(4,1000)`, one stream per channel as in the original | −0.007 | 0.001 | −0.021 | 0.001 |
 
 Before the merge, the two blocks of `gs2` differ by exactly 0.
 All probes sit within 0.3 dB of −35.5 dBFS RMS per channel.
@@ -39,7 +39,7 @@ Separation comes from independent streams, which the original already has, one `
 ## Files
 | file | what it is |
 |---|---|
-| `probes.dsp` | Giuseppe's expression verbatim (`gs1`, `gs2`), its eight signals before the merge (`pre2`), and `sdt.lmo` (`dav`); `ch` selects the output |
+| `probes.dsp` | Giuseppe's expression verbatim (`gs1`, `gs2`), its eight signals before the merge (`pre2`), and `sdt.lmoosc` (`dav`); `ch` selects the output |
 | `run.sh` | builds the probes with the offline harness of `../lmo-bandfilter/` and runs `measure.py` |
 | `measure.py` | renders every channel and prints the table above |
 

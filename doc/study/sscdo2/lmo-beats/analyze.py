@@ -104,6 +104,14 @@ def selftest():
     expect("lmo2 at d=0 has the level of one oscillator", check_level(run("lmo2_ch", s, ch=0, d=0)), False)
     expect("MUTATION two calls at d=0", check_level(run("twocall_ch", s, ch=0, d=0)), True)
 
+    def check_same(a, b):
+        m = float(np.max(np.abs(a - b)))
+        return [f"max |lib - lmo2| = {m:.2e}, expected 0"] if m != 0 else []
+
+    y2 = run("lmo2_ch", s, ch=1, d=20)
+    expect("sdt.lmo equals the prototype lmo2", check_same(run("lib_ch", s, ch=1, d=20), y2), False)
+    expect("MUTATION sdt.lmo at d=21 against lmo2 at d=20", check_same(run("lib_ch", s, ch=1, d=21), y2), True)
+
     a0, b0 = run("osc_ch", s, ch=0, d=0), run("osc_ch", s, ch=4, d=0)
 
     def check_indep(a, b):

@@ -245,6 +245,16 @@ So the beat emerges from about 10–15 Hz; below, a second band widens the sound
 Renders for listening at d = 0, 3, 7, 10, 20, 40 Hz (mono and four-channel) and a sweep of d from 0 to 40 Hz.
 The slider's range is left to that listening.
 
+**The LMO, closed on the Faust side.**
+Giuseppe widened the Δ range to 0–50 Hz, for experiment, and agreed with the rest:
+- the 1.015 factor, a by-product of the old two-oscillator formula, is dropped: the frequency is the band centre, and the cues become 97.44 Hz and 97.44 → 112.67 Hz, the frequencies Davide actually heard;
+- the high-passed direct noise is left out: it started at volume 0 on no fader and never sounded;
+- `fi.dcblockerat(20)` is removed, redundant after the 24th-order highpass;
+- no +6 dB make-up: the normalisation corrects an anomaly, and the level is set by playing, not by compatibility.
+
+`seam.tedesco.lib` now has `sdt.lmoband`, `sdt.lmoosc` (one oscillator, formerly `sdt.lmo`) and `sdt.lmo(N, f, d)`, the two beating oscillators.
+The `lmo-beats` self-test checks that `sdt.lmo` equals the measured prototype sample for sample, and catches a 1 Hz change of d.
+
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
 ## Open

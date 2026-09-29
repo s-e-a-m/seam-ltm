@@ -21,7 +21,7 @@ Two independent noises add in power, hence 1/√2.
 
 | file | what it is |
 |---|---|
-| `dsp/probes.dsp` | `lmo2` and the probes of the self-test (`osc`: the eight bands before the sum; `one`: `sdt.lmo`, the level reference; `twocall`: the two-call mutation) |
+| `dsp/probes.dsp` | `lmo2` and the probes of the self-test (`osc`: the eight bands before the sum; `one`: `sdt.lmoosc`, the level reference; `lib`: `sdt.lmo` from `seam.tedesco.lib`, which must equal `lmo2` sample for sample; `twocall`: the two-call mutation) |
 | `build.sh` | compiles every probe with the offline harness of `../lmo-bandfilter/` |
 | `analyze.py` | `selftest`, `measure` (writes `results.md`), `render` (writes `renders/`) |
 | `results.md` | the tables, regenerated, and the hand-written observations below them, preserved |
@@ -40,7 +40,7 @@ Requirements: `faust` (2.88 was used), a C++17 compiler, the seam-ltm `.venv` (s
 
 All at f = 97.44 Hz (cue 1), 48 kHz, 24-bit, normalised to −20 dBFS RMS with 50 ms fades:
 
-- `one_osc_mono.wav`: the single oscillator, `sdt.lmo`, for reference;
+- `one_osc_mono.wav`: the single oscillator, `sdt.lmoosc`, for reference;
 - `dNN_mono.wav` (20 s) and `dNN_4ch.wav` (10 s, the four channels for STONED), for d = 0, 3, 7, 10, 20, 40 Hz;
 - `sweep_d00-40_mono.wav`: d rising linearly from 0 to 40 Hz over 60 s, to hear where the beat appears.
 
