@@ -8,7 +8,8 @@
 // drives delay, filter and spreading; the same filter on all four channels
 // preserves inter-channel phase by construction.
 //
-// FAUST REFERENCE (seam.math.lib): isos=331.4; imt2samp; sff.np nextPrime.
+// FAUST REFERENCE (seam.math.lib): isos=331.4; imt2npsamp (mm, nearest sample,
+//   sff.np next prime), fed to de.delay(1 << 15, ...), as in ddelay.
 // FAUST REFERENCE (seam.filters.lib): the air-absorption filter (roadmap).
 // ISO REFERENCE: ISO 9613-1:1993 (alpha), Bass/Sutherland/Zuckerwar behind it.
 //──────────────────────────────────────────────────────────────────────────

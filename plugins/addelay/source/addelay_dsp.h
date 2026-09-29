@@ -11,8 +11,10 @@
 // One distance -> one delay -> one filter coefficient set -> one spreading
 // gain, shared by all four channels. Filter STATE is per channel.
 //
-// FAUST REFERENCE (seam.math.lib): isos=331.4; imt2samp(mt)=int(mt*SR/isos);
-//   next prime from sff.np. FAUST REFERENCE (seam.filters.lib): air filter.
+// FAUST REFERENCE (seam.math.lib): isos=331.4; imt2npsamp(mt): the distance
+//   rounded to the millimetre, to the nearest sample, then the next prime
+//   (sff.np); the delay is de.delay(1 << 15, imt2npsamp(mt)).
+//   FAUST REFERENCE (seam.filters.lib): air filter.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include "seam_airabsorption.h"

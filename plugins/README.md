@@ -113,8 +113,8 @@ Canonical function per plugin:
 | m2xhgr | `sam.m2xhgr` (Haar via `sdw.haarmn`) | seam.ambisonics.lib |
 | lr2xhgr | `sam.lr2xhgr` | seam.ambisonics.lib |
 | bamodulex | `sam.bamodulex` | seam.ambisonics.lib |
-| ddelay | `sma.imdelay` | seam.math.lib |
-| addelay | `sma.imdelay` + `sfi.airCascade`/`sfi.airShelf` (ISO 9613-1 `sfi.airalpha`) | seam.math.lib + seam.filters.lib |
+| ddelay | `de.delay` · `sma.imt2npsamp` | delays.lib + seam.math.lib |
+| addelay | `de.delay` · `sma.imt2npsamp` + `sfi.airCascade`/`sfi.airShelf` (ISO 9613-1 `sfi.airalpha`) | delays.lib + seam.math.lib + seam.filters.lib |
 | multipink | `sno.multipink` | seam.noises.lib |
 | x2uhj | `sam.x2uhj` | seam.ambisonics.lib |
 

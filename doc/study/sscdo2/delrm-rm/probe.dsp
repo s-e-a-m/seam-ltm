@@ -30,7 +30,7 @@ mt = hslider("mt", 7.291, 0, 30, 0.001);
 fc = hslider("fc", 1, 0.01, 20, 0.01);
 g  = hslider("g", 1, 0, 100, 0.000001);
 
-xD = sma.imnpdelay(1 << 15, mt);
+xD = de.delay(1 << 15, sma.imt2npsamp(mt));
 
 I0 = fi.integrator;
 I1 = sfi.leakyint(fc) : *(96000);

@@ -317,3 +317,14 @@ For us:
 
 ## Who
 **Who:** Claude (agent), on Giuseppe's instructions.
+
+### Resolved: no delay library, the delay is written out
+Discussed with Giuseppe before moving anything, and the plan above changed.
+None of the delays had a structure of its own: `sma.imdelay` and `sma.imnpdelay` were `de.delay` fed by a conversion, and so are delRM's comb and triple product and the canonical DSP of DDELAY and ADDELAY.
+A `seam.delays.lib` will exist when a delay has its own structure (interpolation, modulation, non-standard read/write), not for a conversion.
+- `sma.imdelay` and `sma.imnpdelay` are removed; `seam.math.lib` is stateless again and keeps the conversions (faust-libraries 6d51be9).
+- Every user writes `de.delay(1 << 15, sma.imt2npsamp(mt))`: `sdt.delrmrm`, the `delrm-rm` probe, `ddelay.dsp`, `addelay.dsp`; the `FAUST REFERENCE` of ddelay and addelay and `plugins/README.md` say the same.
+- `addelay.dsp` had the same drift as `ddelay.dsp` (no primes), and the `FAUST REFERENCE` in `addelay_dsp.h` and `addelay_processor.h` cited `imt2samp`'s truncation while the C++ rounds to the millimetre and to the nearest sample: all corrected.
+- `sff.np` stays a foreign function, a study implementation compiled by the C/C++ backends only; the standard libraries have `ma.primes` (the n-th prime) but no next prime, so no alternative is needed for now.
+- Checks rerun: `delrm-delay` 0 mismatches at 44.1/48/96/192 kHz, the +1 mm mutation still 5 940 mismatches; `delrm-rm` tables unchanged and renders byte-identical.
+- Block diagrams of ddelay and addelay regenerated. Their mathdoc PDFs are not: Faust 2.88's `-mdoc` hits an assertion (`sigtyperules.cpp:209`) on any DSP with a slider, even `_*hslider(...)`, so the July PDFs remain and still show `imdelay`.

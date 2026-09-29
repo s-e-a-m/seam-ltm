@@ -6,8 +6,9 @@ Agreed with Davide: delRM's delay uses DDELAY's prime rounding, with the distanc
 The delay is tuned during the setup and left alone during the piece.
 
 The Faust specification of DDELAY had drifted from the plugin.
-`sma.imdelay` computes `int(mt·SR/331.4)`, truncating and without primes, while DDELAY's C++ (`plugins/ddelay/source/ddelay_processor.cpp`, `updateDelaySamples`) rounds the distance to the millimetre, rounds to the nearest sample, and moves to the next prime strictly above.
-`sma.imt2npsamp` and `sma.imnpdelay` in `seam.math.lib` now specify what the plugin does.
+`sma.imdelay` computed `int(mt·SR/331.4)`, truncating and without primes, while DDELAY's C++ (`plugins/ddelay/source/ddelay_processor.cpp`, `updateDelaySamples`) rounds the distance to the millimetre, rounds to the nearest sample, and moves to the next prime strictly above.
+`sma.imt2npsamp` in `seam.math.lib` now specifies what the plugin does, and the delay is `de.delay(1 << 15, sma.imt2npsamp(mt))`.
+`sma.imdelay`, and the `sma.imnpdelay` that briefly replaced it, were removed: a conversion is mathematics, a delay line has state, and neither was a delay of its own.
 
 ## The check
 `probe.dsp` sweeps the distance by 0.1 mm per sample from 0 to 30 m (DDELAY's range) through `sma.imt2npsamp`.
