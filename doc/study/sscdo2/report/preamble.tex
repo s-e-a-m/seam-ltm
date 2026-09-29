@@ -40,11 +40,12 @@
 \newcommand{\vuoto}[1]{\ifx\relax#1\relax ---\else #1\fi}
 
 % ---- a card per control
+\newcounter{scheda}
 \newcommand{\scheda}[8]{%
+  \refstepcounter{scheda}\label{scheda:#1}%
   \begin{tcolorbox}[breakable,colback=white,colframe=black!40,boxrule=0.4pt,
-    title={\textsf{\bfseries #2}\hfill #7},coltitle=black,colbacktitle=black!6]
-  \label{scheda:#1}%
-  \begin{tabularx}{\linewidth}{@{}>{\bfseries\small}p{3.2cm}X@{}}
+    title={\textsf{\bfseries Scheda \thescheda\quad #2}\hfill #7},coltitle=black,colbacktitle=black!6]
+  \begin{tabularx}{\linewidth}{@{}>{\bfseries\small\raggedright\arraybackslash}p{3.9cm}X@{}}
   Ambito & \vuoto{#3}\\
   Valore iniziale & \vuoto{#4}\\
   Conseguenze & \vuoto{#5}\\
