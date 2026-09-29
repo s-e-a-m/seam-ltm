@@ -363,3 +363,11 @@ A first proposal said the moves were under 0.1 ms: wrong, they reach a whole pri
 Distinctness does not depend on the rule: no duplicate within a line with any of the three rules measured (spacing ≥ 135.8 samples, largest prime gap below 1.3 M is 114); across lines about 5% of slider pairs share a prime with every rule.
 Candidate, not acted on: the same step-over exists in `sma.imt2npsamp` and DDELAY's C++.
 Next, block 3: the chain, 42 `sjm.apfv` in series with g = 1/√2, and each section's `md` written without the prime (maximum time × maximum rate + a margin for the gap).
+
+### stunedrev block 3: the chain
+`sdt.stline(k,ms)`: 42 `sjm.apfv` in series, g = 1/√2, delay `sdt.stdel`, buffer `sdt.stmd(k,i) = int(100·(i+1)·k·SR/1000) + 150`; `sdt.stunedrev(t1..t4)` puts the four lines side by side (faust-libraries, commit after fa12cae).
+The margin of 150 covers the largest prime gap below the longest delay at 192 kHz (148) and the half sample of rounding; checked over every rate, time and section, the delay stays at least 62 samples inside the buffer.
+Measured at 96 kHz on noise: 0 against Davide's `apf` with SEAM's delays, 0 against his `stunedrev.dsp` where the primes agree (17, 3, 19, 7 ms); the check goes red with g = 0.7.
+At the starting 33 ms the SEAM version differs from the original on 6 of 168 sections (√2: 4, φ: 0, e: 1, π: 1), each by one prime.
+Memory of the generated C++ in double: 3.94 GiB original, 1.66 GiB SEAM, 1.15 GiB with `-dlt 4096` (exact sizes at 192 kHz, output unchanged); the C++ plugin sized in `prepare(96000)` needs 588 MiB.
+Next: the listening A/B of the six sections at 33 ms, if wanted; then the C++ plugin, or the fourth DSP (choir).
