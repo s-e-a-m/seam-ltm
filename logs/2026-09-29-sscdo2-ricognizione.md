@@ -328,3 +328,12 @@ A `seam.delays.lib` will exist when a delay has its own structure (interpolation
 - `sff.np` stays a foreign function, a study implementation compiled by the C/C++ backends only; the standard libraries have `ma.primes` (the n-th prime) but no next prime, so no alternative is needed for now.
 - Checks rerun: `delrm-delay` 0 mismatches at 44.1/48/96/192 kHz, the +1 mm mutation still 5 940 mismatches; `delrm-rm` tables unchanged and renders byte-identical.
 - Block diagrams of ddelay and addelay regenerated. Their mathdoc PDFs are not: Faust 2.88's `-mdoc` hits an assertion (`sigtyperules.cpp:209`) on any DSP with a slider, even `_*hslider(...)`, so the July PDFs remain and still show `imdelay`.
+
+### delRM block 5: the DC blockers leave (`doc/study/sscdo2/delrm-dcblock/`)
+Giuseppe's rule for the port: measure at the rate of the piece (96 kHz), and carry over what makes process and timbre, not the original's local answers to local problems.
+The original ends each delRM channel with `fi.dcblocker` and puts a second one on all four channels after the master volume.
+Measured at 96 kHz on the clarinet: with the original `fi.integrator` the DC of channels 2/4 reaches 9.6 dB below the signal after five minutes, which is what the first one was holding back; with `sdt.delrmint` it stays 66.5 dB below, and the comb's is 75 dB below.
+delRM in `seam.tedesco.lib` therefore ends at the compressor, and the library says why.
+The side effect was timbral: the pole 0.995 is a high-pass at 76.59 Hz at 96 kHz, and the two in series took 17.6 dB from the 29.7 Hz fundamental.
+A/B renders (clean, and with the two DC blockers of the performance) are in the study for Davide; if he keeps the thinner low end it enters as a declared `fi.dcblockerat(76.59)`.
+Block 6 (master volume, `si.smoo`) is standard.
