@@ -27,5 +27,29 @@ It is the price of incommensurable delays, and far below what the tuning by ear 
 
 Requirements as for `../lmo-bandfilter/` (faust, a C++17 compiler, the seam-ltm `.venv`, a faustlibraries clone in `NEW_LIBS`).
 
-## Still to do
-Renders on a recording of the contrabass clarinet (Giuseppe will provide one): the comb depends on its input, and its notches at 22.6, 67.9, 113.1 Hz… fall across the instrument's lowest register.
+## On the contrabass clarinet
+`render.py` runs the comb on track 1 (the microphone at 1 m) of `CCB_petalonio_oriz_DO.wav`: eight microphones around a contrabass clarinet on its low C, 96 kHz, 3.56 s of sound.
+The note has a fundamental of 29.7 Hz and mainly odd partials (89, 148, 208, 267, 326, 385 Hz), the spectrum of a cylindrical bore closed at one end.
+
+```bash
+./run.sh                                          # builds the probes, runs the checks
+../../../../.venv/bin/python render.py [SOURCE.wav]
+```
+
+It writes the dry note and the comb at 5, 7.291 and 10 m to `renders/`, normalised to −20 dBFS RMS, and in `renders/render-log.md` the comb's gain on each odd partial, measured against 2·|cos(π·f·M/SR)|.
+They agree within 0.2 dB, except in the deepest notches, which the measurement reads shallower (−12.8 against −21.9 dB): a played partial is not a perfect line, and its spectral peak sits a little beside the notch.
+
+The comb recolours the note partial by partial, and the distance chosen during the setup decides which partials it lifts:
+
+| partial | 5.000 m | 7.291 m | 10.000 m |
+|---|---|---|---|
+| 29.6 Hz (1st) | −9.7 | −0.7 | +5.5 |
+| 88.8 Hz (3rd) | −0.4 | +6.0 | +0.9 |
+| 148.0 Hz (5th) | +3.3 | +2.8 | −17.3 |
+| 207.6 Hz (7th) | +5.3 | −7.3 | +2.4 |
+| 266.8 Hz (9th) | +6.0 | +5.4 | +5.9 |
+
+At Davide's initial 7.291 m the comb reinforces the third partial and hollows the seventh; at 10 m it lifts the fundamental and removes the fifth.
+Tuning delRM's delay is tuning a timbre, not only a time.
+
+The WAVs carry a recorded performance and are kept local until its publication is agreed.

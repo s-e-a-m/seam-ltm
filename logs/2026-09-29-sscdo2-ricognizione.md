@@ -266,7 +266,10 @@ The comb of block 2 is the standard `fi.ff_comb(maxdel, M, 1, 1)`, which is x + 
 `sdt.delrmcomb(mt) = fi.ff_comb(1 << 15, sma.imt2npsamp(mt), 1, 1)`, the first delRM entry of `seam.tedesco.lib`.
 Checked in `doc/study/sscdo2/delrm-comb/` at 48 and 96 kHz: identical to the original structure on noise, impulse response 1 at 0 and at M, peaks +6.02 dB every SR/M Hz, notches below −280 dB, +3.0 dB on white noise; a one-sample mutation is caught.
 The prime rounding makes the spacing differ by 0.4 % between rates (45.24 against 45.43 Hz).
-Renders wait for a recording of the contrabass clarinet, which Giuseppe will provide.
+On a recording Giuseppe provided (`CCB_petalonio_oriz_DO.wav`: eight microphones around the contrabass clarinet on its low C, 96 kHz, 3.56 s; track 1 at 1 m, fundamental 29.7 Hz, mainly odd partials) the comb's gain on each partial matches 2·|cos(π·f·M/SR)| within 0.2 dB outside the deepest notches.
+The distance decides which partials it lifts: at 7.291 m it reinforces the third (+6.0 dB) and hollows the seventh (−7.3 dB); at 10 m it lifts the fundamental (+5.5) and removes the fifth (−17.3).
+Tuning delRM's delay is tuning a timbre.
+The renders stay local until the publication of the recorded performance is agreed.
 
 Quadrature pair: the SVF realisation of the RBJ all-pass sections is tracked as issue #12, as a step before proposing SEAM work to GRAME.
 
