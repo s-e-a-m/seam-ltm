@@ -12,7 +12,7 @@ Ogni sezione ritarda l'energia in media esattamente del proprio tempo $t$, qualu
 In una catena le medie si sommano: l'energia di una linea arriva in media dopo la somma dei suoi 42 ritardi.
 Il percorso diretto attraversa le 42 sezioni con il guadagno $-g$ ciascuna e si riduce a $-126$~dB: nei primi istanti dopo l'ingresso di un suono l'uscita è quasi muta, e il suono riemerge man mano che i ritardi si sommano.
 stunedrev è dunque una memoria più che un riverbero: ciò che entra torna, diffuso, dopo decine di secondi o minuti.
-Giuseppe e Davide lo hanno voluto così: ogni faccia di STONED restituisce il suono con la propria scala del tempo.
+Giuseppe lo ha confermato come voluto: ogni faccia di STONED restituisce il suono con la propria scala del tempo.
 
 \begin{center}
 \begin{tikzpicture}[node distance=4mm and 5mm]
@@ -31,7 +31,7 @@ Giuseppe e Davide lo hanno voluto così: ogni faccia di STONED restituisce il su
 \scheda{stunedrev-tempi}{I quattro tempi ($\sqrt{2}$, $\varphi$, $e$, $\pi$)}
 {da 1 a \qty{100}{\milli\second} per ogni linea}
 {83, 47, 7 e \qty{71}{\milli\second}, come nel patch Pure Data (il valore 33 del file \texttt{.dsp} è solo il default del cursore)}
-{il baricentro dell'energia cade a \misurau{106.0}{\second}{stunedrev-chain} per $\sqrt{2}$, \misurau{68.7}{\second}{stunedrev-chain} per $\varphi$, \misurau{17.2}{\second}{stunedrev-chain} per $e$ e \misurau{201.4}{\second}{stunedrev-chain} per $\pi$; una nota di clarinetto torna al 99,9\,\% della sua energia dopo \misurau{327.8}{\second}{stunedrev-chain}, \misurau{171.1}{\second}{stunedrev-chain}, \misurau{44.4}{\second}{stunedrev-chain} e \misurau{603.8}{\second}{stunedrev-chain}; il baricentro cresce in proporzione al tempo del cursore, perché è il tempo moltiplicato per $k$ e per 903, la somma dei fattori da 1 a 42}
+{il baricentro dell'energia cade a \misurau{106.0}{\second}{stunedrev-chain} per $\sqrt{2}$, \misurau{68.7}{\second}{stunedrev-chain} per $\varphi$, \misurau{17.2}{\second}{stunedrev-chain} per $e$ e \misurau{201.4}{\second}{stunedrev-chain} per $\pi$; una nota di clarinetto torna al 99,9\,\% della sua energia dopo \misurau{327.8}{\second}{stunedrev-chain}, \misurau{171.1}{\second}{stunedrev-chain}, \misurau{44.4}{\second}{stunedrev-chain} e \misurau{603.8}{\second}{stunedrev-chain} (per $\pi$ il 99,8\,\%, con il render fermato a 600~s); il baricentro cresce in proporzione al tempo del cursore, perché è il tempo moltiplicato per $k$ e per 903, la somma dei fattori da 1 a 42}
 {la struttura è quella di Davide; i primi seguono la regola SEAM (scheda~\ref{scheda:stunedrev-sezioni})}
 {\daprovare}
 {\studio{stunedrev-chain}: la nota del clarinetto nelle quattro linee, da rigenerare con \texttt{render.py}}

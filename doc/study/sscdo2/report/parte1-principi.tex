@@ -16,7 +16,7 @@ Lo scopo del porting è il ragionamento sul brano: ogni scelta resta scritta e a
 Una voce di \texttt{seam.tedesco.lib} può essere un solo rimando a una funzione SEAM, con un commento che dice quando e perché quella funzione è nata e che cosa usava l'originale.
 
 \paragraph{Dove.}
-Il filtro di banda di LMO usa la riga di Davide sulle librerie aggiornate; il ritardo di delRM è quello di DDELAY; l'all-pass di stunedrev è la forma di Moorer già presente in SEAM (\texttt{sjm.apfv}).
+Il filtro di banda di LMO usa la riga di Davide sulle librerie aggiornate; il ritardo di delRM è quello di DDELAY; l'all-pass di stunedrev è la forma di Moorer di SEAM, a cui questo porting ha aggiunto la variante con il buffer come parametro (\texttt{sjm.apfv}).
 
 \paragraph{Un numero.}
 Dove i numeri primi coincidono, la linea SEAM di stunedrev è identica a quella di Davide campione per campione; ai tempi iniziali cambiano 7 sezioni su 168, ciascuna di un solo primo (\studio{stunedrev-delays}).
@@ -61,7 +61,7 @@ Ogni frequenza di campionamento dà il proprio insieme di primi, e ogni insieme 
 \paragraph{Perché.}
 Nelle 42 sezioni di una linea di stunedrev i ritardi sono multipli dello stesso passo, cioè una serie armonica.
 Due ritardi con un fattore comune producono echi che coincidono; due primi distinti non ne hanno mai.
-Sulla linea $\sqrt{2}$ a \qty{83}{\milli\second}, prima del primo 313 coppie su 861 hanno un fattore comune, dopo nessuna (\studio{stunedrev-delays}).
+Sulla linea $\sqrt{2}$ a \qty{83}{\milli\second}, prima di passare ai numeri primi 313 coppie di ritardi su 861 hanno un fattore comune; dopo, nessuna (\studio{stunedrev-delays}).
 
 \paragraph{Dove.}
 Il ritardo di delRM, in metri, e i ritardi di stunedrev, in millisecondi.
@@ -80,7 +80,7 @@ Quando un rimedio aveva un effetto sul suono, quell'effetto diventa una scelta d
 Un rimedio copiato senza il suo problema lascia solo l'effetto collaterale.
 
 \paragraph{Dove.}
-I due DC blocker di delRM trattenevano la componente continua dell'integratore originale, che dopo cinque minuti arrivava a \misurau{9.6}{\decibel}{delrm-dcblock} sotto il segnale.
+Il primo dei due DC blocker di delRM tratteneva la componente continua dell'integratore originale (al secondo non ne arrivava), che dopo cinque minuti arrivava a \misurau{9.6}{\decibel}{delrm-dcblock} sotto il segnale.
 Con l'integratore SEAM la componente continua resta \misurau{66.5}{\decibel}{delrm-dcblock} sotto il segnale, e delRM termina al compressore.
 
 \paragraph{Un numero.}
@@ -103,7 +103,7 @@ Due rumori indipendenti si sommano in potenza, quindi la somma dei due oscillato
 
 \section{Precisione}\label{sec:principio-precisione}
 \paragraph{Enunciato.}
-I plugin calcolano in doppia precisione (double), qualunque sia il formato dei buffer dell'host.
+I plugin di SSCDO\#2 calcoleranno in doppia precisione (double), qualunque sia il formato dei buffer dell'host.
 La precisione singola (float) riguarda solo Faust compilato nell'IDE online, che la usa come impostazione predefinita.
 
 \paragraph{Perché.}

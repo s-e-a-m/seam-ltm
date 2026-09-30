@@ -17,12 +17,12 @@ Ogni scheda di prova indica che cosa ascoltare, con quale valore del controllo e
 I campi \emph{Esito} e \emph{Decisione} si compilano a penna in sala; la decisione passa poi nella scheda del controllo, dove lo stato diventa \deciso, e nel log di sessione.
 
 \chapter{Schede di prova}\label{cap:schede-prova}
-Le schede seguono l'ordine del brano: prima LMO con i suoi cue, poi delRM, poi stunedrev.
+Le schede seguono l'ordine delle macchine: prima LMO con i suoi cue, poi delRM, poi stunedrev.
 
 \prova{lmo-cue}
 {la banda di LMO al cue 1, con le due bande alla stessa frequenza (scheda~\ref{scheda:lmo-frequenza})}
 {\qty{97.44}{\hertz}, $\Delta = 0$}
-{\file{lmo-bandfilter/renders/steady96_B.wav}}
+{\file{lmo-beats/renders/d00_4ch.wav}}
 
 \prova{lmo-glissando}
 {il glissando del cue 2: continuità, assenza di scatti, durata (scheda~\ref{scheda:lmo-frequenza})}
@@ -37,7 +37,7 @@ Le schede seguono l'ordine del brano: prima LMO con i suoi cue, poi delRM, poi s
 \prova{lmo-filtro}
 {la forma e la coda del filtro di banda nelle cinque versioni, prima alla cieca (scheda~\ref{scheda:lmo-filtro})}
 {A, B, C, C3, C2}
-{\file{lmo-bandfilter/renders/blind/}, poi la chiave in \file{blind/KEY.txt}}
+{\file{lmo-bandfilter/renders/blind/}; la chiave, \file{blind/KEY.txt}, resta sulla macchina di Giuseppe fuori dal repository: non rigenerare quei render prima della prova, perché ogni rigenerazione rimescola le versioni e cambia la chiave}
 
 \prova{delrm-distanza}
 {quali parziali del clarinetto il pettine alza e quali scava, al variare della distanza (scheda~\ref{scheda:delrm-distanza})}
@@ -71,9 +71,11 @@ Le domande seguono l'ordine delle schede; le risposte si annotano qui e nel log 
 
 \questione{uscite-cue}{Quale uscita cue, e da quale lato, porta ciascuno dei canali LFU, RFD, RBU e LBD?}
 
-\questione{semi}{I semi del rumore condivisi tra le due chiamate di LMO e tra le quattro istanze del coro sono un suono da tenere o una svista? (scheda~\ref{scheda:lmo-canali})}
+\questione{semi}{Nell'originale il secondo oscillatore di LMO e le quattro istanze del coro condividono lo stesso seme del rumore, quindi producono lo stesso rumore: è un suono da tenere o una svista? (scheda~\ref{scheda:lmo-delta})}
 
-\questione{dcblocker}{Il basso più sottile che davano i due DC blocker di delRM va tenuto, come passa-alto dichiarato a \qty{76.59}{\hertz}? (scheda~\ref{scheda:delrm-dcblocker})}
+\questione{dcblocker}{Il basso più sottile che davano i due DC blocker di delRM va tenuto, come due passa-alto dichiarati a \qty{76.59}{\hertz} in serie? (scheda~\ref{scheda:delrm-dcblocker})}
+
+\questione{volume-delrm}{Secondo la lettura del patch il fader CC82 muove uno stadio di guadagno di Pd; il volume interno di delRM parte da 0 nel wrapper e da 0,9 nel file \texttt{.dsp}: con quale valore interno suonava delRM? (scheda~\ref{scheda:delrm-volume})}
 
 \questione{filtro-lmo}{Per il filtro di banda di LMO va bene B, la tua riga sulle librerie aggiornate, o preferisci una delle altre versioni, A, C, C3, C2? (scheda~\ref{scheda:lmo-filtro})}
 
