@@ -1,3 +1,24 @@
-% parte2-coro-master.tex
-\chapter{Coro e master}
-Questo capitolo raccoglie le schede del coro e del master.
+% parte2-coro-master.tex -- choir placeholder and master.
+\chapter{Coro e master}\label{cap:coro-master}
+Il coro (\texttt{pitchDetectorChoirMcAdams}) suona in quattro istanze, una per canale.
+Ogni istanza ha 16 bande: l'inviluppo della banda $k$ intorno a $f \cdot k$ modula un rumore filtrato intorno a $f \cdot k^{a}$, con $f$ = 48, 48, 96 e \qty{96}{\hertz}, $a$ = 1; 1,01; 1,1; 0,9, fattore di merito 350 e rilascio di \qty{1.5}{\second}.
+Lo studio del coro seguirà quello di stunedrev: la scheda qui sotto tiene il suo posto nel sistema.
+
+\scheda{coro-uscita}{Uscita del coro (CC86)}
+{}
+{}
+{non ancora studiato: lo studio seguirà quello di stunedrev}
+{}
+{\daprovare}
+{}
+
+\section{Master}
+Il master chiude la catena e porta i quattro canali alle uscite 9--12, verso STONED.
+
+\scheda{master}{Master (CC88)}
+{fader lineare, levigato da \texttt{si.smoo} della libreria standard}
+{come nel patch}
+{nessuna oltre al livello}
+{invariato; nel porting gli stadi di guadagno del patch diventano i fader delle tracce di Reaper}
+{\daprovare}
+{log di sessione, blocco 6 di delRM}
