@@ -1,3 +1,95 @@
-% appendice-audio.tex
+% appendice-audio.tex -- index of the audio files.
 \chapter{File audio}\label{app:audio}
-Questa appendice elenca i file audio.
+Ogni studio con un suono ha una cartella \texttt{renders/} con i file audio e un \file{render-log.md} che dice come sono stati prodotti: livello, durata, frequenza di campionamento.
+I file brevi sono nel repository; quelli di stunedrev, lunghi, si rigenerano con \file{render.py} (capitolo~\ref{cap:preparazione}).
+La sorgente delle prove su strumento è il Do grave di un clarinetto contrabbasso, registrato a \qty{96}{\kilo\hertz} con il microfono a un metro, pubblicato con l'accordo di Giuseppe.
+
+\section*{LMO: il filtro di banda}
+\studio{lmo-bandfilter}, nel repository.
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.2cm}>{\raggedright\arraybackslash}p{9.2cm}@{}}
+\toprule
+File & Contenuto\\
+\midrule
+\file{steady96_A.wav} \ldots\ \file{steady96_C3.wav} & la banda ferma a \qty{97.44}{\hertz} nelle versioni A, B, C, C2, C3\\
+\file{steady96_A_davide_level.wav} & la versione A al livello reale dell'originale, raddoppiato dai due oscillatori identici\\
+\file{gliss_A.wav} \ldots\ \file{gliss_C3.wav} & il glissando del cue 2 nelle cinque versioni\\
+\file{step_A.wav} \ldots\ \file{step_C3.wav} & un salto di frequenza, per sentire il transitorio\\
+\file{blind/*_V.wav} \ldots\ \file{blind/*_Z.wav} & gli stessi tre ascolti con le versioni nascoste; la chiave è in \file{blind/KEY.txt}\\
+\bottomrule
+\end{longtable}
+
+\section*{LMO: due oscillatori che battono}
+\studio{lmo-beats}, nel repository.
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.2cm}>{\raggedright\arraybackslash}p{9.2cm}@{}}
+\toprule
+File & Contenuto\\
+\midrule
+\file{one_osc_mono.wav} & un oscillatore solo, per confronto\\
+\file{d00_mono.wav} \ldots\ \file{d40_mono.wav} & due bande a $\Delta$ = 0, 3, 7, 10, 20, \qty{40}{\hertz}, in mono\\
+\file{d00_4ch.wav} \ldots\ \file{d40_4ch.wav} & le stesse a quattro canali\\
+\file{sweep_d00-40_mono.wav} & $\Delta$ che sale da 0 a \qty{40}{\hertz}\\
+\bottomrule
+\end{longtable}
+
+\section*{LMO: uno o più flussi di rumore}
+\studio{lmo-streams}, nel repository.
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.2cm}>{\raggedright\arraybackslash}p{9.2cm}@{}}
+\toprule
+File & Contenuto\\
+\midrule
+\file{lmo_gs1_4ch.wav}, \file{lmo_gs1_ch01_stereo.wav} & la variante di Giuseppe con un flusso, a quattro canali e in cuffia\\
+\file{lmo_gs2_4ch.wav}, \file{lmo_gs2_ch01_stereo.wav} & la stessa con due flussi\\
+\file{lmo_dav_4ch.wav}, \file{lmo_dav_ch01_stereo.wav} & un flusso per canale, come nell'originale e nel porting\\
+\bottomrule
+\end{longtable}
+
+\section*{delRM: il pettine}
+\studio{delrm-comb}, nel repository.
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.2cm}>{\raggedright\arraybackslash}p{9.2cm}@{}}
+\toprule
+File & Contenuto\\
+\midrule
+\file{ccb_dry.wav} & la nota del clarinetto senza effetto; è anche la sorgente dei render di stunedrev\\
+\file{ccb_comb_5.000m.wav}, \file{ccb_comb_7.291m.wav}, \file{ccb_comb_10.000m.wav} & il pettine a tre distanze\\
+\bottomrule
+\end{longtable}
+
+\section*{delRM: il prodotto triplo}
+\studio{delrm-rm}, nel repository.
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.2cm}>{\raggedright\arraybackslash}p{9.2cm}@{}}
+\toprule
+File & Contenuto\\
+\midrule
+\file{note_dry.wav} & la nota senza effetto\\
+\file{post_I0-original_fresh.wav}, \file{post_I0-original_after5min.wav} & l'integratore originale, all'accensione e dopo cinque minuti\\
+\file{post_I1-leaky-1Hz-96k_fresh.wav}, \file{post_I1-leaky-1Hz-96k_after5min.wav} & l'integratore SEAM, all'accensione e dopo cinque minuti\\
+\file{post_I2-dcblocked_fresh.wav}, \file{post_I2-dcblocked_after5min.wav} & un'alternativa scartata, con un DC blocker prima dell'integratore\\
+\file{selfrm_post.wav} & la semplice automodulazione, per confronto\\
+\bottomrule
+\end{longtable}
+
+\section*{delRM: i DC blocker}
+\studio{delrm-dcblock}, nel repository.
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.2cm}>{\raggedright\arraybackslash}p{9.2cm}@{}}
+\toprule
+File & Contenuto\\
+\midrule
+\file{note_dry.wav} & la nota senza effetto\\
+\file{ch1_comb_clean.wav}, \file{ch1_comb_2dcblockers.wav} & il pettine senza e con i due DC blocker\\
+\file{ch2_triple_clean.wav}, \file{ch2_triple_2dcblockers.wav} & il prodotto triplo senza e con i due DC blocker\\
+\bottomrule
+\end{longtable}
+
+\section*{stunedrev: le quattro facce}
+\studio{stunedrev-chain}, da rigenerare con \file{render.py}; nel repository c'è solo \file{render-log.md}.
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{6.2cm}>{\raggedright\arraybackslash}p{9.2cm}@{}}
+\toprule
+File & Contenuto\\
+\midrule
+\file{note_dry.wav} & la nota senza effetto\\
+\file{stunedrev_sqrt2_83ms.wav} & la faccia $\sqrt{2}$ a \qty{83}{\milli\second}, \qty{327.8}{\second}\\
+\file{stunedrev_phi_47ms.wav} & la faccia $\varphi$ a \qty{47}{\milli\second}, \qty{171.1}{\second}\\
+\file{stunedrev_e_7ms.wav} & la faccia $e$ a \qty{7}{\milli\second}, \qty{44.4}{\second}\\
+\file{stunedrev_pi_71ms.wav} & la faccia $\pi$ a \qty{71}{\milli\second}, \qty{603.8}{\second}\\
+\bottomrule
+\end{longtable}

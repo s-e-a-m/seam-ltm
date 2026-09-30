@@ -73,3 +73,6 @@
 \newcommand{\questione}[2]{%
   \refstepcounter{questione}\label{q:#1}%
   \par\noindent\domanda\ \textbf{Q\thequestione.}\ #2\par\medskip}
+
+% ---- let long monospace names break lines instead of overflowing
+\setlength{\emergencystretch}{2em}

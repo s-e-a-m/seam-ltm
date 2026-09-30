@@ -388,3 +388,9 @@ Giuseppe asked for every survey to be documented, with reference audio where the
 - `lmo-streams/render.py`: the A/B of one noise stream against several (four channels and a headphone pair), 5 s, committed.
 - The shared harness (`lmo-bandfilter/harness/arch.cpp`) now builds the DSP on the heap: stunedrev's buffers overflowed the stack (segmentation fault); `delrm-comb` re-run, unchanged.
 Not documented as a study, by nature: the survey itself (this log), and the delay-library decision, a refactor recorded above.
+
+### The porting report (`doc/study/sscdo2/report/`)
+Giuseppe asked for the surveys to be organised into a LaTeX report, in Italian, shared with Davide and Alice, to be read and judged during rehearsals and to prepare the documentation of the piece and the operational score (spec `docs/superpowers/specs/2026-09-30-sscdo2-porting-report-design.md`).
+Three parts: the eight principles of the port; the machines, one card per control with range, starting value, consequences in numbers, difference from the original, state (decided / to be tested / question for Davide) and study; the rehearsal protocol, nine listening cards with blank fields for verdict and decision, five questions for Davide, and a one-page draft of the operational table.
+Every measured number goes through `\misura{value}{source}`, and `check.py` finds it literally in the cited study or in this log; `make check` builds with LuaLaTeX, fails on missing glyphs or undefined references, runs the checker's self-test (mutations included) and the check.
+After a rehearsal a decision is written in the report first (the card's state becomes decided), then here and, where needed, in `seam.tedesco.lib`.

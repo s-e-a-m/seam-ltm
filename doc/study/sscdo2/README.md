@@ -4,6 +4,8 @@
 The specification is `seam.tedesco.lib` (prefix `sdt`) in faust-libraries; the plugins will be hand-written C++ VST3s in seam-ltm.
 
 The survey of the patch (sources, technical setup, cue system, findings, content audit, decisions, open questions) is the session log `logs/2026-09-29-sscdo2-ricognizione.md`.
+The rehearsal report, in Italian, gathers every study into principles, one card per control, and the rehearsal protocol: `report/sscdo2-porting.pdf` (`make check` in `report/` rebuilds it and checks every number against its study).
+
 Each folder here documents one block: what the original does, what SEAM does and why, the checks that prove it, and, where the block has a sound, the audio to listen to.
 
 ## Method
