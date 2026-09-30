@@ -62,9 +62,28 @@ def source_text(studies, log, src, cache={}):
     return cache[key]
 
 def args(text, macro, n):
-    """All argument tuples of \\macro{a}{b}... with n brace groups (one level of nesting)."""
-    grp = r"\{((?:[^{}]|\{[^{}]*\})*)\}"
-    return re.findall(r"\\" + macro + r"\s*" + r"\s*".join([grp] * n), text)
+    """All argument tuples of \\macro{a}{b}... with n brace groups, at any nesting depth."""
+    out = []
+    for m in re.finditer(r"\\" + macro + r"(?![A-Za-z])", text):
+        i, groups = m.end(), []
+        while len(groups) < n:
+            while i < len(text) and text[i] in " \t\n":
+                i += 1
+            if i >= len(text) or text[i] != "{":
+                break
+            depth, j = 0, i
+            while j < len(text):
+                if text[j] == "\\":
+                    j += 2; continue
+                if text[j] == "{": depth += 1
+                elif text[j] == "}":
+                    depth -= 1
+                    if depth == 0: break
+                j += 1
+            groups.append(text[i + 1:j]); i = j + 1
+        if len(groups) == n:
+            out.append(tuple(groups))
+    return out
 
 def check(root, studies, log, required=True):
     errors, warnings = [], []
@@ -81,7 +100,7 @@ def check(root, studies, log, required=True):
                 errors.append(f"{f}: \\misura{{{v}}}{{{src}}}: value not found in source")
             if len(v.strip("+-− ")) < 3:
                 warnings.append(f"{f}: \\misura{{{v}}}{{{src}}}: short value, weak check")
-        for (d,) in [(x,) for x in args(body, "studio", 1)]:
+        for (d,) in args(body, "studio", 1):
             cited.add(d)
             if d not in folders:
                 errors.append(f"{f}: \\studio{{{d}}}: no such folder")
@@ -121,13 +140,20 @@ def selftest():
             ("MUTATION uncited", r"\misura{97.44}{log}", 1),
             ("MUTATION empty state", r"\misura{2113}{demo}\scheda{x}{a}{b}{c}{d}{e}{}{g}", 1),
         ]
+        # required ids must be found through nested braces
+        open(os.path.join(root, "a.tex"), "w").write(
+            r"\studio{demo}\scheda{deep}{a}{b}{c}{\texttt{x\textasciitilde{} y} \emph{\misura{2113}{demo}}}{e}{\deciso}{g}")
+        found = {a[0] for a in args(open(os.path.join(root, "a.tex")).read(), "scheda", 8)}
+        good = found == {"deep"}
+        print(f"  [{'ok' if good else 'FAIL'}] nested braces: found {sorted(found)}")
+        ok_nested = good
         ok = True
         for name, tex, want in cases:
             got = len(run(tex))
             good = (got == 0) if want == 0 else (got >= 1)
             print(f"  [{'ok' if good else 'FAIL'}] {name}: {got} error(s)")
             ok &= good
-        return ok
+        return ok and ok_nested
     finally:
         shutil.rmtree(tmp)
 

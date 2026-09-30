@@ -1,3 +1,47 @@
-% parte2-stunedrev.tex
-\chapter{stunedrev}
-Questo capitolo raccoglie le schede di stunedrev.
+% parte2-stunedrev.tex -- chapter stunedrev.
+\chapter{stunedrev}\label{cap:stunedrev}
+stunedrev, l'APF della partitura, è fatto di quattro linee indipendenti, una per ogni faccia di STONED.
+Ogni linea è una catena di 42 filtri passa-tutto (all-pass) in serie, nella forma di Moorer, con guadagno $g = 1/\sqrt{2}$ (\studio{stunedrev-allpass}).
+La sezione $i$ ritarda il suono di un tempo pari a quello del cursore moltiplicato per $(i+1) \cdot k$ e portato al primo successivo, con $k = \sqrt{2}$, $\varphi$, $e$, $\pi$ per le quattro facce (\studio{stunedrev-delays}).
+La macchina viene da in-phi-rev di \emph{Canto alla durata} (\S\ref{sec:principio-genealogia}).
+Nella libreria SEAM le funzioni sono \texttt{sdt.stdel}, \texttt{sdt.stmd}, \texttt{sdt.stline} e \texttt{sdt.stunedrev}.
+
+\section{Una memoria lunga}
+Un filtro all-pass lascia passare tutta l'energia che riceve, ma la restituisce nel tempo.
+Ogni sezione ritarda l'energia in media esattamente del proprio tempo $t$, qualunque sia $g$.
+In una catena le medie si sommano: l'energia di una linea arriva in media dopo la somma dei suoi 42 ritardi.
+Il percorso diretto attraversa le 42 sezioni con il guadagno $-g$ ciascuna e si riduce a $-126$~dB: nei primi istanti dopo l'ingresso di un suono l'uscita è quasi muta, e il suono riemerge man mano che i ritardi si sommano.
+stunedrev è dunque una memoria più che un riverbero: ciò che entra torna, diffuso, dopo decine di secondi o minuti.
+Giuseppe e Davide lo hanno voluto così: ogni faccia di STONED restituisce il suono con la propria scala del tempo.
+
+\scheda{stunedrev-tempi}{I quattro tempi ($\sqrt{2}$, $\varphi$, $e$, $\pi$)}
+{da 1 a \qty{100}{\milli\second} per ogni linea}
+{83, 47, 7 e \qty{71}{\milli\second}, come nel patch Pure Data (il valore 33 del file \texttt{.dsp} è solo il default del cursore)}
+{il baricentro dell'energia cade a \misurau{106.0}{\second}{stunedrev-chain} per $\sqrt{2}$, \misurau{68.7}{\second}{stunedrev-chain} per $\varphi$, \misurau{17.2}{\second}{stunedrev-chain} per $e$ e \misurau{201.4}{\second}{stunedrev-chain} per $\pi$; una nota di clarinetto torna al 99,9\,\% della sua energia dopo \misurau{327.8}{\second}{stunedrev-chain}, \misurau{171.1}{\second}{stunedrev-chain}, \misurau{44.4}{\second}{stunedrev-chain} e \misurau{603.8}{\second}{stunedrev-chain}; il baricentro cresce in proporzione al tempo del cursore, perché è il tempo moltiplicato per $k$ e per 903, la somma dei fattori da 1 a 42}
+{la struttura è quella di Davide; i primi seguono la regola SEAM (scheda~\ref{scheda:stunedrev-sezioni})}
+{\daprovare}
+{\studio{stunedrev-chain}: la nota del clarinetto nelle quattro linee, da rigenerare con \texttt{render.py}}
+
+\scheda{stunedrev-ingresso-uscita}{Ingresso (CC83) e uscita (CC84)}
+{fader lineari}
+{come nel patch}
+{nel patch Pure Data un \texttt{adc\textasciitilde{} 5 6 7 8} è collegato anche direttamente all'ingresso del riverbero; Pd somma i segnali su un ingresso, quindi stunedrev riceve sempre il suono e il fader APF INPUT aggiunge al massimo 6~dB}
+{il collegamento diretto sembra un resto delle prove, ma riprodurlo o toglierlo è una scelta di Davide}
+{\domanda}
+{log di sessione, ``Double feed into the reverb''}
+
+\scheda{stunedrev-sezioni}{Le sezioni che cambiano}
+{fisse: dipendono dai quattro tempi}
+{7 sezioni su 168 diverse dall'originale ai tempi iniziali}
+{il porting arrotonda i campioni dove Davide li troncava: sui 16\,800 ritardi possibili, \misura{813}{stunedrev-delays} passano a un altro primo, e lo spostamento arriva a \misura{96}{stunedrev-delays} campioni, un millisecondo; ai tempi iniziali cambiano 3 sezioni di $\sqrt{2}$, nessuna di $\varphi$, 3 di $e$ e 1 di $\pi$, ciascuna di un solo primo; dove i primi coincidono la linea è identica a quella di Davide campione per campione}
+{regola SEAM mantenuta per coerenza con il sistema; \S\ref{sec:principio-primi}}
+{\deciso}
+{\studio{stunedrev-delays}: la tabella delle sezioni, e il confronto con l'originale}
+
+\scheda{stunedrev-memoria}{Memoria}
+{fissa}
+{---}
+{l'originale in Faust occupa \misura{3.94}{stunedrev-chain} GiB, l'external di Pure Data \misura{15.2}{stunedrev-chain} GiB (da qui la nota di Davide sui 32 GB di RAM); la versione SEAM in Faust occupa \misura{1.66}{stunedrev-chain} GiB, oppure \misura{1.15}{stunedrev-chain} GiB con l'opzione \texttt{-dlt 4096}; il plugin C++ dimensionato a \qty{96}{\kilo\hertz} occuperà \misura{588}{stunedrev-chain} MiB}
+{nell'originale tutte le sezioni di una linea avevano il buffer della più lunga; nel porting ogni sezione ha il buffer del proprio ritardo massimo, e il suono resta identico}
+{\deciso}
+{\studio{stunedrev-chain}}
