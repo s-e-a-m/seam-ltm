@@ -1,0 +1,61 @@
+% parte2-lmo.tex -- chapter LMO.
+\chapter{LMO}\label{cap:lmo}
+LMO (\texttt{liveMultiOscs}) è il generatore del brano: una banda stretta di rumore per ciascuno dei quattro canali.
+La catena ha tre blocchi.
+Il rumore bianco viene da \texttt{no.multinoise} della libreria standard, con un flusso indipendente per ogni canale.
+Il filtro di banda è un passa-alto e un passa-basso di Butterworth di ordine 24 alla stessa frequenza, la riga scritta da Davide.
+Due oscillatori, cioè due bande, possono battere tra loro a una distanza $\Delta$ scelta dall'esecutore.
+Nella libreria SEAM le tre funzioni sono \texttt{sdt.lmoband}, \texttt{sdt.lmoosc} e \texttt{sdt.lmo(N, f, d)}.
+
+\begin{center}
+\begin{tikzpicture}[node distance=5mm and 9mm]
+\node[blocco] (n) {rumore bianco\\\texttt{no.multinoise(2N)}};
+\node[blocco,above right=2mm and 9mm of n] (b1) {banda a $f-\Delta/2+k$\\HP24 : LP24};
+\node[blocco,below right=2mm and 9mm of n] (b2) {banda a $f+\Delta/2+k$\\HP24 : LP24};
+\node[blocco,below right=2mm and 9mm of b1] (s) {somma\\$\times 1/\sqrt{2}$};
+\node[blocco,right=of s] (v) {volume\\CC81};
+\draw[freccia] (n) |- (b1); \draw[freccia] (n) |- (b2);
+\draw[freccia] (b1) -| (s); \draw[freccia] (b2) -| (s); \draw[freccia] (s) -- (v);
+\end{tikzpicture}\\[1mm]
+{\small Un canale $k$ di LMO; i quattro canali sono uguali, con flussi di rumore diversi.}
+\end{center}
+
+\scheda{lmo-frequenza}{Frequenza (cue)}
+{guidata dai cue; il glissando del cue 2 dura \qty{120}{\second}}
+{cue 1: \misurau{97.44}{\hertz}{log}}
+{il cue 2 porta la banda da \misurau{97.44}{\hertz}{log} a \misurau{112.67}{\hertz}{log}; la frequenza è il centro della banda di tutti e quattro i canali, a meno dello scarto di $+i$~Hz del canale $i$}
+{l'originale moltiplicava la frequenza del cursore per 1,015, un residuo della vecchia formula dei due oscillatori; il porting lo toglie e scrive nei cue le frequenze che Davide sentiva (96 e 111 Hz nell'originale diventano i valori qui sopra); \S\ref{sec:principio-ragiona}}
+{\deciso}
+{\studio{lmo-bandfilter}, lista dei cue nel log di sessione}
+
+\scheda{lmo-delta}{Distanza $\Delta$ tra i due oscillatori}
+{da 0 a \qty{50}{\hertz}, allargato da Giuseppe per sperimentare}
+{\qty{0}{\hertz}: le due bande hanno la stessa frequenza e sono decorrelate}
+{a distanza $\Delta$ ogni banda si sposta di $\Delta/2$ dal centro; una banda di rumore oscilla già da sola, e il battimento emerge sopra quell'oscillazione da circa 10--15 Hz: l'inviluppo sale di \misura{+3.0}{lmo-beats} dB a 10 Hz, \misura{15.8}{lmo-beats} dB a 20 Hz, \misura{34.5}{lmo-beats} dB a 40 Hz; sotto i 10 Hz la seconda banda allarga il suono senza battere}
+{l'originale aveva un secondo oscillatore identico al primo, che raddoppiava il livello; il porting realizza l'intenzione di Davide, due bande che possono battere, con il livello di un oscillatore solo; \S\ref{sec:principio-livelli}}
+{\daprovare}
+{\studio{lmo-beats}: ascolti a 0, 3, 7, 10, 20, 40 Hz e uno sweep da 0 a 40 Hz}
+
+\scheda{lmo-volume}{Volume (CC81)}
+{fader lineare}
+{come nel patch}
+{nessuna}
+{nessun guadagno di compatibilità: il livello si fissa in sala; \S\ref{sec:principio-livelli}}
+{\daprovare}
+{}
+
+\scheda{lmo-canali}{I quattro canali}
+{fissi: un flusso di rumore indipendente per canale, scarto di $+i$~Hz sul canale $i$}
+{canali decorrelati}
+{due canali adiacenti hanno correlazione \misura{-0.007}{lmo-streams}, contro \misura{0.998}{lmo-streams} con un solo flusso condiviso: è questa decorrelazione ad aprire il suono nello spazio; lo scarto di 1 Hz da solo non separa nulla, perché la banda a 1 kHz è larga \misurau{73}{\hertz}{lmo-streams}}
+{invariato: l'originale ha già un flusso per canale}
+{\deciso}
+{\studio{lmo-streams}: A/B tra un flusso e più flussi, a quattro canali e in cuffia}
+
+\scheda{lmo-filtro}{Il filtro di banda}
+{fisso: passa-alto e passa-basso di ordine 24 alla stessa frequenza}
+{versione B}
+{la banda a $-3$~dB è larga il \misura{7.35}{lmo-bandfilter}\,\% del centro (Q circa \misura{13.6}{lmo-bandfilter}); la versione C, un passa-banda di Butterworth con gli stessi bordi, ha fianchi quasi verticali ma una coda di \misurau{4.95}{\second}{lmo-bandfilter} contro \misurau{0.31}{\second}{lmo-bandfilter}}
+{B è la riga di Davide sulle librerie Faust aggiornate, scelta da Giuseppe all'ascolto tra A (l'originale), B, C e due ordini intermedi, C3 e C2; tutte restano negli studi per il confronto con Davide}
+{\daprovare}
+{\studio{lmo-bandfilter}: le cinque versioni, con ascolto alla cieca}

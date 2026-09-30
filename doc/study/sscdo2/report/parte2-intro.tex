@@ -1,0 +1,75 @@
+% parte2-intro.tex -- Part II opening: the system as played.
+\chapter{Il sistema}\label{cap:sistema}
+In esecuzione suonano quattro unità Faust, tutte dentro il sottopatch \texttt{pd GRAND\_CENTRAL} di Davide, tutte a quattro canali e con i canali in parallelo.
+Gli ingressi sono i canali fisici 5--8 della BiG SiX, dove arriva la TETRAREC A attraverso il preamplificatore ASP880.
+Le uscite sono i canali 9--12, chiamati LFU, RFD, RBU e LBD: i quattro altoparlanti di STONED, il diffusore tetraedrico del sistema SEAM.
+Le altre azioni della partitura, tra cui l'intera sezione analogica con la TETRAREC B, si svolgono a mano sulla BiG SiX.
+
+\begin{center}
+\begin{tikzpicture}[node distance=6mm and 12mm,
+  box/.style={draw,rounded corners,minimum width=26mm,minimum height=8mm,align=center,font=\small},
+  >={Stealth[length=2mm]}]
+\node[box] (in) {TETRAREC A\\ingressi 5--8};
+\node[box,right=of in] (del) {delRM\\CC82};
+\node[box,above=of del] (lmo) {LMO\\CC81, cue};
+\node[box,below=of del] (st) {stunedrev\\CC83 / CC84};
+\node[box,below=of st] (coro) {coro\\CC86};
+\node[box,right=of del] (mix) {mix a 4 canali};
+\node[box,right=of mix] (out) {master CC88\\uscite 9--12\\STONED};
+\draw[->] (in) -- (del);
+\draw[->] (in.south) |- (st);
+\draw[->] (in.south) |- (coro);
+\draw[->] (lmo) -| (mix);
+\draw[->] (del) -- (mix);
+\draw[->] (st) -| (mix);
+\draw[->] (coro) -| (mix);
+\draw[->] (mix) -- (out);
+\end{tikzpicture}
+\end{center}
+
+\section{I controlli}
+Il sistema si suona con i fader di una Behringer BCF2000, letti come controlli MIDI da CC81 a CC88; il ritorno dei fader motorizzati non è collegato:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Fader & Macchina & Funzione\\
+\midrule
+CC81 & LMO & volume\\
+CC82 & delRM & volume\\
+CC83 & stunedrev & ingresso (APF INPUT)\\
+CC84 & stunedrev & uscita (APF OUTPUT)\\
+CC86 & coro & uscita\\
+CC88 & tutto & master\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Nel patch originale i fader passano per stadi di guadagno lineari con una rampa di \qty{25}{\milli\second}; nel porting gli stadi di guadagno diventano i fader delle tracce di Reaper.
+CC85, CC87 e gli altri controlli della BCF2000 non hanno destinazione.
+
+\section{La lista dei cue}
+I cue guidano soltanto la frequenza di LMO; la barra spaziatrice passa al cue successivo.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Cue & Originale & Porting SEAM\\
+\midrule
+0 & LMO a \qty{48}{\hertz}, inizializzazione in silenzio & invariato\\
+1 & LMO a \qty{96}{\hertz} & \misurau{97.44}{\hertz}{log}\\
+2 & glissando da 96 a \qty{111}{\hertz} in \qty{120}{\second} & da \misurau{97.44}{\hertz}{log} a \misurau{112.67}{\hertz}{log} in \qty{120}{\second}\\
+99 & fine & invariato\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+I valori del porting sono le frequenze che Davide ha davvero ascoltato: la scheda~\ref{scheda:lmo-frequenza} spiega perché cambiano i numeri e resta lo stesso suono.
+
+\section{Come si legge una scheda}
+Ogni controllo ha una scheda con sette voci.
+Il titolo nomina il controllo e porta lo stato: \deciso, \daprovare\ oppure \domanda.
+\emph{Ambito} è l'intervallo in cui il controllo si muove; \emph{Valore iniziale} è quello con cui il brano comincia.
+\emph{Conseguenze} dice che cosa cambia nel suono, con i numeri misurati.
+\emph{Rispetto all'originale} dice che cosa è diverso dalla patch di Davide e perché, con un rimando ai principi della prima parte.
+\emph{Studio e audio} indica la cartella che contiene le misure, i programmi che le riproducono e i file da ascoltare.

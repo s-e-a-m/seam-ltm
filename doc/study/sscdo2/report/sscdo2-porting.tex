@@ -1,0 +1,37 @@
+\documentclass[11pt,a4paper,openany]{report}
+\input{preamble}
+
+\title{Studio sul Corpo d'Ombra \#2\\\large Il porting SEAM: principi, macchine, prove}
+\author{Giuseppe Silvi --- SEAM\\\small con Davide Tedesco e Alice Cortegiani}
+\date{Versione del \today}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+\input{abstract}
+\end{abstract}
+\tableofcontents
+
+\chapter*{Stato delle schede}\label{cap:stati}
+\addcontentsline{toc}{chapter}{Stato delle schede}
+Ogni scheda della seconda parte, con il suo stato; dopo ogni prova si aggiorna la scheda e questo elenco si rigenera.
+\medskip
+
+\listastati
+
+\part{Principi e processi}
+\input{parte1-principi}
+
+\part{Le macchine}
+\input{parte2-intro}
+\input{parte2-lmo}
+\input{parte2-delrm}
+\input{parte2-stunedrev}
+\input{parte2-coro-master}
+
+\part{Protocollo di prova}
+\input{parte3-prove}
+
+\appendix
+\input{appendice-audio}
+\end{document}

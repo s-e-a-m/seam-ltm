@@ -1,0 +1,62 @@
+% parte2-delrm.tex -- chapter delRM.
+\chapter{delRM}\label{cap:delrm}
+delRM (\texttt{delRM\_duet}) lavora su quattro canali, e ciascuno elabora soltanto il proprio ingresso dalla TETRAREC.
+I canali 1 e 3 sono un filtro a pettine: il segnale più se stesso ritardato di D, $x + x[n-D]$.
+I canali 2 e 4 moltiplicano tre segnali, il ritardato, il diretto e il suo integrale, $10 \cdot x[n-D] \cdot x \cdot \int x$, e passano il prodotto a un compressore.
+Il ritardo D è quello del plugin DDELAY: una distanza in metri, convertita alla velocità del suono di \misurau{331.4}{\metre\per\second}{delrm-delay} e portata al primo successivo, secondo l'accordo con Davide (\S\ref{sec:principio-genealogia}).
+La specifica Faust di DDELAY è verificata valore per valore contro il plugin (\studio{delrm-delay}).
+Gli studi usano come segnale di prova una registrazione del Do grave di un clarinetto contrabbasso, con fondamentale a \qty{29.7}{\hertz} e parziali soprattutto dispari, fornita da Giuseppe (appendice~\ref{app:audio}).
+Nella libreria SEAM i blocchi sono \texttt{sdt.delrmcomb}, \texttt{sdt.delrmint}, \texttt{sdt.delrmrm} e \texttt{sdt.delrmdyn}.
+
+\begin{center}
+\begin{tikzpicture}[node distance=5mm and 8mm]
+\node[blocco] (x) {ingresso $x$\\TETRAREC};
+\node[blocco,above right=3mm and 8mm of x] (c) {canali 1, 3\\$x + x[n-D]$};
+\node[blocco,below right=3mm and 8mm of x] (r) {canali 2, 4\\$10 \cdot x[n-D] \cdot x \cdot \int x$};
+\node[blocco,right=of r] (k) {compressore\\11:1};
+\node[blocco,right=8mm of k.east,anchor=west,yshift=12mm] (v) {volume\\CC82};
+\draw[freccia] (x) |- (c); \draw[freccia] (x) |- (r); \draw[freccia] (r) -- (k);
+\draw[freccia] (c) -| (v); \draw[freccia] (k) -| (v);
+\end{tikzpicture}\\[1mm]
+{\small D è il ritardo primo di DDELAY, regolato in metri.}
+\end{center}
+
+\scheda{delrm-distanza}{Distanza (ritardo D)}
+{da 0 a \qty{30}{\metre}; si regola durante il montaggio e resta ferma nel brano, e il piccolo click di un cambio è accettato}
+{\misurau{7.291}{\metre}{delrm-comb}, cioè \misura{2113}{delrm-comb} campioni a \qty{96}{\kilo\hertz}: i \qty{22}{\milli\second} di Davide}
+{il pettine alza e scava i parziali del suono secondo la distanza: a 7,291 m rinforza il terzo parziale del clarinetto contrabbasso di \misura{+6.0}{delrm-comb} dB e scava il settimo di \misura{-7.3}{delrm-comb} dB; a 10 m alza la fondamentale di \misura{+5.5}{delrm-comb} dB e toglie il quinto parziale, \misura{-17.3}{delrm-comb} dB; regolare il ritardo è regolare un timbro}
+{l'originale usava secondi con \texttt{de.delay}; il porting usa il ritardo primo di DDELAY, in metri, così lo stesso strumento serve a SSCDO\#4; \S\ref{sec:principio-primi}}
+{\daprovare}
+{\studio{delrm-comb}: la nota del clarinetto a 5, 7,291 e 10 m, e la nota senza effetto}
+
+\scheda{delrm-volume}{Volume (CC82)}
+{fader lineare; secondo la lettura del patch agisce su uno stadio di guadagno di Pure Data}
+{da verificare: delRM ha anche un proprio volume interno, che nel wrapper di Pd parte da 0 e nel file \texttt{.dsp} da 0,9}
+{nessuna oltre al livello}
+{invariato; resta da capire quale dei due volumi il fader muove e con quale valore interno si suonava (domanda~\ref{q:volume-delrm})}
+{\domanda}
+{log di sessione, ``Build flags''}
+
+\scheda{delrm-dinamica}{Canali 2 e 4: la finestra dinamica}
+{dipende dal guadagno dell'ASP880, cioè dal livello con cui il suono entra}
+{da trovare in sala}
+{il prodotto di tre segnali è cubico: 6 dB in più all'ingresso diventano 18 dB in più prima del compressore; sotto la soglia l'effetto cresce in fretta, sopra il compressore 11:1 lavora come un limitatore; circa 15 dB di dinamica del suonare separano l'effetto assente da quello saturo; i transitori superano l'attacco di 30 ms e toccano 0 dBFS con \misurau{+6}{\decibel}{delrm-rm} all'ingresso, prima del master}
+{il compressore è quello dell'originale, con gli stessi parametri}
+{\daprovare}
+{\studio{delrm-rm}: ascolti del prodotto triplo dopo il compressore}
+
+\scheda{delrm-integratore}{L'integratore}
+{fisso}
+{---}
+{l'integratore originale sommava tutto dall'accensione e trascinava la componente continua: una nota che arrivava dopo cinque minuti produceva un prodotto triplo più forte di \misurau{7.3}{\decibel}{delrm-rm} e simile per \misura{0.88}{delrm-rm} di correlazione a una semplice automodulazione; con l'integratore SEAM l'effetto resta quello dell'accensione per tutto il brano}
+{integratore con perdita a 1 Hz, molto al di sotto della fondamentale del clarinetto, scalato per 96000 perché il suono sia quello che Davide sentiva a \qty{96}{\kilo\hertz}; \S\ref{sec:principio-96k}}
+{\deciso}
+{\studio{delrm-rm}: la nota all'accensione e dopo cinque minuti, nell'originale e nel porting}
+
+\scheda{delrm-dcblocker}{I DC blocker}
+{due in serie nell'originale: uno alla fine di ogni canale, uno dopo il volume}
+{assenti nel porting}
+{con l'integratore SEAM non c'è componente continua da trattenere; a \qty{96}{\kilo\hertz} i DC blocker erano passa-alto a \misurau{76.59}{\hertz}{delrm-dcblock}, e in serie toglievano \misurau{17.63}{\decibel}{delrm-dcblock} alla fondamentale del clarinetto: il basso della performance era più sottile}
+{tolti perché il loro problema non esiste più (\S\ref{sec:principio-processo}); se Davide vuole quel basso più sottile, rientra come un passa-alto dichiarato, due \texttt{fi.dcblockerat(76.59)} in serie, come erano i due DC blocker}
+{\domanda}
+{\studio{delrm-dcblock}: A/B della nota senza e con i due DC blocker}

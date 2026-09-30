@@ -1,0 +1,105 @@
+% parte3-prove.tex -- Part III: the rehearsal protocol.
+\chapter{Preparazione}\label{cap:preparazione}
+Le prove si fanno a \qty{96}{\kilo\hertz}, la frequenza del brano (\S\ref{sec:principio-96k}).
+La TETRAREC A entra nel preamplificatore ASP880 e da lì negli ingressi 5--8 della BiG SiX; le uscite 9--12 portano LFU, RFD, RBU e LBD ai quattro altoparlanti di STONED.
+Il guadagno dell'ASP880 decide dove cade la finestra dinamica dei canali 2 e 4 di delRM (scheda~\ref{scheda:delrm-dinamica}): va fissato prima degli ascolti di delRM.
+
+I file di riferimento sono nelle cartelle \texttt{renders/} degli studi (appendice~\ref{app:audio}).
+Quelli di stunedrev si rigenerano sulla macchina di chi prova, perché occupano circa 330 MB:
+
+\begin{lstlisting}[language={}]
+cd doc/study/sscdo2/stunedrev-chain
+./run.sh                                  # circa 2 minuti
+../../../../.venv/bin/python render.py    # circa 4 minuti
+\end{lstlisting}
+
+Ogni scheda di prova indica che cosa ascoltare, con quale valore del controllo e con quale file confrontare.
+I campi \emph{Esito} e \emph{Decisione} si compilano a penna in sala; la decisione passa poi nella scheda del controllo, dove lo stato diventa \deciso, e nel log di sessione.
+
+\chapter{Schede di prova}\label{cap:schede-prova}
+Le schede seguono l'ordine delle macchine: prima LMO con i suoi cue, poi delRM, poi stunedrev.
+
+\prova{lmo-cue}
+{la banda di LMO al cue 1, con le due bande alla stessa frequenza (scheda~\ref{scheda:lmo-frequenza})}
+{\qty{97.44}{\hertz}, $\Delta = 0$}
+{\file{lmo-beats/renders/d00_4ch.wav}}
+
+\prova{lmo-glissando}
+{il glissando del cue 2: continuità, assenza di scatti, durata (scheda~\ref{scheda:lmo-frequenza})}
+{da \qty{97.44}{\hertz} a \qty{112.67}{\hertz} in \qty{120}{\second}}
+{\file{lmo-bandfilter/renders/gliss_B.wav}}
+
+\prova{lmo-delta}
+{dove comincia il battimento tra le due bande, e fin dove il cursore $\Delta$ deve arrivare (scheda~\ref{scheda:lmo-delta})}
+{$\Delta$ = 0, 3, 7, 10, 20, \qty{40}{\hertz}, poi lo sweep}
+{\file{lmo-beats/renders/}: \file{d00_4ch.wav} \ldots\ \file{d40_4ch.wav}, \file{sweep_d00-40_mono.wav}}
+
+\prova{lmo-filtro}
+{la forma e la coda del filtro di banda nelle cinque versioni, prima alla cieca (scheda~\ref{scheda:lmo-filtro})}
+{A, B, C, C3, C2}
+{\file{lmo-bandfilter/renders/blind/}; la chiave, \file{blind/KEY.txt}, resta sulla macchina di Giuseppe fuori dal repository: non rigenerare quei render prima della prova, perché ogni rigenerazione rimescola le versioni e cambia la chiave}
+
+\prova{delrm-distanza}
+{quali parziali del clarinetto il pettine alza e quali scava, al variare della distanza (scheda~\ref{scheda:delrm-distanza})}
+{5, 7,291 e \qty{10}{\metre}}
+{\file{delrm-comb/renders/}: \file{ccb_dry.wav} e i tre \file{ccb_comb_*.wav}}
+
+\prova{delrm-dinamica}
+{il punto in cui l'effetto dei canali 2 e 4 compare e quello in cui satura, al variare del guadagno dell'ASP880 (scheda~\ref{scheda:delrm-dinamica})}
+{guadagno dell'ASP880 a passi di \qty{3}{\decibel}}
+{dal vivo; timbro di riferimento in \file{delrm-rm/renders/post_I1-leaky-1Hz-96k_fresh.wav}}
+
+\prova{delrm-dcblocker}
+{il basso con e senza i due DC blocker della performance (scheda~\ref{scheda:delrm-dcblocker})}
+{senza / con i due DC blocker}
+{\file{delrm-dcblock/renders/}: \file{ch1_comb_clean.wav} contro \file{ch1_comb_2dcblockers.wav}, \file{ch2_triple_clean.wav} contro \file{ch2_triple_2dcblockers.wav}}
+
+\prova{stunedrev-facce}
+{le quattro facce che restituiscono la nota, ciascuna con la sua scala del tempo (scheda~\ref{scheda:stunedrev-tempi})}
+{83, 47, 7 e \qty{71}{\milli\second}}
+{\file{stunedrev-chain/renders/stunedrev_*.wav}, da rigenerare}
+
+\prova{stunedrev-ingresso}
+{il riverbero con il fader APF INPUT a zero: se suona ancora, il collegamento diretto è attivo (scheda~\ref{scheda:stunedrev-ingresso-uscita})}
+{CC83 = 0}
+{dal vivo, nel patch di Davide e nel porting}
+
+\chapter{Domande per Davide}\label{cap:domande}
+Le domande seguono l'ordine delle schede; le risposte si annotano qui e nel log di sessione.
+
+\questione{doppio-ingresso}{Il collegamento diretto \texttt{adc\textasciitilde{} 5 6 7 8} verso stunedrev è voluto o è un resto delle prove? Il porting deve riprodurlo? (scheda~\ref{scheda:stunedrev-ingresso-uscita})}
+
+\questione{uscite-cue}{Quale uscita cue, e da quale lato, porta ciascuno dei canali LFU, RFD, RBU e LBD?}
+
+\questione{semi}{Nell'originale il secondo oscillatore di LMO e le quattro istanze del coro condividono lo stesso seme del rumore, quindi producono lo stesso rumore: è un suono da tenere o una svista? (scheda~\ref{scheda:lmo-delta})}
+
+\questione{dcblocker}{Il basso più sottile che davano i due DC blocker di delRM va tenuto, come due passa-alto dichiarati a \qty{76.59}{\hertz} in serie? (scheda~\ref{scheda:delrm-dcblocker})}
+
+\questione{volume-delrm}{Secondo la lettura del patch il fader CC82 muove uno stadio di guadagno di Pd; il volume interno di delRM parte da 0 nel wrapper e da 0,9 nel file \texttt{.dsp}: con quale valore interno suonava delRM? (scheda~\ref{scheda:delrm-volume})}
+
+\questione{filtro-lmo}{Per il filtro di banda di LMO va bene B, la tua riga sulle librerie aggiornate, o preferisci una delle altre versioni, A, C, C3, C2? (scheda~\ref{scheda:lmo-filtro})}
+
+\chapter{Bozza della tabella operativa}\label{cap:tabella}
+Questa tabella riduce le schede a una pagina, nell'ordine dei controlli; è la base della partitura operativa.
+
+\begin{longtable}{@{}l l >{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}p{4.2cm} l@{}}
+\toprule
+Controllo & Macchina & Valore iniziale & Ambito & Scheda\\
+\midrule
+\endhead
+Cue 0 & LMO & \qty{48}{\hertz}, in silenzio & --- & \ref{scheda:lmo-frequenza}\\
+Cue 1 & LMO & \qty{97.44}{\hertz} & --- & \ref{scheda:lmo-frequenza}\\
+Cue 2 & LMO & glissando a \qty{112.67}{\hertz} & \qty{120}{\second} & \ref{scheda:lmo-frequenza}\\
+Cue 99 & --- & fine & --- & ---\\
+$\Delta$ & LMO & \qty{0}{\hertz} & 0--\qty{50}{\hertz} & \ref{scheda:lmo-delta}\\
+CC81 & LMO & in sala & fader & \ref{scheda:lmo-volume}\\
+Distanza & delRM & \qty{7.291}{\metre} & 0--\qty{30}{\metre}, fissa nel brano & \ref{scheda:delrm-distanza}\\
+Guadagno ASP880 & delRM & in sala & finestra di circa \qty{15}{\decibel} & \ref{scheda:delrm-dinamica}\\
+CC82 & delRM & in sala & fader & \ref{scheda:delrm-volume}\\
+Tempi & stunedrev & 83, 47, 7, \qty{71}{\milli\second} & 1--\qty{100}{\milli\second} & \ref{scheda:stunedrev-tempi}\\
+CC83 & stunedrev & in sala & fader d'ingresso & \ref{scheda:stunedrev-ingresso-uscita}\\
+CC84 & stunedrev & in sala & fader d'uscita & \ref{scheda:stunedrev-ingresso-uscita}\\
+CC86 & coro & in sala & fader & \ref{scheda:coro-uscita}\\
+CC88 & master & in sala & fader & \ref{scheda:master}\\
+\bottomrule
+\end{longtable}
