@@ -14,6 +14,20 @@ Il percorso diretto attraversa le 42 sezioni con il guadagno $-g$ ciascuna e si 
 stunedrev è dunque una memoria più che un riverbero: ciò che entra torna, diffuso, dopo decine di secondi o minuti.
 Giuseppe e Davide lo hanno voluto così: ogni faccia di STONED restituisce il suono con la propria scala del tempo.
 
+\begin{center}
+\begin{tikzpicture}[node distance=4mm and 5mm]
+\node[blocco] (i) {ingresso\\CC83};
+\node[blocco,right=of i] (a0) {all-pass\\$t_0$};
+\node[blocco,right=of a0] (a1) {all-pass\\$t_1$};
+\node[right=of a1] (d) {$\cdots$};
+\node[blocco,right=of d] (a41) {all-pass\\$t_{41}$};
+\node[blocco,right=of a41] (o) {uscita\\CC84};
+\draw[freccia] (i) -- (a0); \draw[freccia] (a0) -- (a1); \draw[freccia] (a1) -- (d);
+\draw[freccia] (d) -- (a41); \draw[freccia] (a41) -- (o);
+\end{tikzpicture}\\[1mm]
+{\small Una linea; $t_i$ è il tempo del cursore per $(i+1)\cdot k$, portato al primo successivo, con $g = 1/\sqrt{2}$ in ogni sezione.}
+\end{center}
+
 \scheda{stunedrev-tempi}{I quattro tempi ($\sqrt{2}$, $\varphi$, $e$, $\pi$)}
 {da 1 a \qty{100}{\milli\second} per ogni linea}
 {83, 47, 7 e \qty{71}{\milli\second}, come nel patch Pure Data (il valore 33 del file \texttt{.dsp} è solo il default del cursore)}

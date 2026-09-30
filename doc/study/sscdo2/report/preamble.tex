@@ -29,9 +29,16 @@
 
 % ---- state tags
 \newcommand{\statotag}[2]{\textcolor{#1}{\textsf{\small\bfseries #2}}}
-\newcommand{\deciso}{\statotag{sdeciso}{DECISO}}
-\newcommand{\daprovare}{\statotag{sdaprovare}{DA PROVARE}}
-\newcommand{\domanda}{\statotag{sdomanda}{DOMANDA}}
+\DeclareRobustCommand{\deciso}{\statotag{sdeciso}{DECISO}}
+\DeclareRobustCommand{\daprovare}{\statotag{sdaprovare}{DA PROVARE}}
+\DeclareRobustCommand{\domanda}{\statotag{sdomanda}{DOMANDA}}
+
+% ---- the list of card states, one line per card (\listastati)
+\makeatletter
+\newcommand{\listastati}{\@starttoc{sta}}
+\newcommand{\statoentry}[2]{\hbox to 2.6cm{#1\hfil}#2}
+\newcommand{\l@stato}[2]{\par\noindent #1\dotfill\ #2\par}
+\makeatother
 
 % ---- numbers and sources
 \newcommand{\misura}[2]{\num{#1}}
@@ -44,6 +51,7 @@
 \newcounter{scheda}
 \newcommand{\scheda}[8]{%
   \refstepcounter{scheda}\label{scheda:#1}%
+  \addcontentsline{sta}{stato}{\protect\statoentry{#7}{Scheda \thescheda\quad #2}}%
   \begin{tcolorbox}[breakable,colback=white,colframe=black!40,boxrule=0.4pt,
     title={\textsf{\bfseries Scheda \thescheda\quad #2}\hfill #7},coltitle=black,colbacktitle=black!6]
   \begin{tabularx}{\linewidth}{@{}>{\bfseries\small\raggedright\arraybackslash}p{3.9cm}X@{}}
@@ -76,3 +84,7 @@
 
 % ---- let long monospace names break lines instead of overflowing
 \setlength{\emergencystretch}{2em}
+
+% ---- block diagrams of the machines
+\tikzset{blocco/.style={draw,rounded corners,minimum height=8mm,align=center,font=\small},
+  freccia/.style={-{Stealth[length=2mm]}}}

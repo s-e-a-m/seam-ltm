@@ -96,7 +96,8 @@ def check(root, studies, log, required=True):
             cited.add(src)
             if src != "log" and src not in folders:
                 errors.append(f"{f}: \\misura{{{v}}}{{{src}}}: unknown source"); continue
-            if norm(v) not in source_text(studies, log, src):
+            nv = norm(v)
+            if not re.search(r"(?<![\d.])" + re.escape(nv) + r"(?![\d])", source_text(studies, log, src)):
                 errors.append(f"{f}: \\misura{{{v}}}{{{src}}}: value not found in source")
             if len(v.strip("+-− ")) < 3:
                 warnings.append(f"{f}: \\misura{{{v}}}{{{src}}}: short value, weak check")
@@ -107,12 +108,21 @@ def check(root, studies, log, required=True):
         for a in args(body, "scheda", 8):
             if not a[6].strip():
                 errors.append(f"{f}: \\scheda{{{a[0]}}}: empty state")
+            elif a[6].strip() not in (r"\deciso", r"\daprovare", r"\domanda"):
+                errors.append(f"{f}: \\scheda{{{a[0]}}}: state must be \\deciso, \\daprovare or \\domanda")
     index = open(os.path.join(studies, "README.md"), encoding="utf-8").read()
     for d in re.findall(r"`([a-z0-9-]+)/`", index):
         if d in folders and d not in cited:
             errors.append(f"study {d}/ is in the index and never cited")
     if required:
-        alltex = "\n".join(tex.values())
+        # the spec's structure: a list of states, and each machine drawn as a chain
+        main = re.sub(r"(?<!\\)%.*", "", tex.get("sscdo2-porting.tex", ""))
+        if "\\listastati" not in main:
+            errors.append("missing \\listastati (the list of card states) in sscdo2-porting.tex")
+        for f in ("parte2-lmo.tex", "parte2-delrm.tex", "parte2-stunedrev.tex"):
+            if "\\begin{tikzpicture}" not in tex.get(f, ""):
+                errors.append(f"{f}: missing the machine's chain figure (tikzpicture)")
+        alltex = "\n".join(re.sub(r"(?<!\\)%.*", "", t) for t in tex.values())
         have = {m: {a[0] for a in args(alltex, m, n)} for m, n in (("scheda", 8), ("prova", 4), ("questione", 2))}
         for m, req in (("scheda", REQUIRED_SCHEDE), ("prova", REQUIRED_PROVE), ("questione", REQUIRED_QUESTIONI)):
             for i in req:
@@ -139,6 +149,8 @@ def selftest():
             ("MUTATION folder", r"\misura{2113}{demo} \studio{nodemo}", 1),
             ("MUTATION uncited", r"\misura{97.44}{log}", 1),
             ("MUTATION empty state", r"\misura{2113}{demo}\scheda{x}{a}{b}{c}{d}{e}{}{g}", 1),
+            ("MUTATION missing leading digit", r"\misura{113}{demo} \studio{demo}", 1),
+            ("MUTATION bad state", r"\misura{2113}{demo}\scheda{x}{a}{b}{c}{d}{e}{TODO}{g}", 1),
         ]
         # required ids must be found through nested braces
         open(os.path.join(root, "a.tex"), "w").write(
@@ -153,7 +165,16 @@ def selftest():
             good = (got == 0) if want == 0 else (got >= 1)
             print(f"  [{'ok' if good else 'FAIL'}] {name}: {got} error(s)")
             ok &= good
-        return ok and ok_nested
+        # a required card present only in a comment must be reported missing
+        global REQUIRED_SCHEDE, REQUIRED_PROVE, REQUIRED_QUESTIONI
+        saved = (REQUIRED_SCHEDE, REQUIRED_PROVE, REQUIRED_QUESTIONI)
+        REQUIRED_SCHEDE, REQUIRED_PROVE, REQUIRED_QUESTIONI = ["x"], [], []
+        open(os.path.join(root, "a.tex"), "w").write("\\studio{demo}\n% \\scheda{x}{a}{b}{c}{d}{e}{\\deciso}{g}\n")
+        errs = check(root, studies, log, required=True)[0]
+        REQUIRED_SCHEDE, REQUIRED_PROVE, REQUIRED_QUESTIONI = saved
+        good = any("missing \\scheda{x}" in e for e in errs)
+        print(f"  [{'ok' if good else 'FAIL'}] MUTATION commented card: {len(errs)} error(s)")
+        return ok and ok_nested and good
     finally:
         shutil.rmtree(tmp)
 

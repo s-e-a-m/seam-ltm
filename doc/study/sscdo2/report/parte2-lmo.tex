@@ -7,6 +7,19 @@ Il filtro di banda è un passa-alto e un passa-basso di Butterworth di ordine 24
 Due oscillatori, cioè due bande, possono battere tra loro a una distanza $\Delta$ scelta dall'esecutore.
 Nella libreria SEAM le tre funzioni sono \texttt{sdt.lmoband}, \texttt{sdt.lmoosc} e \texttt{sdt.lmo(N, f, d)}.
 
+\begin{center}
+\begin{tikzpicture}[node distance=5mm and 9mm]
+\node[blocco] (n) {rumore bianco\\\texttt{no.multinoise(2N)}};
+\node[blocco,above right=2mm and 9mm of n] (b1) {banda a $f-\Delta/2+k$\\HP24 : LP24};
+\node[blocco,below right=2mm and 9mm of n] (b2) {banda a $f+\Delta/2+k$\\HP24 : LP24};
+\node[blocco,below right=2mm and 9mm of b1] (s) {somma\\$\times 1/\sqrt{2}$};
+\node[blocco,right=of s] (v) {volume\\CC81};
+\draw[freccia] (n) |- (b1); \draw[freccia] (n) |- (b2);
+\draw[freccia] (b1) -| (s); \draw[freccia] (b2) -| (s); \draw[freccia] (s) -- (v);
+\end{tikzpicture}\\[1mm]
+{\small Un canale $k$ di LMO; i quattro canali sono uguali, con flussi di rumore diversi.}
+\end{center}
+
 \scheda{lmo-frequenza}{Frequenza (cue)}
 {guidata dai cue; il glissando del cue 2 dura \qty{120}{\second}}
 {cue 1: \misurau{97.44}{\hertz}{log}}
