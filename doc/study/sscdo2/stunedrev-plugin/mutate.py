@@ -45,3 +45,6 @@ for i,(test,desc,f,a,b) in enumerate(MUT):
     finally:
         subprocess.run(["git","checkout","--",f])
     print(i,test,"|",desc,"|",res,flush=True); rows.append((test,desc,res))
+# The restored sources must leave restored binaries: rebuild every test touched.
+for t in sorted({m[0] for i, m in enumerate(MUT) if not only or i in only}):
+    subprocess.run(["cmake", "--build", "build-test", "--config", "Release", "--target", t], capture_output=True)

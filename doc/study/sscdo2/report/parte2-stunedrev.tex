@@ -55,7 +55,15 @@ Giuseppe lo ha confermato come voluto: ogni faccia di STONED restituisce il suon
 \scheda{stunedrev-memoria}{Memoria}
 {fissa}
 {---}
-{l'originale in Faust occupa \misura{3.94}{stunedrev-chain} GiB, l'external di Pure Data \misura{15.2}{stunedrev-chain} GiB (da qui la nota di Davide sui 32 GB di RAM); la versione SEAM in Faust occupa \misura{1.66}{stunedrev-chain} GiB, oppure \misura{1.15}{stunedrev-chain} GiB con l'opzione \texttt{-dlt 4096}; il plugin C++ dimensionato a \qty{96}{\kilo\hertz} occuperà \misura{588}{stunedrev-chain} MiB}
+{l'originale in Faust occupa \misura{3.94}{stunedrev-chain} GiB, l'external di Pure Data \misura{15.2}{stunedrev-chain} GiB (da qui la nota di Davide sui 32 GB di RAM); la versione SEAM in Faust occupa \misura{1.66}{stunedrev-chain} GiB, oppure \misura{1.15}{stunedrev-chain} GiB con l'opzione \texttt{-dlt 4096}; il plugin C++ occupa a \qty{96}{\kilo\hertz} \misura{588.119}{stunedrev-plugin} MiB, allocati quando l'host lo attiva e mai nel thread audio}
 {nell'originale tutte le sezioni di una linea avevano il buffer della più lunga; nel porting ogni sezione ha il buffer del proprio ritardo massimo, e il suono resta identico}
 {\deciso}
-{\studio{stunedrev-chain}}
+{\studio{stunedrev-chain}; \studio{stunedrev-plugin}}
+
+\scheda{stunedrev-reset}{POWER e RESET}
+{POWER acceso o spento; RESET è un pulsante}
+{POWER spento}
+{RESET porta l'uscita a zero in 25~ms, azzera la memoria un pezzo per ogni blocco audio con l'uscita muta, poi riapre: a \qty{96}{\kilo\hertz} dura \misurau{0.418}{\second}{stunedrev-plugin}, uguale a ogni dimensione del blocco; POWER apre e chiude l'uscita in 25~ms mentre le linee continuano a girare}
+{aggiunte all'originale: POWER è l'interruttore standard della suite; RESET serve alle prove, perché una linea ricorda il suono per minuti e nell'originale solo ricaricare la patch la svuota; RESET non è un parametro, nessuna automazione lo attiva e nessun preset lo salva}
+{\deciso}
+{\studio{stunedrev-plugin}}

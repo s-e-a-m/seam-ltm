@@ -23,7 +23,7 @@ LOG = os.path.join(STUDIES, "..", "..", "..", "logs", "2026-09-29-sscdo2-ricogni
 REQUIRED_SCHEDE = [
     "lmo-frequenza", "lmo-delta", "lmo-volume", "lmo-canali", "lmo-filtro",
     "delrm-distanza", "delrm-volume", "delrm-dinamica", "delrm-integratore", "delrm-dcblocker",
-    "stunedrev-tempi", "stunedrev-ingresso-uscita", "stunedrev-sezioni", "stunedrev-memoria",
+    "stunedrev-tempi", "stunedrev-ingresso-uscita", "stunedrev-sezioni", "stunedrev-memoria", "stunedrev-reset",
     "coro-uscita", "master",
 ]
 REQUIRED_PROVE = [

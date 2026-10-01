@@ -12,5 +12,6 @@
 \contentsline {stato}{\statoentry {\domanda }{Scheda 12\hskip 1em\relax Ingresso (CC83) e uscita (CC84)}}{16}{scheda.12}%
 \contentsline {stato}{\statoentry {\deciso }{Scheda 13\hskip 1em\relax Le sezioni che cambiano}}{17}{scheda.13}%
 \contentsline {stato}{\statoentry {\deciso }{Scheda 14\hskip 1em\relax Memoria}}{17}{scheda.14}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 15\hskip 1em\relax Uscita del coro (CC86)}}{18}{scheda.15}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 16\hskip 1em\relax Master (CC88)}}{18}{scheda.16}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 15\hskip 1em\relax POWER e RESET}}{17}{scheda.15}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 16\hskip 1em\relax Uscita del coro (CC86)}}{19}{scheda.16}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 17\hskip 1em\relax Master (CC88)}}{19}{scheda.17}%
