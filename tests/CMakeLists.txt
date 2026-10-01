@@ -323,3 +323,11 @@ target_include_directories(seam_noise_test PRIVATE
 )
 target_compile_features(seam_noise_test PRIVATE cxx_std_17)
 add_test(NAME seam_noise_test COMMAND seam_noise_test)
+
+add_executable(seam_butterworth_test seam_butterworth_test.cpp)
+target_include_directories(seam_butterworth_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_butterworth_test PRIVATE cxx_std_17)
+add_test(NAME seam_butterworth_test COMMAND seam_butterworth_test)

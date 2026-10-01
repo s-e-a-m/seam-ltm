@@ -7,3 +7,6 @@ Each mutation was applied to the source, the test rebuilt and run, and the sourc
 |---|---|---|
 | seam_noise_test: bit for bit | streams in step order (`steps_[k]`) instead of reverse (`steps_[n-1-k]`) | RED |
 | seam_noise_test: bit for bit | first step fed back (`state_ = steps_[0]`) instead of the last | RED |
+| seam_butterworth_test: order 24 | sections in reverse order | GREEN — an equivalent mutant: LTI sections in series commute, so the order changes only the rounding (below 1e-12 of the peak); nothing to detect |
+| seam_butterworth_test: order 24, −3 dB | damping index shifted by one section (`s` from 0) | RED |
+| seam_butterworth_test: order 24 and 2 HP | HP output without the damping (`v0 - v1 - v2`) | RED |
