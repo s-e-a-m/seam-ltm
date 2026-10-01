@@ -66,10 +66,10 @@ A fresh reviewer read the whole branch and found two important defects in the pr
 A recall while LMO plays moves f over the recalled glide, as a cue does (documented in `plugins/lmo/doc/README.md`, with the advice to draw sloped f envelopes with glide at 0).
 
 ## Open
-- Listening in Reaper at 96 kHz: POWER and volume fades, cue 1, cue 2 (glide 120, then f 112.67), a Δ sweep, the same session at 48 kHz.
-- Publishing the site page (`make -C doc publish`), after Giuseppe's confirmation.
+- stunedrev.
 
-## Host check and registry
+## Host check, listening and registry
+Giuseppe listened in Reaper at 96 kHz (POWER and volume fades, cue 1, cue 2 with glide 120 then f 112.67, a Δ sweep, the same session at 48 kHz): listening OK.
 Giuseppe loaded LMO in Reaper and sent the window's screenshot (`docs/img/lmo.png`): the window is as designed, the bus is 4 in + out, and the read-only "f now" reaches the footer (440.00 with f at 440), which the final reviewer had left to the host check.
 The registry gains a family for the works, "Works — SSCDO#2", with LMO; the counts of `doc/scripts/test-doc.sh`, `render-readme.py` and `CLAUDE.md` go from sixteen to seventeen; `make -C doc test` passes its 12 checks, `uidesc_lint_selftest` passes with the screenshot.
 - Then stunedrev.
