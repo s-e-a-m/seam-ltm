@@ -40,7 +40,8 @@ plugins/stunedrev/
 ├── resource/stunedrev.uidesc    # from _template.uidesc, format L
 └── doc/README.md
 plugins/_common/
-└── seam_primes.h                # NEW: prime sieve, nextPrimeAbove = sff.np
+├── seam_primes.h                # NEW: prime sieve, nextPrimeAbove = sff.np
+└── seam_moorer.h                # NEW: Moorer's all-pass, the C++ side of seam.moorer.lib
 ```
 
 `stunedrev_dsp.h` is SDK-free, so doctest drives the whole engine.
@@ -54,7 +55,10 @@ The sieve is built outside the audio thread; a lookup is a scan of at most one p
 Reusable by every plugin with prime delays (ddelay, delRM).
 Interface: `explicit PrimeSieve(uint32_t bound)`, `bool isPrime(uint32_t)`, `uint32_t nextPrimeAbove(uint32_t)`, `uint32_t bound()`.
 
-### The all-pass section
+### The all-pass section — `seam_moorer.h`
+
+Filters are reusable C++ libraries, as they are in Faust (Giuseppe, 2026-10-01): the all-pass lives in `plugins/_common/seam_moorer.h`, the C++ side of `seam.moorer.lib`, not inside the plugin.
+`Seam::MoorerAllpass` takes g as a parameter and the buffer from the caller (`attach(buf, len)`), as `sjm.apfv` takes the buffer size: stunedrev places its 168 sections in one arena, another plugin may give each its own vector.
 
 Moorer's form, `sjm.apfv(md, t, g)`:
 `(x+_ : *(-g) <: _+x,_ : de.delay(md,t-1),_)~(0-_) : mem+_`.
@@ -68,8 +72,8 @@ y  = wd + a
 ```
 
 One multiplier: all-pass by structure for any g and any rounding.
-g = 1/√2 in every section, as in the original.
-A section is an offset and a length into the arena, a write index, and its current delay t.
+In stunedrev g = 1/√2 in every section, as in the original.
+A section is a `MoorerAllpass` attached to its slice of the arena.
 
 ### Memory: one arena, sized exactly
 
@@ -175,7 +179,7 @@ A full four-line render is millions of samples, so the reference keeps: the whol
 |---|---|---|
 | 1 | `seam_primes.h` | `nextPrimeAbove(n)` equals trial division for **every** n up to the 192 kHz bound (2.53 M), and is strictly greater than n |
 | 2 | delays | the 16 800 delays (1–100 ms × 42 sections × 4 lines) equal `sdt.stdel` at 96 and 48 kHz, exactly |
-| 3 | section | the impulse response of one section equals `sjm.apfv`; flipping the sign of g must fail (the study's 0.0311) |
+| 3 | section | `seam_moorer_test`: the impulse response equals `sjm.apfv` for g = 1/√2 and g = 0.7; the energy of the impulse response is 1 (all-pass); flipping the sign of g must fail |
 | 4 | engine | the four lines against `sdt.stunedrev(83, 47, 7, 71)` at 96 and 48 kHz, on noise and on the clarinet note, on the windows, within about 1e-12 of the peak |
 | 5 | change of time | a time changes at a block boundary, in the C++ and in the refdump at the same sample; the outputs agree after the jump |
 | 6 | arena | every section's length ≥ its longest delay + 1 at 44.1, 48, 88.2, 96, 176.4, 192 and 384 kHz; the total at 96 kHz is reported |

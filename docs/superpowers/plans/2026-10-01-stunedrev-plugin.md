@@ -4,7 +4,7 @@
 
 **Goal:** A hand-written C++ VST3 of `sdt.stunedrev` (four lines of 42 Moorer all-passes, ratios √2 φ e π) for SSCDO#2, equal to the Faust spec to numerical precision, with an exactly sized arena allocated outside the audio thread and a RESET that empties it while playing.
 
-**Architecture:** A new reusable `plugins/_common/seam_primes.h` (sieve + `sff.np` + `sma.ms2npsamp`) feeds an SDK-free engine `plugins/stunedrev/source/stunedrev_dsp.h` (sections in one arena, gain ramps, RESET state machine), driven by a thin `SingleComponentEffect` processor with a ParamBox of atomics and two GUI-only views (RESET, footer). Faust references are rendered once by a committed script into a committed header, so the doctest suite proves C++ == spec without `faust`.
+**Architecture:** Two new reusable headers, `plugins/_common/seam_primes.h` (sieve + `sff.np` + `sma.ms2npsamp`) and `plugins/_common/seam_moorer.h` (Moorer's all-pass, the C++ side of `seam.moorer.lib`), feed an SDK-free engine `plugins/stunedrev/source/stunedrev_dsp.h` (sections in one arena, gain ramps, RESET state machine), driven by a thin `SingleComponentEffect` processor with a ParamBox of atomics and two GUI-only views (RESET, footer). Faust references are rendered once by a committed script into a committed header, so the doctest suite proves C++ == spec without `faust`.
 
 **Tech Stack:** C++17, VST3 SDK + VSTGUI, CMake (Xcode generator), doctest, Faust 2.88 + faustlibraries clone (reference generation only), Python 3 (lint, docs), LuaLaTeX (report).
 
@@ -18,6 +18,7 @@
 - g = 1/√2 in every section; ratios in line order √2, (1+√5)/2, 2.718281828459045, 3.141592653589793; starting times 83, 47, 7, 71 ms; times 1–100 ms, integer step.
 - Section length `msToPrimeSamples(100·(i+1)·k, fs) + 1`; one arena; allocated and zeroed in `setActive(true)`, never in `process()`.
 - RESET is not a VST3 parameter and not in the state.
+- Filters are reusable C++ libraries in `plugins/_common/`, as in Faust (Giuseppe): `seam_<lib>.h` is the C++ side of `seam.<lib>.lib`, cites its Faust in the header, and knows nothing of the plugin that uses it.
 - Ramps of 25 ms (`Seam::LinearRamp`) for input, output, POWER, RESET fade.
 - UI: `doc/style/ui-style.md`, format L (460 px), title `SEAM STUNEDREV`, factory name `SEAM STUNEDREV`, `tools/check-uidesc.py` clean, palette names only (never `TextDim`, in the uidesc or in C++).
 - FUID `0x5E4D0011, 0xA1B2C3D4, 0x53545200, 0x00000011` (word3 = ASCII "STR\0"); subcategory `Fx|Reverb`; bundle id `io.github.s-e-a-m.stunedrev`.
@@ -224,12 +225,13 @@ git commit -m "feat(common): seam_primes.h, a sieve behind sff.np and sma.ms2nps
 - Create: `tests/stunedrev_burst.h` (the test input, shared by the refdump and the tests)
 - Create: `doc/study/sscdo2/stunedrev-plugin/gen-ref.sh` (executable)
 - Create: `doc/study/sscdo2/stunedrev-plugin/refdump.cpp`
-- Create: `doc/study/sscdo2/stunedrev-plugin/dsp/stdel.dsp`, `dsp/apfv.dsp`, `dsp/stunedrev.dsp`
-- Create (generated): `tests/ref/stunedrev_ref.h`
+- Create: `doc/study/sscdo2/stunedrev-plugin/dsp/stdel.dsp`, `dsp/apfv.dsp`, `dsp/apfv07.dsp`, `dsp/stunedrev.dsp`
+- Create (generated): `tests/ref/stunedrev_ref.h`, `tests/ref/seam_moorer_ref.h`
 
 **Interfaces:**
 - Produces: `struct Burst { explicit Burst(double fs); void fill(double* const* in, int n); }`, four channels, 50 ms of LCG white noise then silence.
-- Produces, in namespace `stunedrevref`: `kStdel96[100][168]`, `kStdel48[100][168]` (int; row = ms − 1, column = line·42 + section); `kApfv[512]` (impulse response of `sjm.apfv(1024, 37, 1/√2)` at 96 kHz); `kWin96[4][30][512]`, `kWin96_energy[4][30]`, `kWin48[4][30][512]`, `kWin48_energy[4][30]` (sdt.stunedrev(83,47,7,71) on the burst: the first 512 samples of every second, and the energy of every second); `kChange96[4][3][512]`, `kChange96_energy[4][3]` (the same at 96 kHz, with t3 set to 9 ms at sample 48128).
+- Produces, in namespace `moorerref` (`tests/ref/seam_moorer_ref.h`): `kApfv[512]`, `kApfv07[512]` (impulse responses of `sjm.apfv(1024, 37, g)` with g = 1/√2 and 0.7).
+- Produces, in namespace `stunedrevref`: `kStdel96[100][168]`, `kStdel48[100][168]` (int; row = ms − 1, column = line·42 + section); `kWin96[4][30][512]`, `kWin96_energy[4][30]`, `kWin48[4][30][512]`, `kWin48_energy[4][30]` (sdt.stunedrev(83,47,7,71) on the burst: the first 512 samples of every second, and the energy of every second); `kChange96[4][3][512]`, `kChange96_energy[4][3]` (the same at 96 kHz, with t3 set to 9 ms at sample 48128).
 
 - [ ] **Step 1: Write `tests/stunedrev_burst.h`:**
 
@@ -285,6 +287,14 @@ process = line(sqrt(2)), line((1+sqrt(5))/2), line(ma.E), line(ma.PI);
 import("stdfaust.lib");
 sjm = library("seam.moorer.lib");
 process = sjm.apfv(1024, 37, 1/sqrt(2));
+```
+
+`dsp/apfv07.dsp`:
+```
+// The same section with another gain: the library takes g as a parameter.
+import("stdfaust.lib");
+sjm = library("seam.moorer.lib");
+process = sjm.apfv(1024, 37, 0.7);
 ```
 
 `dsp/stunedrev.dsp`:
@@ -455,6 +465,7 @@ FAUSTLIBS="${FAUSTLIBS:-/Users/giuseppe/Documents/github/grame/faustlibraries}"
 SEAMLIBS="${SEAMLIBS:-$(cd "$ROOT/../faust-libraries/src" && pwd)}"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 OUT="$ROOT/tests/ref/stunedrev_ref.h"
+MOUT="$ROOT/tests/ref/seam_moorer_ref.h"
 mkdir -p "$(dirname "$OUT")"
 
 build() { # dsp
@@ -471,8 +482,6 @@ build() { # dsp
     build stdel.dsp
     "$WORK/refdump" stdel 96000 kStdel96
     "$WORK/refdump" stdel 48000 kStdel48
-    build apfv.dsp
-    "$WORK/refdump" impulse 96000 512 kApfv
     build stunedrev.dsp
     "$WORK/refdump" windows 96000 30 kWin96
     "$WORK/refdump" windows 48000 30 kWin48
@@ -480,30 +489,192 @@ build() { # dsp
     echo "} // namespace stunedrevref"
 } > "$OUT"
 echo "wrote $OUT ($(wc -c < "$OUT") bytes)"
+
+{
+    echo "// GENERATED by doc/study/sscdo2/stunedrev-plugin/gen-ref.sh -- do not edit."
+    echo "// $(faust --version | head -1); faust-libraries $(git -C "$SEAMLIBS" rev-parse --short HEAD)."
+    echo "#pragma once"
+    echo "namespace moorerref {"
+    build apfv.dsp
+    "$WORK/refdump" impulse 96000 512 kApfv
+    build apfv07.dsp
+    "$WORK/refdump" impulse 96000 512 kApfv07
+    echo "} // namespace moorerref"
+} > "$MOUT"
+echo "wrote $MOUT"
 ```
 
 - [ ] **Step 5: Run it.** Run: `doc/study/sscdo2/stunedrev-plugin/gen-ref.sh`
-Expected: `wrote .../tests/ref/stunedrev_ref.h (about 3 MB)`. Check by eye: `grep -c "static const" tests/ref/stunedrev_ref.h` gives 10; the first row of `kStdel96` (ms = 1) starts with `137` (√2 · 96 = 135.8 → 136 → 137) and ends with the π column's section 42 (≈ 12 667). If `faust` fails on `sff.np`, check that `-I "$SEAMLIBS/h"` reaches `../h/nextprime.h`.
+Expected: `wrote .../tests/ref/stunedrev_ref.h (about 3 MB)`. Check by eye: `grep -c "static const" tests/ref/stunedrev_ref.h` gives 8 and `tests/ref/seam_moorer_ref.h` 2; the first row of `kStdel96` (ms = 1) starts with `137` (√2 · 96 = 135.8 → 136 → 137) and ends with the π column's section 42 (≈ 12 667). If `faust` fails on `sff.np`, check that `-I "$SEAMLIBS/h"` reaches `../h/nextprime.h`.
 
 - [ ] **Step 6: Commit.**
 
 ```bash
-git add tests/stunedrev_burst.h tests/ref/stunedrev_ref.h doc/study/sscdo2/stunedrev-plugin
+git add tests/stunedrev_burst.h tests/ref/stunedrev_ref.h tests/ref/seam_moorer_ref.h doc/study/sscdo2/stunedrev-plugin
 git commit -m "test(stunedrev): Faust references of sdt.stdel, sjm.apfv, sdt.stunedrev"
 ```
 
 ---
 
-### Task 3: The engine, part 1: delays, section, arena sizing
+### Task 3: `seam_moorer.h`, then the engine, part 1: delays and arena sizing
 
 **Files:**
-- Create: `plugins/stunedrev/source/stunedrev_dsp.h` (constants, `sectionDelay`, `sectionLength`, `sieveBound`, `Section`)
+- Create: `plugins/_common/seam_moorer.h` (`Seam::MoorerAllpass`, the C++ side of `seam.moorer.lib`'s `apfv`)
+- Create: `tests/seam_moorer_test.cpp`
+- Create: `plugins/stunedrev/source/stunedrev_dsp.h` (constants, `sectionDelay`, `sectionLength`, `sieveBound`)
 - Create: `tests/stunedrev_dsp_test.cpp`
 - Modify: `tests/CMakeLists.txt`
 
 **Interfaces:**
-- Consumes: `Seam::PrimeSieve`, `Seam::msToPrimeSamples` (Task 1); `stunedrevref::kStdel96/48`, `kApfv` (Task 2).
-- Produces (namespace `stunedrev`): `kLines = 4`, `kSections = 42`, `kTMin = 1`, `kTMax = 100`, `kDefaultTimes[4] = {83,47,7,71}`, `kShortRamp = 0.025`, `kClearBytesPerSample = 16384`, `kG`, `kRatio[4]`; `uint32_t sectionDelay(int line, int i, double ms, double fs, const Seam::PrimeSieve&)`; `std::size_t sectionLength(int line, int i, double fs, const Seam::PrimeSieve&)`; `uint32_t sieveBound(double fs)`; `struct Section { double* buf; std::size_t len, pos; uint32_t t; double v; double tick(double); }`.
+- Consumes: `Seam::PrimeSieve`, `Seam::msToPrimeSamples` (Task 1); `stunedrevref::kStdel96/48`, `moorerref::kApfv`, `kApfv07` (Task 2).
+- Produces (namespace `stunedrev`): `kLines = 4`, `kSections = 42`, `kTMin = 1`, `kTMax = 100`, `kDefaultTimes[4] = {83,47,7,71}`, `kShortRamp = 0.025`, `kClearBytesPerSample = 16384`, `kG`, `kRatio[4]`; `uint32_t sectionDelay(int line, int i, double ms, double fs, const Seam::PrimeSieve&)`; `std::size_t sectionLength(int line, int i, double fs, const Seam::PrimeSieve&)`; `uint32_t sieveBound(double fs)`.
+- Produces (`seam_moorer.h`): `class Seam::MoorerAllpass` with `void attach(double* buf, std::size_t len)`, `void clear()` (state to zero; the buffer is the caller's to zero), `void setDelay(uint32_t t)`, `uint32_t delay() const`, `void setGain(double g)`, `double gain() const`, `double tick(double x)`.
+
+- [ ] **Step 0a: Write the failing library test** `tests/seam_moorer_test.cpp`:
+
+```cpp
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "doctest/doctest.h"
+#include "seam_moorer.h"
+#include "ref/seam_moorer_ref.h"
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+using Seam::MoorerAllpass;
+
+static double impulseErr(double g, const double* ref) {
+    std::vector<double> buf(1025, 0.0);
+    MoorerAllpass a; a.attach(buf.data(), buf.size()); a.setDelay(37); a.setGain(g);
+    double err = 0.0, pk = 0.0;
+    for (int k = 0; k < 512; ++k) {
+        const double y = a.tick(k == 0 ? 1.0 : 0.0);
+        err = std::max(err, std::fabs(y - ref[k]));
+        pk  = std::max(pk, std::fabs(ref[k]));
+    }
+    return err / pk;
+}
+
+TEST_CASE("impulse response equals sjm.apfv(1024, 37, 1/sqrt(2))") {
+    CHECK(impulseErr(1.0 / std::sqrt(2.0), moorerref::kApfv) < 1e-15);
+}
+
+TEST_CASE("impulse response equals sjm.apfv(1024, 37, 0.7): g is a parameter") {
+    CHECK(impulseErr(0.7, moorerref::kApfv07) < 1e-15);
+}
+
+TEST_CASE("all-pass by structure: the impulse response carries unit energy") {
+    for (double g : {0.3, 0.7, 1.0 / std::sqrt(2.0), 0.95}) {
+        std::vector<double> buf(64, 0.0);
+        MoorerAllpass a; a.attach(buf.data(), buf.size()); a.setDelay(13); a.setGain(g);
+        double e = 0.0;
+        for (int k = 0; k < 200000; ++k) { const double y = a.tick(k == 0 ? 1.0 : 0.0); e += y * y; }
+        CAPTURE(g);
+        CHECK(std::fabs(e - 1.0) < 1e-9);
+    }
+}
+
+TEST_CASE("clear() returns the state to zero; the caller's zeroed buffer completes it") {
+    std::vector<double> buf(64, 0.0);
+    MoorerAllpass a; a.attach(buf.data(), buf.size()); a.setDelay(13); a.setGain(0.7);
+    for (int k = 0; k < 100; ++k) a.tick(k == 0 ? 1.0 : 0.0);
+    std::fill(buf.begin(), buf.end(), 0.0);
+    a.clear();
+    std::vector<double> fbuf(64, 0.0);
+    MoorerAllpass f; f.attach(fbuf.data(), fbuf.size()); f.setDelay(13); f.setGain(0.7);
+    for (int k = 0; k < 300; ++k) CHECK(a.tick(k == 0 ? 1.0 : 0.0) == f.tick(k == 0 ? 1.0 : 0.0));
+}
+```
+
+Append to `tests/CMakeLists.txt`:
+
+```cmake
+# seam_moorer.h: Moorer's all-pass against sjm.apfv; references in
+# ref/seam_moorer_ref.h (doc/study/sscdo2/stunedrev-plugin/gen-ref.sh).
+add_executable(seam_moorer_test seam_moorer_test.cpp)
+target_include_directories(seam_moorer_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_moorer_test PRIVATE cxx_std_17)
+add_test(NAME seam_moorer_test COMMAND seam_moorer_test)
+```
+
+Run: `cmake -S . -B build-test && cmake --build build-test --config Release --target seam_moorer_test 2>&1 | tail -3`
+Expected: compile error, `seam_moorer.h` not found.
+
+- [ ] **Step 0b: Write `plugins/_common/seam_moorer.h`:**
+
+```cpp
+//──────────────────────────────────────────────────────────────────────────
+// SEAM-LTM · seam_moorer.h — Moorer's all-pass, the C++ side of seam.moorer.lib
+//
+// FAUST REFERENCE (seam.moorer.lib, sjm):
+//   apfv(md,t,g,x) = (x+_ : *(-g) <: _+x,_ : de.delay(md,t-1),_)~(0-_) : mem+_;
+//
+// J. A. Moorer, "About This Reverberation Business" (1979), fig. 2(b): one
+// multiplier, so the section is all-pass by structure for any g and any
+// rounding. apfv is the form with the buffer as a parameter (written
+// 2026-09-29 for Davide Tedesco's stunedrev); here the buffer belongs to the
+// caller, so many sections can share one arena or each own a vector.
+//
+// Unrolled per sample, v being the delay's output held one sample by the
+// loop (and by the output's mem):
+//   a = -g·(x - v)      the only multiplier
+//   w = a + x           written to the buffer
+//   y = v + a
+//   v = w[n-(t-1)]      read after the write, with the t of this sample
+// so a new t is heard one sample after it is set, as in the Faust.
+//──────────────────────────────────────────────────────────────────────────
+#pragma once
+#include <cstddef>
+#include <cstdint>
+
+namespace Seam {
+
+class MoorerAllpass {
+public:
+    // buf holds len doubles, zeroed by the caller; len >= the longest delay + 1.
+    void attach(double* buf, std::size_t len) { buf_ = buf; len_ = len; clear(); }
+
+    // The state to zero. The buffer is the caller's to zero (stunedrev's
+    // RESET zeroes its arena in slices, over several blocks).
+    void clear() { pos_ = 0; v_ = 0.0; }
+
+    void     setDelay(uint32_t t) { t_ = t; }   // 1 <= t <= len - 1
+    uint32_t delay() const        { return t_; }
+    void     setGain(double g)    { g_ = g; }
+    double   gain() const         { return g_; }
+
+    double tick(double x) {
+        const double a = -g_ * (x - v_);
+        buf_[pos_] = a + x;
+        const double y = v_ + a;
+        std::size_t r = pos_ + len_ - (t_ - 1);
+        if (r >= len_) r -= len_;
+        v_ = buf_[r];
+        if (++pos_ == len_) pos_ = 0;
+        return y;
+    }
+
+private:
+    double*     buf_ = nullptr;
+    std::size_t len_ = 0, pos_ = 0;
+    uint32_t    t_ = 1;
+    double      g_ = 0.0;
+    double      v_ = 0.0;
+};
+
+} // namespace Seam
+```
+
+Run: `cmake --build build-test --config Release --target seam_moorer_test && ctest --test-dir build-test -C Release -R seam_moorer_test --output-on-failure`
+Expected: 4 cases passed. Commit:
+
+```bash
+git add plugins/_common/seam_moorer.h tests/seam_moorer_test.cpp tests/CMakeLists.txt
+git commit -m "feat(common): seam_moorer.h, Moorer's all-pass as a reusable library (sjm.apfv)"
+```
 
 - [ ] **Step 1: Write the failing tests** `tests/stunedrev_dsp_test.cpp`:
 
@@ -536,19 +707,6 @@ TEST_CASE("delays equal sdt.stdel at 96 kHz, every ms, section and line") {
 
 TEST_CASE("delays equal sdt.stdel at 48 kHz") {
     CHECK(delayMismatches(48000.0, stunedrevref::kStdel48) == 0);
-}
-
-// ── Test 3: one section equals sjm.apfv ───────────────────────────────────
-TEST_CASE("a section's impulse response equals sjm.apfv(1024, 37, 1/sqrt(2))") {
-    std::vector<double> buf(1025, 0.0);
-    Section s; s.buf = buf.data(); s.len = buf.size(); s.pos = 0; s.t = 37; s.v = 0.0;
-    double err = 0.0, pk = 0.0;
-    for (int k = 0; k < 512; ++k) {
-        const double y = s.tick(k == 0 ? 1.0 : 0.0);
-        err = std::max(err, std::fabs(y - stunedrevref::kApfv[k]));
-        pk  = std::max(pk, std::fabs(stunedrevref::kApfv[k]));
-    }
-    CHECK(err / pk < 1e-15);
 }
 
 // ── Test 6: the arena holds every delay the slider can ask ────────────────
@@ -615,6 +773,7 @@ Expected: compile error, `stunedrev_dsp.h` not found.
 // arena allocated outside the audio thread.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
+#include "seam_moorer.h"
 #include "seam_primes.h"
 #include "seam_ramp.h"
 #include <algorithm>
@@ -664,45 +823,22 @@ inline uint32_t sieveBound(double fs) {
     return (uint32_t)std::floor(kTMax * kSections * kRatio[3] * fs / 1000.0 + 0.5) + 1024u;
 }
 
-// Moorer's all-pass, sjm.apfv(md, t, g):
-//   (x+_ : *(-g) <: _+x,_ : de.delay(md,t-1),_)~(0-_) : mem+_
-// Unrolled per sample, v being the delay's output held one sample by the
-// loop (and by the output's mem):
-//   a = -g·(x - v)      the only multiplier
-//   w = a + x           written to the buffer
-//   y = v + a
-//   v = w[n-(t-1)]      read after the write, with the t of this sample
-// so a new t is heard one sample after it is set, as in the spec.
-struct Section {
-    double*     buf = nullptr;
-    std::size_t len = 0, pos = 0;
-    uint32_t    t = 1;
-    double      v = 0.0;
-
-    double tick(double x) {
-        const double a = -kG * (x - v);
-        buf[pos] = a + x;
-        const double y = v + a;
-        std::size_t r = pos + len - (t - 1);
-        if (r >= len) r -= len;
-        v = buf[r];
-        if (++pos == len) pos = 0;
-        return y;
-    }
-};
+// Each section is a Seam::MoorerAllpass (seam_moorer.h), g = kG, attached
+// to its slice of the arena.
+using Section = Seam::MoorerAllpass;
 
 } // namespace stunedrev
 ```
 
 - [ ] **Step 4: Run to see it pass.** Run: `cmake --build build-test --config Release --target stunedrev_dsp_test && ctest --test-dir build-test -C Release -R stunedrev_dsp_test --output-on-failure -V | grep -E "arena|passed|failed"`
-Expected: 5 test cases passed; the message prints the arena (about 588 MiB).
+Expected: 4 test cases passed; the message prints the arena (about 588 MiB).
 **If a delay test fails** on a handful of values, the C++ product order differs from the Faust compiler's at a rounding boundary: open the generated `ref.h` (rerun `faust ... dsp/stdel.dsp` by hand), read how it computes the argument of `floor` (for instance `fConst * fEntry0`), write `sectionDelay` in that order with a comment saying so, and rerun. Never loosen the test.
 
 - [ ] **Step 5: Commit.**
 
 ```bash
 git add plugins/stunedrev/source/stunedrev_dsp.h tests/stunedrev_dsp_test.cpp tests/CMakeLists.txt
-git commit -m "feat(stunedrev): delays, Moorer section and exact sizing, equal to the spec"
+git commit -m "feat(stunedrev): delays and exact sizing, equal to the spec"
 ```
 
 ---
@@ -939,11 +1075,10 @@ public:
         std::size_t off = 0;
         for (int j = 0; j < kLines; ++j)
             for (int i = 0; i < kSections; ++i) {
-                Section& s = sec_[j][i];
-                s.buf = arena_.get() + off;
-                s.len = sectionLength(j, i, fs, *sieve_);
-                s.pos = 0; s.v = 0.0;
-                off += s.len;
+                const std::size_t len = sectionLength(j, i, fs, *sieve_);
+                sec_[j][i].attach(arena_.get() + off, len);
+                sec_[j][i].setGain(kG);
+                off += len;
             }
         arenaBytes_.store(arenaSize_ * sizeof(double));
         for (int j = 0; j < kLines; ++j) applyTime(j);
@@ -1007,7 +1142,7 @@ public:
 
     // Readouts.
     int         time(int line) const           { return time_[line]; }
-    uint32_t    delay(int line, int i) const   { return sec_[line][i].t; }
+    uint32_t    delay(int line, int i) const   { return sec_[line][i].delay(); }
     double      centroidSeconds(int line) const { return centroid_[line].load(); }
     std::size_t arenaBytes() const             { return arenaBytes_.load(); }
     double      sampleRate() const             { return sampleRate_.load(); }
@@ -1019,8 +1154,9 @@ private:
     void applyTime(int line) {
         double sum = 0.0;
         for (int i = 0; i < kSections; ++i) {
-            sec_[line][i].t = sectionDelay(line, i, time_[line], fs_, *sieve_);
-            sum += sec_[line][i].t;
+            const uint32_t t = sectionDelay(line, i, time_[line], fs_, *sieve_);
+            sec_[line][i].setDelay(t);
+            sum += t;
         }
         centroid_[line].store(sum / fs_);   // each section delays the energy by its t on average
         applied_[line] = true;
@@ -1054,7 +1190,7 @@ Note on `prepare`: `applied_` must be reset so that `applyTime` runs for every l
 
 - [ ] **Step 4: Run to see them pass.** Run: `cmake --build build-test --config Release --target stunedrev_dsp_test && ctest --test-dir build-test -C Release -R stunedrev_dsp_test --output-on-failure`
 Expected: 14 test cases passed. Write down the two relative errors (rerun with `-V` after temporarily adding `MESSAGE` lines if needed) for the README.
-**If 96/48 kHz fail and the delay tests pass:** compare `kWin96[2][0]` (line e, first second) sample by sample with the C++ to find the first differing sample. A difference at sample `t` of section 0 points at the read index (`t-1` against `t`); a constant factor at the burst's start points at g's sign or the product order.
+**If 96/48 kHz fail and the delay and `seam_moorer` tests pass:** compare `kWin96[2][0]` (line e, first second) sample by sample with the C++ to find the first differing sample; suspect the wiring (gain not set on a section, a section attached to the wrong slice, the line order) before the library.
 
 - [ ] **Step 5: Commit.**
 
@@ -1073,7 +1209,7 @@ git commit -m "feat(stunedrev): the engine, equal to sdt.stunedrev at 96 and 48 
 
 **Interfaces:**
 - Consumes: `Engine` of Task 4.
-- Produces: the RESET behaviour of the spec: on a new generation, output fade to 0 over 25 ms with the input ignored; then `kClearBytesPerSample · n` bytes zeroed per block of n samples with zero output and frozen lines; then sections' `v` and `pos` to 0, fade back to 1, `Status::Ready`. `status()` is `Clearing` from the request to the end of the zeroing.
+- Produces: the RESET behaviour of the spec: on a new generation, output fade to 0 over 25 ms with the input ignored; then `kClearBytesPerSample · n` bytes zeroed per block of n samples with zero output and frozen lines; then every section's `clear()`, fade back to 1, `Status::Ready`. `status()` is `Clearing` from the request to the end of the zeroing.
 
 - [ ] **Step 1: Append the failing tests:**
 
@@ -1210,7 +1346,7 @@ Add to the private part of `Engine`:
         std::memset(arena_.get() + clearPos_, 0, m * sizeof(double));
         clearPos_ += m;
         if (clearPos_ < arenaSize_) return;
-        for (auto& line : sec_) for (Section& s : line) { s.v = 0.0; s.pos = 0; }
+        for (auto& line : sec_) for (Section& s : line) s.clear();
         phase_ = Phase::Run;
         fade_.setTarget(1.0, kShortRamp, fs_);
         status_.store(Status::Ready);
@@ -1695,9 +1831,9 @@ private:
 //   stunedrev(t1,t2,t3,t4) = stline(sqrt(2),t1), stline((1+sqrt(5))/2,t2),
 //                            stline(ma.E,t3), stline(ma.PI,t4);
 //
-// Re-implemented by hand (seam-ltm convention) in stunedrev_dsp.h, on
-// seam_primes.h (a sieve: sff.np without division on the audio thread) and
-// seam_ramp.h. Each section is sized exactly for its longest delay in one
+// Re-implemented by hand (seam-ltm convention) in stunedrev_dsp.h, on the
+// reusable libraries of _common: seam_moorer.h (sjm.apfv), seam_primes.h (a
+// sieve: sff.np without division on the audio thread) and seam_ramp.h. Each section is sized exactly for its longest delay in one
 // arena allocated in setActive: stmd's +150 is Faust's compile-time margin.
 //
 // SR rule of the SSCDO#2 port: times are milliseconds at the session's
@@ -2176,16 +2312,17 @@ git commit -m "feat(stunedrev): the processor, RESET and footer views, format-L 
 | seam_primes_test | sieve inner step `p` instead of `2 * p` |
 | stunedrev_dsp_test: delays | `std::floor(ms * fs / 1000.0)` without `+ 0.5` |
 | stunedrev_dsp_test: delays | φ written `1.618` |
-| stunedrev_dsp_test: section | `+kG` instead of `-kG` |
-| stunedrev_dsp_test: section | read `t` back instead of `t - 1` |
+| seam_moorer_test | `+g_` instead of `-g_` |
+| seam_moorer_test | read `t_` back instead of `t_ - 1` |
+| seam_moorer_test: clear | `clear()` keeps `v_` |
 | stunedrev_dsp_test: arena | `sectionLength` without `+ 1` |
 | stunedrev_dsp_test: engine 96/48 | ratios e and π swapped |
 | stunedrev_dsp_test: engine 96/48 | the loop over sections stops at 41 |
 | stunedrev_dsp_test: change of time | `setTime` stores the time but `applyTime` runs only in `prepare` |
 | stunedrev_dsp_test: in-place | outputs written inside the input loop (`out[j][k]` before all `in[j][k]` are read) |
-| stunedrev_dsp_test: prepare at a new rate | `prepare` keeps `s.v` from the previous run |
+| stunedrev_dsp_test: engine 96/48 | `setGain(kG)` omitted in `prepare` (g = 0) |
 | stunedrev_dsp_test: RESET fresh | `clearPos_ += m + want` (a chunk skipped) |
-| stunedrev_dsp_test: RESET fresh | `s.v` not zeroed at the end of the clearing |
+| stunedrev_dsp_test: RESET fresh | `s.clear()` not called at the end of the clearing |
 | stunedrev_dsp_test: RESET twice | `if (gen != servedGen_ && phase_ == Phase::Run)` |
 | stunedrev_dsp_test: RESET silent | lines keep running during `Phase::Clear` |
 | stunedrev_params_test: off-grid | `std::lround(norm * kTimeSteps)` |
@@ -2253,7 +2390,7 @@ git commit -m "test(stunedrev): every test verified by mutation; CPU measured"
   - the specification block (the Faust of the processor header) and the verification (the measured relative errors of Task 4, the mutations, the CPU of Task 8);
   - out of scope (the direct `adc~` question for Davide; no crossfade on a time change; cues and MIDI in Reaper).
 
-- [ ] **Step 2: `doc/study/sscdo2/stunedrev-plugin/README.md`** (scope README): each file (`gen-ref.sh`, `refdump.cpp`, `dsp/*.dsp`, `cpu.cpp`, `mutations.md`, and `tests/stunedrev_burst.h`), how to run (`FAUSTLIBS=... ./gen-ref.sh`, the ctest line, the cpu compile line), how it fits (references → `tests/ref/stunedrev_ref.h` → `stunedrev_dsp_test`), the measured results. Add to `doc/study/sscdo2/README.md`'s table, after the LMO plugin row:
+- [ ] **Step 2: `doc/study/sscdo2/stunedrev-plugin/README.md`** (scope README): each file (`gen-ref.sh`, `refdump.cpp`, `dsp/*.dsp`, `cpu.cpp`, `mutations.md`, and `tests/stunedrev_burst.h`), and the two libraries it added to `_common/` (`seam_primes.h`, `seam_moorer.h`), how to run (`FAUSTLIBS=... ./gen-ref.sh`, the ctest line, the cpu compile line), how it fits (references → `tests/ref/stunedrev_ref.h` → `stunedrev_dsp_test`), the measured results. Add to `doc/study/sscdo2/README.md`'s table, after the LMO plugin row:
   `| stunedrev | the C++ plugin | stunedrev-plugin/ | plugins/stunedrev, equal to sdt.stunedrev within <measured> of the peak | none |`
 
 - [ ] **Step 3: Registry.** Append to the "Works — SSCDO#2" family in `doc/plugins.toml`, after LMO:
