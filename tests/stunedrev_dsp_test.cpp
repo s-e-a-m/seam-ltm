@@ -347,3 +347,22 @@ TEST_CASE("RESET with POWER off clears and stays silent; a click before prepare 
     for (int l = 0; l < 4; ++l) sum += c.e(l, 0);
     CHECK(sum == 0.0);
 }
+
+// ── Subnormals (final review): the lines lose no energy, so their tails sink
+// through the subnormal range and stay in the arena for hours; on x86 every
+// subnormal operand costs ~100 cycles (CPU 4.7 % -> 15 % after 30 min of
+// silence at 48 kHz). The engine flushes them for the duration of process()
+// and restores the caller's floating-point state.
+TEST_CASE("process() flushes subnormals to zero and restores the caller's FP state") {
+    Engine e; settle(e, 48000.0);
+    volatile double tiny = 1e-310;              // subnormal
+    double ib[4][64], ob[4][64];
+    double* in[4]; double* out[4];
+    for (int c = 0; c < 4; ++c) { in[c] = ib[c]; out[c] = ob[c]; std::fill(ib[c], ib[c] + 64, (double)tiny); }
+    for (int b = 0; b < 100; ++b) e.process(in, out, 64);
+    long nonzero = 0;
+    for (int c = 0; c < 4; ++c) for (int k = 0; k < 64; ++k) if (ob[c][k] != 0.0) ++nonzero;
+    CHECK(nonzero == 0);                        // read as zero, never written
+    volatile double one = 1.0;
+    CHECK(tiny * one != 0.0);                   // outside process(), subnormals are back
+}

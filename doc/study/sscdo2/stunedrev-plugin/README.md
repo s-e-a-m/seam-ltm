@@ -2,7 +2,7 @@
 
 This folder holds what proves that the C++ STUNEDREV (`plugins/stunedrev/`) is the Faust specification `sdt.stunedrev(t1, t2, t3, t4)`.
 Nothing here is built with the plugin: the references are rendered once, by hand, into committed headers that the tests read.
-The port added two libraries to `plugins/_common/`, the C++ side of SEAM's Faust libraries: `seam_moorer.h` (Moorer's all-pass, `sjm.apfv`) and `seam_primes.h` (a sieve behind `sff.np` and `sma.ms2npsamp`).
+The port added two libraries to `plugins/_common/`, the C++ side of SEAM's Faust libraries: `seam_moorer.h` (Moorer's all-pass, `sjm.apfv`) and `seam_primes.h` (a sieve behind `sff.np` and `sma.ms2npsamp`); and a helper for any recursive plugin, `seam_denormals.h` (flush-to-zero for one scope).
 
 ## Files
 
@@ -52,5 +52,6 @@ Run it again whenever `seam.tedesco.lib` or `seam.moorer.lib` changes, and commi
 | arena at 96 kHz | 77 085 940 doubles, 588.119 MiB |
 | RESET at 96 kHz, fade and clearing | 0.418 s |
 | cost, Intel i7-8850H 2.6 GHz, 256-sample blocks | 9.4 % of a core at 96 kHz, 18.8 % at 192 kHz |
+| cost at 96 kHz after 10 minutes of silence, subnormals flushed | 9.4 % of a core (without the flush: 4.7 % to 15 % in 30 minutes at 48 kHz, final review) |
 
 Three mutants survived the first run of `mutate.py`; each was a hole in a test, closed and run again (`mutations.md`).

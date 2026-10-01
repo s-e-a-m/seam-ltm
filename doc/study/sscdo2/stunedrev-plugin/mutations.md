@@ -29,5 +29,6 @@ Three mutants survived the first run; each was a hole in a test, which was fixed
 | stunedrev_dsp_test | RESET: a click before prepare is replayed | RED after the fix (was GREEN: the check came after one second, when the replayed RESET had already finished; it now comes after the first block) |
 | stunedrev_params_test | lround(norm*99) instead of the SDK's int(norm*100) | RED |
 | stunedrev_state_test | readState does not store what it read | RED |
+| stunedrev_dsp_test: subnormals | `ScopedNoDenormals` removed from `Engine::process` (the test was written after the final review and seen RED first) | RED |
 
 The in-place mutation zeroes the outputs at the start of the block, the pattern a refactor would most likely introduce: each line reads its own channel before writing it, so no other ordering can break the in-place case.

@@ -9,6 +9,7 @@
 // arena allocated outside the audio thread.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
+#include "seam_denormals.h"
 #include "seam_moorer.h"
 #include "seam_primes.h"
 #include "seam_ramp.h"
@@ -141,6 +142,9 @@ public:
     template <class T>
     void process(const T* const* in, T* const* out, int n) {
         if (!arena_) { zero(out, n); return; }
+        // The lines lose no energy: without this their silent tails would
+        // fill the arena with subnormals, and the cost would grow for hours.
+        Seam::ScopedNoDenormals noDenormals;
         const uint32_t gen = resetGen_.load();
         if (gen != servedGen_) {                  // a click: fade, then clear
             servedGen_ = gen;

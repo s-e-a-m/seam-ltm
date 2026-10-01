@@ -62,7 +62,8 @@ The engine wires two libraries of `plugins/_common/` written for reuse: `seam_mo
 
 `tests/stunedrev_dsp_test.cpp` checks the engine against the specification: the 16 800 delays (100 times, 42 sections, 4 lines) equal `sdt.stdel` exactly at 96 and 48 kHz; the four lines agree with `sdt.stunedrev(83, 47, 7, 71)` over 30 s to 1.8e-15 of the peak at 96 kHz and 1.6e-15 at 48 kHz, and to 8.7e-16 across a change of time.
 Every test was verified by mutation; the references, the record of the mutations and the measurement of the cost are in `doc/study/sscdo2/stunedrev-plugin/`.
-The cost is 9.4 % of a core at 96 kHz and 18.8 % at 192 kHz (Intel i7-8850H, 2.6 GHz).
+The cost is 9.4 % of a core at 96 kHz and 18.8 % at 192 kHz (Intel i7-8850H, 2.6 GHz), and stays 9.4 % after ten minutes of silence.
+The lines lose no energy, so their silent tails would sink into subnormal numbers, a hundred times slower to compute, and the cost would grow for hours (from 4.7 % to 15 % of a core in 30 minutes at 48 kHz, measured without the guard); the engine flushes subnormals to zero while it runs (`plugins/_common/seam_denormals.h`) and restores the host's floating-point state after each block.
 
 ## Out of scope
 
