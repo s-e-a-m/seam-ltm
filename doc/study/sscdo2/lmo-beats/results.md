@@ -11,12 +11,12 @@ At d = 0 it falls 10 dB below its level at 1 Hz by 11.5 Hz: fluctuations faster 
 
 | d Hz | RMS dBFS | envelope maximum Hz (3–80 Hz) | centroid of the excess over d = 0, Hz | envelope level at d, re d = 0 at the same frequency, dB | r(ch0, ch1) |
 |---|---|---|---|---|---|
-| 0 | -45.29 | 4.0 | — | — | -0.036 |
-| 3 | -45.29 | 3.0 | 8.7 | +0.1 | +0.063 |
-| 7 | -45.44 | 3.5 | 11.8 | +0.9 | +0.039 |
-| 10 | -45.37 | 4.5 | 13.3 | +3.0 | +0.036 |
-| 20 | -45.44 | 4.5 | 21.9 | +15.8 | +0.013 |
-| 40 | -45.32 | 3.0 | 40.4 | +34.5 | +0.010 |
+| 0 | -48.31 | 4.0 | — | — | -0.036 |
+| 3 | -48.30 | 3.0 | 8.7 | +0.1 | +0.063 |
+| 7 | -48.45 | 3.5 | 11.8 | +0.9 | +0.039 |
+| 10 | -48.38 | 4.5 | 13.3 | +3.0 | +0.036 |
+| 20 | -48.45 | 4.5 | 21.9 | +15.8 | +0.013 |
+| 40 | -48.33 | 3.0 | 40.4 | +34.5 | +0.010 |
 
 Envelope spectra, dB re the d = 0 spectrum at 1 Hz, at selected frequencies:
 
@@ -32,7 +32,11 @@ Envelope spectra, dB re the d = 0 spectrum at 1 Hz, at selected frequencies:
 ## Commands run
 
 ```
-build/bin/lmo2_ch 48000 2880000 out=/Users/giuseppe/Documents/github/seam/librerie/seam-ltm/doc/study/sscdo2/lmo-beats/build/work/out_48800.f64 pre=1.0 f=97.44 ch=0 d=0
+build/bin/one_ch 48000 960000 out=/Users/giuseppe/Documents/github/seam/librerie/seam-ltm/doc/study/sscdo2/lmo-beats/build/work/out_1057.f64 pre=1.0 f=97.44 ch=0
+build/bin/lmo2_ch 48000 960000 out=/Users/giuseppe/Documents/github/seam/librerie/seam-ltm/doc/study/sscdo2/lmo-beats/build/work/out_1057.f64 pre=1.0 f=97.44 ch=0 d=0
+build/bin/twocall_ch 48000 960000 out=/Users/giuseppe/Documents/github/seam/librerie/seam-ltm/doc/study/sscdo2/lmo-beats/build/work/out_1057.f64 pre=1.0 f=97.44 ch=0 d=0
+build/bin/lib_ch 48000 960000 out=/Users/giuseppe/Documents/github/seam/librerie/seam-ltm/doc/study/sscdo2/lmo-beats/build/work/out_1057.f64 pre=1.0 f=97.44 ch=1 d=20
+build/bin/osc_ch 48000 960000 out=/Users/giuseppe/Documents/github/seam/librerie/seam-ltm/doc/study/sscdo2/lmo-beats/build/work/out_1057.f64 pre=1.0 f=97.44 ch=0 d=0
 ```
 
 <!-- hand-written notes below this line are preserved by analyze.py -->
@@ -63,5 +67,7 @@ The estimate made before measuring (a beat above about 7 Hz, the band's width) w
 Below that, a second band makes the sound wider and more restless, not beating.
 
 ### Level and channels
-The RMS stays within 0.2 dB of −45.3 dBFS at every d: the 1/√2 compensation holds, because the two bands are independent.
+The RMS stays within 0.2 dB of −48.3 dBFS at every d: the 1/√2 compensation holds, because the two bands are independent.
+The study runs at 48 kHz: since 2026-10-01 `sdt.lmo` carries the 96 kHz density anchor (`sdt.lmodens`, √(48000/96000)), so every absolute level here is 3.01 dB below the first run (−45.3 dBFS), and every relative number is unchanged.
+The renders in `renders/` are those of the first run, kept as heard on 2026-09-29; they are normalised to −20 dBFS RMS, so the anchor changes nothing in them but the gain recorded in `render-log.md`.
 Adjacent channels stay uncorrelated (|r| < 0.07) at every d.

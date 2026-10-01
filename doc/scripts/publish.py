@@ -85,7 +85,9 @@ coll.mkdir(parents=True, exist_ok=True)
 
 nav = ["ltm:", '  - title: "Plugin Suite"', "    url: /seam-ltm/", "    children:"]
 for fam in families:
-    slug = "".join(c if c.isalnum() else "-" for c in fam["title"].lower()).strip("-")
+    # the id kramdown gives the heading (GFM): lowercase, drop everything
+    # but letters, digits, spaces and hyphens, spaces to hyphens
+    slug = "".join(c for c in fam["title"].lower() if c.isalnum() or c in " -").replace(" ", "-")
     nav.append(f'      - title: "{fam["title"]}"')
     nav.append(f"        url: /seam-ltm/#{slug}")
 subprocess.run(["python3", str(scripts / "navblock.py"),

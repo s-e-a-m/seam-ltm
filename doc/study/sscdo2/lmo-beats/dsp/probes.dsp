@@ -32,11 +32,11 @@ ch   = hslider("ch", 0, 0, 7, 1);
 
 d = select2(mode, d0, d1 * min(1, ba.time / ma.SR / dur));
 
-bandsA(N, f, d) = par(i, N, sdt.lmoband(f - d/2 + i));
+bandsA(N, f, d) = par(i, N, sdt.lmoband(max(1, f - d/2 + i)));
 bandsB(N, f, d) = par(i, N, sdt.lmoband(f + d/2 + i));
 
 lmo2(N, f, d) = no.multinoise(2*N) : bandsA(N, f, d), bandsB(N, f, d)
-             :> par(i, N, /(sqrt(2)));
+             :> par(i, N, /(sqrt(2)) : *(sdt.lmodens));
 
 lmo2_ch    = lmo2(4, f, d) : ba.selectn(4, ch);
 osc_ch     = no.multinoise(8) : bandsA(4, f, d), bandsB(4, f, d) : ba.selectn(8, ch);

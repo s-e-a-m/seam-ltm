@@ -8,7 +8,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/_data"; : > "$TMP/_data/navigation.yml"
 
-EXPECTED_CHECKS=12
+EXPECTED_CHECKS=13
 fail=0; checks=0
 ok()  { checks=$((checks+1)); echo "  ok   $1"; }
 bad() { checks=$((checks+1)); echo "  FAIL $1"; fail=1; }
@@ -18,7 +18,7 @@ import sys; sys.path.insert(0,'$HERE')
 import registry
 print(sum(len(f['plugin']) for f in registry.load()))
 ")"
-if [ "$n" -eq 16 ]; then ok "16 plugin nel registro"; else bad "16 plugin nel registro (trovati $n)"; fi
+if [ "$n" -eq 17 ]; then ok "17 plugin nel registro"; else bad "17 plugin nel registro (trovati $n)"; fi
 
 # il README deve essere gia rigenerato: se il registro e cambiato senza
 # rigenerare, le due copie sono gia divergenti
@@ -32,15 +32,20 @@ P="$TMP/_ltm/index.md"
 if [ -f "$P" ]; then ok "pagina generata"; else bad "pagina generata"; fi
 if grep -q '^permalink: /seam-ltm/$' "$P"; then ok "permalink"; else bad "permalink"; fi
 if grep -q '^generated_from: seam-ltm$' "$P"; then ok "provenienza"; else bad "provenienza"; fi
-if [ "$(grep -c '^### ' "$P")" -eq 16 ]; then ok "16 schede"; else bad "16 schede"; fi
+if [ "$(grep -c '^### ' "$P")" -eq 17 ]; then ok "17 schede"; else bad "17 schede"; fi
 if grep -q '### MULTIPINK' "$P"; then ok "MULTIPINK presente"; else bad "MULTIPINK presente"; fi
 if grep -q 'seam.ambisonics.lib' "$P"; then ok "rimando alla libreria Faust"; else bad "rimando alla libreria Faust"; fi
-if [ "$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')" -eq 16 ]; then ok "16 screenshot copiati"; else bad "16 screenshot copiati"; fi
+if [ "$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')" -eq 17 ]; then ok "17 screenshot copiati"; else bad "17 screenshot copiati"; fi
 
 # build e installazione restano nel README, non sul sito
 if ! grep -qi 'cmake' "$P"; then ok "niente istruzioni di build sul sito"; else bad "niente istruzioni di build sul sito"; fi
 
 if grep -q '# BEGIN ltm' "$TMP/_data/navigation.yml"; then ok "blocco nav"; else bad "blocco nav"; fi
+
+# le ancore del menu devono essere gli id che kramdown da ai titoli (GFM:
+# minuscole, via tutto cio che non e lettera, cifra, spazio o trattino,
+# spazi in trattini): "Works — SSCDO#2" e #works--sscdo2, non #works---sscdo-2
+if grep -q 'url: /seam-ltm/#works--sscdo2$' "$TMP/_data/navigation.yml"; then ok "ancore del menu come kramdown"; else bad "ancore del menu come kramdown"; fi
 python3 "$HERE/publish.py" "$TMP" >/dev/null 2>&1
 b="$(grep -c '# BEGIN ltm' "$TMP/_data/navigation.yml")"
 if [ "$b" -eq 1 ]; then ok "publish idempotente sul nav"; else bad "publish idempotente sul nav (blocchi: $b)"; fi
