@@ -318,7 +318,14 @@ TEST_CASE("RESET twice: a click during the clearing restarts it") {
     e.requestReset();                         // the second click
     long second = 0;
     do { e.process(in, out, 256); second += 256; } while (e.status() == Status::Clearing);
-    CHECK(second > (long)(0.3 * 96000.0));    // a whole clearing again, not the rest of the first
+    // One whole RESET, measured on a fresh engine: the second click restarts
+    // it from the beginning; it neither finishes the first nor adds to it.
+    Engine f; settle(f, 96000.0);
+    f.requestReset();
+    long whole = 0;
+    do { f.process(in, out, 256); whole += 256; } while (f.status() == Status::Clearing);
+    CHECK(second >= whole - 256);
+    CHECK(second <= whole + 256);
 }
 
 TEST_CASE("RESET with POWER off clears and stays silent; a click before prepare is dropped") {
@@ -326,6 +333,11 @@ TEST_CASE("RESET with POWER off clears and stays silent; a click before prepare 
     e.requestReset();                         // before prepare
     settle(e, 48000.0);
     CHECK(e.status() == Status::Ready);
+    {
+        double z[4][256] = {}; double* zp[4] = { z[0], z[1], z[2], z[3] };
+        e.process(zp, zp, 256);
+        CHECK(e.status() == Status::Ready);    // the old click was not replayed
+    }
     run(e, 48000, 1);
     e.setPower(false);
     e.requestReset();

@@ -42,7 +42,7 @@ TEST_CASE("all-pass by structure: the impulse response carries unit energy") {
 TEST_CASE("clear() returns the state to zero; the caller's zeroed buffer completes it") {
     std::vector<double> buf(64, 0.0);
     MoorerAllpass a; a.attach(buf.data(), buf.size()); a.setDelay(13); a.setGain(0.7);
-    for (int k = 0; k < 100; ++k) a.tick(k == 0 ? 1.0 : 0.0);
+    for (int k = 0; k < 100; ++k) a.tick(std::sin(0.1 * k));   // dense: every buffer cell and v are non-zero
     std::fill(buf.begin(), buf.end(), 0.0);
     a.clear();
     std::vector<double> fbuf(64, 0.0);
