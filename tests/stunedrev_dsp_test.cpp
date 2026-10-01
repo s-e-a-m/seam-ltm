@@ -245,3 +245,93 @@ TEST_CASE("POWER off: after its 25 ms ramp the output is exactly zero; the lines
     CHECK(nonzero == 0);
     CHECK(err == 0.0);   // the memory kept turning while POWER was off
 }
+
+// ── Test 7: RESET ─────────────────────────────────────────────────────────
+// Run zeros through e until the clearing has ended and the fade is back.
+static void finishReset(Engine& e, double fs, int block) {
+    std::vector<double> ib((size_t)4 * block, 0.0), ob((size_t)4 * block);
+    double* in[4]; double* out[4];
+    for (int c = 0; c < 4; ++c) { in[c] = ib.data() + (size_t)c * block; out[c] = ob.data() + (size_t)c * block; }
+    long guard = 0;
+    do { e.process(in, out, block); } while (e.status() == Status::Clearing && ++guard < 10000000);
+    REQUIRE(e.status() == Status::Ready);
+    const int tail = (int)(0.05 * fs);       // the 25 ms fade back, and more
+    for (int done = 0; done < tail; done += block) e.process(in, out, block);
+}
+
+TEST_CASE("after RESET the engine sounds as a fresh one, exactly") {
+    for (int block : {256, 1, 4093}) {
+        Engine e; settle(e, 48000.0);
+        run(e, 48000, 1);                     // the memory holds the burst
+        e.requestReset();
+        finishReset(e, 48000.0, block);
+        Engine fresh; settle(fresh, 48000.0);
+        Capture a = run(e, 48000, 2), b = run(fresh, 48000, 2);
+        CAPTURE(block);
+        CHECK(a.win == b.win);
+        CHECK(a.energy == b.energy);
+    }
+}
+
+TEST_CASE("RESET: clearing lasts the same time at any block size, about 0.39 s at 96 kHz") {
+    Engine e; settle(e, 96000.0);
+    e.requestReset();
+    std::vector<double> ib(4 * 64, 0.0), ob(4 * 64);
+    double* in[4]; double* out[4];
+    for (int c = 0; c < 4; ++c) { in[c] = ib.data() + c * 64; out[c] = ob.data() + c * 64; }
+    long samples = 0;
+    do { e.process(in, out, 64); samples += 64; } while (e.status() == Status::Clearing);
+    const double seconds = samples / 96000.0;
+    MESSAGE("RESET at 96 kHz: " << seconds << " s");
+    CHECK(seconds > 0.3);
+    CHECK(seconds < 0.5);
+}
+
+TEST_CASE("RESET silences the output during the clearing and ignores the input") {
+    Engine e; settle(e, 48000.0);
+    run(e, 48000, 1);
+    e.requestReset();
+    // 25 ms fade, then the clearing: from the first block after the fade
+    // the output is exactly zero while a full-scale input arrives.
+    std::vector<double> ib(4 * 256, 1.0), ob(4 * 256);
+    double* in[4]; double* out[4];
+    for (int c = 0; c < 4; ++c) { in[c] = ib.data() + c * 256; out[c] = ob.data() + c * 256; }
+    for (int b = 0; b < 6; ++b) e.process(in, out, 256);       // 1536 samples > 1200 of fade
+    long nonzero = 0;
+    while (e.status() == Status::Clearing) {
+        e.process(in, out, 256);
+        if (e.status() == Status::Clearing)
+            for (int c = 0; c < 4; ++c) for (int k = 0; k < 256; ++k) if (out[c][k] != 0.0) ++nonzero;
+    }
+    CHECK(nonzero == 0);
+}
+
+TEST_CASE("RESET twice: a click during the clearing restarts it") {
+    Engine e; settle(e, 96000.0);
+    std::vector<double> ib(4 * 256, 0.0), ob(4 * 256);
+    double* in[4]; double* out[4];
+    for (int c = 0; c < 4; ++c) { in[c] = ib.data() + c * 256; out[c] = ob.data() + c * 256; }
+    e.requestReset();
+    long first = 0;
+    for (int b = 0; b < 40; ++b) { e.process(in, out, 256); first += 256; }
+    REQUIRE(e.status() == Status::Clearing);
+    e.requestReset();                         // the second click
+    long second = 0;
+    do { e.process(in, out, 256); second += 256; } while (e.status() == Status::Clearing);
+    CHECK(second > (long)(0.3 * 96000.0));    // a whole clearing again, not the rest of the first
+}
+
+TEST_CASE("RESET with POWER off clears and stays silent; a click before prepare is dropped") {
+    Engine e;
+    e.requestReset();                         // before prepare
+    settle(e, 48000.0);
+    CHECK(e.status() == Status::Ready);
+    run(e, 48000, 1);
+    e.setPower(false);
+    e.requestReset();
+    finishReset(e, 48000.0, 256);
+    Capture c = run(e, 48000, 1);
+    double sum = 0.0;
+    for (int l = 0; l < 4; ++l) sum += c.e(l, 0);
+    CHECK(sum == 0.0);
+}

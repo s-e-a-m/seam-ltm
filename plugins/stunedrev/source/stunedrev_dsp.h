@@ -141,7 +141,19 @@ public:
     template <class T>
     void process(const T* const* in, T* const* out, int n) {
         if (!arena_) { zero(out, n); return; }
-        // RESET: Task 5 serves resetGen_ here.
+        const uint32_t gen = resetGen_.load();
+        if (gen != servedGen_) {                  // a click: fade, then clear
+            servedGen_ = gen;
+            phase_ = Phase::FadeOut;
+            fade_.setTarget(0.0, kShortRamp, fs_);
+            status_.store(Status::Clearing);
+        }
+        if (phase_ == Phase::Clear) {
+            clearChunk(n);
+            for (int k = 0; k < n; ++k) { in_.next(); out_.next(); pow_.next(); }
+            zero(out, n);
+            return;
+        }
         const bool feeding = phase_ == Phase::Run;
         for (int k = 0; k < n; ++k) {
             const double gin  = in_.next();
@@ -153,6 +165,10 @@ public:
                 for (Section& s : sec_[j]) y = s.tick(y);
                 out[j][k] = (T)(y * gout);
             }
+        }
+        if (phase_ == Phase::FadeOut && !fade_.active()) {
+            phase_ = Phase::Clear;                // the lines freeze from the next block
+            clearPos_ = 0;
         }
     }
 
@@ -176,6 +192,20 @@ private:
         }
         centroid_[line].store(sum / fs_);   // each section delays the energy by its t on average
         applied_[line] = true;
+    }
+
+    // A slice of the arena per block, proportional to the block: the lines
+    // are frozen, so no uncleared history can flow into a cleared buffer.
+    void clearChunk(int n) {
+        const std::size_t want = (std::size_t)n * kClearBytesPerSample / sizeof(double);
+        const std::size_t m = std::min(want, arenaSize_ - clearPos_);
+        std::memset(arena_.get() + clearPos_, 0, m * sizeof(double));
+        clearPos_ += m;
+        if (clearPos_ < arenaSize_) return;
+        for (auto& line : sec_) for (Section& s : line) s.clear();
+        phase_ = Phase::Run;
+        fade_.setTarget(1.0, kShortRamp, fs_);
+        status_.store(Status::Ready);
     }
 
     template <class T>
