@@ -14,10 +14,10 @@ WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 OUT="$ROOT/tests/ref/lmo_ref.h"
 mkdir -p "$(dirname "$OUT")"
 
-render() { # dsp sr n name input
+render() { # dsp sr n name input [skip]
     faust -I "$FAUSTLIBS" -I "$SEAMLIBS" -double -lang cpp -cn Ref "$HERE/dsp/$1" -o "$WORK/ref.h"
     c++ -std=c++17 -O1 -I "$WORK" "$HERE/refdump.cpp" -o "$WORK/refdump"
-    "$WORK/refdump" "$2" "$3" "$4" "$5"
+    "$WORK/refdump" "$2" "$3" "$4" "$5" "${6:-0}"
 }
 
 {
@@ -28,8 +28,8 @@ render() { # dsp sr n name input
     echo "namespace lmoref {"
     render noise8.dsp 96000 512  kNoise8 zero
     render bw.dsp     96000 2048 kBw     impulse
-    render lmo.dsp    96000 2048 kLmo96  zero
-    render lmo.dsp    48000 1024 kLmo48  zero
+    render lmo.dsp    96000 2048 kLmo96  zero 96000
+    render lmo.dsp    48000 1024 kLmo48  zero 48000
     echo "} // namespace lmoref"
 } > "$OUT"
 echo "wrote $OUT ($(wc -c < "$OUT") bytes)"

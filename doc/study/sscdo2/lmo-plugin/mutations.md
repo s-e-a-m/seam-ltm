@@ -12,3 +12,10 @@ Each mutation was applied to the source, the test rebuilt and run, and the sourc
 | seam_butterworth_test: order 24 and 2 HP | HP output without the damping (`v0 - v1 - v2`) | RED |
 | seam_ramp_test: exact length | samples truncated instead of rounded (`(long)(seconds*fs)`; 1102.5 at 44.1 kHz) | RED |
 | seam_ramp_test: exact landing | last step adds the increment instead of landing on the target | RED |
+| lmo_dsp_test: 48 kHz vs Faust, statistical level | engine without density (`density_ = 1.0`) | RED (the "density holds" case stays green: it tests `densityGain` itself, not its use) |
+| lmo_dsp_test: 48 kHz vs Faust, density holds, statistical level | `densityGain` returns 1 | RED |
+| lmo_dsp_test: 96 and 48 kHz vs Faust | low and high bands fed from each other's streams | RED |
+| lmo_dsp_test: same target does not restart | no same-target guard in `setFrequency` | RED |
+| lmo_dsp_test: volume ramp | volume ramp converted at a fixed 48 kHz | RED (at 96 kHz) |
+| lmo_dsp_test: block partition | update countdown restarted at every `process()` call | RED |
+| lmo_dsp_test: extreme f and delta | no clamp on the low band (f − Δ/2 = −5 Hz) | RED: the filters diverge to inf/NaN (and the run slows down by minutes on the non-finite arithmetic) |
