@@ -58,3 +58,190 @@ TEST_CASE("the arena at 96 kHz is about 588 MiB, reported") {
     CHECK(mib > 580.0);
     CHECK(mib < 596.0);
 }
+
+// ── The engine against sdt.stunedrev ──────────────────────────────────────
+static void settle(Engine& e, double fs) {
+    REQUIRE(e.prepare(fs));
+    e.setInput(1.0); e.setOutput(1.0); e.setPower(true);
+    e.reset();                              // every ramp onto its target
+}
+
+struct Capture {
+    int seconds; long fs;
+    std::vector<double> win, energy;        // [line][second][512], [line][second]
+    Capture(int s, long rate) : seconds(s), fs(rate), win((size_t)4 * s * 512, 0.0), energy((size_t)4 * s, 0.0) {}
+    double& w(int c, int s, int k) { return win[((size_t)c * seconds + s) * 512 + k]; }
+    double& e(int c, int s) { return energy[(size_t)c * seconds + s]; }
+};
+
+// The burst through the engine in blocks of `block`; hook(pos) runs before
+// the block that starts at pos. inPlace feeds the same buffers in and out.
+template <class Hook>
+static Capture run(Engine& e, long fs, int seconds, int block, Hook hook, bool inPlace = false) {
+    Capture cap(seconds, fs);
+    Burst burst((double)fs);
+    std::vector<double> ib((size_t)4 * block), ob((size_t)4 * block);
+    double* in[4]; double* out[4];
+    for (int c = 0; c < 4; ++c) {
+        in[c]  = ib.data() + (size_t)c * block;
+        out[c] = inPlace ? in[c] : ob.data() + (size_t)c * block;
+    }
+    const long total = fs * seconds;
+    for (long pos = 0; pos < total; pos += block) {
+        const int m = (int)std::min<long>(block, total - pos);
+        hook(pos);
+        burst.fill(in, m);
+        e.process(in, out, m);
+        for (int c = 0; c < 4; ++c)
+            for (int k = 0; k < m; ++k) {
+                const long g = pos + k; const int s = (int)(g / fs); const long off = g % fs;
+                const double y = out[c][k];
+                if (off < 512) cap.w(c, s, (int)off) = y;
+                cap.e(c, s) += y * y;
+            }
+    }
+    return cap;
+}
+static Capture run(Engine& e, long fs, int seconds, int block = 256) {
+    return run(e, fs, seconds, block, [](long) {});
+}
+
+template <int S>
+static double winErr(Capture& c, const double (*ref)[S][512]) {
+    double err = 0.0, pk = 0.0;
+    for (int l = 0; l < 4; ++l) for (int s = 0; s < S; ++s) for (int k = 0; k < 512; ++k) {
+        err = std::max(err, std::fabs(c.w(l, s, k) - ref[l][s][k]));
+        pk  = std::max(pk, std::fabs(ref[l][s][k]));
+    }
+    return err / pk;
+}
+template <int S>
+static double energyErr(Capture& c, const double (*ref)[S]) {
+    double err = 0.0, pk = 0.0;
+    for (int l = 0; l < 4; ++l) for (int s = 0; s < S; ++s) {
+        err = std::max(err, std::fabs(c.e(l, s) - ref[l][s]));
+        pk  = std::max(pk, ref[l][s]);
+    }
+    return err / pk;
+}
+
+// Test 4 of the spec.
+TEST_CASE("the engine equals sdt.stunedrev(83, 47, 7, 71) at 96 kHz over 30 s") {
+    Engine e; settle(e, 96000.0);
+    Capture c = run(e, 96000, 30);
+    MESSAGE("96 kHz: windows " << winErr<30>(c, stunedrevref::kWin96) << ", energy " << energyErr<30>(c, stunedrevref::kWin96_energy));
+    CHECK(winErr<30>(c, stunedrevref::kWin96) < 1e-12);
+    CHECK(energyErr<30>(c, stunedrevref::kWin96_energy) < 1e-10);
+}
+
+TEST_CASE("the engine equals sdt.stunedrev at 48 kHz over 30 s") {
+    Engine e; settle(e, 48000.0);
+    Capture c = run(e, 48000, 30);
+    MESSAGE("48 kHz: windows " << winErr<30>(c, stunedrevref::kWin48) << ", energy " << energyErr<30>(c, stunedrevref::kWin48_energy));
+    CHECK(winErr<30>(c, stunedrevref::kWin48) < 1e-12);
+    CHECK(energyErr<30>(c, stunedrevref::kWin48_energy) < 1e-10);
+}
+
+// Test 5: a time moved at a block boundary.
+TEST_CASE("a change of time equals the spec's: t3 7 -> 9 ms at sample 48128") {
+    Engine e; settle(e, 96000.0);
+    Capture c = run(e, 96000, 3, 256, [&](long pos) { if (pos == 48128) e.setTime(2, 9); });
+    MESSAGE("change of time: windows " << winErr<3>(c, stunedrevref::kChange96));
+    CHECK(winErr<3>(c, stunedrevref::kChange96) < 1e-12);
+    CHECK(energyErr<3>(c, stunedrevref::kChange96_energy) < 1e-10);
+}
+
+// Test 9: the centroid is the 96 kHz time scale, to within a prime gap per section.
+TEST_CASE("centroid: never below the exact time, above it by at most one prime gap per section") {
+    for (double fs : {44100.0, 48000.0, 96000.0, 192000.0}) {
+        Engine e; settle(e, fs);
+        for (int j = 0; j < kLines; ++j) {
+            // sum over i of ms·(i+1)·k = ms·k·903
+            const double exact = kDefaultTimes[j] * kRatio[j] * 903.0 / 1000.0;
+            const double c = e.centroidSeconds(j);
+            CAPTURE(fs); CAPTURE(j);
+            CHECK(c >= exact);
+            CHECK(c - exact <= kSections * 155.0 / fs);   // rounding + gap < 155 samples
+        }
+    }
+    Engine e; settle(e, 96000.0);
+    CHECK(std::fabs(e.centroidSeconds(0) - 106.0) < 0.1);   // the report's 106.0 s
+}
+
+// Review focus 1, 2, 3, 5.
+TEST_CASE("in-place buffers give the out-of-place output exactly") {
+    Engine a; settle(a, 48000.0);
+    Engine b; settle(b, 48000.0);
+    Capture ca = run(a, 48000, 2);
+    Capture cb = run(b, 48000, 2, 256, [](long) {}, true);
+    CHECK(ca.win == cb.win);
+    CHECK(ca.energy == cb.energy);
+}
+
+TEST_CASE("block partition: 1, 7 and 4093-sample blocks equal 256-sample blocks exactly") {
+    Engine ref; settle(ref, 48000.0);
+    Capture cr = run(ref, 48000, 2);
+    for (int block : {1, 7, 4093}) {
+        Engine e; settle(e, 48000.0);
+        Capture c = run(e, 48000, 2, block);
+        CAPTURE(block);
+        CHECK(c.win == cr.win);
+        CHECK(c.energy == cr.energy);
+    }
+}
+
+TEST_CASE("prepare at a new rate gives a fresh engine at that rate") {
+    Engine e; settle(e, 96000.0);
+    run(e, 96000, 1);                       // memory full of the burst
+    settle(e, 48000.0);                     // the host's setActive(false/true) with a new rate
+    Engine fresh; settle(fresh, 48000.0);
+    for (int j = 0; j < kLines; ++j) {
+        CHECK(e.centroidSeconds(j) == fresh.centroidSeconds(j));
+        for (int i = 0; i < kSections; ++i) CHECK(e.delay(j, i) == fresh.delay(j, i));
+    }
+    Capture a = run(e, 48000, 2), b = run(fresh, 48000, 2);
+    CHECK(a.win == b.win);
+}
+
+TEST_CASE("without memory process() writes zeros") {
+    Engine e;                                // never prepared
+    double ib[4][64], ob[4][64];
+    double* in[4]; double* out[4];
+    for (int c = 0; c < 4; ++c) { in[c] = ib[c]; out[c] = ob[c]; std::fill(ib[c], ib[c] + 64, 1.0); std::fill(ob[c], ob[c] + 64, 9.0); }
+    e.process(in, out, 64);
+    for (int c = 0; c < 4; ++c) for (int k = 0; k < 64; ++k) CHECK(ob[c][k] == 0.0);
+    CHECK(e.status() == Status::Unprepared);
+    settle(e, 48000.0);
+    e.release();
+    std::fill(ob[0], ob[0] + 64, 9.0);
+    e.process(in, out, 64);
+    CHECK(ob[0][10] == 0.0);
+}
+
+TEST_CASE("POWER off: after its 25 ms ramp the output is exactly zero; the lines keep running") {
+    Engine e;  settle(e, 48000.0);
+    Engine on; settle(on, 48000.0);
+    e.setPower(false);                        // off from the start, back on at sample 48128
+    Burst be(48000.0), bo(48000.0);
+    const int B = 256;
+    std::vector<double> ie(4 * B), oe(4 * B), io(4 * B), oo(4 * B);
+    double *pie[4], *poe[4], *pio[4], *poo[4];
+    for (int c = 0; c < 4; ++c) {
+        pie[c] = ie.data() + c * B; poe[c] = oe.data() + c * B;
+        pio[c] = io.data() + c * B; poo[c] = oo.data() + c * B;
+    }
+    long nonzero = 0; double err = 0.0;
+    for (long pos = 0; pos < 96000; pos += B) {
+        if (pos == 48128) e.setPower(true);
+        be.fill(pie, B); bo.fill(pio, B);
+        e.process(pie, poe, B); on.process(pio, poo, B);
+        for (int c = 0; c < 4; ++c)
+            for (int k = 0; k < B; ++k) {
+                const long g = pos + k;
+                if (g >= 1200 && g < 48128 && poe[c][k] != 0.0) ++nonzero;      // ramp of 1200 samples
+                if (g >= 48128 + 1200) err = std::max(err, std::fabs(poe[c][k] - poo[c][k]));
+            }
+    }
+    CHECK(nonzero == 0);
+    CHECK(err == 0.0);   // the memory kept turning while POWER was off
+}

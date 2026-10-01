@@ -63,4 +63,142 @@ inline uint32_t sieveBound(double fs) {
 // to its slice of the arena.
 using Section = Seam::MoorerAllpass;
 
+enum class Status : int { Unprepared = 0, Ready, Clearing, AllocFailed };
+
+class Engine {
+public:
+    Engine() { for (int j = 0; j < kLines; ++j) time_[j] = kDefaultTimes[j]; }
+
+    // Outside the audio thread (setActive). Sieve, arena (zeroed now, so
+    // every page is resident before process() runs), delays. false when the
+    // memory is not there: the engine stays silent.
+    bool prepare(double fs) {
+        release();
+        fs_ = fs;
+        sampleRate_.store(fs);
+        try {
+            sieve_.reset(new Seam::PrimeSieve(sieveBound(fs)));
+            std::size_t total = 0;
+            for (int j = 0; j < kLines; ++j)
+                for (int i = 0; i < kSections; ++i) total += sectionLength(j, i, fs, *sieve_);
+            arena_.reset(new double[total]());
+            arenaSize_ = total;
+        } catch (const std::bad_alloc&) {
+            release();
+            status_.store(Status::AllocFailed);
+            return false;
+        }
+        std::size_t off = 0;
+        for (int j = 0; j < kLines; ++j)
+            for (int i = 0; i < kSections; ++i) {
+                const std::size_t len = sectionLength(j, i, fs, *sieve_);
+                sec_[j][i].attach(arena_.get() + off, len);
+                sec_[j][i].setGain(kG);
+                off += len;
+            }
+        arenaBytes_.store(arenaSize_ * sizeof(double));
+        for (int j = 0; j < kLines; ++j) applyTime(j);
+        in_.setTarget(in_.target(), kShortRamp, fs_);
+        out_.setTarget(out_.target(), kShortRamp, fs_);
+        pow_.setTarget(pow_.target(), kShortRamp, fs_);
+        fade_.setTarget(1.0, kShortRamp, fs_);
+        phase_ = Phase::Run;
+        clearPos_ = 0;
+        servedGen_ = resetGen_.load();       // a click before prepare is not replayed
+        status_.store(Status::Ready);
+        return true;
+    }
+
+    void release() {
+        arena_.reset();
+        sieve_.reset();
+        arenaSize_ = 0;
+        arenaBytes_.store(0);
+        status_.store(Status::Unprepared);
+    }
+
+    // Every ramp onto its target (setActive, after the recalled values).
+    void reset() { in_.snap(); out_.snap(); pow_.snap(); fade_.snap(); }
+
+    // Audio thread, at the start of a block (or before prepare). The delays
+    // jump, as in the spec: the buffers hold the whole history.
+    void setTime(int line, int ms) {
+        ms = std::min(kTMax, std::max(kTMin, ms));
+        if (ms == time_[line] && applied_[line]) return;
+        time_[line] = ms;
+        if (arena_) applyTime(line);
+    }
+    void setInput(double v)  { if (v != in_.target())  in_.setTarget(v, kShortRamp, fs_); }
+    void setOutput(double v) { if (v != out_.target()) out_.setTarget(v, kShortRamp, fs_); }
+    void setPower(bool on) {
+        const double t = on ? 1.0 : 0.0;
+        if (t != pow_.target()) pow_.setTarget(t, kShortRamp, fs_);
+    }
+
+    // Any thread (the RESET view): served at the start of the next block.
+    void requestReset() { resetGen_.fetch_add(1); }
+
+    template <class T>
+    void process(const T* const* in, T* const* out, int n) {
+        if (!arena_) { zero(out, n); return; }
+        // RESET: Task 5 serves resetGen_ here.
+        const bool feeding = phase_ == Phase::Run;
+        for (int k = 0; k < n; ++k) {
+            const double gin  = in_.next();
+            const double gout = out_.next() * pow_.next() * fade_.next();
+            double x[kLines];
+            for (int j = 0; j < kLines; ++j) x[j] = feeding ? (double)in[j][k] * gin : 0.0;
+            for (int j = 0; j < kLines; ++j) {
+                double y = x[j];
+                for (Section& s : sec_[j]) y = s.tick(y);
+                out[j][k] = (T)(y * gout);
+            }
+        }
+    }
+
+    // Readouts.
+    int         time(int line) const           { return time_[line]; }
+    uint32_t    delay(int line, int i) const   { return sec_[line][i].delay(); }
+    double      centroidSeconds(int line) const { return centroid_[line].load(); }
+    std::size_t arenaBytes() const             { return arenaBytes_.load(); }
+    double      sampleRate() const             { return sampleRate_.load(); }
+    Status      status() const                 { return status_.load(); }
+
+private:
+    enum class Phase { Run, FadeOut, Clear };
+
+    void applyTime(int line) {
+        double sum = 0.0;
+        for (int i = 0; i < kSections; ++i) {
+            const uint32_t t = sectionDelay(line, i, time_[line], fs_, *sieve_);
+            sec_[line][i].setDelay(t);
+            sum += t;
+        }
+        centroid_[line].store(sum / fs_);   // each section delays the energy by its t on average
+        applied_[line] = true;
+    }
+
+    template <class T>
+    static void zero(T* const* out, int n) {
+        for (int j = 0; j < kLines; ++j) std::fill(out[j], out[j] + n, (T)0);
+    }
+
+    double fs_ = 96000.0;
+    int    time_[kLines] = {};
+    bool   applied_[kLines] = {};
+    Section sec_[kLines][kSections];
+    std::unique_ptr<double[]> arena_;
+    std::size_t arenaSize_ = 0, clearPos_ = 0;
+    std::unique_ptr<Seam::PrimeSieve> sieve_;
+    Seam::LinearRamp in_, out_, pow_, fade_;
+    Phase phase_ = Phase::Run;
+    uint32_t servedGen_ = 0;
+
+    std::atomic<uint32_t>    resetGen_{0};
+    std::atomic<Status>      status_{Status::Unprepared};
+    std::atomic<double>      centroid_[kLines] = {};
+    std::atomic<std::size_t> arenaBytes_{0};
+    std::atomic<double>      sampleRate_{0.0};
+};
+
 } // namespace stunedrev
