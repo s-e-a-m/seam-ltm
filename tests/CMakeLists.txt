@@ -331,3 +331,11 @@ target_include_directories(seam_butterworth_test PRIVATE
 )
 target_compile_features(seam_butterworth_test PRIVATE cxx_std_17)
 add_test(NAME seam_butterworth_test COMMAND seam_butterworth_test)
+
+add_executable(seam_ramp_test seam_ramp_test.cpp)
+target_include_directories(seam_ramp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_ramp_test PRIVATE cxx_std_17)
+add_test(NAME seam_ramp_test COMMAND seam_ramp_test)

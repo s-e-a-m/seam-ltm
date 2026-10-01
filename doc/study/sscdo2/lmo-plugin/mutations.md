@@ -10,3 +10,5 @@ Each mutation was applied to the source, the test rebuilt and run, and the sourc
 | seam_butterworth_test: order 24 | sections in reverse order | GREEN — an equivalent mutant: LTI sections in series commute, so the order changes only the rounding (below 1e-12 of the peak); nothing to detect |
 | seam_butterworth_test: order 24, −3 dB | damping index shifted by one section (`s` from 0) | RED |
 | seam_butterworth_test: order 24 and 2 HP | HP output without the damping (`v0 - v1 - v2`) | RED |
+| seam_ramp_test: exact length | samples truncated instead of rounded (`(long)(seconds*fs)`; 1102.5 at 44.1 kHz) | RED |
+| seam_ramp_test: exact landing | last step adds the increment instead of landing on the target | RED |
