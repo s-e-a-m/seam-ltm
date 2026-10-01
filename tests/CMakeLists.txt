@@ -357,3 +357,13 @@ target_include_directories(lmo_params_test PRIVATE
 )
 target_compile_features(lmo_params_test PRIVATE cxx_std_17)
 add_test(NAME lmo_params_test COMMAND lmo_params_test)
+
+# seam_primes.h: the sieve behind sff.np / sma.ms2npsamp (stunedrev, and any
+# plugin with prime delays).
+add_executable(seam_primes_test seam_primes_test.cpp)
+target_include_directories(seam_primes_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_primes_test PRIVATE cxx_std_17)
+add_test(NAME seam_primes_test COMMAND seam_primes_test)
