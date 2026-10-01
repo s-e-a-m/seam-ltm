@@ -21,7 +21,7 @@ Nella libreria SEAM le tre funzioni sono \texttt{sdt.lmoband}, \texttt{sdt.lmoos
 \end{center}
 
 \scheda{lmo-frequenza}{Frequenza (cue)}
-{guidata dai cue; il glissando del cue 2 dura \qty{120}{\second}}
+{guidata dai cue; il glissando del cue 2 dura \qty{120}{\second}; nel plugin sono due controlli, f e glide, il tempo del prossimo spostamento di f: un cue imposta prima glide, poi f}
 {cue 1: \misurau{97.44}{\hertz}{log}}
 {il cue 2 porta la banda da \misurau{97.44}{\hertz}{log} a \misurau{112.67}{\hertz}{log}; la frequenza è il centro della banda di tutti e quattro i canali, a meno dello scarto di $+i$~Hz del canale $i$}
 {l'originale moltiplicava la frequenza del cursore per 1,015, un residuo della vecchia formula dei due oscillatori; il porting lo toglie e scrive nei cue le frequenze che Davide sentiva (96 e 111 Hz nell'originale diventano i valori qui sopra); \S\ref{sec:principio-ragiona}}
@@ -39,7 +39,7 @@ Nella libreria SEAM le tre funzioni sono \texttt{sdt.lmoband}, \texttt{sdt.lmoos
 \scheda{lmo-volume}{Volume (CC81)}
 {fader lineare}
 {come nel patch}
-{nessuna}
+{a ogni frequenza di campionamento il livello di ogni banda è quello di \qty{96}{\kilo\hertz}: a \qty{48}{\kilo\hertz} il rumore bianco darebbe \misura{3.01}{lmo-beats} dB in più, e LMO lo compensa (\studio{lmo-plugin})}
 {nessun guadagno di compatibilità: il livello si fissa in sala; \S\ref{sec:principio-livelli}}
 {\daprovare}
 {}
