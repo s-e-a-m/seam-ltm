@@ -20,6 +20,11 @@ Cue 2 of the piece is glide = 120 s, then f = 112.67 Hz.
 With glide at 0, f still moves over 25 ms, so that host automation draws a continuous curve.
 A value of f that the host sends again does not restart a glissando under way.
 Δ always moves over 25 ms: it is played by hand, and it would otherwise inherit a two-minute glide.
+glide is made for step cues.
+An f envelope drawn as a slope with glide above 0 sends a new target every block, and each restarts a ramp of glide seconds from where f is: f trails the drawing and arrives late.
+Draw slopes with glide at 0.
+A preset recalled while LMO plays moves f over the recalled glide, as a cue does, and over 25 ms when the recalled glide is 0.
+The recall stores glide before f, so no audio block can start the recalled f on the old glide.
 
 The input bus is declared and never read: a generator with no input would be routed around by the host.
 

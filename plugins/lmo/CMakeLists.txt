@@ -10,6 +10,7 @@ set(lmo_sources
     ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/vstsinglecomponenteffect.h
     source/lmo_ids.h
     source/lmo_dsp.h
+    source/lmo_params.h
     source/lmo_processor.cpp
     source/lmo_processor.h
     source/version.h

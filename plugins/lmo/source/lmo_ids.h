@@ -11,7 +11,7 @@ namespace Seam {
 static const Steinberg::FUID LmoProcessorUID (0x5E4D0010, 0xA1B2C3D4, 0x4C4D4F00, 0x00000010);
 
 enum LmoParams : Steinberg::Vst::ParamID {
-    kParamPower     = 100,   // off / on
+    kParamPower     = 100,   // off / on   (100 + lmo::Param index)
     kParamFrequency = 101,   // Hz
     kParamGlide     = 102,   // s, time of the next frequency move
     kParamDelta     = 103,   // Hz, distance between the two bands
@@ -19,10 +19,6 @@ enum LmoParams : Steinberg::Vst::ParamID {
     kParamFNow      = 200    // read-only: the band centre now
 };
 
-static constexpr double kLmoFMin     = 20.0;
-static constexpr double kLmoFMax     = 1500.0;   // the committed .dsp range
-static constexpr double kLmoFDefault = 48.0;     // cue 0
-static constexpr double kLmoGlideMax = 300.0;
-static constexpr double kLmoDeltaMax = 50.0;
+// Ranges and defaults: lmo_params.h (SDK-free, shared with the tests).
 
 } // namespace Seam

@@ -20,9 +20,7 @@ namespace Seam {
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 
-static const ParamID kStateIds[5] = {
-    kParamPower, kParamFrequency, kParamGlide, kParamDelta, kParamVolume
-};
+static ParamID idOf(lmo::Param p) { return kParamPower + (ParamID)p; }
 
 tresult PLUGIN_API LmoProcessor::initialize(FUnknown* context) {
     tresult r = SingleComponentEffect::initialize(context);
@@ -37,19 +35,20 @@ tresult PLUGIN_API LmoProcessor::initialize(FUnknown* context) {
     parameters.addParameter(new RangeParameter(
         STR16("Power"), kParamPower, STR16(""),
         0.0, 1.0, 0.0, 1, ParameterInfo::kCanAutomate | ParameterInfo::kIsList));
+    using namespace lmo;
 
     auto* f = new RangeParameter(STR16("f"), kParamFrequency, STR16("Hz"),
-        kLmoFMin, kLmoFMax, kLmoFDefault, 0, ParameterInfo::kCanAutomate);
+        kFMin, kFMax, kFDefault, 0, ParameterInfo::kCanAutomate);
     f->setPrecision(2);
     parameters.addParameter(f);
 
     auto* glide = new RangeParameter(STR16("Glide"), kParamGlide, STR16("s"),
-        0.0, kLmoGlideMax, 0.0, 0, ParameterInfo::kCanAutomate);
+        0.0, kGlideMax, 0.0, 0, ParameterInfo::kCanAutomate);
     glide->setPrecision(2);
     parameters.addParameter(glide);
 
     auto* delta = new RangeParameter(STR16("Delta"), kParamDelta, STR16("Hz"),
-        0.0, kLmoDeltaMax, 0.0, 0, ParameterInfo::kCanAutomate);
+        0.0, kDeltaMax, 0.0, 0, ParameterInfo::kCanAutomate);
     delta->setPrecision(2);
     parameters.addParameter(delta);
 
@@ -59,7 +58,7 @@ tresult PLUGIN_API LmoProcessor::initialize(FUnknown* context) {
     parameters.addParameter(vol);
 
     auto* fnow = new RangeParameter(STR16("f now"), kParamFNow, STR16("Hz"),
-        kLmoFMin, kLmoFMax, kLmoFDefault, 0, ParameterInfo::kIsReadOnly);
+        kFMin, kFMax, kFDefault, 0, ParameterInfo::kIsReadOnly);
     fnow->setPrecision(2);
     parameters.addParameter(fnow);
 
@@ -79,22 +78,10 @@ tresult PLUGIN_API LmoProcessor::setupProcessing(ProcessSetup& setup) {
 tresult PLUGIN_API LmoProcessor::setActive(TBool state) {
     if (state) {
         engine_.prepare(sampleRate());
-        applyParams();      // recalled state becomes the targets...
-        engine_.reset();    // ...and the engine starts ON them, no glide from defaults
+        lmo::applyTo(box_.plain(), engine_);   // recalled state becomes the targets...
+        engine_.reset();                       // ...and the engine starts ON them, no glide
     }
     return SingleComponentEffect::setActive(state);
-}
-
-void LmoProcessor::applyParams() {
-    auto plain = [&](ParamID id) -> double {
-        auto* p = parameters.getParameter(id);
-        return p ? p->toPlain(p->getNormalized()) : 0.0;
-    };
-    engine_.setGlide(plain(kParamGlide));
-    engine_.setFrequency(plain(kParamFrequency));
-    engine_.setDelta(plain(kParamDelta));
-    engine_.setVolume(plain(kParamVolume));
-    engine_.setPower(plain(kParamPower) >= 0.5);
 }
 
 tresult PLUGIN_API LmoProcessor::process(ProcessData& data) {
@@ -105,12 +92,16 @@ tresult PLUGIN_API LmoProcessor::process(ProcessData& data) {
             if (!q) continue;
             const int32 np = q->getPointCount();
             if (np <= 0) continue;
+            // The last point of the block, applied at its start: inaudible
+            // against the 25 ms ramps (suite convention).
             int32 off; ParamValue v;
+            const ParamID id = q->getParameterId();
+            if (id < kParamPower || id > kParamVolume) continue;
             if (q->getPoint(np - 1, off, v) == kResultOk)
-                setParamNormalized(q->getParameterId(), v);
+                box_.store((lmo::Param)(id - kParamPower), v);
         }
     }
-    applyParams();   // the engine ignores unchanged targets
+    lmo::applyTo(box_.plain(), engine_);   // glide first; unchanged targets are ignored
 
     if (data.numOutputs > 0 && data.numSamples > 0) {
         // A generator is never silent by inheritance (reference: multipink).
@@ -130,9 +121,9 @@ tresult PLUGIN_API LmoProcessor::process(ProcessData& data) {
     if (auto* oc = data.outputParameterChanges) {
         int32 idx;
         if (auto* q = oc->addParameterData(kParamFNow, idx)) {
-            const double f = std::min(kLmoFMax, std::max(kLmoFMin, engine_.currentFrequency()));
+            const double f = std::min(lmo::kFMax, std::max(lmo::kFMin, engine_.currentFrequency()));
             int32 off = 0;
-            q->addPoint(0, (f - kLmoFMin) / (kLmoFMax - kLmoFMin), off);
+            q->addPoint(0, (f - lmo::kFMin) / (lmo::kFMax - lmo::kFMin), off);
         }
     }
     return kResultOk;
@@ -142,27 +133,29 @@ tresult PLUGIN_API LmoProcessor::canProcessSampleSize(int32 s) {
     return (s == kSample32 || s == kSample64) ? kResultTrue : kResultFalse;
 }
 
-// State: five normalized doubles, append-only (seam_state.h): a short blob
-// keeps the registered defaults for the fields it lacks.
+// State: five normalized doubles in lmo::Param order, append-only
+// (seam_state.h): a short blob keeps the defaults for the fields it lacks.
+// setState runs on the UI thread while process() may run: the values go to
+// the box in kRecallOrder, glide before f, so that no block can start the
+// recalled f on the old glide (lmo_params_test). A recall while playing
+// moves f over the RECALLED glide, as a cue does; with glide 0, over 25 ms.
 tresult PLUGIN_API LmoProcessor::setState(IBStream* state) {
     if (!state) return kResultFalse;
-    double saved[5];
-    for (int i = 0; i < 5; ++i) {
-        auto* p = parameters.getParameter(kStateIds[i]);
-        saved[i] = p ? p->getInfo().defaultNormalizedValue : 0.0;
+    double saved[lmo::kNumParams];
+    for (int i = 0; i < lmo::kNumParams; ++i) saved[i] = lmo::defaultNormalized((lmo::Param)i);
+    Seam::readStateDoubles(state, saved, lmo::kNumParams);
+    for (lmo::Param p : lmo::kRecallOrder) {
+        box_.store(p, saved[(int)p]);
+        setParamNormalized(idOf(p), saved[(int)p]);   // UI thread: the editor follows
     }
-    Seam::readStateDoubles(state, saved, 5);
-    for (int i = 0; i < 5; ++i) setParamNormalized(kStateIds[i], saved[i]);
-    return kResultOk;   // the engine picks the values up in the next process()
+    return kResultOk;
 }
 
 tresult PLUGIN_API LmoProcessor::getState(IBStream* state) {
     if (!state) return kResultFalse;
     IBStreamer s(state, kLittleEndian);
-    for (ParamID id : kStateIds) {
-        auto* p = parameters.getParameter(id);
-        s.writeDouble(p ? p->getNormalized() : 0.0);
-    }
+    for (int i = 0; i < lmo::kNumParams; ++i)
+        s.writeDouble(box_.normalized((lmo::Param)i));
     return kResultOk;
 }
 

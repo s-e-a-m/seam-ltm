@@ -31,7 +31,7 @@
 #pragma once
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "pluginterfaces/vst/ivstplugview.h"
-#include "lmo_dsp.h"
+#include "lmo_params.h"
 
 namespace Seam {
 
@@ -57,14 +57,14 @@ public:
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) SMTG_OVERRIDE;
 
 private:
-    // Denormalize the parameters and hand them to the engine, on the audio
-    // thread. glide goes first: it is the time of the next f move.
-    void applyParams();
     double sampleRate() const {
         return processSetup.sampleRate > 0.0 ? processSetup.sampleRate : 96000.0;
     }
 
     lmo::Engine engine_;
+    // The controls between the threads: process() and setState() store
+    // here; the SDK's Parameter objects are never written from process().
+    lmo::ParamBox box_;
 };
 
 } // namespace Seam

@@ -59,6 +59,12 @@ Every test was verified by mutation (`doc/study/sscdo2/lmo-plugin/mutations.md`)
 VST3 validator: 47 of 47.
 The suite's `minos_lint` fails in `build-test` for a reason older than this branch: that tree's cache holds a deployment target of 15.7, from before the 11.0 floor; `build`, which makes the plugins, is at 11.0.
 
+## Final review
+A fresh reviewer read the whole branch and found two important defects in the processor, both fixed with a test that failed first.
+- The processor wrote the SDK's parameter objects from the audio thread (`setParamNormalized` in `process()`), which notifies the open editor synchronously: a lock and VSTGUI redraws off the main thread, at every automated block, with the window open on stage. The controls now live in atomics (`plugins/lmo/source/lmo_params.h`, `lmo::ParamBox`), as in multipink and ltglide; `process()` never touches a `Parameter`.
+- `setState` stored f before glide: a block landing between the two stores started the recalled f on the old glide, 120 s instead of 25 ms. A recall now stores glide first (`lmo::kRecallOrder`); `lmo_params_test` runs a block at every interleaving of the five stores and failed, before the fix, exactly after the f store.
+A recall while LMO plays moves f over the recalled glide, as a cue does (documented in `plugins/lmo/doc/README.md`, with the advice to draw sloped f envelopes with glide at 0).
+
 ## Open
 - Listening in Reaper at 96 kHz (POWER and volume fades, cue 1, cue 2 with "f now", a Δ sweep, the same session at 48 kHz) and the window's screenshot, `docs/img/lmo.png`, which `uidesc_lint_selftest` waits for.
 - The registry (`doc/plugins.toml`, a family for the works), the README, the site page; the LMO cards of the porting report.
