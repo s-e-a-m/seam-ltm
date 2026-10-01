@@ -52,9 +52,15 @@ Every window follows the same grammar, described in
 | **HILBERT** | mono → stereo | Wideband Quadrature Transformer: one input becomes an in-phase and a quadrature branch held −90° apart from 20 Hz to 20 kHz. Both outputs are all-pass filtered, since the relationship belongs to the pair rather than to either signal. Two topologies — RBJ biquad cascade and Niemitalo polyphase — are selectable live and redesigned per sample rate by the same `seam_quadrature` engine X2UHJ uses internally |
 | **ADDELAY** | 4ch → 4ch | Air-Absorption Delay: inherits DDELAY's exact metres-to-samples integer delay (next-prime rounding included) and adds a minimum-phase air-absorption filter fitted to the ISO 9613-1 α·d distance-dependent high-frequency roll-off. Shelf and three-section RBJ high-shelf cascade topologies are switchable live, with an optional 1/r geometric-spreading attenuation. All four channels share one distance, so the inter-channel phase is preserved |
 
+### Works — SSCDO#2
+
+| Plugin | I/O | Description |
+|---|---|---|
+| **LMO** | → 4ch | The generator of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): on each of four channels, two narrow bands of noise through 24th-order Butterworth high- and low-pass filters, which beat at a distance Δ. The band centre glides linearly over a set time, as the piece's cues ask; the level is anchored at 96 kHz, so the bands sound the same at any sample rate |
+
 ### Screenshots
 
-All sixteen windows, photographed after the UI standard landed, in the order
+All seventeen windows, photographed after the UI standard landed, in the order
 of the three families above.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |
@@ -72,6 +78,10 @@ of the three families above.
 | DSLAR | DDELAY | HILBERT | ADDELAY |
 |:---:|:---:|:---:|:---:|
 | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) | ![ADDELAY](docs/img/addelay.png) |
+
+| LMO |
+|:---:|
+| ![LMO](docs/img/lmo.png) |
 
 <!-- END plugins -->
 
