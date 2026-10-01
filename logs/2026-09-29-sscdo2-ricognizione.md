@@ -394,3 +394,6 @@ Giuseppe asked for the surveys to be organised into a LaTeX report, in Italian, 
 Three parts: the eight principles of the port; the machines, one card per control with range, starting value, consequences in numbers, difference from the original, state (decided / to be tested / question for Davide) and study; the rehearsal protocol, nine listening cards with blank fields for verdict and decision, five questions for Davide, and a one-page draft of the operational table.
 Every measured number goes through `\misura{value}{source}`, and `check.py` finds it literally in the cited study or in this log; `make check` builds with LuaLaTeX, fails on missing glyphs or undefined references, runs the checker's self-test (mutations included) and the check.
 After a rehearsal a decision is written in the report first (the card's state becomes decided), then here and, where needed, in `seam.tedesco.lib`.
+
+## C++ phase
+Continued in `logs/2026-10-01-sscdo2-plugins.md`.
