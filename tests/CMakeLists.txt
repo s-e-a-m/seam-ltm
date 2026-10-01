@@ -313,3 +313,13 @@ target_include_directories(multipink_pink_engine_test PRIVATE
 )
 target_compile_features(multipink_pink_engine_test PRIVATE cxx_std_17)
 add_test(NAME multipink_pink_engine_test COMMAND multipink_pink_engine_test)
+
+# SSCDO#2 LMO: the reusable _common headers and the engine, against the Faust
+# references in ref/lmo_ref.h (doc/study/sscdo2/lmo-plugin/gen-ref.sh).
+add_executable(seam_noise_test seam_noise_test.cpp)
+target_include_directories(seam_noise_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_noise_test PRIVATE cxx_std_17)
+add_test(NAME seam_noise_test COMMAND seam_noise_test)
