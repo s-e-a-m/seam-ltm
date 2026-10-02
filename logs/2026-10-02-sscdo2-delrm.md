@@ -65,9 +65,12 @@ The footer line was cut at "96.0 kH": the text is wider than its 260 px view at 
 Giuseppe chose the line without the dot separators, keeping the @ before the rate, `D 30.24 ms 2903 samples @ 96 kHz` (one space after D, the rate with `%g`): at 30 m it is at most 36 characters (176.4 kHz), from 44.1 to 384 kHz, against the 36 that fit.
 The text moved to `delrm_footer.h`, SDK-free, and `delrm_footer_test` holds it to the width at every rate; the old format turns that test RED.
 
+The second pass showed the window as designed: GR 2 filling from the right against the inputs, the footer `D 30.24 ms 2903 samples @ 96 kHz` at 10 m; that window is `docs/img/delrm.png`.
+With it, `make -C doc test` passes every check, the lint reports no warning, and ctest passes 44 of 44.
+
 ## Open
 
-- The host check in Reaper (Giuseppe): 96 kHz, `ccb_dry.wav` through the four channels, by ear against the `delrm-comb` and `delrm-rm` renders; the distance by hand; GR 2 and GR 4 against the inputs; the same session at 48 kHz; the output peaks of channels 2 and 4 on strong attacks; the screenshot for `docs/img/delrm.png`.
+- The host check in Reaper (Giuseppe): 96 kHz, `ccb_dry.wav` through the four channels, by ear against the `delrm-comb` and `delrm-rm` renders; the distance by hand; GR 2 and GR 4 against the inputs; the same session at 48 kHz; the output peaks of channels 2 and 4 on strong attacks.
 - The dcblocker listening: whether the thinner bass wants the two declared `fi.dcblockerat(76.59)` back.
 - The 6 deferred minors of stunedrev, if still open.
 - The choir's survey.
