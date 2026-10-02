@@ -8,13 +8,14 @@
 //
 //   lmoband(f)  = fi.highpass(24, f) : fi.lowpass(24, f - 0.0001);
 //   lmodens     = sqrt(ma.SR/96000);
-//   lmo(N,f,d)  = no.multinoise(2*N)
+//   lmonoise(N) = sno.multinoiseblock(N*(2 + 16), 0, 2*N);   // blocks 1-2 of 3
+//   lmo(N,f,d)  = lmonoise(N)
 //               : par(i, N, lmoband(max(1, f - d/2 + i))),
 //                 par(i, N, lmoband(f + d/2 + i))
 //               :> par(i, N, /(sqrt(2)) : *(lmodens));
 //
 // Re-implemented by hand (seam-ltm convention) in lmo_dsp.h on three
-// reusable headers: seam_noise.h (no.multinoise bit for bit),
+// reusable headers: seam_noise.h (no.multinoise and sno.multinoiseblock bit for bit),
 // seam_butterworth.h (Smith's SVF Butterworth sections), seam_ramp.h.
 //
 // SR rule of the SSCDO#2 port: it sounds as at 96 kHz at any rate.

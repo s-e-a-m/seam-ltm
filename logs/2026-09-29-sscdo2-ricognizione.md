@@ -418,3 +418,25 @@ Decision (Giuseppe, 2026-10-02):
 
 Open, the first point of the choir study: one stream per voice against one per band (4 against 64 streams). Distinct bands of one white noise are uncorrelated in expectation, and at Q = 350 the bands of a voice barely touch, so the two should sound the same; measure r between the voices of a channel and between channels, and render both for listening.
 Report: question 4 closed, new card `coro-voci` (to be tested), LMO chapter updated.
+
+### Choir block 1: the noise (`doc/study/sscdo2/choir-noise/`)
+Library: `sno.multinoiseblock(M, o, N)` in seam.noises.lib, `sdt.lmonoise`/`sdt.choirnoise` in seam.tedesco.lib, `sdt.lmo` on `lmonoise` (faust-libraries b890245); verified against a bit-exact LCG model, mutation `o = 7` red.
+LMO's C++ follows on branch `lmo-noise-blocks` (f53f56a): `Seam::MultinoiseBlock`, references regenerated, `kChoirNoise` added, two mutations red.
+Found on the way, already on main: `seam_delays_test` aborts in Debug, its clamp test hits the `assert(d < len_)` of `seam_delays.h`; it passes only with `NDEBUG`.
+
+The study measures one stream per voice against one per band exactly, from impulse responses (r is their inner product).
+At Q = 350 the bands of a voice correlate by 2.3e-03 at most and the voice's level changes by 0.01 dB: the two choices give the same voice.
+The equivalence belongs to Q: 0.155 dB at Q = 100, 1.377 dB at Q = 30; Q is fixed at 350 by the wrapper's initialisation.
+In the original the channels were already almost uncorrelated as wholes (r 0.0256 at most), since f and a differ; band 1 of channels 0–1 (48 Hz) and 2–3 (96 Hz) was the same signal in two drivers.
+Renders committed for listening: original, one stream per voice, one per band. The card `coro-voci` stays to be tested until Giuseppe and Davide have listened.
+
+Correction, same day: Giuseppe heard a difference between `choir_v4_4ch.wav` and `choir_v64_4ch.wav`, the residual noise between the bands, and "the two choices give the same voice" was wrong.
+r and the total level are integrals dominated by the peaks; with one stream the 16 band-passes add as complex responses and cancel between the resonances (skirts near −90° and +90°), so the floor between bands drops by up to 25.6 dB against one stream per band (exact, from the frequency responses).
+Renders, channel 0, floor between the bands relative to the peaks: original −28.5 dB, one stream per voice −36.6 dB, one per band −26.7 dB.
+One stream per voice or per band is therefore a musical choice (isolated partials against the breath between them), open for Giuseppe and Davide; the card `coro-voci` says so. The block of the choir stays the third; only its size (4 or 64 streams, M = 12 or 72) depends on the choice.
+
+Outside the bank, same day: Giuseppe saw at the spectrum analyser that `v4` has more broadband noise than `v64`; his reading, a better signal-to-noise ratio with more voices in a channel, is right in its result.
+The mechanism is the coherence of the skirts: with one stream the bank is one filter, and outside it every skirt has the same phase (−90° above, +90° below), so they add in amplitude; independent streams add in power.
+Harmonic bands, one stream against 16: (Σk)²/Σk² = +10.9 dB above the bank, (Σ1/k)²/Σ1/k² = +8.6 dB below; the renders measure +10.7 to +11.1 dB at 5–7 kHz on every channel. The peaks are the same, so peak-to-broadband is about 11 dB better with one stream per band, as in the original.
+
+Decision (Giuseppe, 2026-10-02, after listening and the analyser): one stream per band, `v64`. The choir's block 3 has 64 streams (4 voices × 16 bands), one `no.multinoise(72)`: LMO streams 0–7, choir 8–71, voice c on 8 + 16c … 23 + 16c. The floor between the partials and the broadband floor stay the original's; the voices are decorrelated from each other and from LMO. The generator repeats after 2^32/72 samples, 10.4 min at 96 kHz. Card `coro-voci` decided.

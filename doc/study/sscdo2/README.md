@@ -31,7 +31,7 @@ Every check is verified by mutation: the study breaks the code on purpose and sh
 | LMO | the C++ plugin | `lmo-plugin/` | `plugins/lmo`, equal to `sdt.lmo` within 1e-13 of the peak | none |
 | stunedrev | the C++ plugin | `stunedrev-plugin/` | `plugins/stunedrev`, equal to `sdt.stunedrev` within 2e-15 of the peak; `seam_moorer.h`, `seam_primes.h` | none |
 | delRM | the C++ plugin | `delrm-plugin/` | `plugins/delrm`, equal to `sdt.delrm*` within 6e-16 of the peak; `seam_delays.h`, `seam_filters.h`, `seam_compressors.h` | none |
-| choir | — | not yet surveyed | | |
+| choir | 1, the noise | `choir-noise/` | block 3 of one `multinoise(72)`, one stream per band, 64 (`sdt.choirnoise`); one per voice would add 11 dB of broadband noise and deepen the valleys between partials | A/B original, per voice, per band, committed |
 
 ## Audio
 Short renders are committed: in those folders `renders/.gitignore` makes the exception (`!*.wav`) to the root rule that excludes `*.wav`.
@@ -45,5 +45,5 @@ Track 1, the microphone at 1 m, is committed as `delrm-comb/renders/ccb_dry.wav`
 Every folder has a `run.sh` (or `build.sh`, in the earlier LMO and delRM studies) that builds its probes and runs its checks.
 The probes share the offline harness `lmo-bandfilter/harness/arch.cpp`: one mono DSP, a raw float32 input file or an impulse, a raw float64 output file.
 
-Requirements: `faust`, a C and C++17 compiler, the seam-ltm `.venv` (numpy, soundfile), a faustlibraries clone in `NEW_LIBS` (default `/Users/giuseppe/Documents/github/grame/faustlibraries`), and faust-libraries as a sibling of seam-ltm (or `SEAM_LIBS`).
+Requirements: `faust`, a C and C++17 compiler, the seam-ltm `.venv` (numpy, scipy, soundfile), a faustlibraries clone in `NEW_LIBS` (default `/Users/giuseppe/Documents/github/grame/faustlibraries`), and faust-libraries as a sibling of seam-ltm (or `SEAM_LIBS`).
 Paths to Davide's repository (`DAVIDE=` in `stunedrev-chain/memory.sh`) and to the MDAGIFT volume are Giuseppe's; the scripts take them as arguments or variables.

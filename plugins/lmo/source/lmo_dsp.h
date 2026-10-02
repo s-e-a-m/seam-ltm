@@ -3,8 +3,9 @@
 //
 // sdt.lmo(4, f, d) of seam.tedesco.lib: per channel i (0..3), two bands of
 // noise, HP24 : LP24 at the same centre, one at f - d/2 + i (held >= 1 Hz),
-// one at f + d/2 + i; streams 0..3 of ONE multinoise(8) feed the low bands,
-// streams 4..7 the high ones; channel i = (low + high)/sqrt(2), times the
+// one at f + d/2 + i; streams 0..3 of ONE multinoise(72) feed the low bands,
+// streams 4..7 the high ones (sdt.lmonoise: blocks 1-2; block 3, streams
+// 8..71, is the choir's); channel i = (low + high)/sqrt(2), times the
 // density anchor sqrt(fs/96000), times volume and POWER.
 //
 // Everything that is time is seconds: the ramps (glide for f, 25 ms for
@@ -25,6 +26,7 @@ namespace lmo {
 
 constexpr int    kChannels   = 4;
 constexpr int    kOrder      = 24;        // the original's Butterworth order
+constexpr int    kStreams    = kChannels * (2 + 16);  // sdt.sscdo2streams(4): LMO + the choir's 16 bands per voice
 constexpr double kRefRate    = 96000.0;   // SSCDO#2 is played at 96 kHz
 constexpr double kShortRamp  = 0.025;     // s
 constexpr double kUpdateRate = 6000.0;    // Hz, filter redesign cadence
@@ -59,7 +61,7 @@ private:
 
 class Engine {
 public:
-    Engine() : noise_(2 * kChannels) {}
+    Engine() : noise_(kStreams, 0, 2 * kChannels) {}
 
     void prepare(double fs) {
         fs_ = fs;
@@ -138,7 +140,7 @@ private:
     int period_ = 16, countdown_ = 0;
     double fDesigned_ = -1.0, dDesigned_ = -1.0;
 
-    Seam::FaustMultinoise noise_;
+    Seam::MultinoiseBlock noise_;   // sdt.lmonoise(4)
     std::array<Band, 2 * kChannels> bands_;
     Seam::LinearRamp f_, d_, vol_, pow_;
 };
