@@ -306,7 +306,7 @@ Questions for Davide:
 2. The performance sample rate. **Answered: 96 kHz.**
 3. Which cue output and side carries each of LFU, RFD, RBU, LBD.
    (Inputs 5–8 and the output busses are now known: see Technical setup.)
-4. The shared noise seeds in LMO and choir: a sound to keep, or an oversight?
+4. The shared noise seeds in LMO and choir: a sound to keep, or an oversight? **Answered (2026-10-02): an oversight; the choir takes a third block of the noise, decorrelated from LMO's two (see "The choir" below).**
 
 For us:
 - The four "decision" verdicts of the content audit: seeding, `fi.dcblocker`, `fi.integrator`, `fi.svf.bp` at Nyquist.
@@ -397,3 +397,24 @@ After a rehearsal a decision is written in the report first (the card's state be
 
 ## C++ phase
 Continued in `logs/2026-10-01-sscdo2-plugins.md`.
+
+## The choir (2026-10-02)
+The choir's survey opens here; the C++ work stays in `logs/2026-10-01-sscdo2-plugins.md`.
+
+### Its noise: a third block
+Davide and Giuseppe (2026-10-02): the choir does not reuse an LMO generator; it takes a third block of noise, decorrelated from LMO's two blocks, so that the choir itself is decorrelated from them.
+
+What the original does, measured on the generator with a bit-exact model of `no.multinoise` (Python, scratch):
+- `no.multinoise(N)` is one 32-bit LCG stepped N times per sample, seed 12345. LMO steps it 8 times, each choir instance 16 times, from the same state, so every choir stream is an LMO stream taken every other sample: stream j < 8 of the choir equals LMO's stream j at sample 2n+1, stream j ≥ 8 equals LMO's stream j−8 at sample 2n, bit for bit. Lag-0 correlation does not see it; the numbers are the same.
+- The four choir instances share the seed, so the four channels carry the same noise; they differ only in f and a.
+- A different seed is not a different generator. From state 0, `x ← (x + c)·a` gives `x_m = c·(a + a² + … + a^m)`, linear in c: another seed is the same sequence times a constant mod 2^32. Against seed 12345, stream 0: seed 12346 r = +0.0008, 24690 (double) r = -0.2501, 37035 (triple) r = +0.3369, 54321 r = -0.0019. Small values are luck, not structure.
+- A window on one `no.multinoise(M)` read by every machine gives disjoint values: with LMO on streams 0–7 and the choir on 8–71 of one `multinoise(72)`, no choir value is ever emitted by LMO (0 %), max |r| 0.010 over 40 000 samples. Giuseppe's first form, the last N streams of `multinoise(M)` for the choir alone with LMO left at `multinoise(8)`, keeps lag-0 |r| at 0.015 but 100 % of its values are LMO's, at other instants: `multinoise(8)` consumes every value of the LCG, so the window works only if LMO reads from the same M.
+
+Decision (Giuseppe, 2026-10-02):
+- a SEAM operator `sno.multinoiseblock(M, o, N)`, streams o … o+N−1 of one `no.multinoise(M)`, which keeps the generative and deterministic structure of the standard multinoise;
+- one stream per voice: the choir is four voices, each a noise source through its own bank of 16 filters (source and filter, as a breath through its resonances), so its block has 4 streams and M = 12: LMO = `multinoiseblock(12, 0, 8)`, choir = `multinoiseblock(12, 8, 4)`; the original had one stream per band, 16 per instance;
+- LMO changes realisation (same statistics, not the noise of the merged 49d9255), and its C++ follows;
+- the period is 2^32/12 samples, 62 min at 96 kHz (2^32/8 = 93 min before).
+
+Open, the first point of the choir study: one stream per voice against one per band (4 against 64 streams). Distinct bands of one white noise are uncorrelated in expectation, and at Q = 350 the bands of a voice barely touch, so the two should sound the same; measure r between the voices of a channel and between channels, and render both for listening.
+Report: question 4 closed, new card `coro-voci` (to be tested), LMO chapter updated.

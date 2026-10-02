@@ -3,13 +3,14 @@
 LMO (\texttt{liveMultiOscs}) è il generatore del brano: una banda stretta di rumore per ciascuno dei quattro canali.
 La catena ha tre blocchi.
 Il rumore bianco viene da \texttt{no.multinoise} della libreria standard, con un flusso indipendente per ogni canale.
+I suoi otto flussi sono i primi due blocchi di un unico \texttt{no.multinoise(12)}, il cui terzo blocco va al coro (scheda~\ref{scheda:coro-voci}).
 Il filtro di banda è un passa-alto e un passa-basso di Butterworth di ordine 24 alla stessa frequenza, la riga scritta da Davide.
 Due oscillatori, cioè due bande, possono battere tra loro a una distanza $\Delta$ scelta dall'esecutore.
 Nella libreria SEAM le tre funzioni sono \texttt{sdt.lmoband}, \texttt{sdt.lmoosc} e \texttt{sdt.lmo(N, f, d)}.
 
 \begin{center}
 \begin{tikzpicture}[node distance=5mm and 9mm]
-\node[blocco] (n) {rumore bianco\\\texttt{no.multinoise(2N)}};
+\node[blocco] (n) {rumore bianco, blocchi 1--2\\\texttt{no.multinoise(3N)}};
 \node[blocco,above right=2mm and 9mm of n] (b1) {banda a $f-\Delta/2+k$\\HP24 : LP24};
 \node[blocco,below right=2mm and 9mm of n] (b2) {banda a $f+\Delta/2+k$\\HP24 : LP24};
 \node[blocco,below right=2mm and 9mm of b1] (s) {somma\\$\times 1/\sqrt{2}$};
@@ -48,7 +49,7 @@ Nella libreria SEAM le tre funzioni sono \texttt{sdt.lmoband}, \texttt{sdt.lmoos
 {fissi: un flusso di rumore indipendente per canale, scarto di $+i$~Hz sul canale $i$}
 {canali decorrelati}
 {due canali adiacenti hanno correlazione \misura{-0.007}{lmo-streams}, contro \misura{0.998}{lmo-streams} con un solo flusso condiviso: è questa decorrelazione ad aprire il suono nello spazio; lo scarto di 1 Hz da solo non separa nulla, perché la banda a 1 kHz è larga \misurau{73}{\hertz}{lmo-streams}}
-{invariato: l'originale ha già un flusso per canale}
+{l'originale ha già un flusso per canale; dal 2 ottobre 2026 gli otto flussi sono i blocchi 1 e 2 di un \texttt{no.multinoise(12)}, di cui il coro usa il blocco 3 (scheda~\ref{scheda:coro-voci}): la statistica resta la stessa, cambia la realizzazione}
 {\deciso}
 {\studio{lmo-streams}: A/B tra un flusso e più flussi, a quattro canali e in cuffia}
 

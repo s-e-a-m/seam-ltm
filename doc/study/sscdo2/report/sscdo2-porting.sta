@@ -3,15 +3,16 @@
 \contentsline {stato}{\statoentry {\daprovare }{Scheda 3\hskip 1em\relax Volume (CC81)}}{12}{scheda.3}%
 \contentsline {stato}{\statoentry {\deciso }{Scheda 4\hskip 1em\relax I quattro canali}}{12}{scheda.4}%
 \contentsline {stato}{\statoentry {\daprovare }{Scheda 5\hskip 1em\relax Il filtro di banda}}{12}{scheda.5}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 6\hskip 1em\relax Distanza (ritardo D)}}{13}{scheda.6}%
-\contentsline {stato}{\statoentry {\deciso }{Scheda 7\hskip 1em\relax Volume (CC82)}}{13}{scheda.7}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 8\hskip 1em\relax Canali 2 e 4: la finestra dinamica}}{14}{scheda.8}%
-\contentsline {stato}{\statoentry {\deciso }{Scheda 9\hskip 1em\relax L'integratore}}{14}{scheda.9}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 10\hskip 1em\relax I DC blocker}}{14}{scheda.10}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 11\hskip 1em\relax I quattro tempi ($\sqrt {2}$, $\mitvarphi $, $e$, $\mitpi $)}}{16}{scheda.11}%
-\contentsline {stato}{\statoentry {\domanda }{Scheda 12\hskip 1em\relax Ingresso (CC83) e uscita (CC84)}}{16}{scheda.12}%
-\contentsline {stato}{\statoentry {\deciso }{Scheda 13\hskip 1em\relax Le sezioni che cambiano}}{17}{scheda.13}%
-\contentsline {stato}{\statoentry {\deciso }{Scheda 14\hskip 1em\relax Memoria}}{17}{scheda.14}%
-\contentsline {stato}{\statoentry {\deciso }{Scheda 15\hskip 1em\relax POWER e RESET}}{17}{scheda.15}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 16\hskip 1em\relax Uscita del coro (CC86)}}{19}{scheda.16}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 17\hskip 1em\relax Master (CC88)}}{19}{scheda.17}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 6\hskip 1em\relax Distanza (ritardo D)}}{14}{scheda.6}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 7\hskip 1em\relax Volume (CC82)}}{14}{scheda.7}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 8\hskip 1em\relax Canali 2 e 4: la finestra dinamica}}{15}{scheda.8}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 9\hskip 1em\relax L'integratore}}{15}{scheda.9}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 10\hskip 1em\relax I DC blocker}}{15}{scheda.10}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 11\hskip 1em\relax I quattro tempi ($\sqrt {2}$, $\mitvarphi $, $e$, $\mitpi $)}}{17}{scheda.11}%
+\contentsline {stato}{\statoentry {\domanda }{Scheda 12\hskip 1em\relax Ingresso (CC83) e uscita (CC84)}}{17}{scheda.12}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 13\hskip 1em\relax Le sezioni che cambiano}}{18}{scheda.13}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 14\hskip 1em\relax Memoria}}{18}{scheda.14}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 15\hskip 1em\relax POWER e RESET}}{18}{scheda.15}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 16\hskip 1em\relax Le quattro voci e il loro rumore}}{20}{scheda.16}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 17\hskip 1em\relax Uscita del coro (CC86)}}{20}{scheda.17}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 18\hskip 1em\relax Master (CC88)}}{21}{scheda.18}%

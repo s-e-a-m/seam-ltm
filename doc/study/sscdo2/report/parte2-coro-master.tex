@@ -2,7 +2,27 @@
 \chapter{Coro e master}\label{cap:coro-master}
 Il coro (\texttt{pitchDetectorChoirMcAdams}) suona in quattro istanze, una per canale.
 Ogni istanza ha 16 bande: l'inviluppo della banda $k$ intorno a $f \cdot k$ modula un rumore filtrato intorno a $f \cdot k^{a}$, con $f$ = 48, 48, 96 e \qty{96}{\hertz}, $a$ = 1; 1,01; 1,1; 0,9, fattore di merito 350 e rilascio di \qty{1.5}{\second}.
-Lo studio del coro seguirà quello di stunedrev: la scheda qui sotto tiene il suo posto nel sistema.
+Lo studio del coro è aperto; la prima scheda fissa da dove viene il suo rumore, la seconda tiene il posto dell'uscita.
+
+\begin{center}
+\begin{tikzpicture}[node distance=5mm and 9mm]
+\node[blocco] (n) {\texttt{no.multinoise(12)}};
+\node[blocco,right=12mm of n,text width=4cm] (b2) {blocco 2, flussi 4--7\\LMO, banda alta};
+\node[blocco,above=3mm of b2,text width=4cm] (b1) {blocco 1, flussi 0--3\\LMO, banda bassa};
+\node[blocco,below=3mm of b2,text width=4cm] (b3) {blocco 3, flussi 8--11\\coro, una voce per canale};
+\draw[freccia] (n.east) -- ++(4mm,0) |- (b1.west); \draw[freccia] (n) -- (b2); \draw[freccia] (n.east) -- ++(4mm,0) |- (b3.west);
+\end{tikzpicture}\\[1mm]
+{\small Un solo generatore, tre blocchi disgiunti: nessun valore del rumore è usato da due macchine.}
+\end{center}
+
+\scheda{coro-voci}{Le quattro voci e il loro rumore}
+{fisso: un flusso di rumore per voce, cioè per canale, filtrato dalle 16 bande della voce; i quattro flussi sono il blocco 3 di un \texttt{no.multinoise(12)} di cui LMO usa i blocchi 1 e 2}
+{voci decorrelate tra loro e da LMO}
+{un coro di quattro voci, ognuna un fiato che passa per il proprio banco di risonanze (sorgente e filtro); i blocchi sono disgiunti per costruzione, qualunque sia l'istante in cui parte ciascun plugin; il generatore si ripete dopo $2^{32}/12$ campioni, \qty{62}{\minute} a \qty{96}{\kilo\hertz}}
+{nell'originale le quattro istanze avevano lo stesso seme, quindi lo stesso rumore, e ogni loro flusso era un flusso di LMO preso un campione sì e uno no: gli stessi numeri a istanti diversi (verificato bit per bit); un seme diverso non basta, perché con un altro seme l'LCG dà la stessa sequenza moltiplicata per una costante, con correlazione \misura{-0.2501}{log} per il seme doppio e \misura{+0.3369}{log} per il triplo; l'originale aveva un flusso per banda, 16 per istanza, qui uno per voce (domanda~\ref{q:semi})}
+{\daprovare}
+{lo studio del coro misura, come primo punto, un flusso per voce contro uno per banda (4 contro 64 flussi), con render per l'ascolto}
+
 
 \scheda{coro-uscita}{Uscita del coro (CC86)}
 {}
