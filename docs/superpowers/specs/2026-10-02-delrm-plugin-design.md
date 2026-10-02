@@ -201,7 +201,7 @@ CPU is measured at 96 and 192 kHz and written in the README.
 
 In this order, as the report rule asks (rehearsal decisions go into the report first, then the log, then `seam.tedesco.lib`):
 
-1. **Report** (`doc/study/sscdo2/report/`): card `delrm-dcblocker` → DECISO, without, judged by listening; card `delrm-volume` → DECISO, one output 0–1, the internal 0.9 no longer exists; questions `dcblocker` and `volume-delrm` closed; `make check` passes.
+1. **Report** (`doc/study/sscdo2/report/`): card `delrm-dcblocker` → DA PROVARE: without in the port, the rehearsal's listening (prova `delrm-dcblocker`) judges it; card `delrm-volume` → DECISO, one output 0–1, the internal 0.9 no longer exists; questions `dcblocker` and `volume-delrm` closed; `make check` passes.
 2. **Log** `logs/2026-10-02-sscdo2-delrm.md`: the decisions of this design and the work that follows.
 3. **`seam.tedesco.lib`** (faust-libraries): the delRM header comment records the dcblocker decision as taken; the volume is a plugin matter and stays out of the library.
 4. `plugins/delrm/doc/README.md`; the study `doc/study/sscdo2/delrm-plugin/` and its row in the index; the registry `doc/plugins.toml` (nineteen plugins, family "Works — SSCDO#2"), then `make -C doc doc`, `make -C doc test`, and `make -C doc publish` after Giuseppe's confirmation.
