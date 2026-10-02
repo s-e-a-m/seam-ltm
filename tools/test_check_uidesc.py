@@ -191,6 +191,41 @@ class TestNoTextDim(unittest.TestCase):
         self.assertIn("boxframe-color", errors[0])
 
 
+class TestValueBarDirection(unittest.TestCase):
+    """reverse-orientation flips how the mouse maps onto a CSlider, not the
+    value bar it draws: CSlider::draw reads only kDrawInverted
+    (draw-value-inverted). delrm's GR meters carried reverse-orientation and
+    still grew from the left (found in Reaper, 2026-10-02)."""
+
+    def _root(self, body):
+        import xml.etree.ElementTree as ET
+        return ET.fromstring(fixture(TITLE_OK + "\n" + body))
+
+    BAR = ('    <view class="CSlider" origin="0, 60" size="160, 10" control-tag="M"'
+           ' draw-value="true" draw-value-color="MeterFill"%s/>')
+
+    def test_plain_bar_passes(self):
+        self.assertEqual(check_uidesc.check_value_bar_direction(
+            self._root(self.BAR % ""), "p.uidesc"), [])
+
+    def test_inverted_bar_passes(self):
+        self.assertEqual(check_uidesc.check_value_bar_direction(
+            self._root(self.BAR % ' draw-value-inverted="true"'), "p.uidesc"), [])
+
+    def test_reverse_orientation_alone_on_a_value_bar_fails(self):
+        errors = check_uidesc.check_value_bar_direction(
+            self._root(self.BAR % ' reverse-orientation="true"'), "p.uidesc")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0].level, check_uidesc.ERROR)
+        self.assertIn("draw-value-inverted", errors[0])
+
+    def test_reverse_orientation_without_a_value_bar_passes(self):
+        body = ('    <view class="CSlider" origin="0, 60" size="160, 10"'
+                ' control-tag="M" reverse-orientation="true"/>')
+        self.assertEqual(check_uidesc.check_value_bar_direction(
+            self._root(body), "p.uidesc"), [])
+
+
 class TestFontColors(unittest.TestCase):
     def _root(self, body):
         import xml.etree.ElementTree as ET

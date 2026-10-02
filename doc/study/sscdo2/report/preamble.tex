@@ -82,6 +82,12 @@
   \refstepcounter{questione}\label{q:#1}%
   \par\noindent\domanda\ \textbf{Q\thequestione.}\ #2\par\medskip}
 
+% ---- a question answered: the question, then the answer and its date
+\newcommand{\questionechiusa}[3]{%
+  \refstepcounter{questione}\label{q:#1}%
+  \par\noindent\deciso\ \textbf{Q\thequestione.}\ #2\par
+  \noindent\textit{Risposta:} #3\par\medskip}
+
 % ---- let long monospace names break lines instead of overflowing
 \setlength{\emergencystretch}{2em}
 

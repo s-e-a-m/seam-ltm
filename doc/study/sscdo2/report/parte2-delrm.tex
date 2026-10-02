@@ -24,24 +24,24 @@ Nella libreria SEAM i blocchi sono \texttt{sdt.delrmcomb}, \texttt{sdt.delrmint}
 \scheda{delrm-distanza}{Distanza (ritardo D)}
 {da 0 a \qty{30}{\metre}; si regola durante il montaggio e resta ferma nel brano, e il piccolo click di un cambio è accettato}
 {\misurau{7.291}{\metre}{delrm-comb}, cioè \misura{2113}{delrm-comb} campioni a \qty{96}{\kilo\hertz}: i \qty{22}{\milli\second} di Davide}
-{il pettine alza e scava i parziali del suono secondo la distanza: a 7,291 m rinforza il terzo parziale del clarinetto contrabbasso di \misura{+6.0}{delrm-comb} dB e scava il settimo di \misura{-7.3}{delrm-comb} dB; a 10 m alza la fondamentale di \misura{+5.5}{delrm-comb} dB e toglie il quinto parziale, \misura{-17.3}{delrm-comb} dB; regolare il ritardo è regolare un timbro}
+{il pettine alza e scava i parziali del suono secondo la distanza: a 7,291 m rinforza il terzo parziale del clarinetto contrabbasso di \misura{+6.0}{delrm-comb} dB e scava il settimo di \misura{-7.3}{delrm-comb} dB; a 10 m alza la fondamentale di \misura{+5.5}{delrm-comb} dB e toglie il quinto parziale, \misura{-17.3}{delrm-comb} dB; regolare il ritardo è regolare un timbro; le linee del plugin sono dimensionate esattamente per \qty{30}{\metre}: \misura{1.06}{delrm-plugin}~MiB a \qty{384}{\kilo\hertz}}
 {l'originale usava secondi con \texttt{de.delay}; il porting usa il ritardo primo di DDELAY, in metri, così lo stesso strumento serve a SSCDO\#4; \S\ref{sec:principio-primi}}
 {\daprovare}
 {\studio{delrm-comb}: la nota del clarinetto a 5, 7,291 e 10 m, e la nota senza effetto}
 
 \scheda{delrm-volume}{Volume (CC82)}
-{fader lineare; secondo la lettura del patch agisce su uno stadio di guadagno di Pure Data}
-{da verificare: delRM ha anche un proprio volume interno, che nel wrapper di Pd parte da 0 e nel file \texttt{.dsp} da 0,9}
+{fader lineare da 0 a 1 nel plugin, mosso dal CC82, con una rampa di 25 ms}
+{0}
 {nessuna oltre al livello}
-{invariato; resta da capire quale dei due volumi il fader muove e con quale valore interno si suonava (domanda~\ref{q:volume-delrm})}
-{\domanda}
-{log di sessione, ``Build flags''}
+{l'originale aveva due volumi in serie, lo stadio di guadagno di Pd e il volume interno del \texttt{.dsp} (0 nel wrapper, 0,9 nel file); il porting ne tiene uno solo, e lo 0,9 interno non esiste più (domanda~\ref{q:volume-delrm})}
+{\deciso}
+{log di sessione, ``Build flags''; \file{logs/2026-10-02-sscdo2-delrm.md}; \studio{delrm-plugin}}
 
 \scheda{delrm-dinamica}{Canali 2 e 4: la finestra dinamica}
 {dipende dal guadagno dell'ASP880, cioè dal livello con cui il suono entra}
 {da trovare in sala}
 {il prodotto di tre segnali è cubico: 6 dB in più all'ingresso diventano 18 dB in più prima del compressore; sotto la soglia l'effetto cresce in fretta, sopra il compressore 11:1 lavora come un limitatore; circa 15 dB di dinamica del suonare separano l'effetto assente da quello saturo; i transitori superano l'attacco di 30 ms e toccano 0 dBFS con \misurau{+6}{\decibel}{delrm-rm} all'ingresso, prima del master}
-{il compressore è quello dell'originale, con gli stessi parametri}
+{il compressore è quello dell'originale, con gli stessi parametri; nel plugin, i meter GR dei canali 2 e 4 mostrano la riduzione di guadagno, da destra verso sinistra; il loro scorrere opposto a quello degli ingressi rende leggibile la finestra mentre si regola l'ASP880}
 {\daprovare}
 {\studio{delrm-rm}: ascolti del prodotto triplo dopo il compressore}
 
@@ -57,6 +57,6 @@ Nella libreria SEAM i blocchi sono \texttt{sdt.delrmcomb}, \texttt{sdt.delrmint}
 {due in serie nell'originale: uno alla fine di ogni canale, uno dopo il volume}
 {assenti nel porting}
 {con l'integratore SEAM non c'è componente continua da trattenere; a \qty{96}{\kilo\hertz} i DC blocker erano passa-alto a \misurau{76.59}{\hertz}{delrm-dcblock}, e in serie toglievano \misurau{17.63}{\decibel}{delrm-dcblock} alla fondamentale del clarinetto: il basso della performance era più sottile}
-{tolti perché il loro problema non esiste più (\S\ref{sec:principio-processo}); se Davide vuole quel basso più sottile, rientra come un passa-alto dichiarato, due \texttt{fi.dcblockerat(76.59)} in serie, come erano i due DC blocker}
-{\domanda}
+{tolti perché il loro problema non esiste più (\S\ref{sec:principio-processo}); il porting procede senza, e l'ascolto in prova decide se quel basso più sottile va ripreso, come due \texttt{fi.dcblockerat(76.59)} dichiarati (domanda~\ref{q:dcblocker})}
+{\daprovare}
 {\studio{delrm-dcblock}: A/B della nota senza e con i due DC blocker}

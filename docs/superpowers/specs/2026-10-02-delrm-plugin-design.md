@@ -147,7 +147,7 @@ HEADER   SEAM DELRM · comb and triple product, four channels
 OPS      [■] POWER
 FINE     distance   7.291 m
          output     0.00
-FOOTER   D  22.01 ms · 2113 samples @ 96 kHz
+FOOTER   D 22.01 ms 2113 samples @ 96 kHz
          in 1  ▮▮▮▮▮▮▮▯▯▯  −18 dB        ← rises to the right
          in 2  ▮▮▮▮▮▮▯▯▯▯  −21 dB
          in 3  ▮▮▮▮▮▮▮▯▯▯  −17 dB
@@ -163,7 +163,8 @@ The FOOTER shows D in ms and in samples at the session's rate (the 2026-09-29 de
 They serve the setting of the ASP880 gain.
 
 **GR 2, GR 4:** the deepest `gainDb()` of the compressor within each block, so short peaks are not lost, over 0 to −48 dB (about −38 dB at the recording's level, so the scale shows the strongest transients without hitting the floor), with the same 300 ms release toward 0 dB.
-They are drawn with `reverse-orientation="true"` (verified in VSTGUI's `sliderviewcreator.cpp`; a wrong attribute name is silently ignored, so the screenshot checks it too).
+They are drawn with `draw-value-inverted="true"`, the flag `CSlider::draw` reads (`kDrawInverted`).
+Corrected 2026-10-02 after the host check: the first version used `reverse-orientation="true"`, which VSTGUI reads but applies to the mouse and the handle only, so the bars still grew from the left; `tools/check-uidesc.py` now rejects that combination.
 They are the instrument of rehearsal card `delrm-dinamica`: GR near 0 while the cubic product is below threshold, the effect appearing; GR deep when the compressor works as a limiter, the effect saturated.
 
 **Transport:** the dslar and `seam_meter` idiom, read-only output parameters drawn as `CSlider` in `MeterFill`; no custom CView.

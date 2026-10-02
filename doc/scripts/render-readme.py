@@ -28,7 +28,7 @@ for fam in families:
 
 out.append("### Screenshots")
 out.append("")
-out.append("All eighteen windows, photographed after the UI standard landed, in the order")
+out.append("All nineteen windows, photographed after the UI standard landed, in the order")
 out.append("of the three families above.")
 out.append("")
 
