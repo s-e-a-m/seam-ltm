@@ -40,3 +40,10 @@ The whole suite passes but `uidesc_lint_selftest`, which waits for `docs/img/cho
 - Giuseppe in Reaper: everything works at 96 and at 48 kHz; CPU and memory very contained. The Release window shows no live-editor tab.
 - Screenshot `docs/img/choir.png`; registry entry CHOIR (twenty plugins), counts in `doc/scripts/test-doc.sh`, `render-readme.py`, `CLAUDE.md`; `make -C doc test` 13/13; uidesc lint 0/0; ctest 50/50.
 - `make -C doc publish` waits for Giuseppe's confirmation.
+
+## Release for Davide: `sscdo2-v0.4.0`
+
+Giuseppe asked for a package of the SSCDO#2 plugins alone, for Davide to download (2026-10-02).
+- Suite version 0.3.1 → 0.4.0 (four new plugins); the tag `sscdo2-v0.4.0`, not marked Latest, so v0.3.1 stays the release of the whole suite.
+- Contents: LMO, STUNEDREV, DELRM, CHOIR, each `<name>-0.4.0-macOS.vst3.zip`, and `seam-ltm-sscdo2-0.4.0-macOS.zip` with the four. Nothing else: the report has no choir yet (Giuseppe); the quarantine command is in the release notes. No `libseamcalbus.dylib`: none of the four uses the bus.
+- Full Release build, `ctest -C Release` 50/50 (minos_lint included); validator 47/47 on each; on the re-extracted bundles: version 0.4.0, `x86_64 arm64`, minos 11.0, `codesign --verify --deep --strict` ok.
