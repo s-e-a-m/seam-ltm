@@ -138,6 +138,22 @@ TEST_CASE("RESET silences the ringing bands; the request survives a stopped host
     CHECK(runSilence(e, 20 * 512) == 0.0);
 }
 
+TEST_CASE("RESET does not rewind the noise") {
+    // After a reset the bands start from zero but the noise goes on: the
+    // engine must differ from a fresh one fed the same signal, whose noise
+    // starts at the generator's beginning.
+    Engine a, b; settle(a, 96000.0); settle(b, 96000.0);
+    Source s0{Config(), 96000.0};
+    run(a, s0, 48000, 1);
+    a.requestReset();
+    Source sa{Config(), 96000.0}, sb{Config(), 96000.0};
+    auto ya = run(a, sa, 96000, 2048), yb = run(b, sb, 96000, 2048);
+    double d = 0.0;
+    for (int c = 0; c < 4; ++c)
+        for (size_t k = 0; k < ya[(size_t)c].size(); ++k) d = std::max(d, std::fabs(ya[(size_t)c][k] - yb[(size_t)c][k]));
+    CHECK(d > 0.0);
+}
+
 TEST_CASE("bands at or above 20 kHz are inactive, and the engine stays finite") {
     Config cfg; cfg.f = {{5000, 5000, 5000, 5000}}; cfg.a = {{1, 1, 1, 1}};
     Engine e(cfg); settle(e, 48000.0);

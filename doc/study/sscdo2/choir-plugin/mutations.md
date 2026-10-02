@@ -20,6 +20,7 @@ Each mutation was applied to the source one at a time with `sed`, only the named
 | choir_dsp_test | inactive bands computed, designed at their own centre | RED (non-finite: unstable above fs/2) |
 | choir_dsp_test | RESET clears the bands but keeps the followers | RED (RESET test) |
 | choir_dsp_test | display without the division by Q | RED (display test) |
+| choir_dsp_test | RESET also rewinds the noise (`noise_.reset()` in the reset branch) | RED ("RESET does not rewind the noise", added after the final review) |
 | choir_dsp_test | ScopedNoDenormals removed | RED (subnormal test) |
 | choir_params_test | Power and Output read from each other's slot in plain() | RED |
 | choir_state_test | missing fields filled with 0.9 instead of the defaults | RED (short blob) |

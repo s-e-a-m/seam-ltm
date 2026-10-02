@@ -24,7 +24,8 @@ Spec: `docs/superpowers/specs/2026-10-02-choir-plugin-design.md`; plan: `docs/su
 - Task 6, the plugin: FUID 0x5E4D0013, 20th plugin; VST3 validator 47/47; uidesc lint 0 errors.
 - Task 7: CPU 4.30 % of a core at 96 kHz for the engine (2.15 % at 48 kHz); mutation record; study `doc/study/sscdo2/choir-plugin/`; plugin README; report card `coro-uscita` (DA PROVARE).
 
-Every test verified by mutation (`doc/study/sscdo2/choir-plugin/mutations.md`): 18 mutations, all RED; the two on `choirdens` only at 48 kHz.
+Every test verified by mutation (`doc/study/sscdo2/choir-plugin/mutations.md`): 19 mutations, all RED; the two on `choirdens` only at 48 kHz.
+Final review (fresh reviewer, whole branch): no Critical, no Important; one gap raised to Important and fixed, the spec's "the noise is not rewound" had no test (now `RESET does not rewind the noise`, RED when the reset rewinds it). Deferred minors: the grid keeps the last bars after deactivation; RESET gives no visual feedback while the host is stopped; one active flag for both centres (the grid would grey a band whose voice alone is at 20 kHz); the 20 kHz rule keeps bands stable only for fs >= 40 kHz (never reached with the constants).
 The whole suite passes but `uidesc_lint_selftest`, which waits for `docs/img/choir.png`.
 
 ## Deferred to the end (with Giuseppe)
