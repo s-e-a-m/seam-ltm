@@ -18,7 +18,7 @@ import sys; sys.path.insert(0,'$HERE')
 import registry
 print(sum(len(f['plugin']) for f in registry.load()))
 ")"
-if [ "$n" -eq 18 ]; then ok "18 plugin nel registro"; else bad "18 plugin nel registro (trovati $n)"; fi
+if [ "$n" -eq 19 ]; then ok "19 plugin nel registro"; else bad "19 plugin nel registro (trovati $n)"; fi
 
 # il README deve essere gia rigenerato: se il registro e cambiato senza
 # rigenerare, le due copie sono gia divergenti
@@ -32,10 +32,10 @@ P="$TMP/_ltm/index.md"
 if [ -f "$P" ]; then ok "pagina generata"; else bad "pagina generata"; fi
 if grep -q '^permalink: /seam-ltm/$' "$P"; then ok "permalink"; else bad "permalink"; fi
 if grep -q '^generated_from: seam-ltm$' "$P"; then ok "provenienza"; else bad "provenienza"; fi
-if [ "$(grep -c '^### ' "$P")" -eq 18 ]; then ok "18 schede"; else bad "18 schede"; fi
+if [ "$(grep -c '^### ' "$P")" -eq 19 ]; then ok "19 schede"; else bad "19 schede"; fi
 if grep -q '### MULTIPINK' "$P"; then ok "MULTIPINK presente"; else bad "MULTIPINK presente"; fi
 if grep -q 'seam.ambisonics.lib' "$P"; then ok "rimando alla libreria Faust"; else bad "rimando alla libreria Faust"; fi
-if [ "$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')" -eq 18 ]; then ok "18 screenshot copiati"; else bad "18 screenshot copiati"; fi
+if [ "$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')" -eq 19 ]; then ok "19 screenshot copiati"; else bad "19 screenshot copiati"; fi
 
 # build e installazione restano nel README, non sul sito
 if ! grep -qi 'cmake' "$P"; then ok "niente istruzioni di build sul sito"; else bad "niente istruzioni di build sul sito"; fi

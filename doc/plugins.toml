@@ -160,3 +160,11 @@ The generator of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): on each of f
   faust = "seam.tedesco.lib"
   description = """
 The APF of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four independent lines of 42 Moorer all-pass sections in series, one per face of STONED, tuned by √2, φ, e and π. Each delay is a time in milliseconds moved to the next prime at the session's rate, so each face returns the sound on its own time scale, from seconds to minutes. One arena sized exactly at activation, and a RESET that empties it while playing"""
+
+  [[family.plugin]]
+  name = "DELRM"
+  io = "4ch → 4ch"
+  screenshot = "delrm.png"
+  faust = "seam.tedesco.lib"
+  description = """
+delRM of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four channels, each processing its own input. Channels 1 and 3 add the input to itself delayed; channels 2 and 4 multiply the delayed input, the input and its integral, into an 11:1 compressor. The delay is DDELAY's distance in metres moved to the next prime, one for the four channels. Input meters and the gain reduction of channels 2 and 4, drawn in opposite directions"""

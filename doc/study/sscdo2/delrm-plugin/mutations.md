@@ -49,3 +49,5 @@ The CPU check covers it, `cpu.cpp` in this folder (256-sample blocks, the test s
 | without (scratch copy of the header) | 2.04 % / 2.70 % | 4.03 % / 5.45 % |
 
 Without the guard the silent tail costs about six times more than with it, the subnormals filling the integrators and compressors; with it silence is cheaper than sound.
+
+The mutations were run on the Debug configuration of `build-test`; the two `seam_delays_test` rows were re-confirmed RED in Release, because a Debug build aborts `seam_delays_test` on the assert of its own clamp test.
