@@ -97,4 +97,8 @@ TEST_CASE("metresToPrimeSamples rounds to the millimetre before converting") {
     // 7.2914 m and 7.2906 m are both 7.291 m to the millimetre.
     CHECK(Seam::metresToPrimeSamples(7.2914, 96000.0, s) == 2113);
     CHECK(Seam::metresToPrimeSamples(7.2906, 96000.0, s) == 2113);
+    // 7.0372 m is 7.037 m to the millimetre. Rounded: n = 2038, prime above 2039.
+    // Unrounded: n = 2039 (itself prime), prime above 2053. Only the rounding
+    // gives 2039.
+    CHECK(Seam::metresToPrimeSamples(7.0372, 96000.0, s) == 2039);
 }
