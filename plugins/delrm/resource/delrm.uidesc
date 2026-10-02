@@ -105,7 +105,7 @@
         <view class="CSlider" origin="64, 356" size="160, 10" control-tag="Gr2"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="MeterFill"
-              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click" reverse-orientation="true"/>
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click" draw-value-inverted="true"/>
         <view class="CParamDisplay" origin="228, 354" size="52, 14" control-tag="Gr2"
               font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
         <view class="CTextLabel" origin="20, 372" size="40, 14" font="InfoFont"
@@ -113,7 +113,7 @@
         <view class="CSlider" origin="64, 374" size="160, 10" control-tag="Gr4"
               orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
               draw-value="true" draw-value-color="MeterFill"
-              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click" reverse-orientation="true"/>
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click" draw-value-inverted="true"/>
         <view class="CParamDisplay" origin="228, 372" size="52, 14" control-tag="Gr4"
               font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
 

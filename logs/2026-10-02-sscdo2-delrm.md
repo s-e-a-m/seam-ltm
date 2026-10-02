@@ -55,6 +55,14 @@ The two GREEN are equivalent mutants: the updated-envelope switch (equal for c >
 Run on Debug; the two `seam_delays_test` rows were re-confirmed RED in Release, since a Debug build aborts that test on its own clamp assert.
 CPU, 256-sample blocks: 96 kHz 2.02 % of a core on sound and 0.46 % on silence; 192 kHz 4.12 % and 0.91 %; without `ScopedNoDenormals` the silence costs 2.70 % and 5.45 %, about six times more.
 
+### Host check, first pass (Giuseppe, Reaper, 96 kHz)
+
+The GR meters grew from the left, like the inputs, instead of from the right.
+`reverse-orientation` sets `kRight` in the slider's style, which VSTGUI applies to the mouse and the handle; `CSlider::draw` fills the value bar from the left unless `kDrawInverted` is set, and that is `draw-value-inverted` (`cslider.cpp`, the `kDrawValue` branch).
+The task review had checked that VSTGUI reads the attribute, and the attribute is read: it only does something else.
+`delrm.uidesc` now uses `draw-value-inverted="true"` on GR 2 and GR 4, and `tools/check-uidesc.py` gained `check_value_bar_direction`, an ERROR for a `CSlider` value bar that carries `reverse-orientation` without `draw-value-inverted` (four unit tests; it flagged both GR rows before the fix).
+The footer line was cut at "96.0 kH": the text is wider than its 260 px view at `InfoFont` 12.
+
 ## Open
 
 - The host check in Reaper (Giuseppe): 96 kHz, `ccb_dry.wav` through the four channels, by ear against the `delrm-comb` and `delrm-rm` renders; the distance by hand; GR 2 and GR 4 against the inputs; the same session at 48 kHz; the output peaks of channels 2 and 4 on strong attacks; the screenshot for `docs/img/delrm.png`.

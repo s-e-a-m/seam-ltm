@@ -168,6 +168,29 @@ def check_no_textdim(root, path):
     return errors
 
 
+def check_value_bar_direction(root, path):
+    """A value bar that must grow from the right says draw-value-inverted.
+
+    reverse-orientation flips how the mouse and the handle map onto a
+    CSlider; CSlider::draw fills the value bar from the left unless
+    kDrawInverted (draw-value-inverted) is set. On a meter, then,
+    reverse-orientation alone looks right in the XML and draws the bar the
+    wrong way: delrm's gain-reduction meters did, in Reaper (2026-10-02).
+    """
+    errors = []
+    for view in root.iter("view"):
+        if view.get("class") != "CSlider" or view.get("draw-value") != "true":
+            continue
+        if (view.get("reverse-orientation") == "true"
+                and view.get("draw-value-inverted") != "true"):
+            errors.append(error(path, "CSlider %s: reverse-orientation does "
+                                      "not move its value bar — add "
+                                      "draw-value-inverted=\"true\" to fill "
+                                      "it from the right"
+                                % (view.get("control-tag") or "(untagged)")))
+    return errors
+
+
 def check_font_colors(root, path):
     """Every text-bearing view declares font-color, and it is TextLight.
 
@@ -617,6 +640,7 @@ def check_file(path):
     errors += check_palette(root, path)
     errors += check_no_textdim(root, path)
     errors += check_font_colors(root, path)
+    errors += check_value_bar_direction(root, path)
     errors += check_zone_order(root, path)
     return errors
 
