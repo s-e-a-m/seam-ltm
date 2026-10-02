@@ -50,12 +50,12 @@ Il secondo blocco è la catena (\studio{choir-chain}): analisi, voci, prodotto, 
 {\studio{choir-chain}}
 
 \scheda{coro-uscita}{Uscita del coro (CC86)}
-{}
-{}
-{non ancora studiato: lo studio seguirà quello di stunedrev}
-{}
+{fader lineare da 0 a 1, rampa di \qty{25}{\milli\second}; nel patch uno stadio di guadagno di Pure Data (\texttt{interpolator\_4ch})}
+{0}
+{il plugin ha un solo volume, \texttt{output}, mosso dal CC86; POWER spento lascia il coro in ascolto e porta l'uscita a zero; RESET zittisce le bande che suonano ancora (fino a \misurau{16.0}{\second}{choir-chain} a \qty{48}{\hertz}); la griglia mostra, banda per banda, che cosa il coro sta ascoltando}
+{come nel patch, con la rampa della suite}
 {\daprovare}
-{}
+{\studio{choir-plugin}}
 
 \section{Master}
 Il master chiude la catena e porta i quattro canali alle uscite 9--12, verso STONED.
