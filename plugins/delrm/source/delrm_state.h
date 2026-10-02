@@ -17,6 +17,8 @@ inline void writeState(Steinberg::IBStream* state, const ParamBox& box) {
     for (int i = 0; i < kNumParams; ++i) s.writeDouble(box.normalized((Param)i));
 }
 
+// Returns how many fields the blob held; every field is stored, the missing
+// ones as their defaults.
 inline int readState(Steinberg::IBStream* state, ParamBox& box) {
     double v[kNumParams];
     for (int i = 0; i < kNumParams; ++i) v[i] = defaultNormalized((Param)i);

@@ -37,3 +37,31 @@ TEST_CASE("applyTo sets the engine's distance, output and power") {
     const Seam::PrimeSieve s(sieveBound(96000.0));
     CHECK(e.delaySamples() == delayFor(10.0, 96000.0, s));
 }
+
+TEST_CASE("a negative output clamps to 0") {
+    ParamBox b;
+    b.store(Param::Output, -0.5);
+    CHECK(b.plain().output == 0.0);
+}
+
+TEST_CASE("the POWER threshold is 0.5") {
+    ParamBox b;
+    b.store(Param::Power, 0.49);
+    CHECK_FALSE(b.plain().power);
+    b.store(Param::Power, 0.5);
+    CHECK(b.plain().power);
+}
+
+TEST_CASE("NaN host values give finite, in-range plain values") {
+    const double nan = std::nan("");
+    ParamBox b;
+    b.store(Param::Distance, nan);
+    b.store(Param::Output, nan);
+    b.store(Param::Power, nan);
+    const Plain p = b.plain();
+    CHECK(std::isfinite(p.metres));
+    CHECK((p.metres >= 0.0 && p.metres <= 30.0));
+    CHECK(std::isfinite(p.output));
+    CHECK((p.output >= 0.0 && p.output <= 1.0));
+    CHECK_FALSE(p.power);
+}
