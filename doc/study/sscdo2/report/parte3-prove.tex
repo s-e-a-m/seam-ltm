@@ -73,9 +73,9 @@ Le domande seguono l'ordine delle schede; le risposte si annotano qui e nel log 
 
 \questione{semi}{Nell'originale il secondo oscillatore di LMO e le quattro istanze del coro condividono lo stesso seme del rumore, quindi producono lo stesso rumore: è un suono da tenere o una svista? (scheda~\ref{scheda:lmo-delta})}
 
-\questione{dcblocker}{Il basso più sottile che davano i due DC blocker di delRM va tenuto, come due passa-alto dichiarati a \qty{76.59}{\hertz} in serie? (scheda~\ref{scheda:delrm-dcblocker})}
+\questionechiusa{dcblocker}{Il basso più sottile che davano i due DC blocker di delRM va tenuto, come due passa-alto dichiarati a \qty{76.59}{\hertz} in serie? (scheda~\ref{scheda:delrm-dcblocker})}{il porting procede senza; si ascolta in prova e si valuta (prova~\ref{prova:delrm-dcblocker}). Giuseppe e Davide, 2 ottobre 2026, dopo la lettura di questo documento.}
 
-\questione{volume-delrm}{Secondo la lettura del patch il fader CC82 muove uno stadio di guadagno di Pd; il volume interno di delRM parte da 0 nel wrapper e da 0,9 nel file \texttt{.dsp}: con quale valore interno suonava delRM? (scheda~\ref{scheda:delrm-volume})}
+\questionechiusa{volume-delrm}{Secondo la lettura del patch il fader CC82 muove uno stadio di guadagno di Pd; il volume interno di delRM parte da 0 nel wrapper e da 0,9 nel file \texttt{.dsp}: con quale valore interno suonava delRM? (scheda~\ref{scheda:delrm-volume})}{nel porting c'è un solo volume, il fader \texttt{output} del plugin da 0 a 1, mosso dal CC82; lo 0,9 interno non esiste più. Giuseppe e Davide, 2 ottobre 2026.}
 
 \questione{filtro-lmo}{Per il filtro di banda di LMO va bene B, la tua riga sulle librerie aggiornate, o preferisci una delle altre versioni, A, C, C3, C2? (scheda~\ref{scheda:lmo-filtro})}
 

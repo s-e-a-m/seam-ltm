@@ -30,12 +30,12 @@ Nella libreria SEAM i blocchi sono \texttt{sdt.delrmcomb}, \texttt{sdt.delrmint}
 {\studio{delrm-comb}: la nota del clarinetto a 5, 7,291 e 10 m, e la nota senza effetto}
 
 \scheda{delrm-volume}{Volume (CC82)}
-{fader lineare; secondo la lettura del patch agisce su uno stadio di guadagno di Pure Data}
-{da verificare: delRM ha anche un proprio volume interno, che nel wrapper di Pd parte da 0 e nel file \texttt{.dsp} da 0,9}
+{fader lineare da 0 a 1 nel plugin, mosso dal CC82, con una rampa di 25 ms}
+{0}
 {nessuna oltre al livello}
-{invariato; resta da capire quale dei due volumi il fader muove e con quale valore interno si suonava (domanda~\ref{q:volume-delrm})}
-{\domanda}
-{log di sessione, ``Build flags''}
+{l'originale aveva due volumi in serie, lo stadio di guadagno di Pd e il volume interno del \texttt{.dsp} (0 nel wrapper, 0,9 nel file); il porting ne tiene uno solo, e lo 0,9 interno non esiste più (domanda~\ref{q:volume-delrm})}
+{\deciso}
+{log di sessione, ``Build flags''; \file{logs/2026-10-02-sscdo2-delrm.md}}
 
 \scheda{delrm-dinamica}{Canali 2 e 4: la finestra dinamica}
 {dipende dal guadagno dell'ASP880, cioè dal livello con cui il suono entra}
@@ -57,6 +57,6 @@ Nella libreria SEAM i blocchi sono \texttt{sdt.delrmcomb}, \texttt{sdt.delrmint}
 {due in serie nell'originale: uno alla fine di ogni canale, uno dopo il volume}
 {assenti nel porting}
 {con l'integratore SEAM non c'è componente continua da trattenere; a \qty{96}{\kilo\hertz} i DC blocker erano passa-alto a \misurau{76.59}{\hertz}{delrm-dcblock}, e in serie toglievano \misurau{17.63}{\decibel}{delrm-dcblock} alla fondamentale del clarinetto: il basso della performance era più sottile}
-{tolti perché il loro problema non esiste più (\S\ref{sec:principio-processo}); se Davide vuole quel basso più sottile, rientra come un passa-alto dichiarato, due \texttt{fi.dcblockerat(76.59)} in serie, come erano i due DC blocker}
-{\domanda}
+{tolti perché il loro problema non esiste più (\S\ref{sec:principio-processo}); il porting procede senza, e l'ascolto in prova decide se quel basso più sottile va ripreso, come due \texttt{fi.dcblockerat(76.59)} dichiarati (domanda~\ref{q:dcblocker})}
+{\daprovare}
 {\studio{delrm-dcblock}: A/B della nota senza e con i due DC blocker}

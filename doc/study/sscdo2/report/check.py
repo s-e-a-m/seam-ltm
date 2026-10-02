@@ -11,7 +11,7 @@ Rules:
    folder's *.md files (build/ excluded) or in the session log;
 2. every \\studio{folder} names an existing folder;
 3. every folder listed in ../README.md is cited by \\studio or \\misura;
-4. every required \\scheda, \\prova and \\questione id is present, and no
+4. every required \\scheda, \\prova and \\questione id is present (a \\questionechiusa counts), and no
    \\scheda has an empty state argument.
 """
 import os, re, sys, tempfile, shutil
@@ -124,6 +124,7 @@ def check(root, studies, log, required=True):
                 errors.append(f"{f}: missing the machine's chain figure (tikzpicture)")
         alltex = "\n".join(re.sub(r"(?<!\\)%.*", "", t) for t in tex.values())
         have = {m: {a[0] for a in args(alltex, m, n)} for m, n in (("scheda", 8), ("prova", 4), ("questione", 2))}
+        have["questione"] |= {a[0] for a in args(alltex, "questionechiusa", 3)}
         for m, req in (("scheda", REQUIRED_SCHEDE), ("prova", REQUIRED_PROVE), ("questione", REQUIRED_QUESTIONI)):
             for i in req:
                 if i not in have[m]:
