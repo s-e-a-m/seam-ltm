@@ -427,3 +427,13 @@ target_include_directories(seam_delays_test PRIVATE
 )
 target_compile_features(seam_delays_test PRIVATE cxx_std_17)
 add_test(NAME seam_delays_test COMMAND seam_delays_test)
+
+# seam_filters.h: sfi.leakyint; references in ref/seam_filters_ref.h
+# (doc/study/sscdo2/delrm-plugin/gen-ref.sh).
+add_executable(seam_filters_test seam_filters_test.cpp)
+target_include_directories(seam_filters_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_filters_test PRIVATE cxx_std_17)
+add_test(NAME seam_filters_test COMMAND seam_filters_test)
