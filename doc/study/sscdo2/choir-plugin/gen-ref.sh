@@ -39,3 +39,10 @@ OUT="$ROOT/tests/ref/seam_analyzers_ref.h"
   render follow.dsp 96000 1024 kFollowLate96 zero 191000
   echo "} // namespace analyzersref"; } > "$OUT"
 echo "wrote $OUT ($(wc -c < "$OUT") bytes)"
+
+OUT="$ROOT/tests/ref/choir_ref.h"
+{ banner; echo "namespace choirref {"
+  render choir.dsp 96000 2048 kChoir96 zero 288000
+  render choir.dsp 48000 1024 kChoir48 zero 144000
+  echo "} // namespace choirref"; } > "$OUT"
+echo "wrote $OUT ($(wc -c < "$OUT") bytes)"

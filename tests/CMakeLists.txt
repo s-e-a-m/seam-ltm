@@ -381,6 +381,15 @@ target_include_directories(lmo_dsp_test PRIVATE
 target_compile_features(lmo_dsp_test PRIVATE cxx_std_17)
 add_test(NAME lmo_dsp_test COMMAND lmo_dsp_test)
 
+add_executable(choir_dsp_test choir_dsp_test.cpp)
+target_include_directories(choir_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/choir/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(choir_dsp_test PRIVATE cxx_std_17)
+add_test(NAME choir_dsp_test COMMAND choir_dsp_test)
+
 add_executable(lmo_params_test lmo_params_test.cpp)
 target_include_directories(lmo_params_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
