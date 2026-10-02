@@ -458,3 +458,29 @@ target_include_directories(delrm_dsp_test PRIVATE
 )
 target_compile_features(delrm_dsp_test PRIVATE cxx_std_17)
 add_test(NAME delrm_dsp_test COMMAND delrm_dsp_test)
+
+add_executable(delrm_params_test delrm_params_test.cpp)
+target_include_directories(delrm_params_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/delrm/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(delrm_params_test PRIVATE cxx_std_17)
+add_test(NAME delrm_params_test COMMAND delrm_params_test)
+
+add_executable(delrm_state_test
+    delrm_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(delrm_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/delrm/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(delrm_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    target_link_libraries(delrm_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(delrm_state_test PRIVATE cxx_std_17)
+add_test(NAME delrm_state_test COMMAND delrm_state_test)
