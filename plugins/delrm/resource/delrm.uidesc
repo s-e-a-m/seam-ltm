@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="12"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="Structure" rgba="#888888ff"/>
+        <color name="MeterFill" rgba="#c8a24aff"/>
+    </colors>
+
+    <!-- S format: 300 px, one column at x=20 of width 260. Two fine controls
+         (distance, output) with POWER in OPS. No SETUP zone. Zone order
+         HEADER, OPS, FINE, FOOTER; the FOOTER carries D, six meters, logo. -->
+    <template name="view" class="CViewContainer" origin="0, 0" size="300, 510"
+              minSize="300, 510" maxSize="300, 510"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- ── HEADER ─────────────────────────────────────────────────── -->
+        <view class="CTextLabel" origin="0, 18" size="300, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM DELRM" transparent="true"/>
+        <view class="CTextLabel" origin="0, 46" size="300, 18" font="SubtitleFont"
+              font-color="TextLight" text-alignment="center" title="Studio sul Corpo d'Ombra #2" transparent="true"/>
+        <view class="CTextLabel" origin="0, 66" size="300, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="center"
+              title="comb and triple product &#xB7; four channels" transparent="true"/>
+
+        <!-- ── OPS ───────────────────────────────────────────────────────
+             POWER on means sounding. Box and caption centred on 150 as in
+             multipink. -->
+        <view class="CCheckBox" origin="121, 100" size="14, 14" control-tag="Power"
+              boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
+              title="" transparent="true"/>
+        <view class="CTextLabel" origin="139, 98" size="52, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="POWER" transparent="true"/>
+
+        <!-- ── FINE ─────────────────────────────────────────────────────── -->
+        <view class="CTextLabel" origin="20, 126" size="260, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="distance (m)" transparent="true"/>
+        <view class="CSlider" origin="20, 142" size="260, 18" control-tag="Distance"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 162" size="260, 16" font="ValueFont" control-tag="Distance"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="3" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="20, 184" size="260, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="output" transparent="true"/>
+        <view class="CSlider" origin="20, 200" size="260, 18" control-tag="Output"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack"
+              frame-width="1" mode="free click" transparent="false"/>
+        <view class="CTextEdit" origin="20, 220" size="260, 16" font="ValueFont" control-tag="Output"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="3" style-no-frame="true"/>
+
+        <!-- ── FOOTER — what the plugin reports, then the logo ──────────
+             D at the session's rate, input peaks of the four channels, and
+             the gain reduction of channels 2 and 4 (bars grow leftwards). -->
+        <view class="CView" custom-view-name="DelrmFooter" origin="20, 252" size="260, 16"/>
+        <view class="CTextLabel" origin="20, 276" size="40, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="in 1" transparent="true"/>
+        <view class="CSlider" origin="64, 278" size="160, 10" control-tag="In1"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="MeterFill"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CParamDisplay" origin="228, 276" size="52, 14" control-tag="In1"
+              font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
+        <view class="CTextLabel" origin="20, 294" size="40, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="in 2" transparent="true"/>
+        <view class="CSlider" origin="64, 296" size="160, 10" control-tag="In2"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="MeterFill"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CParamDisplay" origin="228, 294" size="52, 14" control-tag="In2"
+              font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
+        <view class="CTextLabel" origin="20, 312" size="40, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="in 3" transparent="true"/>
+        <view class="CSlider" origin="64, 314" size="160, 10" control-tag="In3"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="MeterFill"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CParamDisplay" origin="228, 312" size="52, 14" control-tag="In3"
+              font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
+        <view class="CTextLabel" origin="20, 330" size="40, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="in 4" transparent="true"/>
+        <view class="CSlider" origin="64, 332" size="160, 10" control-tag="In4"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="MeterFill"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CParamDisplay" origin="228, 330" size="52, 14" control-tag="In4"
+              font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
+        <view class="CTextLabel" origin="20, 354" size="40, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="GR 2" transparent="true"/>
+        <view class="CSlider" origin="64, 356" size="160, 10" control-tag="Gr2"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="MeterFill"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click" reverse-orientation="true"/>
+        <view class="CParamDisplay" origin="228, 354" size="52, 14" control-tag="Gr2"
+              font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
+        <view class="CTextLabel" origin="20, 372" size="40, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="left" title="GR 4" transparent="true"/>
+        <view class="CSlider" origin="64, 374" size="160, 10" control-tag="Gr4"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="MeterFill"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click" reverse-orientation="true"/>
+        <view class="CParamDisplay" origin="228, 372" size="52, 14" control-tag="Gr4"
+              font="InfoFont" font-color="TextLight" text-alignment="right" transparent="true" value-precision="1"/>
+
+        <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
+        <view class="CView" origin="30, 404" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Power"     tag="100"/>
+        <control-tag name="Distance"  tag="101"/>
+        <control-tag name="Output"    tag="102"/>
+        <control-tag name="In1"       tag="200"/>
+        <control-tag name="In2"       tag="201"/>
+        <control-tag name="In3"       tag="202"/>
+        <control-tag name="In4"       tag="203"/>
+        <control-tag name="Gr2"       tag="204"/>
+        <control-tag name="Gr4"       tag="205"/>
+    </control-tags>
+</vstgui-ui-description>
