@@ -30,8 +30,9 @@ One stream per voice, the bands of a voice:
 | 2 | 96 | 1.1 | 1.4e-03 (bands 15 and 16) | +0.0037 dB |
 | 3 | 96 | 0.9 | 2.3e-03 (bands 15 and 16) | +0.0103 dB |
 
-At Q = 350 the bands of a voice barely touch, so one stream per voice and one per band give the same voice: the level differs by 0.01 dB at most.
+At Q = 350 the bands of a voice are nearly uncorrelated and the level of the voice differs by 0.01 dB at most.
 The closest pair is the highest, bands 15 and 16, whose relative distance is the smallest.
+These two figures are integrals over the whole spectrum, dominated by the peaks: they do not say the two voices sound the same (see "Between the bands").
 
 How it depends on Q (the original's slider spans 10 to 1000):
 
@@ -43,7 +44,7 @@ How it depends on Q (the original's slider spans 10 to 1000):
 | 350 | 2.3e-03 | +0.010 dB |
 | 1000 | 2.6e-04 | +0.001 dB |
 
-The equivalence is a property of Q: from Q = 100 up the two choices agree within 0.16 dB, below 30 one stream per voice makes the bands of a voice correlated and louder.
+The agreement in level is a property of Q: from Q = 100 up the two choices agree within 0.16 dB, below 30 one stream per voice makes the bands of a voice correlated and louder.
 If Q ever becomes a performance control, this table says where the choice must be looked at again.
 
 Between channels, in the original (stream k feeds band k of every channel):
@@ -64,6 +65,25 @@ With the third block every voice has its own stream, and that band is uncorrelat
 The levels of the probes over 10 s (after 20 s of pre-roll) differ by up to 0.39 dB between the two choices: that is the estimation noise of so few degrees of freedom, and the exact figure is the one above.
 The probes sum the bands as they come out of `fi.svf.bp` (peak gain Q), hence levels above 0 dBFS; the original divides by Q·2π after the envelopes.
 
+### Between the bands
+Giuseppe heard the difference between `choir_v4_4ch.wav` and `choir_v64_4ch.wav` (2026-10-02): the residual noise between the bands, more present with one stream per band.
+The measures above could not see it.
+With one stream the 16 band-passes add as complex responses and form one filter: between two resonances the skirt of the lower band is near −90° and that of the upper near +90°, so they cancel and the sum has anti-resonances between the peaks (the reason parallel formant synthesisers alternate the polarity of their branches).
+With independent streams the skirts add in power and never cancel.
+
+Floor between bands k and k+1, one stream per voice against one per band (exact, from the frequency responses, at the geometric mean of the two centres):
+
+| channel | k = 1 … 15 (dB) |
+|---|---|
+| 0 | +2.4 +0.6 -1.1 -2.7 -4.4 -6.2 -8.3 -10.8 -14.3 -20.0 -25.6 -17.2 -11.6 -7.3 -3.1 |
+| 1 | +2.3 +0.5 -1.1 -2.7 -4.4 -6.2 -8.3 -10.8 -14.3 -20.0 -25.7 -17.2 -11.6 -7.3 -3.1 |
+| 2 | +1.9 +0.2 -1.3 -2.9 -4.5 -6.2 -8.3 -10.8 -14.3 -19.9 -26.6 -17.6 -11.8 -7.4 -3.2 |
+| 3 | +2.9 +0.9 -0.9 -2.6 -4.3 -6.2 -8.3 -10.9 -14.4 -20.1 -24.5 -16.7 -11.3 -7.2 -3.0 |
+
+In the renders, channel 0, mean floor between the bands relative to the mean peak: original −28.5 dB, one stream per voice −36.6 dB, one stream per band −26.7 dB.
+One stream per voice deepens the valleys between the partials by about 8–10 dB against the original; one stream per band keeps the original's floor.
+The choice between them is musical, not neutral: isolated, more pitched partials against the breath between them.
+
 ### Mutation
 `measure.py` with Q = 3.5, wide bands that overlap: max |r| 0.95 within a voice and +7.5 dB on the sum, so the measure sees correlation when there is some.
 The Q table above is the same check, graded.
@@ -77,7 +97,7 @@ The Q table above is the same check, graded.
 | `choir_v4_4ch.wav`, `choir_v4_ch01_stereo.wav` | one stream per voice, `sdt.choirnoise(4)` (the decision) | −0.009 |
 | `choir_v64_4ch.wav`, `choir_v64_ch01_stereo.wav` | one stream per band, 64 streams | −0.003 |
 
-`v4` against `v64` is the question of this study: they should sound the same.
+`v4` against `v64` is the question of this study: they differ in the noise between the bands (above).
 `vo` against `v4` lets one hear what the shared band 1 did between channels 0 and 1.
 
 ## Files
@@ -85,7 +105,7 @@ The Q table above is the same check, graded.
 |---|---|
 | `probes.dsp` | the voices in three versions (`vo_c`, `v4_c`, `v64_c`, channel c) and the band filter alone (`bp48`) |
 | `run.sh` | builds the probes with the offline harness of `../lmo-bandfilter/` and runs `measure.py` |
-| `measure.py` | the model check, the exact correlations, the probe levels and the Q table above |
+| `measure.py` | the model check, the exact correlations, the probe levels, the Q table and the floor between the bands |
 | `render.py` | the listening files in `renders/` (committed: 30 MB) |
 
 Requirements as for `../lmo-bandfilter/` (faust, a C++17 compiler, the seam-ltm `.venv` with numpy, scipy and soundfile, a faustlibraries clone in `NEW_LIBS`).

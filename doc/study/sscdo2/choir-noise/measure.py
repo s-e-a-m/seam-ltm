@@ -82,3 +82,19 @@ for q in (10, 30, 100, 350, 1000):
         worst_r = max(worst_r, np.abs(R[~np.eye(16, dtype=bool)]).max())
         worst_l = max(worst_l, 10 * np.log10(G.sum() / np.trace(G)))
     print(f"| {q} | {worst_r:.1e} | {worst_l:+.3f} dB |")
+
+# 6. the noise BETWEEN the bands. With one stream the 16 band-passes add as
+#    complex responses, one filter: between two resonances the skirts are near
+#    -90 and +90 degrees and cancel (anti-resonances); with independent streams
+#    they add in power. r and the total level are dominated by the peaks and
+#    cannot see this; the ear can (Giuseppe, listening to the renders).
+from scipy.signal import freqz
+Q = 350.0
+print("\n| channel | floor between bands k and k+1, one stream vs 16 (dB), k = 1..15 |")
+print("|---|---|")
+for c, (f, a) in enumerate(CH):
+    fr = [f * (k + 1) ** a for k in range(16)]
+    w = 2 * np.pi * np.array([np.sqrt(fr[k] * fr[k + 1]) for k in range(15)]) / SR
+    Hs = np.array([freqz(*svf_bp(x), worN=w)[1] for x in fr])
+    d = 20 * np.log10(np.abs(Hs.sum(0))) - 10 * np.log10((np.abs(Hs) ** 2).sum(0))
+    print(f"| {c} | {' '.join(f'{v:+.1f}' for v in d)} |")

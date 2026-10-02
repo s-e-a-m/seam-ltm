@@ -429,3 +429,8 @@ At Q = 350 the bands of a voice correlate by 2.3e-03 at most and the voice's lev
 The equivalence belongs to Q: 0.155 dB at Q = 100, 1.377 dB at Q = 30; Q is fixed at 350 by the wrapper's initialisation.
 In the original the channels were already almost uncorrelated as wholes (r 0.0256 at most), since f and a differ; band 1 of channels 0–1 (48 Hz) and 2–3 (96 Hz) was the same signal in two drivers.
 Renders committed for listening: original, one stream per voice, one per band. The card `coro-voci` stays to be tested until Giuseppe and Davide have listened.
+
+Correction, same day: Giuseppe heard a difference between `choir_v4_4ch.wav` and `choir_v64_4ch.wav`, the residual noise between the bands, and "the two choices give the same voice" was wrong.
+r and the total level are integrals dominated by the peaks; with one stream the 16 band-passes add as complex responses and cancel between the resonances (skirts near −90° and +90°), so the floor between bands drops by up to 25.6 dB against one stream per band (exact, from the frequency responses).
+Renders, channel 0, floor between the bands relative to the peaks: original −28.5 dB, one stream per voice −36.6 dB, one per band −26.7 dB.
+One stream per voice or per band is therefore a musical choice (isolated partials against the breath between them), open for Giuseppe and Davide; the card `coro-voci` says so. The block of the choir stays the third; only its size (4 or 64 streams, M = 12 or 72) depends on the choice.

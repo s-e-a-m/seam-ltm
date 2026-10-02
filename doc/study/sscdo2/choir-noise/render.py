@@ -51,3 +51,14 @@ with open(os.path.join(R, "render-log.md"), "w") as fh:
              f"{TARGET:.0f} dBFS RMS over all, 20 ms fades, 24-bit.\n\n"
              "| files | version | r(0,1) | RMS per channel (dBFS) |\n|---|---|---|---|\n" + "\n".join(rows) + "\n")
 print(open(os.path.join(R, "render-log.md")).read())
+
+# the floor between the bands, channel 0 (f = 48 Hz, a = 1), relative to the peaks
+with open(os.path.join(R, "render-log.md"), "a") as fh:
+    fh.write("\nChannel 0, mean floor between the bands (median of 0.3-0.7 of each gap) relative to the mean peak:\n\n| version | floor re peaks |\n|---|---|\n")
+    for p, _ in PROBES:
+        x = sig[p][:, 0]
+        S = np.abs(np.fft.rfft(x * np.hanning(len(x)))) ** 2; f = np.fft.rfftfreq(len(x), 1 / SR)
+        pk = np.mean([S[np.argmin(np.abs(f - 48 * k))] for k in range(1, 17)])
+        fl = np.mean([np.median(S[(f > 48 * (k + 0.3)) & (f < 48 * (k + 0.7))]) for k in range(1, 16)])
+        fh.write(f"| `{p}` | {10 * math.log10(fl / pk):.1f} dB |\n")
+print(open(os.path.join(R, "render-log.md")).read())
