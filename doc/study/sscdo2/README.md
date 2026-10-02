@@ -31,7 +31,7 @@ Every check is verified by mutation: the study breaks the code on purpose and sh
 | LMO | the C++ plugin | `lmo-plugin/` | `plugins/lmo`, equal to `sdt.lmo` within 1e-13 of the peak | none |
 | stunedrev | the C++ plugin | `stunedrev-plugin/` | `plugins/stunedrev`, equal to `sdt.stunedrev` within 2e-15 of the peak; `seam_moorer.h`, `seam_primes.h` | none |
 | delRM | the C++ plugin | `delrm-plugin/` | `plugins/delrm`, equal to `sdt.delrm*` within 6e-16 of the peak; `seam_delays.h`, `seam_filters.h`, `seam_compressors.h` | none |
-| choir | 1, the noise | `choir-noise/` | block 3 of one `multinoise(12)` (`sdt.choirnoise`); one stream per voice or per band is a musical choice: 8–10 dB deeper valleys between the partials | A/B original, per voice, per band, committed |
+| choir | 1, the noise | `choir-noise/` | block 3 of one `multinoise(72)`, one stream per band, 64 (`sdt.choirnoise`); one per voice would add 11 dB of broadband noise and deepen the valleys between partials | A/B original, per voice, per band, committed |
 
 ## Audio
 Short renders are committed: in those folders `renders/.gitignore` makes the exception (`!*.wav`) to the root rule that excludes `*.wav`.

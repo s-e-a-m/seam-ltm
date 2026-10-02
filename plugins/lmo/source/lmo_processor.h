@@ -8,7 +8,7 @@
 //
 //   lmoband(f)  = fi.highpass(24, f) : fi.lowpass(24, f - 0.0001);
 //   lmodens     = sqrt(ma.SR/96000);
-//   lmonoise(N) = sno.multinoiseblock(3*N, 0, 2*N);   // blocks 1-2 of 3
+//   lmonoise(N) = sno.multinoiseblock(N*(2 + 16), 0, 2*N);   // blocks 1-2 of 3
 //   lmo(N,f,d)  = lmonoise(N)
 //               : par(i, N, lmoband(max(1, f - d/2 + i))),
 //                 par(i, N, lmoband(f + d/2 + i))

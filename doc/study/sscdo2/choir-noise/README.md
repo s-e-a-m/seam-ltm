@@ -2,10 +2,12 @@
 
 Part of the SSCDO#2 port (`logs/2026-09-29-sscdo2-ricognizione.md`, "The choir"), the first block of the choir's survey.
 
-Davide and Giuseppe decided (2026-10-02) that the choir takes a third block of noise, decorrelated from LMO's two: one `no.multinoise(12)`, LMO on streams 0–7, the choir on 8–11 (`sdt.lmonoise`, `sdt.choirnoise`, on `sno.multinoiseblock`).
-Giuseppe proposed one stream per voice: a choir of four voices, each a breath through its own bank of 16 resonances (source and filter).
+Davide and Giuseppe decided (2026-10-02) that the choir takes a third block of noise, decorrelated from LMO's two (`sdt.lmonoise`, `sdt.choirnoise`, on `sno.multinoiseblock`).
+Giuseppe first proposed one stream per voice: a choir of four voices, each a breath through its own bank of 16 resonances (source and filter), block 3 of a `no.multinoise(12)`.
 The original had one stream per band, 16 per instance, the same 16 in all four instances.
 This study measures what one stream per voice changes against one per band, and what the original's shared streams did between channels.
+
+**Decision (Giuseppe, after listening and the spectrum analyser): one stream per band.** The choir's block has 64 streams, one `no.multinoise(72)`: LMO on streams 0–7, the choir on 8–71, voice c on 8 + 16c to 23 + 16c (`v64` here, `sdt.choirnoise(4)`).
 
 ## What a voice is
 Each of the four instances of `pitchDetectorChoirMcAdams` has 16 bands: the envelope of the input around `f·k` modulates noise filtered by `fi.svf.bp(f·k^a, 350)`, k = 1…16; f = 48, 48, 96, 96 Hz and a = 1, 1.01, 1.1, 0.9 on channels 0–3.
@@ -113,8 +115,8 @@ The Q table above is the same check, graded.
 | files | version | r(0,1) over 6 s |
 |---|---|---|
 | `choir_vo_4ch.wav`, `choir_vo_ch01_stereo.wav` | the original: the same 16 streams in every channel | +0.018 |
-| `choir_v4_4ch.wav`, `choir_v4_ch01_stereo.wav` | one stream per voice, `sdt.choirnoise(4)` (the decision) | −0.009 |
-| `choir_v64_4ch.wav`, `choir_v64_ch01_stereo.wav` | one stream per band, 64 streams | −0.003 |
+| `choir_v4_4ch.wav`, `choir_v4_ch01_stereo.wav` | one stream per voice, block 3 of `multinoise(12)` | −0.009 |
+| `choir_v64_4ch.wav`, `choir_v64_ch01_stereo.wav` | one stream per band, `sdt.choirnoise(4)` (the decision) | −0.003 |
 
 `v4` against `v64` is the question of this study: they differ in the noise between the bands (above).
 `vo` against `v4` lets one hear what the shared band 1 did between channels 0 and 1.

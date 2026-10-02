@@ -7,8 +7,8 @@ usage (from this folder, after ./run.sh has built the probes):
 The 16 noise bands of each voice, without the envelopes of the input, so
 that only the noise is heard, in three versions (probes.dsp):
   vo   the original: the four channels carry the same 16 streams
-  v4   one stream per voice, block 3 of multinoise(12) (the decision)
-  v64  one stream per band, 64 streams of multinoise(72)
+  v4   one stream per voice, block 3 of multinoise(12)
+  v64  one stream per band, sdt.choirnoise(4), block 3 of multinoise(72) (the decision)
 6 s at 96 kHz after a 20 s pre-roll (the bands take seconds to form, Q = 350),
 as four channels (LFU, RFD, RBU, LBD) and as channels 0 and 1 in a stereo
 pair for headphones, where the correlation between voices is heard as width.
@@ -23,8 +23,8 @@ B = os.path.join(HERE, "build")
 R = os.path.join(HERE, "renders")
 SR, SEC, PRE, TARGET = 96000, 6, 20, -20.0
 PROBES = [("vo", "the original: the same 16 streams in every channel"),
-          ("v4", "one stream per voice, `sdt.choirnoise(4)`"),
-          ("v64", "one stream per band, 64 streams")]
+          ("v4", "one stream per voice, block 3 of `multinoise(12)`"),
+          ("v64", "one stream per band, `sdt.choirnoise(4)` (the decision)")]
 
 def get(p, c):
     out = os.path.join(B, f"r_{p}_{c}.f64")

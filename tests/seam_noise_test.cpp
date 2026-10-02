@@ -18,21 +18,21 @@ TEST_CASE("FaustMultinoise(8) equals no.multinoise(8) bit for bit") {
     CHECK(mismatches == 0);
 }
 
-TEST_CASE("MultinoiseBlock(12, 8, 4) equals sdt.choirnoise(4) bit for bit") {
-    Seam::MultinoiseBlock nz(12, 8, 4);
-    double v[4];
+TEST_CASE("MultinoiseBlock(72, 8, 64) equals sdt.choirnoise(4) bit for bit") {
+    Seam::MultinoiseBlock nz(72, 8, 64);
+    double v[64];
     int mismatches = 0;
-    for (int k = 0; k < 512; ++k) {
+    for (int k = 0; k < 128; ++k) {
         nz.tick(v);
-        for (int c = 0; c < 4; ++c)
+        for (int c = 0; c < 64; ++c)
             if (v[c] != lmoref::kChoirNoise[c][k]) ++mismatches;
     }
     CHECK(mismatches == 0);
 }
 
 TEST_CASE("blocks of one generator never share a value") {
-    Seam::MultinoiseBlock lmo(12, 0, 8), choir(12, 8, 4);
-    double a[8], b[4];
+    Seam::MultinoiseBlock lmo(72, 0, 8), choir(72, 8, 64);
+    double a[8], b[64];
     std::set<double> seen;
     for (int k = 0; k < 4096; ++k) { lmo.tick(a); for (double x : a) seen.insert(x); }
     int shared = 0;

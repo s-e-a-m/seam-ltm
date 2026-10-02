@@ -8,10 +8,10 @@ sdt = library("seam.tedesco.lib");
 F(c) = ba.take(c+1, (48, 48, 96, 96));
 A(c) = ba.take(c+1, (1, 1.01, 1.1, 0.9));
 bands(c) = par(k, 16, fi.svf.bp(F(c) * pow(k+1, A(c)), 350));
-// one stream per voice: block 3 of the SSCDO#2 noise, multinoise(12)
-v4(c)  = sdt.choirnoise(4) : ba.selectn(4, c) <: bands(c) :> _;
-// one stream per band: 64 streams after LMO's 8, multinoise(72)
-v64(c) = sno.multinoiseblock(72, 8 + 16*c, 16) : bands(c) :> _;
+// one stream per voice: block 3 of a multinoise(12) (the alternative)
+v4(c)  = sno.multinoiseblock(12, 8, 4) : ba.selectn(4, c) <: bands(c) :> _;
+// one stream per band: block 3 of the SSCDO#2 noise, multinoise(72) (the decision)
+v64(c) = sdt.choirnoise(4) : par(i, 64, _) : route(64, 16, par(k, 16, (16*c + k + 1, k + 1))) : bands(c) :> _;
 // the original: every instance calls no.multinoise(16) from the same state,
 // so the four channels carry the same 16 streams
 vo(c) = no.multinoise(16) : bands(c) :> _;

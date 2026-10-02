@@ -3,8 +3,8 @@
 | files | version | r(0,1) | RMS per channel (dBFS) |
 |---|---|---|---|
 | `choir_vo_4ch.wav`, `choir_vo_ch01_stereo.wav` | the original: the same 16 streams in every channel | +0.018 | -21.5 / -21.9 / -17.7 / -20.1 |
-| `choir_v4_4ch.wav`, `choir_v4_ch01_stereo.wav` | one stream per voice, `sdt.choirnoise(4)` | -0.009 | -22.0 / -22.0 / -18.0 / -19.8 |
-| `choir_v64_4ch.wav`, `choir_v64_ch01_stereo.wav` | one stream per band, 64 streams | -0.003 | -21.7 / -21.6 / -17.9 / -19.8 |
+| `choir_v4_4ch.wav`, `choir_v4_ch01_stereo.wav` | one stream per voice, block 3 of `multinoise(12)` | -0.009 | -22.0 / -22.0 / -18.0 / -19.8 |
+| `choir_v64_4ch.wav`, `choir_v64_ch01_stereo.wav` | one stream per band, `sdt.choirnoise(4)` (the decision) | -0.003 | -21.7 / -21.6 / -17.9 / -19.8 |
 
 Channel 0, mean floor between the bands (median of 0.3-0.7 of each gap) relative to the mean peak:
 
