@@ -90,6 +90,9 @@ public:
         len_ = 0;
         delay_.store(0);
         sampleRate_.store(0.0);
+        // the meters fall to the floor with the engine, they do not freeze
+        for (int c = 0; c < kChannels; ++c) { heldPeak_[c] = blockPeak_[c] = 0.0; }
+        for (int r = 0; r < 2; ++r) { heldGr_[r] = blockGr_[r] = 0.0; }
     }
 
     // Every ramp onto its target (setActive, after the recalled values).

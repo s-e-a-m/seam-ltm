@@ -21,6 +21,8 @@
 // in dB with half the attack time. The attack/release switch compares |x|
 // with the envelope's PREVIOUS value. gainDb() is the knee's output, the
 // gain the sample was just multiplied by: a gain-reduction meter reads it.
+// Callers wrap process in seam_denormals.h ScopedNoDenormals: the envelope
+// and the knee stall at subnormals in silence.
 // Written 2026-10-02 for SSCDO#2's delRM (ratio 11, -24 dB, 30 ms, 40 ms).
 //──────────────────────────────────────────────────────────────────────────
 #pragma once

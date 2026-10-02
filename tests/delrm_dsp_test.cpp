@@ -161,10 +161,15 @@ TEST_CASE("before prepare and after release, process writes zeros") {
     e.process(in, out, 32);
     for (auto& ch : y) for (double v : ch) CHECK(v == 0.0);
     settle(e, 96000.0);
+    for (int b = 0; b < 8; ++b) e.process(in, out, 32);     // some signal first
+    REQUIRE(e.inputPeak(0) > 0.0);
     e.release();
     for (auto& ch : y) for (double& v : ch) v = 9.0;
     e.process(in, out, 32);
     for (auto& ch : y) for (double v : ch) CHECK(v == 0.0);
+    // the meters fall to the floor with the engine, they do not freeze
+    CHECK(e.inputPeak(0) == 0.0);
+    CHECK(e.reductionDb(0) == 0.0);
 }
 
 TEST_CASE("silence after the loud part: exact zeros, never NaN, GR back toward 0") {

@@ -3,7 +3,9 @@
 DELRM is the delRM of *Studio sul Corpo d'Ombra #2* (Alice Cortegiani, Davide Tedesco), ported from the Pure Data patch for Giuseppe Silvi's performance.
 It has four channels, and each channel processes only its own input from the TETRAREC.
 Channels 1 and 3 are a feed-forward comb: the input added to itself delayed by D.
-Channels 2 and 4 multiply three signals, the input delayed by D, the input and its integral, and pass the product through an 11:1 compressor that works as a limiter near −20 dBFS.
+Channels 2 and 4 multiply three signals, the input delayed by D, the input and its integral, and pass the product through an 11:1 compressor that works as a limiter near −20 dBFS in steady state.
+Onsets pass well above 0 dBFS for 10 to 30 ms before the compressor clamps them: a sine onset after silence peaked at +21 to +43 dBFS on channel 2 (100 Hz at −14 dBFS: +21; 100 Hz at −6 dBFS: +43; 440 Hz at −6 dBFS: +32; 1 kHz at −6 dBFS: +27), against a steady level of −12 to −15 dBFS.
+This is the behaviour of the original and of the specification, so the master chain needs a brickwall limiter.
 Inputs and outputs 1–4 are in the order of the original.
 
 ## Parameters
@@ -18,7 +20,7 @@ Six read-only meters sit in the footer.
 `in 1`–`in 4` show the peak of each input over −70 to +5 dB, instant attack and 300 ms release, to set the gain of the ASP880.
 `GR 2` and `GR 4` show the gain reduction of the compressors over 0 to −48 dB, the deepest value of each block, with the same release.
 The GR bars are drawn right to left, opposite to the inputs: the input rising and the compressor descending read as two opposite movements, and the window of rehearsal card `delrm-dinamica` is legible while the ASP880 is set.
-GR near 0 dB means the product is still below the threshold and the effect is appearing; GR deep means the compressor works as a limiter and the effect is saturated.
+GR near 0 dB means the product is still below the threshold and the effect is appearing; GR deep means the compressor works as a limiter and the effect is saturated (in steady state; the onsets still pass above 0 dBFS, see the top of this page).
 
 ## The distance
 
@@ -53,6 +55,8 @@ Decided with Davide on 2026-10-02:
 ## Specification
 
 The DSP is `sdt.delrmcomb`, `sdt.delrmint`, `sdt.delrmrm` and `sdt.delrmdyn` of `seam.tedesco.lib` (faust-libraries), written again by hand in `source/delrm_dsp.h`:
+
+In the block below `mt` is the distance entry, and `process` is from `doc/study/sscdo2/delrm-plugin/dsp/delrm.dsp`.
 
 ```
 imt2npsamp(mt) = select2(n < 2, n : sff.np, n)

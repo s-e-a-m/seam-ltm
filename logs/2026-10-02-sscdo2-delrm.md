@@ -15,15 +15,23 @@ Spec: `docs/superpowers/specs/2026-10-02-delrm-plugin-design.md`; plan: `docs/su
 
 The plan's ten tasks, as done on the branch `delrm-plugin`, each with its tests verified by mutation:
 
-1. Session log and the metres rule in `seam_primes.h` (`metresToPrimeSamples`, DDELAY's rounding and 331.4 m/s).
-2. `seam_delays.h`, `Seam::IntegerDelay` equal to `de.delay`.
-3. `seam_filters.h`, `Seam::LeakyIntegrator` equal to `sfi.leakyint(1)`.
-4. `seam_compressors.h`, `Seam::CompressorMono` equal to `co.compressor_mono`, `gainDb()` for the meter.
-5. The engine `delrm_dsp.h`, four channels, equal to `sdt.delrm*` at 96 and 48 kHz and across a change of distance, with block meters.
-6. `ParamBox` of atomics and the append-only state.
-7. The processor, the footer with D, the S window with the four input meters and the two GR meters.
-8. The mutation record and the CPU measurement.
-9. This documentation: plugin README, study README, registry (nineteen plugins), log, report.
+1. Decisions in the report, the log and the library; the interior speed of sound and the millimetre rounding fixed before any code.
+2. `metresToPrimeSamples` in `seam_primes.h` (DDELAY's rounding and 331.4 m/s) and `seam_delays.h`, `Seam::IntegerDelay` equal to `de.delay`.
+3. The Faust references: `gen-ref.sh` and `refdump` render the specification offline, and three reference headers hold the bit-exact windows.
+4. `seam_filters.h`, `Seam::LeakyIntegrator` equal to `sfi.leakyint(1)`.
+5. `seam_compressors.h`, `Seam::CompressorMono` equal to `co.compressor_mono`, `gainDb()` for the meter.
+6. The engine `delrm_dsp.h`, four channels, equal to `sdt.delrm*` at 96 and 48 kHz and across a change of distance, with block meters.
+7. `ParamBox` of atomics and the append-only state.
+8. The processor, the footer with D, the S window with the four input meters and the two GR meters, and the build.
+9. The mutation record and the CPU measurement.
+10. This documentation: plugin README, study README, registry (nineteen plugins), log, report.
+
+### Final review
+
+- Onset overshoot, measured by the final reviewer in a scratch run: 96 kHz, Output = 1, POWER on, a sine onset after silence, channel 2.
+- 100 Hz at −14 dBFS: peak +21 dBFS, steady −14 dBFS; 100 Hz at −6 dBFS: +43 / −12; 440 Hz at −6 dBFS: +32 / −13; 1 kHz at −6 dBFS: +27 / −15.
+- The 30 ms attack plus the 15 ms knee let the onsets of the cubic product through far above 0 dBFS for 10 to 30 ms before the 11:1 compressor clamps it; this is the behaviour of the original and of the spec, so the plugin README now says the master chain needs a brickwall limiter.
+- `release()` zeroes the meters (held and block peaks, held and block GR), so they fall to the floor instead of freezing; pinned in the test "before prepare and after release, process writes zeros", RED without the fix.
 
 ### Deviations found during implementation
 
@@ -49,7 +57,8 @@ CPU, 256-sample blocks: 96 kHz 2.02 % of a core on sound and 0.46 % on silence; 
 
 ## Open
 
-- The host check in Reaper (Giuseppe): 96 kHz, `ccb_dry.wav` through the four channels, by ear against the `delrm-comb` and `delrm-rm` renders; the distance by hand; GR 2 and GR 4 against the inputs; the same session at 48 kHz; the screenshot for `docs/img/delrm.png`.
+- The host check in Reaper (Giuseppe): 96 kHz, `ccb_dry.wav` through the four channels, by ear against the `delrm-comb` and `delrm-rm` renders; the distance by hand; GR 2 and GR 4 against the inputs; the same session at 48 kHz; the output peaks of channels 2 and 4 on strong attacks; the screenshot for `docs/img/delrm.png`.
 - The dcblocker listening: whether the thinner bass wants the two declared `fi.dcblockerat(76.59)` back.
 - The 6 deferred minors of stunedrev, if still open.
 - The choir's survey.
+- Extend the delrm-rm study with an onset-overshoot measurement and update card delrm-dinamica (it says transients touch 0 dBFS at +6 dB).
