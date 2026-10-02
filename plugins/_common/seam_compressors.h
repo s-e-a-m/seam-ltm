@@ -29,12 +29,9 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include "seam_basics.h"
 
 namespace Seam {
-
-inline double tau2pole(double tau, double fs) {
-    return std::fabs(tau) < DBL_EPSILON ? 0.0 : std::exp(-1.0 / (tau * fs));
-}
 
 class CompressorMono {
 public:
