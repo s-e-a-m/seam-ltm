@@ -9,9 +9,9 @@ using namespace delrm;
 TEST_CASE("the footer line reads D in ms, samples and the rate") {
     char s[64];
     formatDelayLine(s, sizeof s, 2903, 96000.0);
-    CHECK(std::string(s) == "D 30.24 ms 2903 samples 96 kHz");
+    CHECK(std::string(s) == "D 30.24 ms 2903 samples @ 96 kHz");
     formatDelayLine(s, sizeof s, 1061, 44100.0);
-    CHECK(std::string(s) == "D 24.06 ms 1061 samples 44.1 kHz");
+    CHECK(std::string(s) == "D 24.06 ms 1061 samples @ 44.1 kHz");
     formatDelayLine(s, sizeof s, 0, 0.0);
     CHECK(std::string(s) == "D \xE2\x80\x94 inactive");
 }
