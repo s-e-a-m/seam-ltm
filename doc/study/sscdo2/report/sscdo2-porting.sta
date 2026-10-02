@@ -14,5 +14,8 @@
 \contentsline {stato}{\statoentry {\deciso }{Scheda 14\hskip 1em\relax Memoria}}{18}{scheda.14}%
 \contentsline {stato}{\statoentry {\deciso }{Scheda 15\hskip 1em\relax POWER e RESET}}{18}{scheda.15}%
 \contentsline {stato}{\statoentry {\deciso }{Scheda 16\hskip 1em\relax Le quattro voci e il loro rumore}}{20}{scheda.16}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 17\hskip 1em\relax Uscita del coro (CC86)}}{21}{scheda.17}%
-\contentsline {stato}{\statoentry {\daprovare }{Scheda 18\hskip 1em\relax Master (CC88)}}{21}{scheda.18}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 17\hskip 1em\relax Il DC blocker finale}}{21}{scheda.17}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 18\hskip 1em\relax Il livello delle voci}}{21}{scheda.18}%
+\contentsline {stato}{\statoentry {\deciso }{Scheda 19\hskip 1em\relax Le bande oltre i \qty {20}{\kilo \hertz }}}{22}{scheda.19}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 20\hskip 1em\relax Uscita del coro (CC86)}}{22}{scheda.20}%
+\contentsline {stato}{\statoentry {\daprovare }{Scheda 21\hskip 1em\relax Master (CC88)}}{22}{scheda.21}%

@@ -24,7 +24,7 @@ REQUIRED_SCHEDE = [
     "lmo-frequenza", "lmo-delta", "lmo-volume", "lmo-canali", "lmo-filtro",
     "delrm-distanza", "delrm-volume", "delrm-dinamica", "delrm-integratore", "delrm-dcblocker",
     "stunedrev-tempi", "stunedrev-ingresso-uscita", "stunedrev-sezioni", "stunedrev-memoria", "stunedrev-reset",
-    "coro-voci", "coro-uscita", "master",
+    "coro-voci", "coro-dcblocker", "coro-livello", "coro-nyquist", "coro-uscita", "master",
 ]
 REQUIRED_PROVE = [
     "lmo-cue", "lmo-glissando", "lmo-delta", "lmo-filtro",

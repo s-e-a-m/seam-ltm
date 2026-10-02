@@ -10,4 +10,8 @@ for p in dcb dry bandir foll ring nyq55 nyq75; do
   faust -double -pn $p -I "$NEW_LIBS" -I "$SEAM_LIBS" -a "$ARCH" "$HERE/probes.dsp" -o "$B/$p.cpp"
   c++ -O2 -std=c++17 -I"$(faust --includedir)" "$B/$p.cpp" -o "$B/$p" 2>/dev/null
 done
-cd "$B" && "$HERE/../../../../.venv/bin/python" "$HERE/measure.py"
+for p in o0 o1 o2 o3 do0 do1 do2 do3 df0 df1 df2 df3 nyq_ours nyq_orig; do
+  faust -double -pn $p -I "$NEW_LIBS" -I "$SEAM_LIBS" -a "$ARCH" "$HERE/spec.dsp" -o "$B/$p.cpp"
+  c++ -O2 -std=c++17 -I"$(faust --includedir)" "$B/$p.cpp" -o "$B/$p" 2>/dev/null
+done
+cd "$B" && "$HERE/../../../../.venv/bin/python" "$HERE/measure.py" && "$HERE/../../../../.venv/bin/python" "$HERE/spec.py"

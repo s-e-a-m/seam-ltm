@@ -3,7 +3,7 @@
 Il coro (\texttt{pitchDetectorChoirMcAdams}) suona in quattro istanze, una per canale.
 Ogni istanza ha 16 bande: l'inviluppo della banda $k$ intorno a $f \cdot k$ modula un rumore filtrato intorno a $f \cdot k^{a}$, con $f$ = 48, 48, 96 e \qty{96}{\hertz}, $a$ = 1; 1,01; 1,1; 0,9, fattore di merito 350 e rilascio di \qty{1.5}{\second}.
 Lo studio del coro è aperto; la prima scheda fissa da dove viene il suo rumore, la seconda tiene il posto dell'uscita.
-Il secondo blocco, la catena (\studio{choir-chain}), è misurato e attende le decisioni di Giuseppe: il \texttt{fi.dcblocker} finale toglie \misura{5.48}{choir-chain} dB alla prima parziale a 48 Hz senza togliere alcuna corrente continua, le bande di rumore perdono \misura{3.01}{choir-chain} dB a ogni raddoppio della frequenza di campionamento, e \texttt{fi.svf.bp} diventa instabile sopra la frequenza di Nyquist.
+Il secondo blocco è la catena (\studio{choir-chain}): analisi, voci, prodotto, somma; le tre schede dopo quella del rumore ne fissano le scelte, decise da Giuseppe il 2 ottobre 2026.
 
 \begin{center}
 \begin{tikzpicture}[node distance=5mm and 9mm]
@@ -24,6 +24,30 @@ Il secondo blocco, la catena (\studio{choir-chain}), è misurato e attende le de
 {\deciso}
 {\studio{choir-noise}: un flusso per voce contro uno per banda; le bande di una voce hanno correlazione al più \misura{2.3e-03}{choir-noise} e il livello cambia di \misura{+0.0103}{choir-noise} dB, ma l'orecchio di Giuseppe ha sentito la differenza fra le bande: con un flusso solo le code dei 16 filtri si sommano in fase e si cancellano fra un picco e l'altro, e il fondo fra le parziali scende a \misura{-36.6}{choir-noise} dB dai picchi, contro \misura{-28.5}{choir-noise} dB nell'originale e \misura{-26.7}{choir-noise} dB con un flusso per banda; fuori dal banco invece le code sono in fase e si sommano in ampiezza: un flusso per voce porta \misura{+10.9}{choir-noise} dB di rumore a banda larga sopra le parziali rispetto a uno per banda (misurato da Giuseppe all'analizzatore), e l'originale si comporta come uno per banda; Giuseppe ha scelto all'ascolto un flusso per banda (2 ottobre 2026); nell'originale i canali erano già quasi scorrelati, \misura{+0.0256}{choir-noise} al più, ma la banda 1 dei canali 0 e 1 (48 Hz) e dei canali 2 e 3 (96 Hz) era la stessa; render per l'ascolto: originale, un flusso per voce, uno per banda}
 
+
+\scheda{coro-dcblocker}{Il DC blocker finale}
+{fisso: nessuno}
+{---}
+{il coro non ha corrente continua da togliere: ogni prodotto è un inviluppo positivo per una banda di rumore, e il passa-banda ha uno zero in DC; la prima parziale dei canali 0 e 1 (48 Hz) resta intera}
+{l'originale chiudeva con \texttt{fi.dcblocker}, un polo a 0,995 il cui angolo segue la frequenza di campionamento (\misurau{76.4}{\hertz}{choir-chain} a 96 kHz): toglieva \misura{5.48}{choir-chain} dB alla parziale a 48 Hz e \misura{2.12}{choir-chain} dB a quella a 96 Hz; tolto come in delRM, l'ascolto in prova decide (\S\ref{sec:principio-processo})}
+{\daprovare}
+{\studio{choir-chain}}
+
+\scheda{coro-livello}{Il livello delle voci}
+{fisso}
+{il livello di \qty{96}{\kilo\hertz}}
+{a ogni frequenza di campionamento ogni voce ha il livello di \qty{96}{\kilo\hertz}: una banda di rumore bianco perde \misura{3.01}{choir-chain} dB a ogni raddoppio, e il coro lo compensa con il fattore $\sqrt{SR/96000}$, come LMO}
+{l'originale suonava \misura{3.01}{choir-chain} dB più forte a 48 kHz che a 96 kHz; \S\ref{sec:principio-96k}}
+{\deciso}
+{\studio{choir-chain}}
+
+\scheda{coro-nyquist}{Le bande oltre i \qty{20}{\kilo\hertz}}
+{fisso}
+{nessuna banda è così alta con le costanti del brano (la più alta è a \misurau{2017}{\hertz}{choir-chain})}
+{una banda con il centro a \qty{20}{\kilo\hertz} o più tace: è inaudibile a ogni frequenza di campionamento, e il filtro non arriva mai a SR/2, oltre la quale diventa instabile (a $0{,}75 \cdot SR$ raggiunge \misura{4.16e+30}{choir-chain} in mezzo secondo)}
+{gli slider dell'originale portavano $f \cdot k^{a}$ fino a 128 kHz, oltre Nyquist a ogni frequenza di campionamento}
+{\deciso}
+{\studio{choir-chain}}
 
 \scheda{coro-uscita}{Uscita del coro (CC86)}
 {}

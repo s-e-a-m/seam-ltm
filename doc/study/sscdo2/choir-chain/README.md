@@ -49,12 +49,44 @@ Both are rate-invariant: the choir listens with a memory of seconds, by design o
 `fi.svf.bp` designs with tan(π·f/SR): at f = SR/2 the tangent is infinite and the band goes silent; above it the tangent is negative and the filter is unstable.
 With the performance's constants the highest centre is 96·16^1.1 = 2017 Hz, far below; the sliders of the original (f up to 500 Hz, a up to 2) reach 128 kHz.
 
+## The decisions and the spec
+Giuseppe, 2026-10-02: no DC blocker, the voices at their 96 kHz level, bands at or above 20 kHz silent.
+`sdt.choirband`, `sdt.choirchan`, `sdt.choir(q, rel)` in seam.tedesco.lib (faust-libraries).
+`spec.py` checks the spec against the original transcribed in `spec.dsp`, on the same noise streams and without its DC blocker; the input of channel c is 16 sines at f·k, 0.05 each, 20 s, compared after 10 s:
+
+| SR | channel | peak of the original | max \|ours − orig·choirdens\| | max \|ours − sdt.choir\| |
+|---|---|---|---|---|
+| 96000 | 0 | 0.16 | 4.0e-16 of the peak | 4.0e-16 of the peak |
+| 96000 | 1 | 0.206 | 3.8e-16 of the peak | 3.8e-16 of the peak |
+| 96000 | 2 | 0.31 | 3.3e-16 of the peak | 3.3e-16 of the peak |
+| 96000 | 3 | 0.235 | 3.3e-16 of the peak | 3.3e-16 of the peak |
+| 48000 | 0 | 0.253 | 2.9e-16 of the peak | 2.9e-16 of the peak |
+| 48000 | 1 | 0.258 | 2.8e-16 of the peak | 2.8e-16 of the peak |
+| 48000 | 2 | 0.412 | 2.7e-16 of the peak | 2.7e-16 of the peak |
+| 48000 | 3 | 0.367 | 2.0e-16 of the peak | 2.0e-16 of the peak |
+
+The first column proves `choirchan` is the original without the DC blocker, with `choirdens` on the voices (1 at 96 kHz); the second that `sdt.choir` gives each channel its own input and its own 16 streams.
+With f = 5000 Hz at 48 kHz (bands from 20 kHz up to 80 kHz) the original is unstable, 3.4e+38 and only 33.5 % of the samples finite in 2 s; the spec stays finite, peak 0.293 (input: the harmonics of 1 kHz below Nyquist, in `spec.py`).
+
+### Mutations
+| mutation | check | result |
+|---|---|---|
+| M1: voices not interleaved with their analysis bands | ours − orig, channel 0, 96 kHz | RED, 1.35 |
+| M2: channel c sings on channel c+1's streams | ours − sdt.choir, channel 0 | RED, 0.256 |
+| M4: `choirdens` applied twice | ours − orig, channel 0, 48 kHz | RED, 0.0524 (at 96 kHz `choirdens` is 1: the check must run at another rate) |
+| M5: the stretch a on the analysis bands too | ours − orig, channel 2 | RED, 0.127 |
+| M3: no clamp at 19999 Hz in `choirband` | with constant f | equivalent: Faust folds `band * 0` to 0 and never computes the filter |
+| M3: no clamp, centre on a slider at 30 kHz, 48 kHz | finite output | RED: non-finite from 14.54 s (24.2 % finite over 60 s); with the clamp finite and silent |
+
+The clamp matters wherever the centre is a variable, as in C++: the gate alone multiplies an unstable filter by 0, and inf times 0 is NaN.
+
 ## Files
 | file | what it is |
 |---|---|
 | `probes.dsp` | the DC blocker on a 48 Hz sine, the band's impulse response, the follower and the analysis band on a gated sine, two centres above Nyquist |
 | `run.sh` | builds the probes with the offline harness of `../lmo-bandfilter/` and runs `measure.py` |
-| `measure.py` | the tables above; each figure beside the formula it must match (dcblocker response, exp(-1/1.5), 3.01 dB per doubling) |
+| `measure.py` | the tables of the stages; each figure beside the formula it must match (dcblocker response, exp(-1/1.5), 3.01 dB per doubling) |
+| `spec.dsp`, `spec.py` | the original transcribed, `sdt.choirchan` and `sdt.choir` against it, and above Nyquist |
 
-No audio: these are properties of single stages; the choir's sound is heard when the chain is assembled.
+No audio yet: the choir answers only where the input has partials within a fraction of a hertz of f·k, so its sound belongs to the plugin in the room, with the TETRAREC.
 Requirements as for `../lmo-bandfilter/`.
