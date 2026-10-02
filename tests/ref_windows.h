@@ -10,6 +10,7 @@
 #pragma once
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 namespace refwin {
@@ -22,19 +23,29 @@ struct Compare {
     void see(int c, long g, double y, const double* ref) {
         const int w = (int)(g / period); const long off = g % period;
         if (w >= nw) return;
+        if (!std::isfinite(y)) nonFinite = true;
         energy[(size_t)c * nw + w] += y * y;
         if (off < 512) {
             const double r = ref[((size_t)c * nw + w) * 512 + off];
-            maxErr = std::max(maxErr, std::fabs(y - r));
-            peak = std::max(peak, std::fabs(r));
+            const double d = std::fabs(y - r), a = std::fabs(r);
+            if (!(d <= maxErr)) maxErr = d;   // NaN-propagating: a NaN error sticks
+            if (!(a <= peak)) peak = a;
+            ++compared;
         }
     }
-    double relErr() const { return peak > 0.0 ? maxErr / peak : maxErr; }
+    double relErr() const {
+        const double inf = std::numeric_limits<double>::infinity();
+        if (nonFinite || compared == 0 || !(peak > 0.0)) return inf;   // nothing compared, or not finite: never a pass
+        return maxErr / peak;
+    }
     double energyRelErr(const double* eref) const {
+        if (nonFinite) return std::numeric_limits<double>::infinity();
         double worst = 0.0;
         for (size_t i = 0; i < energy.size(); ++i) {
             const double e = eref[i];
-            worst = std::max(worst, e > 0.0 ? std::fabs(energy[i] - e) / e : std::fabs(energy[i]));
+            // e == 0: a silent reference window, so the absolute error is used.
+            const double d = e > 0.0 ? std::fabs(energy[i] - e) / e : std::fabs(energy[i]);
+            if (!(d <= worst)) worst = d;
         }
         return worst;
     }
@@ -42,6 +53,8 @@ struct Compare {
     int no, nw; long period;
     std::vector<double> energy;
     double maxErr = 0.0, peak = 0.0;
+    long compared = 0;      // samples compared against the reference
+    bool nonFinite = false; // a NaN or inf was seen in the output
 };
 
 } // namespace refwin

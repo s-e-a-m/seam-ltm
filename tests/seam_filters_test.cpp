@@ -19,6 +19,7 @@ static double runAgainst(double fs, const double* ref, const double* eref, doubl
         sig.fill(in, B, 1);
         for (int k = 0; k < B; ++k) cmp.see(0, pos + k, li.tick(buf[k]), ref);
     }
+    CHECK(cmp.compared == 16 * 512);   // a test that compares nothing must fail
     *energyErr = cmp.energyRelErr(eref);
     return cmp.relErr();
 }
