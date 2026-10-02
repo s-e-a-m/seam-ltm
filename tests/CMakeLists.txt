@@ -437,3 +437,13 @@ target_include_directories(seam_filters_test PRIVATE
 )
 target_compile_features(seam_filters_test PRIVATE cxx_std_17)
 add_test(NAME seam_filters_test COMMAND seam_filters_test)
+
+# seam_compressors.h: co.compressor_mono; references in
+# ref/seam_compressors_ref.h (doc/study/sscdo2/delrm-plugin/gen-ref.sh).
+add_executable(seam_compressors_test seam_compressors_test.cpp)
+target_include_directories(seam_compressors_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_compressors_test PRIVATE cxx_std_17)
+add_test(NAME seam_compressors_test COMMAND seam_compressors_test)
