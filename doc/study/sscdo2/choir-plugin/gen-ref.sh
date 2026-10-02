@@ -32,3 +32,10 @@ OUT="$ROOT/tests/ref/seam_svf_ref.h"
   render svf1k.dsp 48000 512  kSvf1k impulse
   echo "} // namespace svfref"; } > "$OUT"
 echo "wrote $OUT ($(wc -c < "$OUT") bytes)"
+
+OUT="$ROOT/tests/ref/seam_analyzers_ref.h"
+{ banner; echo "namespace analyzersref {"
+  render follow.dsp 96000 2048 kFollowStop96 zero 95000
+  render follow.dsp 96000 1024 kFollowLate96 zero 191000
+  echo "} // namespace analyzersref"; } > "$OUT"
+echo "wrote $OUT ($(wc -c < "$OUT") bytes)"
