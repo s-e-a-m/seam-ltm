@@ -186,7 +186,7 @@ The references come from the specification, compiled with `faust -double` agains
 | 6 | inactive bands | an engine with f = 5000 Hz at 48 kHz stays finite and its bands from 20 kHz up are silent |
 | 7 | denormals | after the signal, 60 s of silence leave no subnormal state |
 | 8 | ramps | POWER and output reach their targets in exactly 25 ms at every rate |
-| 9 | display | a sine of amplitude A on band k reads 20·log10(A) within 0.1 dB at steady state; the other bands read below −60 dB |
+| 9 | display | a sine of amplitude A on band k reads 20·log10(A) within 0.1 dB at steady state; the other bands read below −40 dB (the nearest, at 1.5 times the centre, sit near −49 dB: 1/(350·0.83)) |
 | 10 | parameters and state | the ParamBox round-trip; the processor's state round-trip; a short read keeps the defaults; RESET is not in the state |
 
 Every test is verified by mutation, recorded in `doc/study/sscdo2/choir-plugin/mutations.md`, at least: channel on another channel's streams; `choirdens` missing or applied twice; the stretch a on the analysis bands; the follower with a wrong release; an inactive band computed without the 19999 Hz design; RESET without zeroing the followers; the display without the division by Q.
