@@ -15,7 +15,6 @@
 // as de.delay does, and a new d is heard on the next tick.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 
@@ -32,9 +31,10 @@ public:
         pos_ = 0;
     }
 
-    // 0 <= d <= len - 1; a longer d is clamped (asserted in debug).
+    // 0 <= d <= len - 1; a longer d is clamped to len - 1, in every build:
+    // the clamp is the contract (seam_delays_test), so no assert stops a
+    // Debug host on the audio thread for a case the line already handles.
     void setDelay(uint32_t d) {
-        assert(len_ == 0 || d < len_);
         d_ = (len_ > 0 && d >= len_) ? (uint32_t)(len_ - 1) : d;
     }
     uint32_t    delay() const  { return d_; }

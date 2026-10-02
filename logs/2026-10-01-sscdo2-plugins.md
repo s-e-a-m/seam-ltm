@@ -112,3 +112,8 @@ No critical finding; the DSP, the memory lifetime, the threading and the six edg
 ## Host check (Giuseppe, 2026-10-02)
 Giuseppe loaded STUNEDREV in Reaper at 96 kHz and reported everything in order; the screenshot (`docs/img/stunedrev.png`) shows the window as designed, the bus 4 in + out, and the footer reading the centroids 106, 69, 17, 201 s and the arena, 588 MiB at 96.0 kHz, ready.
 With the screenshot `make -C doc test` passes its 13 checks, `tools/check-uidesc.py` reports no warning, and ctest passes 37 of 37.
+
+## Debug, 2026-10-02 (closing the session)
+- `seam_delays_test` aborted in Debug: the clamp test hit `assert(d < len_)` in `seam_delays.h`, so the documented and tested contract (a longer d is clamped to len − 1) crashed every Debug build, and a Debug host would have stopped on the audio thread. The assert is gone, the clamp stays in every build; the exact sizing of delRM's lines keeps its own tests.
+- `minos_lint` red in `build-test`: not the deployment target (11.0 in the cache), but a tests-only tree (`SEAM_BUILD_PLUGINS=OFF`) checking `VST3/Debug`, where bundles from 26 July, built before the floor was pinned, still lay. The test now reads the bundles only in a tree that builds them, and the calibration bus always. In `build` (plugins on) it still reads every bundle and passes; the script still fails on the stale 15.7 bundles.
+- `build-test`, Debug: 44/44.

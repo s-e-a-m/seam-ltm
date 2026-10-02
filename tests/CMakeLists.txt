@@ -237,11 +237,19 @@ if(Python3_Interpreter_FOUND)
     # tree, so the thing checked is the artefact a release ships and not the
     # CMake variable that was meant to shape it. See the deployment-target
     # block in the root CMakeLists.txt for what this catches.
+    # A tests-only tree (SEAM_BUILD_PLUGINS=OFF) builds no bundle: its
+    # VST3/<config> holds whatever an earlier configuration left there, and
+    # checking those would judge stale artefacts, not this build.
     if(APPLE)
+        if(SEAM_BUILD_PLUGINS)
+            set(_minos_bundles ${CMAKE_BINARY_DIR}/VST3/$<CONFIG>)
+        else()
+            set(_minos_bundles "")
+        endif()
         add_test(NAME minos_lint
                  COMMAND ${Python3_EXECUTABLE}
                          ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-minos.py
-                         ${CMAKE_BINARY_DIR}/VST3/$<CONFIG>
+                         ${_minos_bundles}
                          $<TARGET_FILE:seam_calbus>)
     endif()
 else()
