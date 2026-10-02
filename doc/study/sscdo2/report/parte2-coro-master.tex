@@ -3,6 +3,7 @@
 Il coro (\texttt{pitchDetectorChoirMcAdams}) suona in quattro istanze, una per canale.
 Ogni istanza ha 16 bande: l'inviluppo della banda $k$ intorno a $f \cdot k$ modula un rumore filtrato intorno a $f \cdot k^{a}$, con $f$ = 48, 48, 96 e \qty{96}{\hertz}, $a$ = 1; 1,01; 1,1; 0,9, fattore di merito 350 e rilascio di \qty{1.5}{\second}.
 Lo studio del coro è aperto; la prima scheda fissa da dove viene il suo rumore, la seconda tiene il posto dell'uscita.
+Il secondo blocco, la catena (\studio{choir-chain}), è misurato e attende le decisioni di Giuseppe: il \texttt{fi.dcblocker} finale toglie \misura{5.48}{choir-chain} dB alla prima parziale a 48 Hz senza togliere alcuna corrente continua, le bande di rumore perdono \misura{3.01}{choir-chain} dB a ogni raddoppio della frequenza di campionamento, e \texttt{fi.svf.bp} diventa instabile sopra la frequenza di Nyquist.
 
 \begin{center}
 \begin{tikzpicture}[node distance=5mm and 9mm]
