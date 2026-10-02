@@ -440,3 +440,12 @@ The mechanism is the coherence of the skirts: with one stream the bank is one fi
 Harmonic bands, one stream against 16: (Σk)²/Σk² = +10.9 dB above the bank, (Σ1/k)²/Σ1/k² = +8.6 dB below; the renders measure +10.7 to +11.1 dB at 5–7 kHz on every channel. The peaks are the same, so peak-to-broadband is about 11 dB better with one stream per band, as in the original.
 
 Decision (Giuseppe, 2026-10-02, after listening and the analyser): one stream per band, `v64`. The choir's block 3 has 64 streams (4 voices × 16 bands), one `no.multinoise(72)`: LMO streams 0–7, choir 8–71, voice c on 8 + 16c … 23 + 16c. The floor between the partials and the broadband floor stay the original's; the voices are decorrelated from each other and from LMO. The generator repeats after 2^32/72 samples, 10.4 min at 96 kHz. Card `coro-voci` decided.
+
+### Choir block 2: the chain (`doc/study/sscdo2/choir-chain/`)
+Input: patch inputs 5–8 (TETRAREC A via ASP880), as delRM; output through `interpolator_4ch` (CC86) to the mix. f, a, Q and release are constants in the performance (loadbangs; the four-channel abstraction's fire after the wrapper's), only CC86 moves.
+Measured at 48 and 96 kHz:
+- `fi.dcblocker` (pole 0.995, corner 76.4 Hz at 96 kHz) takes 5.48 dB off the 48 Hz first partial of channels 0–1 and 2.12 dB off the 96 Hz one of channels 2–3; it removes no DC, since every product is an envelope times a band-pass with a zero at DC.
+- The noise bands lose 3.01 dB per doubling of SR (-4.36 / -7.37 dBFS at 48 / 96 kHz, 48 Hz, Q 350): LMO's density case.
+- `an.amp_follower(1.5)`: -5.80 dB after 1 s at both rates (exp(-1/1.5)); the analysis band rings 16 s to -60 dB (Q/(π f) = 2.3 s): rate-invariant memory, by design.
+- `fi.svf.bp` above SR/2 is unstable (4.16e+30 in 0.5 s at 0.75·SR); performance centres reach 2017 Hz, the original's sliders 128 kHz.
+Proposals for Giuseppe (by the method: discuss, then report, log, lib): (1) no DC blocker, as delRM, judged by listening; (2) `choirdens = sqrt(SR/96000)` on the voices, as `lmodens`; (3) a band whose centre is at or above 20 kHz is silenced (inaudible at any rate, and the filter never reaches SR/2 since SR ≥ 44.1 kHz).
