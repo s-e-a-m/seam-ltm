@@ -418,3 +418,14 @@ Decision (Giuseppe, 2026-10-02):
 
 Open, the first point of the choir study: one stream per voice against one per band (4 against 64 streams). Distinct bands of one white noise are uncorrelated in expectation, and at Q = 350 the bands of a voice barely touch, so the two should sound the same; measure r between the voices of a channel and between channels, and render both for listening.
 Report: question 4 closed, new card `coro-voci` (to be tested), LMO chapter updated.
+
+### Choir block 1: the noise (`doc/study/sscdo2/choir-noise/`)
+Library: `sno.multinoiseblock(M, o, N)` in seam.noises.lib, `sdt.lmonoise`/`sdt.choirnoise` in seam.tedesco.lib, `sdt.lmo` on `lmonoise` (faust-libraries b890245); verified against a bit-exact LCG model, mutation `o = 7` red.
+LMO's C++ follows on branch `lmo-noise-blocks` (f53f56a): `Seam::MultinoiseBlock`, references regenerated, `kChoirNoise` added, two mutations red.
+Found on the way, already on main: `seam_delays_test` aborts in Debug, its clamp test hits the `assert(d < len_)` of `seam_delays.h`; it passes only with `NDEBUG`.
+
+The study measures one stream per voice against one per band exactly, from impulse responses (r is their inner product).
+At Q = 350 the bands of a voice correlate by 2.3e-03 at most and the voice's level changes by 0.01 dB: the two choices give the same voice.
+The equivalence belongs to Q: 0.155 dB at Q = 100, 1.377 dB at Q = 30; Q is fixed at 350 by the wrapper's initialisation.
+In the original the channels were already almost uncorrelated as wholes (r 0.0256 at most), since f and a differ; band 1 of channels 0–1 (48 Hz) and 2–3 (96 Hz) was the same signal in two drivers.
+Renders committed for listening: original, one stream per voice, one per band. The card `coro-voci` stays to be tested until Giuseppe and Davide have listened.
