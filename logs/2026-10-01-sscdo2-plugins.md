@@ -66,10 +66,49 @@ A fresh reviewer read the whole branch and found two important defects in the pr
 A recall while LMO plays moves f over the recalled glide, as a cue does (documented in `plugins/lmo/doc/README.md`, with the advice to draw sloped f envelopes with glide at 0).
 
 ## Open
-- stunedrev.
+- stunedrev: done below; then the choir.
 
 ## Host check, listening and registry
 Giuseppe listened in Reaper at 96 kHz (POWER and volume fades, cue 1, cue 2 with glide 120 then f 112.67, a Δ sweep, the same session at 48 kHz): listening OK.
 Giuseppe loaded LMO in Reaper and sent the window's screenshot (`docs/img/lmo.png`): the window is as designed, the bus is 4 in + out, and the read-only "f now" reaches the footer (440.00 with f at 440), which the final reviewer had left to the host check.
 The registry gains a family for the works, "Works — SSCDO#2", with LMO; the counts of `doc/scripts/test-doc.sh`, `render-readme.py` and `CLAUDE.md` go from sixteen to seventeen; `make -C doc test` passes its 12 checks, `uidesc_lint_selftest` passes with the screenshot.
-- Then stunedrev.
+- Then stunedrev (below).
+
+# stunedrev
+
+Spec `docs/superpowers/specs/2026-10-01-stunedrev-plugin-design.md`, plan `docs/superpowers/plans/2026-10-01-stunedrev-plugin.md`, branch `stunedrev-plugin`, executed inline.
+
+## Decisions (Giuseppe, brainstorming)
+- The APF INPUT and APF OUTPUT faders (CC83, CC84) live in the plugin, linear 0–1 with 25 ms ramps, as LMO's volume.
+- A change of time makes the 42 delays jump, as the specification and the original do; no crossfade, which would break the all-pass during the fade.
+- RESET in OPS, emptying the memory while playing; POWER added for the suite standard (the lines keep running while it is off).
+- The footer shows each line's energy centroid, the sum of its 42 delays: the report's card `stunedrev-tempi`, live.
+- One arena for the 168 sections, each sized exactly for its longest delay, allocated and zeroed in `setActive`; `sdt.stmd`'s +150 is Faust's compile-time margin and stays in the specification.
+- Filters are reusable C++ libraries, as in Faust: the all-pass is `plugins/_common/seam_moorer.h` (`Seam::MoorerAllpass`, `sjm.apfv` with g and the buffer as parameters), not a struct of the plugin. With `seam_primes.h`, the sieve behind `sff.np`, the port adds two libraries to `_common/`.
+
+## Decisions taken while designing and building
+- RESET is a GUI-only button that increments a generation counter in the engine: a momentary parameter would be lost in a host that merges press and release (ltglide, Reaper). A click during the clearing restarts it; a click before activation is dropped.
+- The clearing zeroes 16 KiB per sample of the block, not 4 MiB per block as first designed: with 32-sample blocks 4 MiB would outlast the block. It lasts 0.39 s at any block size and rate, 0.418 s with the fade.
+- Test 4 of the spec runs on a 50 ms noise burst instead of the clarinet note: a unit test cannot embed a 3.8 s WAV; the clarinet stays for the listening.
+- The processor's state round-trip is tested on its codec (`stunedrev_state.h`), which the processor calls as it is, with the SDK's memory stream.
+- A host value between two time steps maps to the millisecond the SDK's `RangeParameter` displays (`int(norm·100)`), not to a rounding of `norm·99`.
+
+## Verification
+- The 16 800 delays equal `sdt.stdel` exactly at 96 and 48 kHz, with the product in the order Faust writes it.
+- `seam_moorer.h` equals `sjm.apfv` for g = 1/√2 and 0.7 below 1e-15 of the peak, and carries unit energy for four gains.
+- The engine equals `sdt.stunedrev(83, 47, 7, 71)` over 30 s to 1.83e-15 of the peak at 96 kHz and 1.62e-15 at 48 kHz, and to 8.7e-16 across a change of time (t e from 7 to 9 ms at a block boundary).
+- The arena at 96 kHz is 77 085 940 doubles, 588.119 MiB, as computed on 2026-09-29; 1.15 GiB at 192 kHz.
+- Cost: 9.4 % of a core at 96 kHz, 18.8 % at 192 kHz (Intel i7-8850H).
+- 23 mutations (`doc/study/sscdo2/stunedrev-plugin/mutations.md`); three survived the first run and each was a hole in a test: an impulse response too sparse to see a state left by `clear()`, a lower bound too loose to tell a restarted RESET from the end of the first, a check placed after the replayed RESET had already ended. The tests were tightened and the mutants run again: all RED.
+- A trap of the method, now in `mutate.py`: restoring the source leaves the mutated binary in the build tree, and the next ctest runs it; the script rebuilds every test it touched.
+- VST3 validator: 47 of 47. `tools/check-uidesc.py`: no error. The whole ctest passes but `uidesc_lint_selftest`, which waits for the screenshot.
+
+## Final review (fresh reviewer, whole branch)
+No critical finding; the DSP, the memory lifetime, the threading and the six edge cases of the host held.
+- Important, fixed: the lines lose no energy, so after a burst their silent tails sink into subnormal numbers and stay in the 588 MiB; measured by the reviewer at 48 kHz, the cost went from 4.7 % to 15 % of a core in 30 minutes of silence, and kept rising. `plugins/_common/seam_denormals.h` (`Seam::ScopedNoDenormals`, FTZ and DAZ on x86, FZ on arm64, restored at the end of the scope) now wraps `Engine::process`; a test feeds 1e-310 and requires exact zeros and the caller's state restored (RED before the fix). After the fix: 9.4 % of a core at 96 kHz after 10 minutes of silence, as at the start. Every comparison with Faust is unchanged.
+- Important, open until the host check: `uidesc_lint_selftest` and `make -C doc test` wait for `docs/img/stunedrev.png`.
+- Minor, deferred: RESET's phases switch at block boundaries, so the moment the sound resumes moves by up to two blocks with the block size (the final state is identical); input and output are not clamped against a corrupt state blob; the off-grid test re-derives the SDK formula rather than calling `RangeParameter`; no test runs a section with no spare sample; the RESET view has no `onMouseCancel` (as dslar); a comment says 1.2 GiB where the measure is 1.15.
+
+## Host check (Giuseppe, 2026-10-02)
+Giuseppe loaded STUNEDREV in Reaper at 96 kHz and reported everything in order; the screenshot (`docs/img/stunedrev.png`) shows the window as designed, the bus 4 in + out, and the footer reading the centroids 106, 69, 17, 201 s and the arena, 588 MiB at 96.0 kHz, ready.
+With the screenshot `make -C doc test` passes its 13 checks, `tools/check-uidesc.py` reports no warning, and ctest passes 37 of 37.

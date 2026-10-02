@@ -357,3 +357,63 @@ target_include_directories(lmo_params_test PRIVATE
 )
 target_compile_features(lmo_params_test PRIVATE cxx_std_17)
 add_test(NAME lmo_params_test COMMAND lmo_params_test)
+
+# seam_primes.h: the sieve behind sff.np / sma.ms2npsamp (stunedrev, and any
+# plugin with prime delays).
+add_executable(seam_primes_test seam_primes_test.cpp)
+target_include_directories(seam_primes_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_primes_test PRIVATE cxx_std_17)
+add_test(NAME seam_primes_test COMMAND seam_primes_test)
+
+# seam_moorer.h: Moorer's all-pass against sjm.apfv; references in
+# ref/seam_moorer_ref.h (doc/study/sscdo2/stunedrev-plugin/gen-ref.sh).
+add_executable(seam_moorer_test seam_moorer_test.cpp)
+target_include_directories(seam_moorer_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_moorer_test PRIVATE cxx_std_17)
+add_test(NAME seam_moorer_test COMMAND seam_moorer_test)
+
+# stunedrev: the engine against sdt.stunedrev; references in
+# ref/stunedrev_ref.h (doc/study/sscdo2/stunedrev-plugin/gen-ref.sh).
+add_executable(stunedrev_dsp_test stunedrev_dsp_test.cpp)
+target_include_directories(stunedrev_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/stunedrev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(stunedrev_dsp_test PRIVATE cxx_std_17)
+add_test(NAME stunedrev_dsp_test COMMAND stunedrev_dsp_test)
+
+add_executable(stunedrev_params_test stunedrev_params_test.cpp)
+target_include_directories(stunedrev_params_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/stunedrev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(stunedrev_params_test PRIVATE cxx_std_17)
+add_test(NAME stunedrev_params_test COMMAND stunedrev_params_test)
+
+# stunedrev_state_test links the SDK base layers, as seam_state_test does:
+# the unit under test is the processor's IBStream codec.
+add_executable(stunedrev_state_test
+    stunedrev_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(stunedrev_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/stunedrev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(stunedrev_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    find_library(CORE_FOUNDATION CoreFoundation)
+    target_link_libraries(stunedrev_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(stunedrev_state_test PRIVATE cxx_std_17)
+add_test(NAME stunedrev_state_test COMMAND stunedrev_state_test)
