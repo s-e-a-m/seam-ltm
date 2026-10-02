@@ -22,6 +22,18 @@
 // arithmetic reproduces exactly; the result is reinterpreted as signed and
 // scaled by 1/2147483647 in double (the constant Faust emits,
 // 4.656612875245797e-10, is that double to the bit).
+//
+// FAUST REFERENCE (seam.noises.lib):
+//
+//   multinoiseblock(M, o, N) = no.multinoise(M) : si.block(o), si.bus(N),
+//                                                 si.block(M-o-N);
+//
+// MultinoiseBlock: streams o .. o+N-1 of one multinoise(M). Machines that
+// must be decorrelated read disjoint blocks of the SAME M: each value of
+// the generator goes to one of them only. Another M or another seed reuses
+// the same numbers (another M: at other instants; another seed: times a
+// constant mod 2^32), see seam-ltm logs/2026-09-29-sscdo2-ricognizione.md,
+// "The choir".
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include <cstdint>
@@ -55,6 +67,26 @@ private:
     int32_t seed_;
     int32_t state_ = 0;
     std::vector<int32_t> steps_;
+};
+
+class MultinoiseBlock {
+public:
+    MultinoiseBlock(int m, int o, int n)
+        : all_(m), o_(o), n_(n), buf_((size_t)m, 0.0) {}
+
+    void reset() { all_.reset(); }
+    int  size() const { return n_; }
+
+    // Steps the whole generator, writes streams o_ .. o_+n_-1 to out[0 .. n_-1].
+    void tick(double* out) {
+        all_.tick(buf_.data());
+        for (int k = 0; k < n_; ++k) out[k] = buf_[(size_t)(o_ + k)];
+    }
+
+private:
+    FaustMultinoise all_;
+    int o_, n_;
+    std::vector<double> buf_;
 };
 
 } // namespace Seam

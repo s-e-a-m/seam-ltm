@@ -27,6 +27,7 @@ render() { # dsp sr n name input [skip]
     echo "#pragma once"
     echo "namespace lmoref {"
     render noise8.dsp 96000 512  kNoise8 zero
+    render choirnoise.dsp 96000 512 kChoirNoise zero
     render bw.dsp     96000 2048 kBw     impulse
     render lmo.dsp    96000 2048 kLmo96  zero 96000
     render lmo.dsp    48000 1024 kLmo48  zero 48000
