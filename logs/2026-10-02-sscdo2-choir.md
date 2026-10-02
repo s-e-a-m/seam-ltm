@@ -33,3 +33,10 @@ The whole suite passes but `uidesc_lint_selftest`, which waits for `docs/img/cho
 - The Release build of LMO and the choir together; the host check in Reaper at 96 kHz (TETRAREC A into the four channels, the grid while the clarinet plays, RESET, POWER, output on CC86) and at 48 kHz; the screenshot `docs/img/choir.png`.
 - The registry (`doc/plugins.toml`, twenty plugins) and the counts in `doc/scripts/test-doc.sh`, `render-readme.py`, `CLAUDE.md`; `make -C doc publish` after Giuseppe's confirmation.
 - Until the Release build, the `choir.vst3` symlink in `~/Library/Audio/Plug-Ins/VST3` points to the Debug build of `build/`.
+
+## Host check and registry (Task 8, with Giuseppe)
+
+- Release build of LMO and the choir together (19:57): both validators 47/47, minos 11.0; the `~/Library/Audio/Plug-Ins/VST3` links point to `build/VST3/Release`. LMO now carries the noise in three blocks.
+- Giuseppe in Reaper: everything works at 96 and at 48 kHz; CPU and memory very contained. The Release window shows no live-editor tab.
+- Screenshot `docs/img/choir.png`; registry entry CHOIR (twenty plugins), counts in `doc/scripts/test-doc.sh`, `render-readme.py`, `CLAUDE.md`; `make -C doc test` 13/13; uidesc lint 0/0; ctest 50/50.
+- `make -C doc publish` waits for Giuseppe's confirmation.

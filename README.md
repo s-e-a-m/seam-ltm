@@ -59,10 +59,11 @@ Every window follows the same grammar, described in
 | **LMO** | → 4ch | The generator of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): on each of four channels, two narrow bands of noise through 24th-order Butterworth high- and low-pass filters, which beat at a distance Δ. The band centre glides linearly over a set time, as the piece's cues ask; the level is anchored at 96 kHz, so the bands sound the same at any sample rate |
 | **STUNEDREV** | 4ch → 4ch | The APF of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four independent lines of 42 Moorer all-pass sections in series, one per face of STONED, tuned by √2, φ, e and π. Each delay is a time in milliseconds moved to the next prime at the session's rate, so each face returns the sound on its own time scale, from seconds to minutes. One arena sized exactly at activation, and a RESET that empties it while playing |
 | **DELRM** | 4ch → 4ch | delRM of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four channels, each processing its own input. Channels 1 and 3 add the input to itself delayed; channels 2 and 4 multiply the delayed input, the input and its integral, into an 11:1 compressor. The delay is DDELAY's distance in metres moved to the next prime, one for the four channels. Input meters and the gain reduction of channels 2 and 4, drawn in opposite directions |
+| **CHOIR** | 4ch → 4ch | The choir of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): on each of four channels, 16 narrow bands listen to the input around the harmonics of a fundamental and make 16 voices of noise sing around stretched harmonics, each voice as loud as its band of the input. The voices sing on the third block of the piece's noise, decorrelated from LMO and from each other. A 4×16 grid shows, band by band, what the choir is hearing, and a RESET silences the bands that are still ringing |
 
 ### Screenshots
 
-All nineteen windows, photographed after the UI standard landed, in the order
+All twenty windows, photographed after the UI standard landed, in the order
 of the three families above.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |
@@ -81,9 +82,9 @@ of the three families above.
 |:---:|:---:|:---:|:---:|
 | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) | ![ADDELAY](docs/img/addelay.png) |
 
-| LMO | STUNEDREV | DELRM |
-|:---:|:---:|:---:|
-| ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) |
+| LMO | STUNEDREV | DELRM | CHOIR |
+|:---:|:---:|:---:|:---:|
+| ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) | ![CHOIR](docs/img/choir.png) |
 
 <!-- END plugins -->
 
