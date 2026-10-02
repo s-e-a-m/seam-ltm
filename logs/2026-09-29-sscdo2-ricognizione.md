@@ -434,3 +434,7 @@ Correction, same day: Giuseppe heard a difference between `choir_v4_4ch.wav` and
 r and the total level are integrals dominated by the peaks; with one stream the 16 band-passes add as complex responses and cancel between the resonances (skirts near −90° and +90°), so the floor between bands drops by up to 25.6 dB against one stream per band (exact, from the frequency responses).
 Renders, channel 0, floor between the bands relative to the peaks: original −28.5 dB, one stream per voice −36.6 dB, one per band −26.7 dB.
 One stream per voice or per band is therefore a musical choice (isolated partials against the breath between them), open for Giuseppe and Davide; the card `coro-voci` says so. The block of the choir stays the third; only its size (4 or 64 streams, M = 12 or 72) depends on the choice.
+
+Outside the bank, same day: Giuseppe saw at the spectrum analyser that `v4` has more broadband noise than `v64`; his reading, a better signal-to-noise ratio with more voices in a channel, is right in its result.
+The mechanism is the coherence of the skirts: with one stream the bank is one filter, and outside it every skirt has the same phase (−90° above, +90° below), so they add in amplitude; independent streams add in power.
+Harmonic bands, one stream against 16: (Σk)²/Σk² = +10.9 dB above the bank, (Σ1/k)²/Σ1/k² = +8.6 dB below; the renders measure +10.7 to +11.1 dB at 5–7 kHz on every channel. The peaks are the same, so peak-to-broadband is about 11 dB better with one stream per band, as in the original.

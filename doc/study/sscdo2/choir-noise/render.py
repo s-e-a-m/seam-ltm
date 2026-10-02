@@ -62,3 +62,14 @@ with open(os.path.join(R, "render-log.md"), "a") as fh:
         fl = np.mean([np.median(S[(f > 48 * (k + 0.3)) & (f < 48 * (k + 0.7))]) for k in range(1, 16)])
         fh.write(f"| `{p}` | {10 * math.log10(fl / pk):.1f} dB |\n")
 print(open(os.path.join(R, "render-log.md")).read())
+
+# outside the bank: v4 minus v64, per channel (Giuseppe's spectrum analyser)
+def band_db(x, lo, hi):
+    S = np.abs(np.fft.rfft(x * np.hanning(len(x)))) ** 2; f = np.fft.rfftfreq(len(x), 1 / SR)
+    return 10 * math.log10(float(np.mean(S[(f > lo) & (f < hi)])))
+with open(os.path.join(R, "render-log.md"), "a") as fh:
+    fh.write("\nOutside the bank, `v4` minus `v64`:\n\n| channel | 20-30 Hz | 5-7 kHz | 20-30 kHz |\n|---|---|---|---|\n")
+    for c in range(4):
+        fh.write(f"| {c} | " + " | ".join(f"{band_db(sig['v4'][:, c], lo, hi) - band_db(sig['v64'][:, c], lo, hi):+.1f} dB"
+                                       for lo, hi in [(20, 30), (5000, 7000), (20000, 30000)]) + " |\n")
+print(open(os.path.join(R, "render-log.md")).read())

@@ -84,6 +84,25 @@ In the renders, channel 0, mean floor between the bands relative to the mean pea
 One stream per voice deepens the valleys between the partials by about 8–10 dB against the original; one stream per band keeps the original's floor.
 The choice between them is musical, not neutral: isolated, more pitched partials against the breath between them.
 
+### Outside the bank
+Giuseppe, at the spectrum analyser (2026-10-02): `v4` carries more broadband noise than `v64`, above and below the partials.
+It is the same mechanism seen from outside.
+One stream makes the bank one filter, the sum of the 16 responses: above the bank every skirt is near −90°, below it near +90°, so the skirts are in phase and add in amplitude; with independent streams they add in power.
+Far above, the skirt of band k is about f_k/f, so for harmonic bands one stream against 16 gives (Σk)²/Σk² = 136²/1496, +10.9 dB; far below it is about f/f_k, (Σ1/k)²/Σ1/k², +8.6 dB; with 16 equal skirts the bound is 10·log10(16) = 12 dB.
+The peaks are the same with either choice, each dominated by its own band, so the ratio of the peaks to the broadband floor is about 11 dB better with one stream per band.
+
+One stream per voice against one per band, exact (`measure.py`) and measured on the renders (`render.py`):
+
+| channel | 20–30 Hz exact / render | 5–7 kHz exact / render | 20–30 kHz exact / render |
+|---|---|---|---|
+| 0 | +7.5 / +6.8 dB | +10.9 / +11.0 dB | +10.9 / +11.0 dB |
+| 1 | +7.4 / +7.5 dB | +10.9 / +11.0 dB | +10.9 / +10.9 dB |
+| 2 | +7.7 / +8.6 dB | +10.7 / +10.7 dB | +10.8 / +10.8 dB |
+| 3 | +9.0 / +7.7 dB | +11.0 / +11.1 dB | +11.1 / +11.0 dB |
+
+The whole picture of one stream per voice against one per band: +11 dB of broadband noise above the bank, +7 to +9 dB below it, up to +2.4 dB between the low bands and valleys down to −25.6 dB between the high ones.
+The original had 16 streams per channel and behaves as one stream per band here too.
+
 ### Mutation
 `measure.py` with Q = 3.5, wide bands that overlap: max |r| 0.95 within a voice and +7.5 dB on the sum, so the measure sees correlation when there is some.
 The Q table above is the same check, graded.
@@ -105,7 +124,7 @@ The Q table above is the same check, graded.
 |---|---|
 | `probes.dsp` | the voices in three versions (`vo_c`, `v4_c`, `v64_c`, channel c) and the band filter alone (`bp48`) |
 | `run.sh` | builds the probes with the offline harness of `../lmo-bandfilter/` and runs `measure.py` |
-| `measure.py` | the model check, the exact correlations, the probe levels, the Q table and the floor between the bands |
+| `measure.py` | the model check, the exact correlations, the probe levels, the Q table, the floor between the bands and outside the bank |
 | `render.py` | the listening files in `renders/` (committed: 30 MB) |
 
 Requirements as for `../lmo-bandfilter/` (faust, a C++17 compiler, the seam-ltm `.venv` with numpy, scipy and soundfile, a faustlibraries clone in `NEW_LIBS`).

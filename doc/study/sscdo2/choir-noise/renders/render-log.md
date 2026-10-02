@@ -13,3 +13,12 @@ Channel 0, mean floor between the bands (median of 0.3-0.7 of each gap) relative
 | `vo` | -28.5 dB |
 | `v4` | -36.6 dB |
 | `v64` | -26.7 dB |
+
+Outside the bank, `v4` minus `v64`:
+
+| channel | 20-30 Hz | 5-7 kHz | 20-30 kHz |
+|---|---|---|---|
+| 0 | +6.8 dB | +11.0 dB | +11.0 dB |
+| 1 | +7.5 dB | +11.0 dB | +10.9 dB |
+| 2 | +8.6 dB | +10.7 dB | +10.8 dB |
+| 3 | +7.7 dB | +11.1 dB | +11.0 dB |

@@ -98,3 +98,21 @@ for c, (f, a) in enumerate(CH):
     Hs = np.array([freqz(*svf_bp(x), worN=w)[1] for x in fr])
     d = 20 * np.log10(np.abs(Hs.sum(0))) - 10 * np.log10((np.abs(Hs) ** 2).sum(0))
     print(f"| {c} | {' '.join(f'{v:+.1f}' for v in d)} |")
+
+# 7. OUTSIDE the bank (Giuseppe, at the spectrum analyser: v4 has more
+#    broadband noise). Above the bank every skirt is near -90 degrees, below it
+#    near +90: in phase, so one stream adds them in amplitude, 16 streams in
+#    power. Far above, |H_k| ~ f_k/f: ratio (sum k)^2 / sum k^2 = +10.9 dB for
+#    harmonic bands; far below, |H_k| ~ f/f_k: (sum 1/k)^2 / sum 1/k^2 = +8.6 dB.
+k = np.arange(1, 17)
+print(f"\nharmonic limits, one stream vs 16: above the bank {20*np.log10(k.sum()/np.sqrt((k**2).sum())):+.1f} dB, "
+      f"below {20*np.log10((1/k).sum()/np.sqrt((1/k**2).sum())):+.1f} dB")
+print("\n| channel | 20-30 Hz | 5-7 kHz | 20-30 kHz |  (one stream vs 16, exact)")
+print("|---|---|---|---|")
+for c, (f, a) in enumerate(CH):
+    fr = [f * (j + 1) ** a for j in range(16)]; row = []
+    for lo, hi in [(20, 30), (5000, 7000), (20000, 30000)]:
+        w = 2 * np.pi * np.linspace(lo, hi, 200) / SR
+        Hs = np.array([freqz(*svf_bp(x), worN=w)[1] for x in fr])
+        row.append(10 * np.log10(np.mean(np.abs(Hs.sum(0)) ** 2) / np.mean((np.abs(Hs) ** 2).sum(0))))
+    print(f"| {c} | " + " | ".join(f"{v:+.1f} dB" for v in row) + " |")
