@@ -390,6 +390,32 @@ target_include_directories(choir_dsp_test PRIVATE
 target_compile_features(choir_dsp_test PRIVATE cxx_std_17)
 add_test(NAME choir_dsp_test COMMAND choir_dsp_test)
 
+add_executable(choir_params_test choir_params_test.cpp)
+target_include_directories(choir_params_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/choir/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(choir_params_test PRIVATE cxx_std_17)
+add_test(NAME choir_params_test COMMAND choir_params_test)
+
+add_executable(choir_state_test
+    choir_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(choir_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/choir/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(choir_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    target_link_libraries(choir_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(choir_state_test PRIVATE cxx_std_17)
+add_test(NAME choir_state_test COMMAND choir_state_test)
+
 add_executable(lmo_params_test lmo_params_test.cpp)
 target_include_directories(lmo_params_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
