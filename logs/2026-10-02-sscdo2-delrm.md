@@ -62,6 +62,8 @@ The GR meters grew from the left, like the inputs, instead of from the right.
 The task review had checked that VSTGUI reads the attribute, and the attribute is read: it only does something else.
 `delrm.uidesc` now uses `draw-value-inverted="true"` on GR 2 and GR 4, and `tools/check-uidesc.py` gained `check_value_bar_direction`, an ERROR for a `CSlider` value bar that carries `reverse-orientation` without `draw-value-inverted` (four unit tests; it flagged both GR rows before the fix).
 The footer line was cut at "96.0 kH": the text is wider than its 260 px view at `InfoFont` 12.
+Giuseppe chose the line without separators, `D 30.24 ms 2903 samples 96 kHz` (one space after D, the rate with `%g`): at 30 m it is at most 34 characters, from 44.1 to 384 kHz, against the 36 that fit.
+The text moved to `delrm_footer.h`, SDK-free, and `delrm_footer_test` holds it to the width at every rate; the old format turns that test RED.
 
 ## Open
 

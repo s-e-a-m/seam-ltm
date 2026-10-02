@@ -147,7 +147,7 @@ HEADER   SEAM DELRM · comb and triple product, four channels
 OPS      [■] POWER
 FINE     distance   7.291 m
          output     0.00
-FOOTER   D  22.01 ms · 2113 samples @ 96 kHz
+FOOTER   D 22.01 ms 2113 samples 96 kHz
          in 1  ▮▮▮▮▮▮▮▯▯▯  −18 dB        ← rises to the right
          in 2  ▮▮▮▮▮▮▯▯▯▯  −21 dB
          in 3  ▮▮▮▮▮▮▮▯▯▯  −17 dB

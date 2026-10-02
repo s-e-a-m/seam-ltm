@@ -12,6 +12,7 @@ set(delrm_sources
     source/delrm_dsp.h
     source/delrm_params.h
     source/delrm_state.h
+    source/delrm_footer.h
     source/delrm_views.h
     source/delrm_processor.cpp
     source/delrm_processor.h

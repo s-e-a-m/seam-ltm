@@ -484,3 +484,13 @@ if(APPLE)
 endif()
 target_compile_features(delrm_state_test PRIVATE cxx_std_17)
 add_test(NAME delrm_state_test COMMAND delrm_state_test)
+
+# delrm_footer.h: the footer's text, which must fit its view at every rate.
+add_executable(delrm_footer_test delrm_footer_test.cpp)
+target_include_directories(delrm_footer_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/delrm/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(delrm_footer_test PRIVATE cxx_std_17)
+add_test(NAME delrm_footer_test COMMAND delrm_footer_test)

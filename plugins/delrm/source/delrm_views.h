@@ -1,12 +1,13 @@
 //──────────────────────────────────────────────────────────────────────────
 // SEAM-LTM · delrm — the footer view (VSTGUI)
 //
-// One line: D in milliseconds and in samples at the session's rate, read
+// One line, written by delrm_footer.h: D in milliseconds, in samples and the rate, read
 // from the engine's atomics by a GUI timer, as stunedrev's centroids. The
 // prime changing with the rate is visible here.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include "delrm_dsp.h"
+#include "delrm_footer.h"
 #include "vstgui/lib/cview.h"
 #include "vstgui/lib/cdrawcontext.h"
 #include "vstgui/lib/ccolor.h"
@@ -29,14 +30,7 @@ public:
     void draw(VSTGUI::CDrawContext* c) override {
         using namespace VSTGUI;
         char line[128];
-        const double fs = engine_->sampleRate();
-        if (fs > 0.0) {
-            const unsigned d = engine_->delaySamples();
-            std::snprintf(line, sizeof line, "D  %.2f ms \xC2\xB7 %u samples @ %.1f kHz",
-                          1000.0 * d / fs, d, fs / 1000.0);
-        } else {
-            std::snprintf(line, sizeof line, "D  \xE2\x80\x94  inactive");
-        }
+        delrm::formatDelayLine(line, sizeof line, engine_->delaySamples(), engine_->sampleRate());
         c->setFont(font_);
         c->setFontColor(color_);
         c->drawString(line, getViewSize(), kLeftText);
