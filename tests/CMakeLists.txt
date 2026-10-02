@@ -356,6 +356,14 @@ target_include_directories(seam_basics_test PRIVATE
 target_compile_features(seam_basics_test PRIVATE cxx_std_17)
 add_test(NAME seam_basics_test COMMAND seam_basics_test)
 
+add_executable(seam_svf_test seam_svf_test.cpp)
+target_include_directories(seam_svf_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_svf_test PRIVATE cxx_std_17)
+add_test(NAME seam_svf_test COMMAND seam_svf_test)
+
 add_executable(lmo_dsp_test lmo_dsp_test.cpp)
 target_include_directories(lmo_dsp_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
