@@ -417,3 +417,13 @@ if(APPLE)
 endif()
 target_compile_features(stunedrev_state_test PRIVATE cxx_std_17)
 add_test(NAME stunedrev_state_test COMMAND stunedrev_state_test)
+
+# seam_delays.h: de.delay for an integer delay (delRM, and any plugin with a
+# plain delay line).
+add_executable(seam_delays_test seam_delays_test.cpp)
+target_include_directories(seam_delays_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_delays_test PRIVATE cxx_std_17)
+add_test(NAME seam_delays_test COMMAND seam_delays_test)

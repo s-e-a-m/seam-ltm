@@ -6,6 +6,9 @@
 //                    the smallest prime STRICTLY greater than n
 //   sma.ms2npsamp  = select2(n < 2, n : sff.np, n)
 //                    with { n = int(floor(ms*ma.SR/1000 + 0.5)); };
+//   sma.imt2npsamp = select2(n < 2, n : sff.np, n)
+//                    with { mm = floor(mt*1000 + 0.5)/1000;
+//                           n  = int(floor(mm*ma.SR/isos + 0.5)); };   isos = 331.4
 //
 // nextprime.h tests each candidate by trial division, up to ~800 divisions
 // for a number near 2.5 million. A plugin that recomputes 42 delays when a
@@ -58,6 +61,19 @@ private:
 // sma.ms2npsamp: milliseconds to a prime number of samples at fs.
 inline uint32_t msToPrimeSamples(double ms, double fs, const PrimeSieve& s) {
     const long n = (long)std::floor(ms * fs / 1000.0 + 0.5);
+    if (n < 2) return n < 0 ? 0u : (uint32_t)n;
+    return s.nextPrimeAbove((uint32_t)n);
+}
+
+// sma.isos: the interior speed of sound of seam.math.lib, in m/s.
+constexpr double kSpeedOfSoundInterior = 331.4;
+
+// sma.imt2npsamp: a distance in metres to a prime number of samples at fs,
+// as DDELAY computes it: the millimetre of a laser distance meter, the
+// interior speed of sound, the sample, the prime strictly above.
+inline uint32_t metresToPrimeSamples(double mt, double fs, const PrimeSieve& s) {
+    const double mm = std::floor(mt * 1000.0 + 0.5) / 1000.0;
+    const long n = (long)std::floor(mm * fs / kSpeedOfSoundInterior + 0.5);
     if (n < 2) return n < 0 ? 0u : (uint32_t)n;
     return s.nextPrimeAbove((uint32_t)n);
 }
