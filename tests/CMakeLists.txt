@@ -447,3 +447,14 @@ target_include_directories(seam_compressors_test PRIVATE
 )
 target_compile_features(seam_compressors_test PRIVATE cxx_std_17)
 add_test(NAME seam_compressors_test COMMAND seam_compressors_test)
+
+# delrm: the engine against sdt.delrm*; references in ref/delrm_ref.h
+# (doc/study/sscdo2/delrm-plugin/gen-ref.sh).
+add_executable(delrm_dsp_test delrm_dsp_test.cpp)
+target_include_directories(delrm_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/delrm/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(delrm_dsp_test PRIVATE cxx_std_17)
+add_test(NAME delrm_dsp_test COMMAND delrm_dsp_test)
