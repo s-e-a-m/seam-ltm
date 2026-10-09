@@ -232,3 +232,70 @@ TEST_CASE("the held meters release with a 300 ms time constant") {
     const double want = 0.5 * std::exp(-blocks * 256.0 / (0.3 * 96000.0));
     CHECK(std::fabs(e.inputPeak(0) / want - 1.0) < 1e-9);
 }
+
+// ── The compressor under sliders: one set for channel 2, one for channel 4 ──
+// The two sets of doc/study/sscdo2/delrm-plugin/dsp/delrmw.dsp, different on
+// the two channels so that a set reaching the wrong one shows.
+static const Dynamics kSet2{ 30.0, 4.0, -12.0, 0.005, 0.2 };
+static const Dynamics kSet4{ 6.0, 20.0, -36.0, 0.1, 1.0 };
+
+static refwin::Compare againstSliders(const double* ref, long changeAt = -1, double thresh2 = 0) {
+    Engine e; REQUIRE(e.prepare(96000.0));
+    e.setOutput(1.0); e.setPower(true);
+    e.setDynamics(0, kSet2); e.setDynamics(1, kSet4);
+    e.reset();                                  // the drives start on their targets
+    refwin::Compare cmp(4, 16, 12000);
+    run(e, 96000.0, 256, [&](long pos) {
+            if (pos == changeAt) { Dynamics d = kSet2; d.threshDb = thresh2; e.setDynamics(0, d); }
+        },
+        [&](int c, long g, double y) { cmp.see(c, g, y, ref); });
+    return cmp;
+}
+
+TEST_CASE("the sliders away from the score equal sdt.delrmdynw, each on its own channel") {
+    const auto c = againstSliders(&delrmref::kSliders96[0][0][0]);
+    MESSAGE("sliders rel. error " << c.relErr());
+    CHECK(c.compared == 4 * 16 * 512);
+    CHECK(c.relErr() < 1e-12);
+    CHECK(c.energyRelErr(&delrmref::kSliders96_energy[0][0]) < 1e-10);
+}
+
+TEST_CASE("a threshold moved at sample 96000 follows the spec: the compressor does not restart") {
+    const auto c = againstSliders(&delrmref::kThresh96[0][0][0], 96000, -30.0);
+    MESSAGE("threshold change rel. error " << c.relErr());
+    CHECK(c.compared == 4 * 16 * 512);
+    CHECK(c.relErr() < 1e-12);
+    CHECK(c.energyRelErr(&delrmref::kThresh96_energy[0][0]) < 1e-10);
+}
+
+TEST_CASE("the score's set, sent at every block, changes no output bit") {
+    Engine a; settle(a, 96000.0);
+    Engine b; settle(b, 96000.0);
+    std::vector<double> ya, yb;
+    run(a, 96000.0, 256, [](long) {}, [&](int, long, double y) { ya.push_back(y); });
+    run(b, 96000.0, 256, [&](long) { b.setDynamics(0, Dynamics{}); b.setDynamics(1, Dynamics{}); },
+        [&](int, long, double y) { yb.push_back(y); });
+    CHECK(ya == yb);
+}
+
+// Ratio 1 opens the compressor (gain 0 dB), so the output is the drive times
+// the triple product: two engines differing only in the drive show the glide.
+TEST_CASE("the drive glides from +20 to +40 dB in 25 ms, linear in gain") {
+    const Dynamics open{ 20.0, 1.0, -24.0, 0.03, 0.04 };
+    Engine a; REQUIRE(a.prepare(96000.0)); a.setOutput(1.0); a.setPower(true);
+    Engine b; REQUIRE(b.prepare(96000.0)); b.setOutput(1.0); b.setPower(true);
+    a.setDynamics(0, open); b.setDynamics(0, open); a.reset(); b.reset();
+    const long kAt = 188 * 256;                 // 48128, a block start
+    std::vector<double> ya(96000), yb(96000);
+    run(a, 48000.0 * 2, 256, [](long) {}, [&](int c, long g, double y) { if (c == 1 && g < 96000) ya[g] = y; });
+    run(b, 48000.0 * 2, 256, [&](long pos) { if (pos == kAt) { Dynamics d = open; d.driveDb = 40.0; b.setDynamics(0, d); } },
+        [&](int c, long g, double y) { if (c == 1 && g < 96000) yb[g] = y; });
+    // 2400 samples = 25 ms at 96 kHz; the gain moves by 90/2400 per sample.
+    auto ratioAt = [&](long k) { return yb[kAt + k] / ya[kAt + k]; };
+    REQUIRE(std::fabs(ya[kAt + 1199]) > 1e-9);
+    CHECK(yb[kAt - 1] == ya[kAt - 1]);
+    CHECK(ratioAt(0)    == doctest::Approx(1.0 + 9.0 * 1.0 / 2400.0).epsilon(1e-12));
+    CHECK(ratioAt(1199) == doctest::Approx(1.0 + 9.0 * 1200.0 / 2400.0).epsilon(1e-12));
+    CHECK(ratioAt(2399) == doctest::Approx(10.0).epsilon(1e-12));
+    CHECK(ratioAt(4799) == doctest::Approx(10.0).epsilon(1e-12));
+}

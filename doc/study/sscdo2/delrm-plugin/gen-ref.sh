@@ -48,5 +48,8 @@ OUT="$ROOT/tests/ref/delrm_ref.h"
   "$WORK/refdump" 96000 2 kWin96
   "$WORK/refdump" 48000 2 kWin48
   "$WORK/refdump" 96000 2 kChange96 96000 mt 10
+  build delrmw.dsp
+  "$WORK/refdump" 96000 2 kSliders96
+  "$WORK/refdump" 96000 2 kThresh96 96000 t2 -30
   echo "} // namespace delrmref"; } > "$OUT"
 echo "wrote $OUT ($(wc -c < "$OUT") bytes)"
