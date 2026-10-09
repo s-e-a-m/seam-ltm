@@ -167,7 +167,7 @@ The APF of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four independent l
   screenshot = "delrm.png"
   faust = "seam.tedesco.lib"
   description = """
-delRM of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four channels, each processing its own input. Channels 1 and 3 add the input to itself delayed; channels 2 and 4 multiply the delayed input, the input and its integral, into an 11:1 compressor. The delay is DDELAY's distance in metres moved to the next prime, one for the four channels. Input meters and the gain reduction of channels 2 and 4, drawn in opposite directions"""
+delRM of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four channels, each processing its own input. Channels 1 and 3 add the input to itself delayed; channels 2 and 4 multiply the delayed input, the input and its integral, into a compressor, the score's 11:1 by default, with drive, threshold, ratio, attack and release under five sliders for each of the two. The delay is DDELAY's distance in metres moved to the next prime, one for the four channels. Input meters and the gain reduction of channels 2 and 4, drawn in opposite directions"""
 
   [[family.plugin]]
   name = "CHOIR"

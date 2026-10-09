@@ -5,6 +5,7 @@
 #include "stunedrev_ids.h"
 #include "stunedrev_state.h"
 #include "stunedrev_views.h"
+#include "seam_spectrum_view.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -18,6 +19,9 @@
 namespace Seam {
 using namespace Steinberg;
 using namespace Steinberg::Vst;
+
+// The spectra's EMA: steady enough to read, quick enough to follow a gesture.
+static constexpr double kSpectrumTau = 0.3;   // s
 
 static ParamID idOf(stunedrev::Param p) { return kParamPower + (ParamID)p; }
 
@@ -67,10 +71,12 @@ tresult PLUGIN_API StunedrevProcessor::terminate() {
 tresult PLUGIN_API StunedrevProcessor::setActive(TBool state) {
     if (state) {
         engine_.prepare(sampleRate());
+        spectrum_->prepare(sampleRate(), kSpectrumTau);
         stunedrev::applyTo(box_.plain(), engine_);   // recalled values become the targets...
         engine_.reset();                             // ...and the ramps start on them
     } else {
         engine_.release();
+        spectrum_->release();
     }
     return SingleComponentEffect::setActive(state);
 }
@@ -105,10 +111,13 @@ tresult PLUGIN_API StunedrevProcessor::process(ProcessData& data) {
             for (int32 c = 0; c < data.outputs[0].numChannels; ++c) if (out[c]) memset(out[c], 0, bytes);
         } else {
             void** in = getChannelBuffersPointer(processSetup, data.inputs[0]);
-            if (data.symbolicSampleSize == kSample32)
+            if (data.symbolicSampleSize == kSample32) {
                 engine_.process(reinterpret_cast<float**>(in), reinterpret_cast<float**>(out), data.numSamples);
-            else
+                spectrum_->process(reinterpret_cast<float**>(out), data.numSamples);
+            } else {
                 engine_.process(reinterpret_cast<double**>(in), reinterpret_cast<double**>(out), data.numSamples);
+                spectrum_->process(reinterpret_cast<double**>(out), data.numSamples);
+            }
         }
     }
     return kResultOk;
@@ -167,6 +176,21 @@ VSTGUI::CView* PLUGIN_API StunedrevProcessor::createCustomView(
         VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
         if (!font) font = VSTGUI::kNormalFontSmall;
         return new StunedrevFooter(VSTGUI::CRect(0, 0, 400, 36), &engine_, font, text);
+    }
+    if (std::string(name) == "StunedrevSpectrum") {
+        // One colour per line, from the palette: the azure of the sliders,
+        // the meters' gold, the inverted red, and white.
+        VSTGUI::CColor gold(0xc8, 0xa2, 0x4a, 0xff), red(0xc0, 0x40, 0x40, 0xff);
+        if (description) {
+            description->getColor("MeterFill", gold);
+            description->getColor("MeterInv", red);
+        }
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
+        if (!font) font = VSTGUI::kNormalFontSmall;
+        return new Seam::SpectrumView<stunedrev::kLines>(
+            VSTGUI::CRect(0, 0, 400, 200), spectrum_.get(), font, frame, text,
+            {{ azure, gold, red, text }},
+            {{ "\xE2\x88\x9A" "2", "\xCF\x86", "e", "\xCF\x80" }});   // sqrt2, phi, e, pi
     }
     return nullptr;
 }

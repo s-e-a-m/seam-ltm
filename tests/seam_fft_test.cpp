@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 #include "seam_fft.h"
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -243,4 +244,21 @@ TEST_CASE("Welch reset clears the hold too") {
     CHECK(w.holdDb()[64] > -6.0f);
     w.reset();
     CHECK(w.holdDb()[64] == -120.0f);
+}
+
+TEST_CASE("Welch windows the frame in time order: far bins of a sine stay below -90 dB") {
+    // Every other hop the ring's oldest sample sits mid-buffer; a window laid
+    // on the ring in storage order would cut the sine there and leak.
+    seam::fft::Welch w;
+    const int n = 1024; const double fs = 48000.0;
+    w.prepare(n, 0.0, fs);
+    // Between bins 40 and 41: not periodic in the frame, so a frame taken
+    // out of time order carries a jump (a sine on a bin would hide it).
+    const double hz = 40.5 * fs / n;
+    for (int i = 0; i < 3 * n + n / 2; ++i) w.push((float)(0.5 * std::sin(2 * M_PI * hz * i / fs)));
+    const float* db = w.magnitudeDb();
+    CHECK(std::max(db[40], db[41]) > -8.0f);            // -6.02 less Hann's 1.42 dB scallop
+    float far = -200.0f;
+    for (int k = 120; k < w.numBins(); ++k) far = std::max(far, db[k]);
+    CHECK(far < -90.0f);
 }

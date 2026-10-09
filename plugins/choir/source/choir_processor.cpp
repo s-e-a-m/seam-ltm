@@ -24,6 +24,21 @@ using namespace Steinberg::Vst;
 
 static ParamID idOf(choir::Param p) { return kParamPower + (ParamID)p; }
 
+// Q and release: equal travel, equal ratio. The host shows and types the
+// plain value; the mapping is choir_params.h's, so DSP and display agree.
+class LogParameter : public RangeParameter {
+public:
+    LogParameter(const TChar* title, ParamID id, const TChar* units,
+                 double lo, double hi, double def, int32 precision)
+        : RangeParameter(title, id, units, lo, hi, def, 0, ParameterInfo::kCanAutomate) {
+        setPrecision(precision);
+        setNormalized(toNormalized(def));
+        info.defaultNormalizedValue = getNormalized();
+    }
+    ParamValue toPlain(ParamValue n) const SMTG_OVERRIDE { return choir::logToPlain(n, getMin(), getMax()); }
+    ParamValue toNormalized(ParamValue v) const SMTG_OVERRIDE { return choir::logToNormalized(v, getMin(), getMax()); }
+};
+
 tresult PLUGIN_API ChoirProcessor::initialize(FUnknown* context) {
     tresult r = SingleComponentEffect::initialize(context);
     if (r != kResultOk) return r;
@@ -40,6 +55,14 @@ tresult PLUGIN_API ChoirProcessor::initialize(FUnknown* context) {
         0.0, 1.0, 0.0, 0, ParameterInfo::kCanAutomate);
     out->setPrecision(3);
     parameters.addParameter(out);
+
+    parameters.addParameter(new RangeParameter(
+        STR16("1/f"), kParamPink, STR16(""),
+        0.0, 1.0, 0.0, 1, ParameterInfo::kCanAutomate | ParameterInfo::kIsList));
+    parameters.addParameter(new LogParameter(STR16("Q"), kParamQ, STR16(""),
+        choir::kQMin, choir::kQMax, choir::Config().q, 1));
+    parameters.addParameter(new LogParameter(STR16("Release"), kParamRelease, STR16("s"),
+        choir::kRelMin, choir::kRelMax, choir::Config().release, 2));
     return kResultOk;
 }
 
@@ -71,7 +94,7 @@ tresult PLUGIN_API ChoirProcessor::process(ProcessData& data) {
             // The last point of the block, applied at its start (suite convention).
             int32 off; ParamValue v;
             const ParamID id = q->getParameterId();
-            if (id < kParamPower || id > kParamOutput) continue;
+            if (id < kParamPower || id > kParamRelease) continue;
             if (q->getPoint(np - 1, off, v) == kResultOk)
                 box_.store((choir::Param)(id - kParamPower), v);
         }

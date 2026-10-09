@@ -9,9 +9,9 @@
 // ChoirGrid: four rows (channels) of 16 bars (bands). Each bar is the block
 // peak of the band's envelope divided by Q, the amplitude of the input's
 // partial there, in dBFS from -80 to 0, read from 64 relaxed atomics by a
-// 30 Hz timer. Row labels carry f and a; the last line carries Q, the
-// release, the noise block and the rate. An inactive band is an empty
-// grey frame.
+// 30 Hz timer. Row labels carry f and a; the last line carries the noise
+// block and the rate (Q and the release have their own sliders since
+// 2026-10-09). An inactive band is an empty grey frame.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include "choir_dsp.h"
@@ -127,11 +127,9 @@ public:
         }
         const double fs = engine_->sampleRate();
         if (fs > 0.0)
-            std::snprintf(s, sizeof s, "Q %g \xC2\xB7 release %g s \xC2\xB7 noise block 3 \xC2\xB7 @ %g kHz",
-                          cfg.q, cfg.release, fs / 1000.0);
+            std::snprintf(s, sizeof s, "noise block 3 \xC2\xB7 @ %g kHz", fs / 1000.0);
         else
-            std::snprintf(s, sizeof s, "Q %g \xC2\xB7 release %g s \xC2\xB7 noise block 3 \xC2\xB7 inactive",
-                          cfg.q, cfg.release);
+            std::snprintf(s, sizeof s, "noise block 3 \xC2\xB7 inactive");
         c->drawString(s, CRect(vs.left, axisTop + kAxisH + 2, vs.right, axisTop + kAxisH + 2 + kLineH), kLeftText);
         setDirty(false);
     }

@@ -3,7 +3,7 @@
 DELRM is the delRM of *Studio sul Corpo d'Ombra #2* (Alice Cortegiani, Davide Tedesco), ported from the Pure Data patch for Giuseppe Silvi's performance.
 It has four channels, and each channel processes only its own input from the TETRAREC.
 Channels 1 and 3 are a feed-forward comb: the input added to itself delayed by D.
-Channels 2 and 4 multiply three signals, the input delayed by D, the input and its integral, and pass the product through an 11:1 compressor that works as a limiter near −20 dBFS in steady state.
+Channels 2 and 4 multiply three signals, the input delayed by D, the input and its integral, and pass the product through a compressor that, at the score's 11:1, works as a limiter near −20 dBFS in steady state.
 Onsets pass well above 0 dBFS for 10 to 30 ms before the compressor clamps them: a sine onset after silence peaked at +21 to +43 dBFS on channel 2 (100 Hz at −14 dBFS: +21; 100 Hz at −6 dBFS: +43; 440 Hz at −6 dBFS: +32; 1 kHz at −6 dBFS: +27), against a steady level of −12 to −15 dBFS.
 This is the behaviour of the original and of the specification, so the master chain needs a brickwall limiter.
 Inputs and outputs 1–4 are in the order of the original.
@@ -15,12 +15,27 @@ Inputs and outputs 1–4 are in the order of the original.
 | POWER | off / on | off | fades the output in or out over 25 ms; the engine keeps running |
 | distance | 0–30 m, 1 mm | 7.291 m | the distance of DDELAY, the same for the four channels (see below) |
 | output | 0–1 | 0 | linear gain out of the four channels, CC82 in the original, 25 ms ramp |
+| drive (ch 2, ch 4) | 0–60 dB, linear | +20 dB | gain of the triple product into the compressor, 25 ms ramp |
+| threshold (ch 2, ch 4) | −60–0 dB, linear | −24 dB | the compressor's threshold |
+| ratio (ch 2, ch 4) | 1–40, logarithmic | 11 | the compressor's ratio; 1 opens it |
+| attack (ch 2, ch 4) | 1 ms–1 s, logarithmic | 30 ms | the envelope's attack; the knee smooths the gain over half of it |
+| release (ch 2, ch 4) | 5 ms–5 s, logarithmic | 40 ms | the envelope's release |
 
 Six read-only meters sit in the footer.
 `in 1`–`in 4` show the peak of each input over −70 to +5 dB, instant attack and 300 ms release, to set the gain of the ASP880.
 `GR 2` and `GR 4` show the gain reduction of the compressors over 0 to −48 dB, the deepest value of each block, with the same release.
 The GR bars are drawn right to left, opposite to the inputs: the input rising and the compressor descending read as two opposite movements, and the window of rehearsal card `delrm-dinamica` is legible while the ASP880 is set.
 GR near 0 dB means the product is still below the threshold and the effect is appearing; GR deep means the compressor works as a limiter and the effect is saturated (in steady state; the onsets still pass above 0 dBFS, see the top of this page).
+
+## The compressor under sliders
+
+Added on 2026-10-09, after the rehearsal, to tune the limiter of channels 2 and 4 during the performance.
+Each of the two channels has its own five sliders, in two columns of the window, and the defaults are the score's set (`sdt.delrmdyn`).
+A session that never touches them plays the score bit for bit, and a session saved before the sliders existed opens on the score's set.
+A moved slider changes the law at the start of the next audio block and keeps the compressor's state: the envelope and the knee continue from where they are.
+The drive glides over 25 ms, linear in gain.
+Threshold and ratio jump, and the knee's one-pole smooths the jump of the gain in dB over half the attack time.
+Attack and release are coefficients and act from the next sample.
 
 ## The distance
 
@@ -54,7 +69,7 @@ Decided with Davide on 2026-10-02:
 
 ## Specification
 
-The DSP is `sdt.delrmcomb`, `sdt.delrmint`, `sdt.delrmrm` and `sdt.delrmdyn` of `seam.tedesco.lib` (faust-libraries), written again by hand in `source/delrm_dsp.h`:
+The DSP is `sdt.delrmcomb`, `sdt.delrmint`, `sdt.delrmrm` and `sdt.delrmdynw` of `seam.tedesco.lib` (faust-libraries), written again by hand in `source/delrm_dsp.h`:
 
 In the block below `mt` is the distance entry, and `process` is from `doc/study/sscdo2/delrm-plugin/dsp/delrm.dsp`.
 
@@ -66,7 +81,9 @@ leakyint(fc)   = /(ma.SR) : fi.pole(exp(-2*ma.PI*fc/ma.SR));
 delrmcomb(mt)  = fi.ff_comb(1 << 15, sma.imt2npsamp(mt), 1, 1);
 delrmint       = sfi.leakyint(1) : *(96000);
 delrmrm(mt)    = _ <: de.delay(1 << 15, sma.imt2npsamp(mt)), _, delrmint : *, _ : *;
-delrmdyn       = *(10) : co.compressor_mono(11, -24, 0.03, 0.04);
+delrmdynw(drive, ratio, thresh, att, rel)
+               = *(drive) : co.compressor_mono(ratio, thresh, att, rel);
+delrmdyn       = delrmdynw(10, 11, -24, 0.03, 0.04);   // the score's set, the default
 process        = delrmcomb(mt), (delrmrm(mt) : delrmdyn),
                  delrmcomb(mt), (delrmrm(mt) : delrmdyn);
 ```
@@ -84,9 +101,13 @@ The references are the specification compiled with `faust -double`; the tests ne
 | engine against the specification, 96 kHz | 5.28e-16 relative |
 | engine against the specification, 48 kHz | 5.98e-16 relative |
 | change of distance at sample 96000 | 5.34e-16 relative |
+| compressor sliders against `sdt.delrmdynw`, two sets on channels 2 and 4 | 1.42e-15 relative |
+| channel 2's threshold moved at sample 96000 | 1.49e-15 relative |
+| the score's set sent at every block | identical to the bit |
+| drive from +20 to +40 dB | linear in gain over 2400 samples (25 ms at 96 kHz), to 1e-12 |
 | line memory at 384 kHz | 1.06 MiB |
 
-Every test was verified by mutation, 24 mutations in all, two of them equivalent mutants explained in the record; the references, the record and the CPU measurement are in `doc/study/sscdo2/delrm-plugin/`.
+Every test was verified by mutation, 44 mutations in all (24 at the port, 20 for the compressor's sliders), two of them equivalent mutants explained in the record; the references, the record and the CPU measurement are in `doc/study/sscdo2/delrm-plugin/`.
 The cost is 2.02 % of a core at 96 kHz on sound and 0.46 % on silence, 4.12 % and 0.91 % at 192 kHz.
 The integrator and the compressor are poles that decay in silence, so their states would sink into subnormal numbers; the engine flushes subnormals to zero while it runs (`plugins/_common/seam_denormals.h`), and without the guard the silence costs about six times more (2.70 % at 96 kHz, 5.45 % at 192 kHz).
 

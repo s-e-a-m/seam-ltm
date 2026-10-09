@@ -1,7 +1,8 @@
 //──────────────────────────────────────────────────────────────────────────
 // SEAM-LTM · choir — the processor's state (SDK)
 //
-// Two normalized doubles in Param order, little-endian, under the suite's
+// Five normalized doubles in Param order (Power, Output; 1/f, Q, release
+// appended 2026-10-09), little-endian, under the suite's
 // append-only contract (seam_state.h): a short blob keeps the defaults for
 // the fields it lacks. RESET and the grid are not state.
 //──────────────────────────────────────────────────────────────────────────

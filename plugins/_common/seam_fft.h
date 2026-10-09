@@ -48,8 +48,12 @@ inline void transform(float* data, int n, bool forward) {
 // EMA time average. Allocation-free after prepare().
 class Welch {
 public:
-    void prepare(int fftSize, double emaTau, double fs) {
+    // hopPhase: samples already counted towards the first hop, so that
+    // several analysers fed in lockstep can take their FFTs in turn
+    // (seam_spectrum.h); 0 = the first frame after hop samples (strx).
+    void prepare(int fftSize, double emaTau, double fs, int hopPhase = 0) {
         n_ = fftSize; bins_ = fftSize/2 + 1; hop_ = fftSize/2;
+        phase_ = hopPhase % hop_;
         fs_ = (fs > 0.0) ? fs : 48000.0;
         // EMA coefficient over the hop rate (one hop = hop_ samples).
         const double dt = double(hop_) / fs_;
@@ -95,7 +99,7 @@ public:
     const float* holdDb() const { return holdDb_.data(); }
 
     void reset() {
-        pos_ = 0; sinceHop_ = 0; primed_ = false; newFrame_ = false;
+        pos_ = 0; sinceHop_ = phase_; primed_ = false; newFrame_ = false;
         std::fill(ring_.begin(), ring_.end(), 0.0f);
         std::fill(magLin_.begin(), magLin_.end(), 0.0f);
         std::fill(magDb_.begin(), magDb_.end(), -120.0f);
@@ -104,7 +108,7 @@ public:
     }
     void push(float x) {
         ring_[pos_] = x;
-        pos_ = (pos_ + 1) % n_;
+        if (++pos_ == n_) pos_ = 0;                    // no division per sample
         if (++sinceHop_ >= hop_) { sinceHop_ = 0; runFrame(); }
     }
     bool hasNewFrame() { bool f = newFrame_; newFrame_ = false; return f; }
@@ -113,10 +117,10 @@ public:
 private:
     void runFrame() {
         // windowed frame from the ring (oldest sample = current pos_)
-        for (int i = 0; i < n_; ++i) {
-            const float s = ring_[(pos_ + i) % n_];
-            scratch_[2*i]   = s * win_[i];
+        for (int i = 0, j = pos_; i < n_; ++i) {
+            scratch_[2*i]   = ring_[j] * win_[i];
             scratch_[2*i+1] = 0.0f;
+            if (++j == n_) j = 0;
         }
         transform(scratch_.data(), n_, true);
         for (int k = 0; k < bins_; ++k) {
@@ -133,7 +137,7 @@ private:
         }
         newFrame_ = true;
     }
-    int n_=0, bins_=0, hop_=0, pos_=0, sinceHop_=0;
+    int n_=0, bins_=0, hop_=0, pos_=0, sinceHop_=0, phase_=0;
     double fs_=48000.0, ema_=0.0, winNorm_=1.0;
     bool primed_=false, newFrame_=false;
     std::vector<float> win_, ring_, scratch_, magLin_, magDb_, holdLin_, holdDb_;

@@ -66,3 +66,33 @@ TEST_CASE("a two-double blob pins Distance at index 1 and leaves Output at its d
     CHECK(b.normalized(Param::Distance) == 0.25);
     CHECK(b.normalized(Param::Output) == defaultNormalized(Param::Output));
 }
+
+TEST_CASE("the ten sliders follow Output on disk: channel 2's five, then channel 4's") {
+    MemoryStream stream;
+    {
+        Steinberg::IBStreamer w(&stream, kLittleEndian);
+        for (int i = 0; i < 13; ++i) w.writeDouble(0.01 * (i + 1));
+    }
+    rewindStream(stream);
+    ParamBox b;
+    CHECK(readState(&stream, b) == 13);
+    const Param order[13] = { Param::Power, Param::Distance, Param::Output,
+                              Param::Drive2, Param::Thresh2, Param::Ratio2, Param::Attack2, Param::Release2,
+                              Param::Drive4, Param::Thresh4, Param::Ratio4, Param::Attack4, Param::Release4 };
+    for (int i = 0; i < 13; ++i) { CAPTURE(i); CHECK(b.normalized(order[i]) == 0.01 * (i + 1)); }
+}
+
+TEST_CASE("a session saved before the sliders recalls the score's compressor") {
+    MemoryStream stream;
+    {
+        Steinberg::IBStreamer w(&stream, kLittleEndian);
+        w.writeDouble(1.0); w.writeDouble(0.25); w.writeDouble(0.75);   // Power, Distance, Output
+    }
+    rewindStream(stream);
+    ParamBox b;
+    b.store(Param::Ratio2, 0.9); b.store(Param::Release4, 0.1);         // the recall must replace them
+    CHECK(readState(&stream, b) == 3);
+    const Plain p = b.plain();
+    CHECK(p.dyn[0] == Dynamics{});
+    CHECK(p.dyn[1] == Dynamics{});
+}

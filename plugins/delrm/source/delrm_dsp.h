@@ -3,8 +3,10 @@
 //
 // delRM of SSCDO#2 on four channels, each processing only its own input.
 // Channels 1 and 3: x + x[n-D] (sdt.delrmcomb). Channels 2 and 4: x[n-D]
-// times x times its integral anchored at 96 kHz (sdt.delrmrm), times 10,
-// into the 11:1 compressor (sdt.delrmdyn). One D for the four channels:
+// times x times its integral anchored at 96 kHz (sdt.delrmrm), times the
+// drive into the compressor (sdt.delrmdynw), one set of five sliders for
+// channel 2 and one for channel 4, the score's +20 dB, 11:1, -24 dB, 30 ms,
+// 40 ms by default (sdt.delrmdyn). One D for the four channels:
 // DDELAY's distance in metres moved to the next prime at the session's rate
 // (sma.imt2npsamp). This file only wires the _common blocks.
 //──────────────────────────────────────────────────────────────────────────
@@ -32,8 +34,15 @@ constexpr double kShortRamp     = 0.025;    // s
 // sdt.delrmint: sfi.leakyint(1) scaled by the rate SSCDO#2 is played at.
 constexpr double kIntegratorFc    = 1.0;
 constexpr double kIntegratorScale = 96000.0;
-// sdt.delrmdyn: *(10) : co.compressor_mono(11, -24, 0.03, 0.04).
-constexpr double kRmGain = 10.0, kRatio = 11.0, kThreshDb = -24.0, kAttack = 0.03, kRelease = 0.04;
+// The compressor of channels 2 and 4; the defaults are sdt.delrmdyn,
+// *(10) : co.compressor_mono(11, -24, 0.03, 0.04).
+struct Dynamics {
+    double driveDb = 20.0, ratio = 11.0, threshDb = -24.0, attack = 0.03, release = 0.04;   // dB, :1, dB, s, s
+    bool operator==(const Dynamics& o) const {
+        return driveDb == o.driveDb && ratio == o.ratio && threshDb == o.threshDb &&
+               attack == o.attack && release == o.release;
+    }
+};
 // Meters: instant attack per block, one-pole release across blocks.
 constexpr double kMeterRelease = 0.3;       // s
 constexpr double kInFloorDb = -70.0, kInTopDb = 5.0, kGrRangeDb = 48.0;
@@ -73,7 +82,9 @@ public:
         for (int c = 0; c < kChannels; ++c) dl_[c].attach(mem_.get() + (std::size_t)c * len_, len_);
         for (int r = 0; r < 2; ++r) {
             li_[r].prepare(fs, kIntegratorFc);
-            cm_[r].prepare(fs, kRatio, kThreshDb, kAttack, kRelease);
+            const Dynamics& d = dyn_[r];
+            cm_[r].prepare(fs, d.ratio, d.threshDb, d.attack, d.release);
+            drive_[r].setTarget(dbToGain(d.driveDb), kShortRamp, fs_);
         }
         applyDistance();
         out_.setTarget(out_.target(), kShortRamp, fs_);
@@ -96,7 +107,7 @@ public:
     }
 
     // Every ramp onto its target (setActive, after the recalled values).
-    void reset() { out_.snap(); pow_.snap(); }
+    void reset() { out_.snap(); pow_.snap(); drive_[0].snap(); drive_[1].snap(); }
 
     // Audio thread, at the start of a block (or before prepare). The delay
     // jumps, as in the spec.
@@ -110,6 +121,19 @@ public:
     void setPower(bool on) {
         const double t = on ? 1.0 : 0.0;
         if (t != pow_.target()) pow_.setTarget(t, kShortRamp, fs_);
+    }
+
+    // Audio thread, at the start of a block (or before prepare); r = 0 for
+    // channel 2, 1 for channel 4. A new law keeps the compressor's state;
+    // the drive glides 25 ms, threshold and ratio jump (the knee smooths the
+    // gain in dB), attack and release are coefficients.
+    void setDynamics(int r, const Dynamics& d) {
+        if (d == dyn_[r]) return;
+        const Dynamics was = dyn_[r];
+        dyn_[r] = d;
+        if (!mem_) return;
+        cm_[r].set(fs_, d.ratio, d.threshDb, d.attack, d.release);
+        if (d.driveDb != was.driveDb) drive_[r].setTarget(dbToGain(d.driveDb), kShortRamp, fs_);
     }
 
     template <class T>
@@ -130,7 +154,7 @@ public:
                 } else {                                             // channels 2, 4
                     const int r = c >> 1;
                     const double p = d * x * (kIntegratorScale * li_[r].tick(x));
-                    y = cm_[r].tick(kRmGain * p);
+                    y = cm_[r].tick(drive_[r].next() * p);
                     depth[r] = std::max(depth[r], -cm_[r].gainDb());
                 }
                 out[c][k] = (T)(y * g);
@@ -152,12 +176,15 @@ public:
     std::size_t lineLength() const        { return len_; }
     uint32_t    delaySamples() const      { return delay_.load(); }
     double      sampleRate() const        { return sampleRate_.load(); }
+    const Dynamics& dynamics(int r) const { return dyn_[r]; }
     double      inputPeak(int c) const    { return heldPeak_[c]; }
     double      reductionDb(int r) const  { return heldGr_[r]; }
     double      blockPeak(int c) const    { return blockPeak_[c]; }
     double      blockReductionDb(int r) const { return blockGr_[r]; }
 
 private:
+    static double dbToGain(double db) { return std::pow(10.0, db / 20.0); }
+
     void applyDistance() {
         const uint32_t d = delayFor(metres_, fs_, *sieve_);
         for (auto& l : dl_) l.setDelay(d);
@@ -179,7 +206,8 @@ private:
     Seam::IntegerDelay    dl_[kChannels];
     Seam::LeakyIntegrator li_[2];
     Seam::CompressorMono  cm_[2];
-    Seam::LinearRamp out_, pow_;
+    Dynamics              dyn_[2];
+    Seam::LinearRamp out_, pow_, drive_[2];
     double heldPeak_[kChannels] = {}, blockPeak_[kChannels] = {};
     double heldGr_[2] = {}, blockGr_[2] = {};
 

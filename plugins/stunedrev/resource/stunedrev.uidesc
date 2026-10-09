@@ -13,13 +13,15 @@
         <color name="SliderTrack" rgba="#444444ff"/>
         <color name="SliderActive" rgba="#4a9ec8ff"/>
         <color name="Structure" rgba="#888888ff"/>
+        <color name="MeterFill" rgba="#c8a24aff"/>
+        <color name="MeterInv" rgba="#c04040ff"/>
     </colors>
 
     <!-- L format: six fine controls, two columns of 180 px at x=30 and
          x=250. Left: the four times, in the lines' order. Right: input and
          output. No SETUP zone. Zone order HEADER, OPS, FINE, FOOTER. -->
-    <template name="view" class="CViewContainer" origin="0, 0" size="460, 500"
-              minSize="460, 500" maxSize="460, 500"
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 710"
+              minSize="460, 710" maxSize="460, 710"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- ── HEADER ─────────────────────────────────────────────────── -->
@@ -116,8 +118,12 @@
              remembers), the arena, the status. -->
         <view class="CView" origin="30, 366" size="400, 36" custom-view-name="StunedrevFooter"/>
 
+        <!-- The four outputs' spectra overlaid, one colour per line
+             (sqrt2 phi e pi = channels 1-4), live while the piece plays. -->
+        <view class="CView" origin="30, 410" size="400, 200" custom-view-name="StunedrevSpectrum"/>
+
         <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
-        <view class="CView" origin="110, 412" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="110, 622" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>

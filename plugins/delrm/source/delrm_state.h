@@ -1,7 +1,7 @@
 //──────────────────────────────────────────────────────────────────────────
 // SEAM-LTM · delrm — the processor's state (SDK)
 //
-// Three normalized doubles in Param order, little-endian, under the suite's
+// Thirteen normalized doubles in Param order, little-endian, under the suite's
 // append-only contract (seam_state.h): a short blob keeps the defaults for
 // the fields it lacks. The meters are not state.
 //──────────────────────────────────────────────────────────────────────────

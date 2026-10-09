@@ -75,6 +75,36 @@ TEST_CASE("silence gives exactly 0, never NaN, and the gain returns to 0 dB") {
     CHECK(c.gainDb() > -1e-6);
 }
 
+// A slider moved during the performance: set() takes the new law without
+// emptying the envelope and the knee, as prepare() does.
+TEST_CASE("set() with the same law leaves the output untouched mid-signal") {
+    CompressorMono a, b;
+    a.prepare(96000.0, 11, -24, 0.03, 0.04);
+    b.prepare(96000.0, 11, -24, 0.03, 0.04);
+    for (int i = 0; i < 9600; ++i) { const double x = 0.9 * std::sin(i * 0.003); a.tick(x); b.tick(x); }
+    REQUIRE(b.gainDb() < -10.0);                   // the compressor is working
+    b.set(96000.0, 11, -24, 0.03, 0.04);
+    double worst = 0.0;
+    for (int i = 9600; i < 19200; ++i) {
+        const double x = 0.9 * std::sin(i * 0.003);
+        worst = std::max(worst, std::fabs(a.tick(x) - b.tick(x)));
+    }
+    CHECK(worst == 0.0);
+}
+
+TEST_CASE("set() replaces ratio, threshold, attack, release and the knee") {
+    CompressorMono a, b;
+    a.prepare(96000.0, 4, -12, 0.005, 0.2);
+    b.prepare(96000.0, 11, -24, 0.03, 0.04);
+    b.set(96000.0, 4, -12, 0.005, 0.2);            // both still at rest
+    double worst = 0.0;
+    for (int i = 0; i < 19200; ++i) {
+        const double x = 0.9 * std::sin(i * 0.003) * (i % 4800 < 2400 ? 1.0 : 0.05);
+        worst = std::max(worst, std::fabs(a.tick(x) - b.tick(x)));
+    }
+    CHECK(worst == 0.0);
+}
+
 TEST_CASE("tau2pole: 0 below epsilon, exp(-1/(tau fs)) otherwise") {
     CHECK(Seam::tau2pole(0.0, 96000.0) == 0.0);
     CHECK(std::fabs(Seam::tau2pole(0.03, 96000.0) - std::exp(-1.0 / (0.03 * 96000.0))) < 1e-16);

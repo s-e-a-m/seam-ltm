@@ -51,3 +51,37 @@ The CPU check covers it, `cpu.cpp` in this folder (256-sample blocks, the test s
 Without the guard the silent tail costs about six times more than with it, the subnormals filling the integrators and compressors; with it silence is cheaper than sound.
 
 The mutations were run on the Debug configuration of `build-test`; the two `seam_delays_test` rows were re-confirmed RED in Release, because a Debug build aborts `seam_delays_test` on the assert of its own clamp test.
+
+## The compressor under sliders (2026-10-09)
+
+Same method, on the Release configuration of `build-test`; the source was restored from a copy taken before the first mutation, and `cmp` with that copy confirmed it before the commit.
+
+| test | mutation | result |
+|---|---|---|
+| seam_compressors_test: same law | `set()` ends with `reset()` | RED |
+| seam_compressors_test: new law | `set()` forgets `thresh_` (`prepare` keeps it) | RED |
+| seam_compressors_test: new law | `set()` forgets `slope_` (`prepare` keeps it) | RED |
+| seam_compressors_test: new law | `set()` forgets `cAtt_` (`prepare` keeps it) | RED |
+| seam_compressors_test: new law | `set()` forgets `cRel_` (`prepare` keeps it) | RED |
+| seam_compressors_test: new law | `set()` forgets `cKnee_` (`prepare` keeps it) | RED |
+| delrm_dsp_test: sliders | `setDynamics` reaches the other channel's compressor (`cm_[1 - r]`) | RED |
+| delrm_dsp_test: threshold change | `setDynamics` calls `prepare` (the compressor restarts) | RED |
+| delrm_dsp_test: score's set every block | no early return on an unchanged set, and `prepare` in place of `set` | RED |
+| delrm_dsp_test: drive glide | the drive jumps (`snap()` after `setTarget`) | RED |
+| delrm_dsp_test: drive glide | the drive glides 50 ms | RED |
+| delrm_dsp_test: at 0 m | the drive's gain as `exp(db·ln10/20)`, not exactly 10 | RED |
+| delrm_dsp_test: engine 96/48 | `reset()` leaves the drives ramping up from 0 | RED |
+| delrm_params_test, delrm_state_test | channel 2's threshold and ratio swapped in `Param` | RED |
+| delrm_params_test | the row taken as `% 2`, not `/ 5` | RED |
+| delrm_params_test | ratio linear over 1-40 | RED |
+| delrm_params_test | threshold upside down (`-60 · n`) | RED |
+| delrm_params_test | the sliders' default positions at 0 | RED (see below) |
+| delrm_params_test | `applyTo` forgets channel 4 | RED |
+| delrm_params_test | `plain()` without the score's value at the default position | RED (attack 30 ms comes back one ulp off) |
+
+The coefficient mutations keep the coefficient in `prepare` and drop it only from `set`.
+A first version dropped it from `set` alone while `prepare` called `set`, so both compressors of the test lost it and stayed equal: it proved nothing, and was replaced.
+
+The default positions at 0 first went RED only by a side effect.
+A slider on its default plays the score's value itself, so with every default at 0 the plugin still played the score and the defaults test stayed GREEN, while the host would have shown every slider at the bottom of its travel.
+A test now reads each default position through the slider's own scale and asks for the score's value; it goes RED on that mutation directly.

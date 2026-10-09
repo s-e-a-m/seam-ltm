@@ -28,6 +28,14 @@ public:
         d_ = 1.0 + g_ * (g_ + k_);
     }
 
+    // A new q at the same centre: k = 1/q is the only term that moves, so no
+    // tan. The TPT structure stays stable while its coefficients change, so
+    // q may glide while the filter rings (the choir's live Q).
+    void setQ(double q) {
+        k_ = 1.0 / q;
+        d_ = 1.0 + g_ * (g_ + k_);
+    }
+
     double tick(double x) {
         const double v1 = (ic1_ + g_ * (x - ic2_)) / d_;
         const double v2 = ic2_ + g_ * v1;

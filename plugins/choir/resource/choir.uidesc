@@ -16,10 +16,11 @@
         <color name="MeterFill" rgba="#c8a24aff"/>
     </colors>
 
-    <!-- L format for the grid's width (strx's reason), two controls only.
-         No SETUP zone. Zone order HEADER, OPS, FINE, FOOTER. -->
-    <template name="view" class="CViewContainer" origin="0, 0" size="460, 470"
-              minSize="460, 470" maxSize="460, 470"
+    <!-- L format: the grid's width (strx's reason), and since 2026-10-09
+         Q and release in two columns under the output. No SETUP zone.
+         Zone order HEADER, OPS, FINE, FOOTER. -->
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 532"
+              minSize="460, 532" maxSize="460, 532"
               background-color="BgDark" background-color-draw-style="filled">
 
         <!-- ── HEADER ─────────────────────────────────────────────────── -->
@@ -32,19 +33,26 @@
               title="sixteen voices on four channels &#xB7; noise block 3" transparent="true"/>
 
         <!-- ── OPS ───────────────────────────────────────────────────────
-             POWER over the left column, RESET over the right one. RESET
+             POWER over the left column, RESET over the right one, 1/F
+             between them: a switch played live, crossfaded in 25 ms. RESET
              is UI-only: it silences the ringing bands, not a parameter. -->
         <view class="CCheckBox" origin="93, 90" size="14, 14" control-tag="Power"
               boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
               title="" transparent="true"/>
         <view class="CTextLabel" origin="111, 88" size="52, 16" font="KnobLabelFont"
               font-color="TextLight" text-alignment="left" title="POWER" transparent="true"/>
+        <view class="CCheckBox" origin="203, 90" size="14, 14" control-tag="Pink"
+              boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
+              title="" transparent="true" tooltip="1/f on the voices: the choir pink per octave"/>
+        <view class="CTextLabel" origin="221, 88" size="40, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="1/F" transparent="true"/>
         <view class="CView" origin="313, 90" size="14, 14" custom-view-name="ChoirReset"
               tooltip="silence the ringing bands"/>
         <view class="CTextLabel" origin="331, 88" size="52, 16" font="KnobLabelFont"
               font-color="TextLight" text-alignment="left" title="RESET" transparent="true"/>
 
-        <!-- ── FINE — the output, full width (dslar's Output) ───────────── -->
+        <!-- ── FINE — the output, full width (dslar's Output); Q and the
+             followers' release in the two columns below ────────────────── -->
         <view class="CTextLabel" origin="0, 120" size="460, 14" font="KnobLabelFont"
               font-color="TextLight" text-alignment="center" title="output" transparent="true"/>
         <view class="CSlider" origin="80, 136" size="300, 18" control-tag="Output"
@@ -55,14 +63,37 @@
               font-color="TextLight" text-alignment="center" transparent="true"
               value-precision="3" style-no-frame="true"/>
 
+        <view class="CTextLabel" origin="30, 182" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="Q" transparent="true"/>
+        <view class="CSlider" origin="30, 198" size="180, 18" control-tag="Q"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CTextEdit" origin="30, 218" size="180, 16" font="ValueFont" control-tag="Q"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="1" style-no-frame="true"/>
+
+        <view class="CTextLabel" origin="250, 182" size="180, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="release" transparent="true"/>
+        <view class="CSlider" origin="250, 198" size="180, 18" control-tag="Release"
+              orientation="horizontal" draw-back="true" draw-back-color="SliderTrack"
+              draw-value="true" draw-value-color="SliderActive"
+              draw-frame="true" draw-frame-color="SliderTrack" frame-width="1" mode="free click"/>
+        <view class="CTextEdit" origin="250, 218" size="180, 16" font="ValueFont" control-tag="Release"
+              font-color="TextLight" text-alignment="center" transparent="true"
+              value-precision="2" style-no-frame="true"/>
+
         <!-- ── FOOTER — what the choir hears, band by band, then the logo ─ -->
-        <view class="CView" origin="30, 188" size="400, 176" custom-view-name="ChoirGrid"/>
-        <view class="CView" origin="110, 380" size="240, 77" bitmap="logo"/>
+        <view class="CView" origin="30, 250" size="400, 176" custom-view-name="ChoirGrid"/>
+        <view class="CView" origin="110, 442" size="240, 77" bitmap="logo"/>
     </template>
 
     <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
     <control-tags>
         <control-tag name="Power"  tag="100"/>
         <control-tag name="Output" tag="101"/>
+        <control-tag name="Pink"   tag="102"/>
+        <control-tag name="Q"      tag="103"/>
+        <control-tag name="Release" tag="104"/>
     </control-tags>
 </vstgui-ui-description>
