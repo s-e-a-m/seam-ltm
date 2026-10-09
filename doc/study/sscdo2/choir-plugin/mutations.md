@@ -29,3 +29,22 @@ Each mutation was applied to the source one at a time with `sed`, only the named
 The two mutations on `choirdens` are RED at 48 kHz only: at 96 kHz the factor is 1, so a test run at that rate alone would let both through.
 The low-pass mutation of `SvfBandpass` passes the peak-gain case, because Simper's low-pass also has gain q at the resonance; the impulse responses catch it.
 An inactive band skipped but designed at its own centre is not a defect anyone can hear (it is never computed); the mutation removes both the skip and the 19999 Hz design, and the output goes non-finite above fs/2.
+
+## After the rehearsal with STONED (2026-10-09): 1/f, Q, release
+
+| test | mutation | result |
+|---|---|---|
+| choir_dsp_test | make-up fixed at 1 | RED (white-noise power; sdt.choirw reference) |
+| choir_dsp_test | make-up summed on fl alone | RED (white-noise power; sdt.choirw reference) |
+| choir_dsp_test | weight sqrt(f/fv) instead of f/fv | RED (20log10(k) test) |
+| choir_dsp_test | the crossfade ignored (`0 * pm`) | RED (20log10(k) test) |
+| choir_dsp_test | 1/f snaps instead of crossfading | RED (25 ms crossfade) |
+| choir_dsp_test | setPink(false) ignored once on | RED (off is the score's choir) |
+| choir_dsp_test | applyQ leaves Q*2*pi stale | RED (new Q equals the choir designed at it) |
+| choir_dsp_test | the Q grid restarted every block | RED (block size does not move the grid) |
+| choir_dsp_test | setRelease leaves the followers' pole | RED (new release equals the choir designed with it) |
+| choir_params_test | applyTo without setQ / without setPink | RED (applyTo) |
+| choir_params_test, choir_state_test | release default 0 instead of 1.5 s | RED (defaults; old session recall) |
+
+A mutation that survived is recorded because it taught something: `pinkW - 0.9` instead of `pinkW - 1` is green, and rightly so — with the crossfade at 0 the weight is multiplied by zero, so the mutant is the same program.
+The test that guards "off is the score's choir" is killed instead by a switch that cannot return to off.
