@@ -108,7 +108,7 @@ public:
     }
     void push(float x) {
         ring_[pos_] = x;
-        pos_ = (pos_ + 1) % n_;
+        if (++pos_ == n_) pos_ = 0;                    // no division per sample
         if (++sinceHop_ >= hop_) { sinceHop_ = 0; runFrame(); }
     }
     bool hasNewFrame() { bool f = newFrame_; newFrame_ = false; return f; }
@@ -117,10 +117,10 @@ public:
 private:
     void runFrame() {
         // windowed frame from the ring (oldest sample = current pos_)
-        for (int i = 0; i < n_; ++i) {
-            const float s = ring_[(pos_ + i) % n_];
-            scratch_[2*i]   = s * win_[i];
+        for (int i = 0, j = pos_; i < n_; ++i) {
+            scratch_[2*i]   = ring_[j] * win_[i];
             scratch_[2*i+1] = 0.0f;
+            if (++j == n_) j = 0;
         }
         transform(scratch_.data(), n_, true);
         for (int k = 0; k < bins_; ++k) {
