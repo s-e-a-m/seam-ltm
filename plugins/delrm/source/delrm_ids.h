@@ -16,7 +16,7 @@ enum DelrmParams : Steinberg::Vst::ParamID {
     kParamOutput   = 102,   // linear, CC82 in the original
     // The compressor of channel 2, then of channel 4; the score's set by
     // default (sdt.delrmdyn).
-    kParamDrive2 = 103,     // dB, 0-40, linear; +20
+    kParamDrive2 = 103,     // dB, 0-60, linear; +20
     kParamThresh2,          // dB, -60-0, linear; -24
     kParamRatio2,           // 1-40, logarithmic; 11
     kParamAttack2,          // s, 0.001-1, logarithmic; 0.03

@@ -15,7 +15,7 @@ Inputs and outputs 1–4 are in the order of the original.
 | POWER | off / on | off | fades the output in or out over 25 ms; the engine keeps running |
 | distance | 0–30 m, 1 mm | 7.291 m | the distance of DDELAY, the same for the four channels (see below) |
 | output | 0–1 | 0 | linear gain out of the four channels, CC82 in the original, 25 ms ramp |
-| drive (ch 2, ch 4) | 0–40 dB, linear | +20 dB | gain of the triple product into the compressor, 25 ms ramp |
+| drive (ch 2, ch 4) | 0–60 dB, linear | +20 dB | gain of the triple product into the compressor, 25 ms ramp |
 | threshold (ch 2, ch 4) | −60–0 dB, linear | −24 dB | the compressor's threshold |
 | ratio (ch 2, ch 4) | 1–40, logarithmic | 11 | the compressor's ratio; 1 opens it |
 | attack (ch 2, ch 4) | 1 ms–1 s, logarithmic | 30 ms | the envelope's attack; the knee smooths the gain over half of it |

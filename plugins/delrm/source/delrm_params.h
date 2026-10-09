@@ -24,7 +24,10 @@ constexpr int kDynFields = 5;              // drive, threshold, ratio, attack, r
 
 // Drive and threshold are linear in dB; ratio, attack and release are
 // logarithmic: equal travel, equal ratio.
-constexpr double kDriveMaxDb = 40.0;
+// Drive up to +60 dB (2026-10-09, GS in the host): the triple product is
+// cubic, so a quiet input sits far below any threshold, and +40 dB was the
+// whole travel. The score's +20 dB sits at one third.
+constexpr double kDriveMaxDb = 60.0;
 constexpr double kThreshMinDb = -60.0;
 constexpr double kRatioMax = 40.0;
 constexpr double kAttackMin = 0.001, kAttackMax = 1.0;      // s

@@ -89,9 +89,9 @@ TEST_CASE("drive and threshold are linear in dB; ratio, attack and release are l
     // At n = 0.5 the logarithmic ones sit at the geometric mean of their ends.
     const Row rows[] = {
         { 0.0,   0.0, -60.0,  1.0,                  0.001,                 0.005 },
-        { 0.25, 10.0, -45.0,  2.5148668593658708,   0.0056234132519034910, 0.028117066259517455 },
-        { 0.5,  20.0, -30.0,  6.3245553203367586,   0.031622776601683791,  0.15811388300841897 },
-        { 1.0,  40.0,   0.0, 40.0,                  1.0,                   5.0 },
+        { 0.25, 15.0, -45.0,  2.5148668593658708,   0.0056234132519034910, 0.028117066259517455 },
+        { 0.5,  30.0, -30.0,  6.3245553203367586,   0.031622776601683791,  0.15811388300841897 },
+        { 1.0,  60.0,   0.0, 40.0,                  1.0,                   5.0 },
     };
     for (const Row& w : rows) {
         CAPTURE(w.n);
@@ -118,7 +118,7 @@ TEST_CASE("each slider reaches its own field of its own channel, and nothing els
             const Plain p = b.plain();
             Dynamics want;                       // the score's set with one field at its top
             double* field[5] = { &want.driveDb, &want.threshDb, &want.ratio, &want.attack, &want.release };
-            const double top[5] = { 40.0, 0.0, 40.0, 1.0, 5.0 };
+            const double top[5] = { 60.0, 0.0, 40.0, 1.0, 5.0 };
             *field[f] = top[f];
             CHECK(same(p.dyn[r], want));
             CHECK(same(p.dyn[1 - r], Dynamics{}));
@@ -133,7 +133,7 @@ TEST_CASE("NaN on the compressor's sliders gives finite, in-range values") {
     for (int i = (int)Param::Drive2; i < kNumParams; ++i) b.store((Param)i, nan);
     const Plain p = b.plain();
     for (int r = 0; r < 2; ++r) {
-        CHECK((p.dyn[r].driveDb >= 0.0 && p.dyn[r].driveDb <= 40.0));
+        CHECK((p.dyn[r].driveDb >= 0.0 && p.dyn[r].driveDb <= 60.0));
         CHECK((p.dyn[r].threshDb >= -60.0 && p.dyn[r].threshDb <= 0.0));
         CHECK((p.dyn[r].ratio >= 1.0 && p.dyn[r].ratio <= 40.0));
         CHECK((p.dyn[r].attack >= 0.001 && p.dyn[r].attack <= 1.0));
