@@ -96,3 +96,22 @@ TEST_CASE("switching to the dual glides Z from +1 to -1 in 25 ms, at 96 and 48 k
     checkGlide(96000.0, 2400);
     checkGlide(48000.0, 1200);
 }
+
+// The matrix written in seam.ambisonics.lib and in doc/README.md: the dual
+// encoder followed by bamodulex (whose coefficients are encode()'s, the
+// matrix being involutory), impulse by impulse.
+TEST_CASE("dual tetrahedron through bamodulex is the documented matrix of ±1/2") {
+    const double M[4][4] = { {  0.5,  0.5, -0.5,  0.5 },
+                             {  0.5,  0.5,  0.5, -0.5 },
+                             { -0.5,  0.5,  0.5,  0.5 },
+                             {  0.5, -0.5,  0.5,  0.5 } };
+    for (int j = 0; j < 4; ++j) {
+        CAPTURE(j);
+        Encoder e; e.prepare(96000.0); e.setDual(true); e.reset();
+        double x[4] = { 0, 0, 0, 0 }; x[j] = 1.0;
+        const auto a = runBlock(e, x, 1)[0];
+        double s[4];
+        encode(a[0], a[1], a[2], a[3], s[0], s[1], s[2], s[3]);   // bamodulex
+        for (int i = 0; i < 4; ++i) { CAPTURE(i); CHECK(s[i] == M[i][j]); }
+    }
+}

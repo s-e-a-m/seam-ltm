@@ -54,7 +54,7 @@ Stereo to AmbiX via Haar (Silvi's method): each channel is Haar-decomposed, plac
   screenshot = "abmodulex.png"
   faust = "seam.ambisonics.lib"
   description = """
-Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD → A0 A1 A2 A3. Pure matrix, involutory (M² = I), the inverse of BAMODULEX, and the front end of the TETRAREC chain"""
+Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD → A0 A1 A2 A3. Pure matrix, involutory (M² = I), the inverse of BAMODULEX, and the front end of the TETRAREC chain. A SETUP menu reads the four capsules as the dual tetrahedron, LFD RFU RBD LBU: the upright one mirrored in the horizontal plane, Z changing sign"""
 
   [[family.plugin]]
   name = "BAMODULEX"
