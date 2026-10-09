@@ -25,6 +25,9 @@ using namespace Steinberg;
 using namespace Steinberg::Vst;
 
 static ParamID idOf(delrm::Param p) { return kParamPower + (ParamID)p; }
+static_assert(kParamDrive2 == kParamPower + (ParamID)delrm::Param::Drive2 &&
+              kParamRelease4 == kParamPower + (ParamID)delrm::Param::Release4,
+              "the host's IDs follow the state's order");
 
 // A gain reduction shown as a negative dB value, while its normalized value
 // grows with the depth: the bar, drawn right to left, grows as the
@@ -39,6 +42,25 @@ public:
         std::snprintf(s, sizeof s, db >= 0.05 ? "-%.1f" : "0.0", db);
         UString(string, 128).fromAscii(s);
     }
+};
+
+// A compressor slider: the host shows and types the plain value through the
+// mapping of delrm_params.h, so DSP and display agree, and the host's default
+// is the box's, where the score's value plays exactly.
+class DynParameter : public RangeParameter {
+public:
+    DynParameter(const TChar* title, ParamID id, const TChar* units,
+                 double lo, double hi, delrm::Param p, int32 precision)
+        : RangeParameter(title, id, units, lo, hi, lo, 0, ParameterInfo::kCanAutomate),
+          field_(delrm::dynFieldOf(p)) {
+        setPrecision(precision);
+        setNormalized(delrm::defaultNormalized(p));
+        info.defaultNormalizedValue = getNormalized();
+    }
+    ParamValue toPlain(ParamValue n) const SMTG_OVERRIDE { return delrm::dynToPlain(field_, n); }
+    ParamValue toNormalized(ParamValue v) const SMTG_OVERRIDE { return delrm::dynToNormalized(field_, v); }
+private:
+    int field_;
 };
 
 tresult PLUGIN_API DelrmProcessor::initialize(FUnknown* context) {
@@ -64,6 +86,22 @@ tresult PLUGIN_API DelrmProcessor::initialize(FUnknown* context) {
         0.0, 1.0, 0.0, 0, ParameterInfo::kCanAutomate);
     out->setPrecision(3);
     parameters.addParameter(out);
+
+    struct DynSpec { const char16* name; const char16* units; double lo, hi; int32 precision; };
+    const DynSpec spec[2][kDynFields] = {
+        { { STR16("Drive 2"), STR16("dB"), 0.0, kDriveMaxDb, 1 }, { STR16("Threshold 2"), STR16("dB"), kThreshMinDb, 0.0, 1 },
+          { STR16("Ratio 2"), STR16(":1"), 1.0, kRatioMax, 1 },   { STR16("Attack 2"), STR16("s"), kAttackMin, kAttackMax, 3 },
+          { STR16("Release 2"), STR16("s"), kReleaseMin, kReleaseMax, 3 } },
+        { { STR16("Drive 4"), STR16("dB"), 0.0, kDriveMaxDb, 1 }, { STR16("Threshold 4"), STR16("dB"), kThreshMinDb, 0.0, 1 },
+          { STR16("Ratio 4"), STR16(":1"), 1.0, kRatioMax, 1 },   { STR16("Attack 4"), STR16("s"), kAttackMin, kAttackMax, 3 },
+          { STR16("Release 4"), STR16("s"), kReleaseMin, kReleaseMax, 3 } },
+    };
+    for (int r = 0; r < 2; ++r)
+        for (int f = 0; f < kDynFields; ++f) {
+            const Param p = (Param)((int)Param::Drive2 + r * kDynFields + f);
+            const DynSpec& s = spec[r][f];
+            parameters.addParameter(new DynParameter(s.name, idOf(p), s.units, s.lo, s.hi, p, s.precision));
+        }
 
     const char16* inNames[kChannels] = { STR16("in 1"), STR16("in 2"), STR16("in 3"), STR16("in 4") };
     for (int c = 0; c < kChannels; ++c) {
@@ -105,7 +143,7 @@ tresult PLUGIN_API DelrmProcessor::process(ProcessData& data) {
             // The last point of the block, applied at its start (suite convention).
             int32 off; ParamValue v;
             const ParamID id = q->getParameterId();
-            if (id < kParamPower || id > kParamOutput) continue;
+            if (id < kParamPower || id > kParamRelease4) continue;
             if (q->getPoint(np - 1, off, v) == kResultOk)
                 box_.store((delrm::Param)(id - kParamPower), v);
         }

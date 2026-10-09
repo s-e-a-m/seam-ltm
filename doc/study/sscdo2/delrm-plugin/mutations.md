@@ -71,6 +71,17 @@ Same method, on the Release configuration of `build-test`; the source was restor
 | delrm_dsp_test: drive glide | the drive glides 50 ms | RED |
 | delrm_dsp_test: at 0 m | the drive's gain as `exp(db·ln10/20)`, not exactly 10 | RED |
 | delrm_dsp_test: engine 96/48 | `reset()` leaves the drives ramping up from 0 | RED |
+| delrm_params_test, delrm_state_test | channel 2's threshold and ratio swapped in `Param` | RED |
+| delrm_params_test | the row taken as `% 2`, not `/ 5` | RED |
+| delrm_params_test | ratio linear over 1-40 | RED |
+| delrm_params_test | threshold upside down (`-60 · n`) | RED |
+| delrm_params_test | the sliders' default positions at 0 | RED (see below) |
+| delrm_params_test | `applyTo` forgets channel 4 | RED |
+| delrm_params_test | `plain()` without the score's value at the default position | RED (attack 30 ms comes back one ulp off) |
 
 The coefficient mutations keep the coefficient in `prepare` and drop it only from `set`.
 A first version dropped it from `set` alone while `prepare` called `set`, so both compressors of the test lost it and stayed equal: it proved nothing, and was replaced.
+
+The default positions at 0 first went RED only by a side effect.
+A slider on its default plays the score's value itself, so with every default at 0 the plugin still played the score and the defaults test stayed GREEN, while the host would have shown every slider at the bottom of its travel.
+A test now reads each default position through the slider's own scale and asks for the score's value; it goes RED on that mutation directly.

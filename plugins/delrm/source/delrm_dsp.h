@@ -176,6 +176,7 @@ public:
     std::size_t lineLength() const        { return len_; }
     uint32_t    delaySamples() const      { return delay_.load(); }
     double      sampleRate() const        { return sampleRate_.load(); }
+    const Dynamics& dynamics(int r) const { return dyn_[r]; }
     double      inputPeak(int c) const    { return heldPeak_[c]; }
     double      reductionDb(int r) const  { return heldGr_[r]; }
     double      blockPeak(int c) const    { return blockPeak_[c]; }
