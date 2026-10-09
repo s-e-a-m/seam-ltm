@@ -10,6 +10,7 @@ set(abmodulex_sources
     ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/vstsinglecomponenteffect.h
     source/abmodulex_ids.h
     source/abmodulex_dsp.h
+    source/abmodulex_state.h
     source/abmodulex_processor.cpp
     source/abmodulex_processor.h
     source/version.h
@@ -22,6 +23,10 @@ smtg_add_vst3plugin(${target} ${abmodulex_sources})
 smtg_target_configure_version_file(${target})
 
 target_compile_features(${target} PUBLIC cxx_std_17)
+target_include_directories(${target} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../_common
+)
 target_link_libraries(${target} PRIVATE sdk vstgui_support)
 
 smtg_target_add_plugin_resources(${target}
