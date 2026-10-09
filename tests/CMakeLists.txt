@@ -34,6 +34,7 @@ add_executable(abmodulex_dsp_test
 target_include_directories(abmodulex_dsp_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/abmodulex/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
 )
 target_compile_features(abmodulex_dsp_test PRIVATE cxx_std_17)
 add_test(NAME abmodulex_dsp_test COMMAND abmodulex_dsp_test)
