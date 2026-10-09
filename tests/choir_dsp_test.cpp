@@ -349,3 +349,12 @@ TEST_CASE("a new release is the choir designed with that release") {
     auto ya = run(a, sa, 48000, 2048), yb = run(b, sb, 48000, 2048);
     for (int c = 0; c < 4; ++c) CHECK(ya[(size_t)c] == yb[(size_t)c]);
 }
+
+TEST_CASE("1/f on, Q 100, release 0.5 s equals sdt.choirw(100, 0.5, 1) at 48 kHz") {
+    Engine e; e.prepare(48000.0);
+    e.setOutput(1.0); e.setPower(true); e.setPink(true); e.setQ(100.0); e.setRelease(0.5);
+    e.reset();
+    Source s{Config(), 48000.0};
+    auto y = run(e, s, 144000 + 1024, 1024);
+    CHECK(relErr<1024>(y, choirref::kChoirW48) < 1e-12);
+}

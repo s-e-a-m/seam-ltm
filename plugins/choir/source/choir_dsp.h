@@ -133,7 +133,7 @@ public:
 
     double pinkMix() const { return pink_.value(); }
     double q() const       { return q_; }
-    double release() const { return release_; }
+    double releaseTime() const { return release_; }
     double makeup(int c) const { return makeup_[c]; }
 
     // GUI thread: served at the start of the next block.

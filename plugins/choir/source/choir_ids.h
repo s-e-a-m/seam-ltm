@@ -12,7 +12,10 @@ static const Steinberg::FUID ChoirProcessorUID (0x5E4D0013, 0xA1B2C3D4, 0x434852
 
 enum ChoirParams : Steinberg::Vst::ParamID {
     kParamPower  = 100,   // off / on   (100 + choir::Param index)
-    kParamOutput = 101    // linear, CC86 in the patch
+    kParamOutput = 101,   // linear, CC86 in the patch
+    kParamPink   = 102,   // 1/f on the voices, off / on
+    kParamQ      = 103,   // 10 .. 1000, logarithmic; 350 in the score
+    kParamRelease= 104    // s, 0.05 .. 10, logarithmic; 1.5 in the score
 };
 
 } // namespace Seam

@@ -11,13 +11,16 @@
 //   choirnoise(N)  = sno.multinoiseblock(N*(2 + 16), 2*N, N*16);
 //   choirdens      = sqrt(ma.SR/96000);
 //   choirband(fc,q) = fi.svf.bp(min(fc, 19999), q) : *(fc < 20000);
-//   choirchan(f,a,q,rel) = (listen, sing) : ro.interleave(16, 2)
-//                        : par(k, 16, *) :> /(q*2*ma.PI)
+//   choirpink(f,a,k) = f / (f*pow(k+1, a));               // 1/f on the voice
+//   choirmakeup(f,a) = sqrt(sum(k, 16, fl*fv) / sum(k, 16, fl*fv*w*w));
+//   choirchan(f,a,q,rel,p) = (listen, sing) : ro.interleave(16, 2)
+//                          : par(k, 16, * : *(1 + p*(choirpink(f,a,k)*choirmakeup(f,a) - 1)))
+//                          :> /(q*2*ma.PI)
 //   with { listen = _ <: par(k, 16, choirband(f*(k+1), q) : an.amp_follower(rel));
 //          sing   = par(k, 16, choirband(f*pow(k+1, a), q) : *(choirdens)); };
-//   choir(q,rel)   = si.bus(4), choirnoise(4) : (route) :
-//                    par(c, 4, choirchan(choirf(c), choira(c), q, rel));
-//   choirf = 48, 48, 96, 96;  choira = 1, 1.01, 1.1, 0.9;  q = 350;  rel = 1.5
+//   choir(q,rel,p) = si.bus(4), choirnoise(4) : (route) :
+//                    par(c, 4, choirchan(choirf(c), choira(c), q, rel, p));
+//   choirf = 48, 48, 96, 96;  choira = 1, 1.01, 1.1, 0.9;  score: q 350, rel 1.5, p 0
 //
 // Re-implemented by hand (seam-ltm convention) in choir_dsp.h on the
 // reusable libraries of _common: seam_svf.h (fi.svf.bp), seam_analyzers.h
@@ -30,8 +33,16 @@
 // Against the original (Giuseppe, 2026-10-02): no DC blocker, voices at
 // their 96 kHz level, bands from 20 kHz silent, the noise is block 3 of the
 // SSCDO#2 noise (one stream per band, decorrelated from LMO and between
-// channels); f, a, Q and the release are the performance's constants,
-// shown in the window; POWER, output (CC86), RESET, the 4x16 grid.
+// channels); f and a are the performance's constants, shown in the window;
+// POWER, output (CC86), RESET, the 4x16 grid.
+//
+// After the rehearsal with STONED (Giuseppe, 2026-10-09): the choir was
+// too bright, so 1/F weights each voice by f/fv (-6 dB per octave of the
+// voice: without it the choir climbs 6 dB per octave, with it it is pink
+// per octave), with a fixed make-up per channel that keeps its power on
+// white noise (+17.8 .. +21.6 dB), crossfaded in 25 ms; Q (10-1000, log,
+// 25 ms glide) and the followers' release (0.05-10 s, log) are live
+// controls. Off, at Q 350 and 1.5 s, the plugin is the score's choir.
 //
 // Studies and decisions: doc/study/sscdo2/ (choir-*), logs/2026-10-02-sscdo2-choir.md.
 //──────────────────────────────────────────────────────────────────────────
