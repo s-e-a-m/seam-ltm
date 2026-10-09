@@ -562,3 +562,21 @@ target_include_directories(delrm_footer_test PRIVATE
 )
 target_compile_features(delrm_footer_test PRIVATE cxx_std_17)
 add_test(NAME delrm_footer_test COMMAND delrm_footer_test)
+
+# abmodulex: the Tetrahedron menu in the processor's state.
+add_executable(abmodulex_state_test
+    abmodulex_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(abmodulex_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/abmodulex/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(abmodulex_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    target_link_libraries(abmodulex_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(abmodulex_state_test PRIVATE cxx_std_17)
+add_test(NAME abmodulex_state_test COMMAND abmodulex_state_test)

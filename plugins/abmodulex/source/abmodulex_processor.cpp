@@ -8,6 +8,8 @@
 #include "public.sdk/source/main/pluginfactory.h"
 #include "public.sdk/source/vst/vstaudioprocessoralgo.h"
 #include "pluginterfaces/base/ibstream.h"
+#include "public.sdk/source/vst/vstparameters.h"
+#include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include <cstring>
 
@@ -22,7 +24,22 @@ tresult PLUGIN_API ABMODULEXProcessor::initialize(FUnknown* context) {
     if (r != kResultOk) return r;
     addAudioInput (STR16("A-format In"), SpeakerArr::kAmbi1stOrderACN);
     addAudioOutput(STR16("AmbiX Out"),   SpeakerArr::kAmbi1stOrderACN);
+
+    // How the microphone is mounted: the upright tetrahedron or its dual.
+    auto* tetra = new StringListParameter(STR16("Tetrahedron"), kParamTetrahedron);
+    tetra->appendString(STR16("LFU RFD RBU LBD"));
+    tetra->appendString(STR16("LFD RFU RBD LBU"));
+    parameters.addParameter(tetra);
     return kResultOk;
+}
+
+tresult PLUGIN_API ABMODULEXProcessor::setActive(TBool state) {
+    if (state) {
+        encoder_.prepare(processSetup.sampleRate);
+        encoder_.setDual(box_.dual());   // the recalled menu...
+        encoder_.reset();                // ...without a glide at activation
+    }
+    return SingleComponentEffect::setActive(state);
 }
 
 tresult PLUGIN_API ABMODULEXProcessor::terminate() {
@@ -30,6 +47,18 @@ tresult PLUGIN_API ABMODULEXProcessor::terminate() {
 }
 
 tresult PLUGIN_API ABMODULEXProcessor::process(ProcessData& data) {
+    if (auto* changes = data.inputParameterChanges) {
+        for (int32 i = 0; i < changes->getParameterCount(); ++i) {
+            IParamValueQueue* q = changes->getParameterData(i);
+            if (!q || q->getParameterId() != kParamTetrahedron) continue;
+            // The last point of the block, applied at its start (suite convention).
+            int32 off; ParamValue v;
+            const int32 np = q->getPointCount();
+            if (np > 0 && q->getPoint(np - 1, off, v) == kResultOk) box_.store(v);
+        }
+    }
+    encoder_.setDual(box_.dual());
+
     if (data.numInputs == 0 || data.numOutputs == 0) return kResultOk;
 
     int32 numCh = data.inputs[0].numChannels;
@@ -51,32 +80,30 @@ tresult PLUGIN_API ABMODULEXProcessor::process(ProcessData& data) {
         return kResultOk;
     }
 
+    // In place is safe: each sample's four inputs are read before its outputs are written.
     if (data.symbolicSampleSize == kSample32)
-        processBlock<Sample32>(reinterpret_cast<Sample32**>(in),
-                               reinterpret_cast<Sample32**>(out), data.numSamples);
+        encoder_.process(reinterpret_cast<Sample32**>(in), reinterpret_cast<Sample32**>(out), data.numSamples);
     else
-        processBlock<Sample64>(reinterpret_cast<Sample64**>(in),
-                               reinterpret_cast<Sample64**>(out), data.numSamples);
+        encoder_.process(reinterpret_cast<Sample64**>(in), reinterpret_cast<Sample64**>(out), data.numSamples);
     return kResultOk;
-}
-
-template <typename S>
-void ABMODULEXProcessor::processBlock(S** in, S** out, int32 n) {
-    for (int32 i = 0; i < n; ++i) {
-        double a0,a1,a2,a3;
-        abmodulex::encode((double)in[0][i], (double)in[1][i],
-                          (double)in[2][i], (double)in[3][i],
-                          a0,a1,a2,a3);
-        out[0][i] = (S)a0; out[1][i] = (S)a1; out[2][i] = (S)a2; out[3][i] = (S)a3;
-    }
 }
 
 tresult PLUGIN_API ABMODULEXProcessor::canProcessSampleSize(int32 s) {
     return (s == kSample32 || s == kSample64) ? kResultTrue : kResultFalse;
 }
 
-tresult PLUGIN_API ABMODULEXProcessor::setState(IBStream*) { return kResultOk; }
-tresult PLUGIN_API ABMODULEXProcessor::getState(IBStream*) { return kResultOk; }
+tresult PLUGIN_API ABMODULEXProcessor::setState(IBStream* state) {
+    if (!state) return kResultFalse;
+    abmodulex::readState(state, box_);
+    setParamNormalized(kParamTetrahedron, box_.normalized());
+    return kResultOk;
+}
+
+tresult PLUGIN_API ABMODULEXProcessor::getState(IBStream* state) {
+    if (!state) return kResultFalse;
+    abmodulex::writeState(state, box_);
+    return kResultOk;
+}
 
 tresult PLUGIN_API ABMODULEXProcessor::setBusArrangements(
     SpeakerArrangement* in, int32 numIn, SpeakerArrangement* out, int32 numOut) {
