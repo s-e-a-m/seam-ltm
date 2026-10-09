@@ -3,6 +3,8 @@
 #include "choir_dsp.h"
 #include "ref/choir_ref.h"
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <cmath>
 #include <vector>
 
@@ -76,6 +78,16 @@ static double relErr(const Buf& y, const double (*ref)[L]) {
         for (int k = 0; k < L; ++k) {
             e  = std::max(e, std::fabs(y[(size_t)c][(size_t)k] - ref[c][k]));
             pk = std::max(pk, std::fabs(ref[c][k]));
+        }
+    return e / pk;
+}
+
+static double relErr2(const Buf& y, const Buf& r) {
+    double e = 0.0, pk = 0.0;
+    for (size_t c = 0; c < 4; ++c)
+        for (size_t k = 0; k < r[c].size(); ++k) {
+            e  = std::max(e, std::fabs(y[c][k] - r[c][k]));
+            pk = std::max(pk, std::fabs(r[c][k]));
         }
     return e / pk;
 }
@@ -213,5 +225,127 @@ TEST_CASE("a new rate redesigns everything: equal to a fresh engine") {
     Engine b; settle(b, 96000.0);
     Source sa{Config(), 96000.0}, sb{Config(), 96000.0};
     auto ya = run(a, sa, 96000, 1024), yb = run(b, sb, 96000, 1024);
+    for (int c = 0; c < 4; ++c) CHECK(ya[(size_t)c] == yb[(size_t)c]);
+}
+
+//── live controls (2026-10-09): 1/f weight, Q, release ──────────────────────
+
+// One sine on channel 0 at band k's centre (48 Hz * (k+1)); returns the RMS
+// of channel 0's output over the last second of `secs`.
+static double bandRms(Engine& e, int k, double fs, double secs) {
+    const int B = 512;
+    Buf in(4, std::vector<double>(B, 0.0)), out(4, std::vector<double>(B));
+    const double* ip[4]; double* op[4];
+    for (int c = 0; c < 4; ++c) { ip[c] = in[(size_t)c].data(); op[c] = out[(size_t)c].data(); }
+    const long n = (long)(secs * fs), tail = (long)fs;
+    double acc = 0.0; long cnt = 0;
+    for (long pos = 0; pos < n; pos += B) {
+        for (int i = 0; i < B; ++i)
+            in[0][(size_t)i] = 0.1 * std::sin(2 * M_PI * 48.0 * (k + 1) * (double)(pos + i) / fs);
+        e.process(ip, op, B);
+        if (pos >= n - tail) for (int i = 0; i < B; ++i) { acc += out[0][(size_t)i] * out[0][(size_t)i]; ++cnt; }
+    }
+    return std::sqrt(acc / (double)cnt);
+}
+
+TEST_CASE("1/f: a voice at k*f loses 20log10(k) dB against the fundamental's") {
+    // Channel 0 is harmonic (a = 1): the voice of band k sits at 48*(k+1) Hz,
+    // so 1/f lowers band 7 (384 Hz) by 18.06 dB more than band 0 (48 Hz).
+    // A low Q keeps the run short; the weight does not depend on Q.
+    Config cfg; cfg.q = 20.0; cfg.release = 0.2;
+    const double fs = 48000.0;
+    auto rms = [&](int k, bool pink) {
+        Engine e(cfg); settle(e, fs); e.setPink(pink); e.reset();
+        return bandRms(e, k, fs, 3.0);
+    };
+    const double d0 = 20 * std::log10(rms(0, true) / rms(0, false));
+    const double d7 = 20 * std::log10(rms(7, true) / rms(7, false));
+    CHECK(d0 - d7 == doctest::Approx(20 * std::log10(8.0)).epsilon(0.01));
+}
+
+TEST_CASE("1/f: on white noise the make-up keeps the choir's power") {
+    // White noise on the four inputs: with 1/f on, the total output power
+    // stays within 1 dB of the power with 1/f off, on every channel.
+    Config cfg; cfg.q = 20.0; cfg.release = 0.2;
+    const double fs = 48000.0;
+    auto power = [&](bool pink) {
+        Engine e(cfg); settle(e, fs); e.setPink(pink); e.reset();
+        uint64_t st = 0x9E3779B97F4A7C15ull;
+        auto white = [&]() { st ^= st << 13; st ^= st >> 7; st ^= st << 17;
+                             return ((double)(st >> 11) / 9007199254740992.0) * 2.0 - 1.0; };
+        const int B = 512; const long n = (long)(30 * fs), skip = (long)(2 * fs);
+        Buf in(4, std::vector<double>(B)), out(4, std::vector<double>(B));
+        const double* ip[4]; double* op[4];
+        for (int c = 0; c < 4; ++c) { ip[c] = in[(size_t)c].data(); op[c] = out[(size_t)c].data(); }
+        std::array<double, 4> p{};
+        for (long pos = 0; pos < n; pos += B) {
+            for (int c = 0; c < 4; ++c) for (int i = 0; i < B; ++i) in[(size_t)c][(size_t)i] = 0.1 * white();
+            e.process(ip, op, B);
+            if (pos >= skip) for (int c = 0; c < 4; ++c) for (int i = 0; i < B; ++i) p[(size_t)c] += out[(size_t)c][(size_t)i] * out[(size_t)c][(size_t)i];
+        }
+        return p;
+    };
+    const auto off = power(false), on = power(true);
+    for (int c = 0; c < 4; ++c) CHECK(std::fabs(10 * std::log10(on[(size_t)c] / off[(size_t)c])) < 1.0);
+}
+
+TEST_CASE("1/f off is the score's choir, bit for bit") {
+    Engine a, b; settle(a, 96000.0); settle(b, 96000.0);
+    b.setPink(true); b.setPink(false); b.reset();
+    Source sa{Config(), 96000.0}, sb{Config(), 96000.0};
+    auto ya = run(a, sa, 20000, 2048), yb = run(b, sb, 20000, 2048);
+    for (int c = 0; c < 4; ++c) CHECK(ya[(size_t)c] == yb[(size_t)c]);
+}
+
+TEST_CASE("the 1/f toggle crossfades in 25 ms") {
+    for (double fs : {48000.0, 96000.0}) {
+        Engine e; settle(e, fs);
+        e.setPink(true);
+        const int n = (int)std::lround(0.025 * fs);
+        std::vector<double> z((size_t)n, 0.0), o((size_t)n, 0.0);
+        const double* in[4] = { z.data(), z.data(), z.data(), z.data() };
+        double* out[4] = { o.data(), o.data(), o.data(), o.data() };
+        e.process(in, out, n - 1);
+        CHECK(e.pinkMix() > 0.0); CHECK(e.pinkMix() < 1.0);
+        e.process(in, out, 1);
+        CHECK(e.pinkMix() == 1.0);
+    }
+}
+
+TEST_CASE("a new Q, once reached, is the choir designed at that Q") {
+    Config c100; c100.q = 100.0;
+    Engine a; settle(a, 48000.0); a.setQ(100.0); a.reset();
+    Engine b(c100); settle(b, 48000.0);
+    Source sa{Config(), 48000.0}, sb{Config(), 48000.0};
+    auto ya = run(a, sa, 48000, 2048), yb = run(b, sb, 48000, 2048);
+    CHECK(relErr2(ya, yb) < 1e-12);
+}
+
+TEST_CASE("Q glides in 25 ms, on a grid the block size does not move") {
+    Engine e; settle(e, 96000.0);
+    e.setQ(10.0);
+    const int n = (int)std::lround(0.025 * 96000.0);
+    std::vector<double> z((size_t)n, 0.0), o((size_t)n, 0.0);
+    const double* in[4] = { z.data(), z.data(), z.data(), z.data() };
+    double* out[4] = { o.data(), o.data(), o.data(), o.data() };
+    e.process(in, out, n - 1);
+    CHECK(e.q() > 10.0); CHECK(e.q() < 350.0);
+    e.process(in, out, 1);
+    CHECK(e.q() == doctest::Approx(10.0).epsilon(1e-12));
+
+    Engine a, b; settle(a, 96000.0); settle(b, 96000.0);
+    a.setQ(30.0); b.setQ(30.0);
+    Source sa{Config(), 96000.0}, sb{Config(), 96000.0};
+    auto ya = run(a, sa, 8000, 8000, 1), yb = run(b, sb, 8000, 8000, 512);
+    for (int c = 0; c < 4; ++c) CHECK(ya[(size_t)c] == yb[(size_t)c]);
+    for (auto& ch : ya) for (double v : ch) REQUIRE(std::isfinite(v));
+}
+
+TEST_CASE("a new release is the choir designed with that release") {
+    Config r02; r02.release = 0.2;
+    Engine a; settle(a, 48000.0); a.setRelease(0.2); a.reset();
+    Engine b(r02); settle(b, 48000.0);
+    Source sa{Config(), 48000.0}, sb{Config(), 48000.0};
+    auto ya = run(a, sa, 48000, 2048), yb = run(b, sb, 48000, 2048);
     for (int c = 0; c < 4; ++c) CHECK(ya[(size_t)c] == yb[(size_t)c]);
 }
