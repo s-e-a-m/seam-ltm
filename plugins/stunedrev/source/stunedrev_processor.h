@@ -26,7 +26,11 @@
 // rate, so every memory is the 96 kHz one; each rate has its own primes.
 //
 // What the plugin adds to the spec: input and output gains (CC83, CC84),
-// POWER, 25 ms ramps, RESET, and the centroid readout.
+// POWER, 25 ms ramps, RESET, the centroid readout, and (after the
+// rehearsal with STONED, Giuseppe 2026-10-09) the four outputs' spectra
+// overlaid at the bottom of the window, to read the lines' spectral content
+// while the piece plays: seam_spectrum.h (Welch per line, EMA 0.3 s, an
+// FFT of ~11 Hz bins at every rate) drawn by seam_spectrum_view.h.
 //
 // Studies and decisions: doc/study/sscdo2/ (stunedrev-*), logs/2026-10-01-sscdo2-plugins.md.
 //──────────────────────────────────────────────────────────────────────────
@@ -35,6 +39,8 @@
 #include "pluginterfaces/vst/ivstplugview.h"
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include "stunedrev_params.h"
+#include "seam_spectrum.h"
+#include <memory>
 
 namespace Seam {
 
@@ -59,7 +65,7 @@ public:
         Steinberg::Vst::SpeakerArrangement* out, Steinberg::int32 numOut) SMTG_OVERRIDE;
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) SMTG_OVERRIDE;
 
-    // VST3EditorDelegate: the RESET square and the footer.
+    // VST3EditorDelegate: the RESET square, the footer and the spectra.
     VSTGUI::CView* PLUGIN_API createCustomView(
         VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes& attributes,
         const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor* editor) SMTG_OVERRIDE;
@@ -71,6 +77,10 @@ private:
 
     stunedrev::Engine   engine_;
     stunedrev::ParamBox box_;
+    // The four outputs, for the window: on the heap (three frames of four
+    // 192 kHz spectra, 400 KB), prepared in setActive.
+    std::unique_ptr<Seam::MultiSpectrum<stunedrev::kLines>> spectrum_ =
+        std::make_unique<Seam::MultiSpectrum<stunedrev::kLines>>();
 };
 
 } // namespace Seam
