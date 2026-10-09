@@ -36,12 +36,18 @@ namespace Seam {
 class CompressorMono {
 public:
     void prepare(double fs, double ratio, double threshDb, double attack, double release) {
+        set(fs, ratio, threshDb, attack, release);
+        reset();
+    }
+    // A new law, keeping the envelope and the knee: a slider moved during
+    // the performance. The knee's one-pole smooths the jump of the gain in dB
+    // that a new threshold or ratio makes.
+    void set(double fs, double ratio, double threshDb, double attack, double release) {
         thresh_ = threshDb;
         slope_ = 1.0 / std::max(DBL_EPSILON, ratio) - 1.0;
         cAtt_ = tau2pole(attack, fs);
         cRel_ = tau2pole(release, fs);
         cKnee_ = tau2pole(attack / 2.0, fs);
-        reset();
     }
     void reset() { env_ = 0.0; knee_ = 0.0; }
 
