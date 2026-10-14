@@ -22,10 +22,11 @@
 // Frequencies are designed at the session's rate, ramps are in seconds,
 // and lmodens holds each band at its 96 kHz level.
 //
-// What the plugin adds to the spec: the glissando of the cues (f moves
-// linearly in Hz over `glide` seconds, Pd line semantics; glide 0 = 25 ms,
-// which smooths host automation), 25 ms ramps on delta, volume and POWER,
-// and a read-only "f now".
+// What the plugin adds to the spec: the glissando (f moves exponentially,
+// the same interval every second, over `glide` seconds; Pd line semantics
+// for the timing, not for the curve; glide 0 = 25 ms, which smooths host
+// automation), f on a logarithmic taper from Bb0 to Bb4 at A = 442 Hz,
+// 25 ms ramps on delta, volume and POWER, and a read-only "f now".
 //
 // Studies and decisions: doc/study/sscdo2/ (lmo-*), logs/2026-10-01-sscdo2-plugins.md.
 //──────────────────────────────────────────────────────────────────────────

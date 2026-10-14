@@ -17,6 +17,7 @@
 #pragma once
 #include "lmo_dsp.h"
 #include <atomic>
+#include <cmath>
 
 namespace lmo {
 
@@ -24,9 +25,13 @@ namespace lmo {
 enum class Param : int { Power = 0, Frequency, Glide, Delta, Volume };
 constexpr int kNumParams = 5;
 
-constexpr double kFMin      = 20.0;
-constexpr double kFMax      = 1500.0;   // the committed .dsp range
-constexpr double kFDefault  = 48.0;     // cue 0
+// f spans four octaves of B-flat at A = 442 Hz, Bb0 to Bb4: Bb0 is the
+// sounding pitch of the written C of the contrabass clarinet in B-flat.
+// The taper is logarithmic, so every step of a 7-bit fader (BCF2000) is
+// the same interval, 48/127 of a semitone, at the bottom as at the top.
+constexpr double kFMin      = 29.267667981675533;   // 442 * 2^(-47/12), Bb0
+constexpr double kFMax      = 468.28268770680853;   // 442 * 2^(1/12),   Bb4
+constexpr double kFDefault  = kFMin;                // the fader at rest
 constexpr double kGlideMax  = 300.0;    // s
 constexpr double kDeltaMax  = 50.0;     // Hz
 
@@ -36,8 +41,16 @@ constexpr double kDeltaMax  = 50.0;     // Hz
 constexpr Param kRecallOrder[kNumParams] = {
     Param::Glide, Param::Frequency, Param::Delta, Param::Volume, Param::Power };
 
+// The logarithmic taper of f, shared by the box, the parameter and f now.
+inline double fToNormalized(double hz) {
+    return std::log(hz / kFMin) / std::log(kFMax / kFMin);
+}
+inline double fFromNormalized(double norm) {
+    return kFMin * std::pow(kFMax / kFMin, norm);
+}
+
 inline double defaultNormalized(Param p) {
-    return p == Param::Frequency ? (kFDefault - kFMin) / (kFMax - kFMin) : 0.0;
+    return p == Param::Frequency ? fToNormalized(kFDefault) : 0.0;
 }
 
 struct Plain {
@@ -56,7 +69,7 @@ public:
     Plain plain() const {
         Plain x;
         x.power  = normalized(Param::Power) >= 0.5;
-        x.f      = kFMin + normalized(Param::Frequency) * (kFMax - kFMin);
+        x.f      = fFromNormalized(normalized(Param::Frequency));
         x.glide  = normalized(Param::Glide) * kGlideMax;
         x.delta  = normalized(Param::Delta) * kDeltaMax;
         x.volume = normalized(Param::Volume);

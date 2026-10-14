@@ -20,6 +20,29 @@ namespace Seam {
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 
+// f on the logarithmic taper of lmo_params.h: equal fader travel spans
+// equal intervals, and the display still reads Hz.
+class LmoFrequencyParameter : public RangeParameter {
+public:
+    LmoFrequencyParameter(const TChar* title, ParamID tag, int32 flags)
+        : RangeParameter(title, tag, STR16("Hz"), lmo::kFMin, lmo::kFMax,
+                         lmo::kFDefault, 0, flags)
+    {
+        // The base ctor normalized the default with the LINEAR taper
+        // (virtual dispatch is frozen to the base during its construction).
+        const ParamValue n = lmo::fToNormalized(lmo::kFDefault);
+        info.defaultNormalizedValue = n;
+        setNormalized(n);
+        setPrecision(2);
+    }
+    ParamValue toPlain(ParamValue norm) const SMTG_OVERRIDE {
+        return lmo::fFromNormalized(norm);
+    }
+    ParamValue toNormalized(ParamValue plain) const SMTG_OVERRIDE {
+        return lmo::fToNormalized(plain);
+    }
+};
+
 static ParamID idOf(lmo::Param p) { return kParamPower + (ParamID)p; }
 
 tresult PLUGIN_API LmoProcessor::initialize(FUnknown* context) {
@@ -37,10 +60,8 @@ tresult PLUGIN_API LmoProcessor::initialize(FUnknown* context) {
         0.0, 1.0, 0.0, 1, ParameterInfo::kCanAutomate | ParameterInfo::kIsList));
     using namespace lmo;
 
-    auto* f = new RangeParameter(STR16("f"), kParamFrequency, STR16("Hz"),
-        kFMin, kFMax, kFDefault, 0, ParameterInfo::kCanAutomate);
-    f->setPrecision(2);
-    parameters.addParameter(f);
+    parameters.addParameter(new LmoFrequencyParameter(
+        STR16("f"), kParamFrequency, ParameterInfo::kCanAutomate));
 
     auto* glide = new RangeParameter(STR16("Glide"), kParamGlide, STR16("s"),
         0.0, kGlideMax, 0.0, 0, ParameterInfo::kCanAutomate);
@@ -57,10 +78,8 @@ tresult PLUGIN_API LmoProcessor::initialize(FUnknown* context) {
     vol->setPrecision(3);
     parameters.addParameter(vol);
 
-    auto* fnow = new RangeParameter(STR16("f now"), kParamFNow, STR16("Hz"),
-        kFMin, kFMax, kFDefault, 0, ParameterInfo::kIsReadOnly);
-    fnow->setPrecision(2);
-    parameters.addParameter(fnow);
+    parameters.addParameter(new LmoFrequencyParameter(
+        STR16("f now"), kParamFNow, ParameterInfo::kIsReadOnly));
 
     return kResultOk;
 }
@@ -123,7 +142,7 @@ tresult PLUGIN_API LmoProcessor::process(ProcessData& data) {
         if (auto* q = oc->addParameterData(kParamFNow, idx)) {
             const double f = std::min(lmo::kFMax, std::max(lmo::kFMin, engine_.currentFrequency()));
             int32 off = 0;
-            q->addPoint(0, (f - lmo::kFMin) / (lmo::kFMax - lmo::kFMin), off);
+            q->addPoint(0, lmo::fToNormalized(f), off);
         }
     }
     return kResultOk;

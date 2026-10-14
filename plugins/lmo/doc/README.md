@@ -9,11 +9,20 @@ The four outputs are LFU, RFD, RBU, LBD, the order of the patch's `dac~ 9 10 11 
 | Parameter | Range | Default | What it does |
 |---|---|---|---|
 | POWER | off / on | off | fades the output in or out over 25 ms |
-| f | 20–1500 Hz | 48 Hz | centre of the bands of channel 0; channel i is i Hz higher |
-| glide | 0–300 s | 0 s | the time of the next move of f, linear in Hz |
+| f | 29.27–468.28 Hz (B♭0–B♭4), logarithmic | 29.27 Hz | centre of the bands of channel 0; channel i is i Hz higher |
+| glide | 0–300 s | 0 s | the time of the next move of f, exponential: the same interval every second |
 | Δ | 0–50 Hz | 0 Hz | distance between the two bands of each channel; each moves Δ/2 from f |
 | volume | 0–1 | 0 | linear gain, CC81 in the original, 25 ms ramp |
 | f now | read-only | — | the band centre at this moment, for following a glissando |
+
+f spans four octaves of B♭ at A = 442 Hz: B♭0, the bottom of the fader, is the sounding pitch of the written C of the contrabass clarinet in B♭.
+The taper is logarithmic, so every step of a 7-bit MIDI fader is the same interval, 48/127 of a semitone, and half the travel is B♭2.
+The range was 20–1500 Hz and linear: on a 7-bit fader a step was 11.6 Hz, more than a tritone at 30 Hz.
+Sessions saved before this change store f as a normalized value, and they reopen on a different frequency.
+
+The glissando is exponential: f moves along log₂ f, the same interval every second.
+A 120 s glide from B♭0 to B♭4 climbs one octave every 30 s, 0.4 semitone a second.
+The Pd patch's `line~` was linear in Hz; on the same move it spent 8 s on the first octave and 64 s on the last.
 
 glide is the time of the next move of f, as Pd's `line` takes its time before its target: a cue sets glide first, then f.
 Cue 2 of the piece is glide = 120 s, then f = 112.67 Hz.
@@ -48,7 +57,7 @@ lmo(N,f,d)  = no.multinoise(2*N)
             :> par(i, N, /(sqrt(2)) : *(lmodens));
 ```
 
-The engine rests on three headers of `plugins/_common/`, written for reuse: `seam_noise.h` (the standard `no.multinoise`, bit for bit), `seam_butterworth.h` (Butterworth filters of even order in J.O. Smith's state-variable sections), `seam_ramp.h` (a linear ramp in seconds).
+The engine rests on three headers of `plugins/_common/`, written for reuse: `seam_noise.h` (the standard `no.multinoise`, bit for bit), `seam_butterworth.h` (Butterworth filters of even order in J.O. Smith's state-variable sections), `seam_ramp.h` (a linear ramp in seconds, which LMO runs on log₂ f).
 `tests/lmo_dsp_test.cpp` checks the engine against the Faust specification at 96 and 48 kHz, to 7.9e-14 and 5.2e-14 of the peak; the references and the record of the mutations are in `doc/study/sscdo2/lmo-plugin/`.
 
 ## Out of scope

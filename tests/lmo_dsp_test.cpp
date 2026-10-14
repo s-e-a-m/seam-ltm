@@ -99,14 +99,16 @@ TEST_CASE("output level at 48 kHz matches 96 kHz (statistical)") {
     CHECK(std::fabs(levelDb(48000.0) - levelDb(96000.0)) < 0.25);
 }
 
-TEST_CASE("glide: 97.44 -> 112.67 Hz in 120 s, monotonic, no jumps") {
+TEST_CASE("glide: Bb0 -> Bb4 in 120 s, exponential, monotonic, no jumps") {
+    // The same interval every second: one octave every 30 s, 0.4 semitone/s.
     const double fs = 48000.0;
-    Engine e = settled(fs, 97.44, 0.0);
+    const double f0 = 442.0 * std::pow(2.0, -47.0 / 12.0), f1 = 16.0 * f0;
+    Engine e = settled(fs, f0, 0.0);
     e.setGlide(120.0);
-    e.setFrequency(112.67);
+    e.setFrequency(f1);
     const int block = 480;
     double buf[4][480]; double* out[4] = { buf[0], buf[1], buf[2], buf[3] };
-    double prev = e.currentFrequency(), maxStep = 0.0;
+    double prev = e.currentFrequency(), maxStep = 0.0;   // in octaves
     bool monotonic = true;
     const long total = (long)(121.0 * fs);
     long reachedAt = -1;
@@ -114,15 +116,18 @@ TEST_CASE("glide: 97.44 -> 112.67 Hz in 120 s, monotonic, no jumps") {
         e.process(out, block);
         const double f = e.currentFrequency();
         if (f < prev) monotonic = false;
-        maxStep = std::max(maxStep, f - prev);
+        maxStep = std::max(maxStep, std::log2(f / prev));
         prev = f;
-        if (reachedAt < 0 && f == 112.67) reachedAt = pos + block;
+        const long t = pos + block;
+        if (t % (long)(30.0 * fs) == 0 && t <= (long)(120.0 * fs))   // octave by octave
+            CHECK(std::fabs(std::log2(f / f0) - t / (30.0 * fs)) < 1e-7);   // ramp rounding over 5.76M steps
+        if (reachedAt < 0 && f == f1) reachedAt = t;
     }
     CHECK(monotonic);
     CHECK(reachedAt >= (long)(120.0 * fs));
     CHECK(reachedAt <= (long)(120.0 * fs) + block);
-    // per block of 480 samples the ramp moves (112.67-97.44)/(120*fs)*480
-    CHECK(maxStep < 1.01 * (112.67 - 97.44) / (120.0 * fs) * block);
+    // per block of 480 samples the ramp climbs 4 octaves / (120*fs) * 480
+    CHECK(maxStep < 1.01 * 4.0 / (120.0 * fs) * block);
 }
 
 TEST_CASE("same target does not restart the glide") {
@@ -132,8 +137,8 @@ TEST_CASE("same target does not restart the glide") {
     e.setFrequency(112.67);
     double buf[4][480]; double* out[4] = { buf[0], buf[1], buf[2], buf[3] };
     for (int b = 0; b < 1000; ++b) { e.setFrequency(112.67); e.process(out, 480); }
-    // 480000 samples = 10 s of the 120 s ramp
-    const double expected = 97.44 + (112.67 - 97.44) * 10.0 / 120.0;
+    // 480000 samples = 10 s of the 120 s ramp, a twelfth of the interval
+    const double expected = 97.44 * std::pow(112.67 / 97.44, 10.0 / 120.0);
     CHECK(std::fabs(e.currentFrequency() - expected) < 1e-6);
 }
 

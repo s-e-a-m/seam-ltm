@@ -8,6 +8,11 @@
 // 8..71, is the choir's); channel i = (low + high)/sqrt(2), times the
 // density anchor sqrt(fs/96000), times volume and POWER.
 //
+// f glides exponentially: the ramp runs on log2(f), so a glissando climbs
+// the same interval every second (120 s from Bb0 to Bb4: 0.4 semitone/s).
+// The Pd patch's line~ was linear in Hz, which spends a tenth of the time
+// on the lowest octave and drags through the highest.
+//
 // Everything that is time is seconds: the ramps (glide for f, 25 ms for
 // d, volume and POWER, the ramp of the original's interpolator_4ch), and
 // the cadence of the filter redesign, 6 kHz (16 samples at 96 kHz).
@@ -84,8 +89,10 @@ public:
     void setGlide(double seconds) { glide_ = std::max(0.0, seconds); }
 
     void setFrequency(double hz) {
-        if (hz == f_.target()) return;   // automation re-sends; never restart
-        f_.setTarget(hz, glide_ > 0.0 ? glide_ : kShortRamp, fs_);
+        hz = std::max(kMinBand, hz);
+        if (hz == fTarget_) return;      // automation re-sends; never restart
+        fTarget_ = hz;
+        f_.setTarget(std::log2(hz), glide_ > 0.0 ? glide_ : kShortRamp, fs_);
     }
     void setDelta(double hz) {
         if (hz == d_.target()) return;
@@ -101,15 +108,19 @@ public:
         pow_.setTarget(t, kShortRamp, fs_);
     }
 
-    double currentFrequency() const { return f_.value(); }
+    // On arrival the target itself, not exp2(log2(target)).
+    double currentFrequency() const {
+        return f_.active() ? std::exp2(f_.value()) : fTarget_;
+    }
 
     template <class T>
     void process(T* const* out, int n) {
         double nz[2 * kChannels];
         for (int i = 0; i < n; ++i) {
             if (countdown_ == 0) {
-                if (f_.value() != fDesigned_ || d_.value() != dDesigned_)
-                    design(f_.value(), d_.value());
+                const double f = currentFrequency();   // one exp2 per period
+                if (f != fDesigned_ || d_.value() != dDesigned_)
+                    design(f, d_.value());
                 countdown_ = period_;
             }
             --countdown_;
@@ -137,12 +148,14 @@ private:
     }
 
     double fs_ = kRefRate, density_ = 1.0, glide_ = 0.0;
+    double fTarget_ = 0.0;              // Hz; f_ ramps on its log2
     int period_ = 16, countdown_ = 0;
     double fDesigned_ = -1.0, dDesigned_ = -1.0;
 
     Seam::MultinoiseBlock noise_;   // sdt.lmonoise(4)
     std::array<Band, 2 * kChannels> bands_;
-    Seam::LinearRamp f_, d_, vol_, pow_;
+    Seam::LinearRamp f_;                // log2 Hz
+    Seam::LinearRamp d_, vol_, pow_;
 };
 
 } // namespace lmo
