@@ -32,7 +32,7 @@
 
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "pluginterfaces/vst/ivstplugview.h"
-#include "seam_haar.h"
+#include "m2xhgr_dsp.h"
 #include "lr2xhgr_dsp.h"
 #include "seam_meter.h"
 
@@ -67,8 +67,8 @@ private:
     void processHaarStereo (SampleType** in, SampleType** out, Steinberg::int32 numSamples);
 
     // Haar wavelet state: one per stereo channel
-    HaarState<double> haarL;
-    HaarState<double> haarR;
+    m2xhgr::Bank bankL;
+    m2xhgr::Bank bankR;
 
     // Parameters (in radians)
     double fDivergence = 0.0;   // half-angle between L and R

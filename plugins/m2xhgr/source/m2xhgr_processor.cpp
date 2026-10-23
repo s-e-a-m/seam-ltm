@@ -5,7 +5,7 @@
 #include "m2xhgr_processor.h"
 #include "m2xhgr_ids.h"
 #include "version.h"
-#include "seam_haar.h"
+#include "m2xhgr_dsp.h"
 #include "seam_rotation.h"
 #include "seam_meter.h"
 #include "seam_state.h"
@@ -87,7 +87,7 @@ tresult PLUGIN_API M2XHGRProcessor::terminate ()
 tresult PLUGIN_API M2XHGRProcessor::setActive (TBool state)
 {
     if (state)
-        haar.reset ();
+        bank.reset ();
     return SingleComponentEffect::setActive (state);
 }
 
@@ -205,20 +205,9 @@ void M2XHGRProcessor::processHaarMono (SampleType* in, SampleType** out, int32 n
 
     for (int32 i = 0; i < numSamples; ++i)
     {
-        // Haar decomposition (uses double state internally)
-        double d = static_cast<double>(in[i]);
-        double da0, da1, da2, da3;
-        haarDecompose (haar, d, da0, da1, da2, da3);
-
-        SampleType a0 = static_cast<SampleType>(da0);
-        SampleType a1 = static_cast<SampleType>(da1);
-        SampleType a2 = static_cast<SampleType>(da2);
-        SampleType a3 = static_cast<SampleType>(da3);
-
-        // Apply harmonic gain trims, then rotate
-        gainRotateYPR (g1, g2, g3, yaw, pitch, roll,
-                       a0, a1, a2, a3,
-                       out0[i], out1[i], out2[i], out3[i]);
+        SampleType o[4];
+        m2xhgr::tick (bank, in[i], g1, g2, g3, yaw, pitch, roll, o);
+        out0[i] = o[0]; out1[i] = o[1]; out2[i] = o[2]; out3[i] = o[3];
     }
 }
 

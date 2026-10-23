@@ -19,7 +19,7 @@
 
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "pluginterfaces/vst/ivstplugview.h"
-#include "seam_haar.h"
+#include "m2xhgr_dsp.h"
 #include "seam_rotation.h"
 #include "seam_meter.h"
 
@@ -53,7 +53,7 @@ private:
     template <typename SampleType>
     void processHaarMono (SampleType* in, SampleType** out, Steinberg::int32 numSamples);
 
-    HaarState<double> haar;
+    m2xhgr::Bank bank;
 
     double fYaw   = 0.0;
     double fPitch = 0.0;

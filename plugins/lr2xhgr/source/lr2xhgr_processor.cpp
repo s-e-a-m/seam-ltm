@@ -5,7 +5,7 @@
 #include "lr2xhgr_processor.h"
 #include "lr2xhgr_ids.h"
 #include "version.h"
-#include "seam_haar.h"
+#include "m2xhgr_dsp.h"
 #include "seam_rotation.h"
 #include "lr2xhgr_dsp.h"
 #include "seam_meter.h"
@@ -97,8 +97,8 @@ tresult PLUGIN_API LR2XHGRProcessor::setActive (TBool state)
 {
     if (state)
     {
-        haarL.reset ();
-        haarR.reset ();
+        bankL.reset ();
+        bankR.reset ();
     }
     return SingleComponentEffect::setActive (state);
 }
@@ -233,32 +233,13 @@ void LR2XHGRProcessor::processHaarStereo (SampleType** in, SampleType** out, int
 
     for (int32 i = 0; i < numSamples; ++i)
     {
-        // Step 1: Haar decomposition of each channel
-        SampleType la0, la1, la2, la3;
-        SampleType ra0, ra1, ra2, ra3;
-
-        // Haar uses double internally — convert sample to double, decompose, convert back
-        double dL = static_cast<double>(inL[i]);
-        double dR = static_cast<double>(inR[i]);
-
-        double dla0, dla1, dla2, dla3;
-        double dra0, dra1, dra2, dra3;
-        haarDecompose (haarL, dL, dla0, dla1, dla2, dla3);
-        haarDecompose (haarR, dR, dra0, dra1, dra2, dra3);
-
-        la0 = static_cast<SampleType>(dla0);
-        la1 = static_cast<SampleType>(dla1);
-        la2 = static_cast<SampleType>(dla2);
-        la3 = static_cast<SampleType>(dla3);
-        ra0 = static_cast<SampleType>(dra0);
-        ra1 = static_cast<SampleType>(dra1);
-        ra2 = static_cast<SampleType>(dra2);
-        ra3 = static_cast<SampleType>(dra3);
+        // Step 1: Haar decomposition of each channel (double inside the bank)
+        SampleType la[4], ra[4];
+        bankL.decompose (inL[i], la);
+        bankR.decompose (inR[i], ra);
 
         // Steps 2-4: shared harmonic gain trims, divergence split, sum,
         // global rotation — all via the tested lr2xhgr::mix core.
-        const SampleType la[4] = { la0, la1, la2, la3 };
-        const SampleType ra[4] = { ra0, ra1, ra2, ra3 };
         SampleType o[4];
         Seam::lr2xhgr::mix (divYaw, yaw, pitch, roll, g1, g2, g3, la, ra, o);
         out0[i] = o[0]; out1[i] = o[1]; out2[i] = o[2]; out3[i] = o[3];
