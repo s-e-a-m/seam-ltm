@@ -14,7 +14,7 @@ PDINCLUDEDIR ?= $(PDAPP)/Contents/Resources/src
 PDBIN        ?= $(PDAPP)/Contents/Resources/bin/pd
 INSTALLDIR   ?= $(HOME)/Documents/Pd/externals/seam-ltm
 
-EXTERNALS = m2xhgr~
+EXTERNALS = m2xhgr~ lr2xhgr~
 
 CXX      ?= c++
 ARCHS     = -arch x86_64 -arch arm64
@@ -29,6 +29,10 @@ all: $(BINARIES)
 m2xhgr~.d_fat: m2xhgr~.cpp m2xhgr_engine.h seam_pd_param.h \
                ../plugins/m2xhgr/source/m2xhgr_dsp.h
 	$(CXX) $(CXXFLAGS) -I../plugins/m2xhgr/source $(LDFLAGS) -o $@ $<
+
+lr2xhgr~.d_fat: lr2xhgr~.cpp lr2xhgr_engine.h seam_pd_param.h \
+                ../plugins/lr2xhgr/source/lr2xhgr_dsp.h ../plugins/m2xhgr/source/m2xhgr_dsp.h
+	$(CXX) $(CXXFLAGS) -I../plugins/lr2xhgr/source -I../plugins/m2xhgr/source $(LDFLAGS) -o $@ $<
 
 install: all
 	mkdir -p "$(INSTALLDIR)"
