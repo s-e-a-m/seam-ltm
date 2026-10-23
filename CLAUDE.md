@@ -35,19 +35,7 @@ implementation). The generated code never lands in `plugins/*/source/`.
 
 ## Plugin file layout (canonical)
 
-Established by `ddelay` and `bamodulex`:
-
-```
-plugins/<name>/
-├── CMakeLists.txt
-├── source/
-│   ├── <name>_ids.h           # plugin UID, parameter IDs
-│   ├── <name>_processor.h     # opens with FAUST REFERENCE comment block
-│   ├── <name>_processor.cpp   # IAudioProcessor + DSP implementation
-│   └── version.h
-├── resource/                  # VSTGUI .uidesc + assets (when GUI present)
-└── doc/                       # plugin-specific documentation
-```
+Established by `ddelay` and `bamodulex` — copy their `source/`, `resource/`, `doc/` shape.
 
 Add complementary `.cpp/.h` pairs only when a real concern justifies it
 (e.g., shared static state across instances). Do not split prematurely.
