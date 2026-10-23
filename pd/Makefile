@@ -3,7 +3,8 @@
 #   make            build every external (fat x86_64 + arm64 .d_fat)
 #   make install    copy binaries and help patches to INSTALLDIR
 #   make smoke      open each tests/smoke-*.pd in a headless Pd, fail on
-#                   "couldn't create"
+#                   "couldn't create" or on a line of tests/smoke-*.expected
+#                   missing from the console (signal values via snapshot~)
 #   make clean
 #
 # No VST3 SDK and no downloads: the externals include the plugins' DSP
@@ -14,7 +15,7 @@ PDINCLUDEDIR ?= $(PDAPP)/Contents/Resources/src
 PDBIN        ?= $(PDAPP)/Contents/Resources/bin/pd
 INSTALLDIR   ?= $(HOME)/Documents/Pd/externals/seam-ltm
 
-EXTERNALS = m2xhgr~ lr2xhgr~
+EXTERNALS = m2xhgr~ lr2xhgr~ bamodulex~
 
 CXX      ?= c++
 ARCHS     = -arch x86_64 -arch arm64
@@ -34,6 +35,9 @@ lr2xhgr~.d_fat: lr2xhgr~.cpp lr2xhgr_engine.h seam_pd_param.h \
                 ../plugins/lr2xhgr/source/lr2xhgr_dsp.h ../plugins/m2xhgr/source/m2xhgr_dsp.h
 	$(CXX) $(CXXFLAGS) -I../plugins/lr2xhgr/source -I../plugins/m2xhgr/source $(LDFLAGS) -o $@ $<
 
+bamodulex~.d_fat: bamodulex~.cpp bamodulex_engine.h ../plugins/bamodulex/source/bamodulex_dsp.h
+	$(CXX) $(CXXFLAGS) -I../plugins/bamodulex/source $(LDFLAGS) -o $@ $<
+
 install: all
 	mkdir -p "$(INSTALLDIR)"
 	cp $(BINARIES) $(addsuffix -help.pd,$(EXTERNALS)) "$(INSTALLDIR)"
@@ -45,6 +49,12 @@ smoke: all
 	  perl -e 'alarm 20; exec @ARGV' -- "$(PDBIN)" -nogui -noprefs -nomidi -noaudio \
 	    -stderr -r 48000 -path "$(CURDIR)" -open $$t > $$log 2>&1; \
 	  if grep -q "couldn't create" $$log; then echo "FAIL $$t"; cat $$log; exit 1; fi; \
+	  exp=$${t%.pd}.expected; \
+	  if [ -f $$exp ]; then \
+	    while IFS= read -r l; do \
+	      grep -qxF -- "$$l" $$log || { echo "FAIL $$t: missing '$$l'"; cat $$log; exit 1; }; \
+	    done < $$exp; \
+	  fi; \
 	  echo "ok   $$t"; \
 	done
 

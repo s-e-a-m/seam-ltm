@@ -128,6 +128,17 @@ target_include_directories(pd_lr2xhgr_engine_test PRIVATE
 target_compile_features(pd_lr2xhgr_engine_test PRIVATE cxx_std_17)
 add_test(NAME pd_lr2xhgr_engine_test COMMAND pd_lr2xhgr_engine_test)
 
+add_executable(pd_bamodulex_engine_test
+    pd_bamodulex_engine_test.cpp
+)
+target_include_directories(pd_bamodulex_engine_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../pd
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bamodulex/source
+)
+target_compile_features(pd_bamodulex_engine_test PRIVATE cxx_std_17)
+add_test(NAME pd_bamodulex_engine_test COMMAND pd_bamodulex_engine_test)
+
 add_executable(ltburst_dsp_test
     ltburst_dsp_test.cpp
 )
