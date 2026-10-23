@@ -13,7 +13,7 @@
 PDAPP        ?= /Applications/Pd-0.56-2.app
 PDINCLUDEDIR ?= $(PDAPP)/Contents/Resources/src
 PDBIN        ?= $(PDAPP)/Contents/Resources/bin/pd
-INSTALLDIR   ?= $(HOME)/Documents/Pd/externals/seam-ltm
+INSTALLDIR   ?= $(HOME)/Library/Pd/seam-ltm
 
 EXTERNALS = m2xhgr~ lr2xhgr~ bamodulex~
 

@@ -116,7 +116,8 @@ Each `.cpp` is a thin C++ Pd external: `extern "C"` setup function, `t_object` s
 
 - `make` builds fat (x86_64 + arm64) `.d_fat` binaries against the headers of the installed Pd (`/Applications/Pd-0.56-2.app/Contents/Resources/src`), overridable with `PDINCLUDEDIR=`.
   No VST3 SDK, no download, no external build system.
-- `make install` copies binaries and help patches into **`~/Documents/Pd/externals/seam-ltm/`**. That folder already holds other people's externals at its top level; ours stay in their own subfolder, and patches load them with `[declare -stdpath seam-ltm]`.
+- `make install` copies binaries and help patches into **`~/Library/Pd/seam-ltm/`**, and patches load them with `[declare -stdpath seam-ltm]`.
+  *Amended during implementation:* the draft said `~/Documents/Pd/externals/seam-ltm/`, but `-stdpath` only searches Pd's static paths (`~/Library/Pd`, `/Library/Pd`, the app's `extra`), never the preference-set search path, so the externals would not load there; `~/Library/Pd` also keeps the concert patch independent of the preferences.
 - *Builder's call:* whether the DSP-equivalence tests run from `pd/` or join the CMake test suite in `tests/` (the latter is the suite's convention).
 
 ## The concert patch (outside the repo)

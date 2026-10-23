@@ -17,7 +17,7 @@ Design: `docs/superpowers/specs/2026-10-23-pd-stone-externals-design.md`.
 
 ```bash
 make -C pd            # fat x86_64 + arm64 .d_fat, against /Applications/Pd-0.56-2.app
-make -C pd install    # → ~/Documents/Pd/externals/seam-ltm/
+make -C pd install    # → ~/Library/Pd/seam-ltm/
 make -C pd smoke      # opens each pd/tests/smoke-*.pd in a headless Pd
 ```
 
@@ -30,6 +30,8 @@ In a patch, load the installed folder with
 ```
 [declare -stdpath seam-ltm]
 ```
+
+`-stdpath` searches Pd's static paths only (`~/Library/Pd`, `/Library/Pd`, the app's `extra`), not the user search path set in the preferences — which is why the install goes to `~/Library/Pd` and not to `~/Documents/Pd/externals`: the patch finds the externals even with `-noprefs` or reset preferences.
 
 ## Parameters
 
