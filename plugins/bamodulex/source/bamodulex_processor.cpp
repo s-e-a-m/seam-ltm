@@ -3,6 +3,7 @@
 //─────────────────────────────────────────────────────────────────────────────
 
 #include "bamodulex_processor.h"
+#include "bamodulex_dsp.h"
 #include "bamodulex_ids.h"
 #include "version.h"
 
@@ -13,10 +14,6 @@
 #include "pluginterfaces/base/ibstream.h"
 
 #include <cstring>
-
-// 1/2 normalization factor — the orthogonal AmbiX→tetrahedral matrix
-// scales every output by 1/2 so that abmodulex ∘ bamodulex = identity.
-static constexpr double kHalf = 0.5;
 
 namespace Seam {
 
@@ -104,21 +101,12 @@ tresult PLUGIN_API BAMODULEXProcessor::process (ProcessData& data)
 }
 
 //─────────────────────────────────────────────────────────────────────────────
-// DSP core — Gerzon BA-module (AmbiX variant)
-//
-//   LFU = (a0 + a1 + a2 + a3) / 2
-//   RFD = (a0 - a1 - a2 + a3) / 2
-//   RBU = (a0 - a1 + a2 - a3) / 2
-//   LBD = (a0 + a1 - a2 - a3) / 2
-//
-// AmbiX (ACN): a0=W, a1=Y, a2=Z, a3=X.
+// DSP core — Gerzon BA-module (AmbiX variant), see bamodulex_dsp.h
 //─────────────────────────────────────────────────────────────────────────────
 
 template <typename SampleType>
 void BAMODULEXProcessor::processMatrix (SampleType** in, SampleType** out, int32 numSamples)
 {
-    const SampleType half = static_cast<SampleType>(kHalf);
-
     SampleType* a0 = in[0];
     SampleType* a1 = in[1];
     SampleType* a2 = in[2];
@@ -131,15 +119,9 @@ void BAMODULEXProcessor::processMatrix (SampleType** in, SampleType** out, int32
 
     for (int32 i = 0; i < numSamples; ++i)
     {
-        SampleType w = a0[i];
-        SampleType y = a1[i];
-        SampleType z = a2[i];
-        SampleType x = a3[i];
-
-        lfu[i] = (w + y + z + x) * half;
-        rfd[i] = (w - y - z + x) * half;
-        rbu[i] = (w - y + z - x) * half;
-        lbd[i] = (w + y - z - x) * half;
+        SampleType o[4];
+        bamodulex::decode (a0[i], a1[i], a2[i], a3[i], o);
+        lfu[i] = o[0]; rfd[i] = o[1]; rbu[i] = o[2]; lbd[i] = o[3];
     }
 }
 

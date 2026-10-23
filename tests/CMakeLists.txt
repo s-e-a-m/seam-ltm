@@ -93,6 +93,16 @@ target_include_directories(m2xhgr_dsp_test PRIVATE
 target_compile_features(m2xhgr_dsp_test PRIVATE cxx_std_17)
 add_test(NAME m2xhgr_dsp_test COMMAND m2xhgr_dsp_test)
 
+add_executable(bamodulex_dsp_test
+    bamodulex_dsp_test.cpp
+)
+target_include_directories(bamodulex_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bamodulex/source
+)
+target_compile_features(bamodulex_dsp_test PRIVATE cxx_std_17)
+add_test(NAME bamodulex_dsp_test COMMAND bamodulex_dsp_test)
+
 add_executable(ltburst_dsp_test
     ltburst_dsp_test.cpp
 )
