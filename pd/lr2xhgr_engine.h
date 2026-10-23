@@ -80,6 +80,8 @@ public:
 
     double current (int index) const { return p_[index].current (); }
 
+    const char* paramName (int index) const { return p_[index].name; }
+
 private:
     RampedParam p_[kNumParams] = {
         { "divergence",   0.0, 360.0, 90.0 },

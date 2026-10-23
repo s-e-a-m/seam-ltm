@@ -128,3 +128,16 @@ TEST_CASE("rate check") {
     e.prepare (96000);
     CHECK_FALSE(e.rateIsNominal ());
 }
+
+TEST_CASE("a non-numeric creation argument keeps its position and takes the default") {
+    // The glue passes NaN for a symbol: later values must not shift left.
+    const double args[7] = { 35, NAN, 0, 0, -2, 0, 0 };
+    CHECK(Lr2xhgrEngine (args, 7).objectLine () == "lr2xhgr~ 35 0 0 0 -2 0 0");
+}
+
+TEST_CASE("a NaN message is ignored") {
+    Lr2xhgrEngine e (nullptr, 0);
+    e.prepare (48000);
+    CHECK(e.set ("divergence", NAN));
+    CHECK(e.objectLine () == "lr2xhgr~ 90 0 0 0 0 0 0");
+}

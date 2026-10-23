@@ -74,6 +74,8 @@ public:
 
     double current (int index) const { return p_[index].current (); }
 
+    const char* paramName (int index) const { return p_[index].name; }
+
 private:
     RampedParam p_[kNumParams] = {
         { "yaw",   -180.0, 180.0, 0.0 },

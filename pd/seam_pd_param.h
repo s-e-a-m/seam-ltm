@@ -17,6 +17,7 @@
 #include "seam_ramp.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -33,15 +34,21 @@ struct RampedParam
 
     double clip (double v) const { return std::min (hi, std::max (lo, v)); }
 
-    // Creation value: clipped, no ramp.
+    // Creation value: clipped, no ramp. NaN — the glue's mark for a
+    // non-numeric argument — takes the default, so later values keep
+    // their positions.
     void init (double v)
     {
-        ramp.setTarget (clip (v), 0.0, 1.0);
+        ramp.setTarget (std::isnan (v) ? deflt : clip (v), 0.0, 1.0);
         ramp.snap ();
     }
 
-    // Message value: clipped, reached in kRampSeconds.
-    void set (double v, double fs) { ramp.setTarget (clip (v), kRampSeconds, fs); }
+    // Message value: clipped, reached in kRampSeconds. NaN is ignored.
+    void set (double v, double fs)
+    {
+        if (!std::isnan (v))
+            ramp.setTarget (clip (v), kRampSeconds, fs);
+    }
 
     void   snap ()          { ramp.snap (); }
     double next ()          { return ramp.next (); }

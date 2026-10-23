@@ -2,3 +2,5 @@ m2x-W: 1
 m2x-Y: 0
 m2x-Z: 0
 m2x-X: 1.99526
+error: m2xhgr~: argument 1 (yaw) is not a number, using the default
+error: m2xhgr~: ignoring 2 extra arguments

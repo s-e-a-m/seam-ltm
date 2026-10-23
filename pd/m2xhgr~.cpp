@@ -12,6 +12,7 @@
 #include "m_pd.h"
 #include "m2xhgr_engine.h"
 
+#include <cmath>
 #include <vector>
 
 static_assert (sizeof (t_sample) == sizeof (float), "m2xhgr~ is built for 32-bit Pd");
@@ -39,8 +40,8 @@ static void m2xhgr_dsp (t_m2xhgr* x, t_signal** sp)
 {
     x->engine->prepare (sp[0]->s_sr);
     if (!x->engine->rateIsNominal ())
-        post ("m2xhgr~: running at %g Hz — the Haar band mapping is tuned for 48000 Hz",
-              sp[0]->s_sr);
+        pd_error (x, "m2xhgr~: running at %g Hz — the Haar band mapping is tuned for 48000 Hz",
+                  sp[0]->s_sr);
     dsp_add (m2xhgr_perform, 7, x, sp[0]->s_vec,
              sp[1]->s_vec, sp[2]->s_vec, sp[3]->s_vec, sp[4]->s_vec,
              static_cast<t_int>(sp[0]->s_n));
@@ -61,16 +62,20 @@ static void m2xhgr_anything (t_m2xhgr* x, t_symbol* s, int argc, t_atom* argv)
 static void* m2xhgr_new (t_symbol*, int argc, t_atom* argv)
 {
     auto* x = reinterpret_cast<t_m2xhgr*>(pd_new (m2xhgr_class));
+    constexpr int np = Seam::pd::M2xhgrEngine::kNumParams;
+    // A non-numeric argument stays in its slot as NaN (the engine uses the
+    // default), so a typo never shifts the later values into other parameters.
     std::vector<double> args;
-    for (int i = 0; i < argc; ++i) {
-        if (argv[i].a_type == A_FLOAT)
-            args.push_back (atom_getfloat (argv + i));
-        else
-            pd_error (x, "m2xhgr~: ignoring non-numeric argument '%s'",
-                      atom_getsymbol (argv + i)->s_name);
-    }
+    for (int i = 0; i < argc && i < np; ++i)
+        args.push_back (argv[i].a_type == A_FLOAT ? atom_getfloat (argv + i) : NAN);
     x->x_f = 0;
     x->engine = new Seam::pd::M2xhgrEngine (args.data (), static_cast<int>(args.size ()));
+    for (int i = 0; i < argc && i < np; ++i)
+        if (argv[i].a_type != A_FLOAT)
+            pd_error (x, "m2xhgr~: argument %d (%s) is not a number, using the default",
+                      i + 1, x->engine->paramName (i));
+    if (argc > np)
+        pd_error (x, "m2xhgr~: ignoring %d extra argument%s", argc - np, argc - np > 1 ? "s" : "");
     for (int k = 0; k < 4; ++k)
         outlet_new (&x->x_obj, &s_signal);
     return x;

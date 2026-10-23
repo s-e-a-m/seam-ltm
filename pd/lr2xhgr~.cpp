@@ -13,6 +13,7 @@
 #include "m_pd.h"
 #include "lr2xhgr_engine.h"
 
+#include <cmath>
 #include <vector>
 
 static_assert (sizeof (t_sample) == sizeof (float), "lr2xhgr~ is built for 32-bit Pd");
@@ -41,8 +42,8 @@ static void lr2xhgr_dsp (t_lr2xhgr* x, t_signal** sp)
 {
     x->engine->prepare (sp[0]->s_sr);
     if (!x->engine->rateIsNominal ())
-        post ("lr2xhgr~: running at %g Hz — the Haar band mapping is tuned for 48000 Hz",
-              sp[0]->s_sr);
+        pd_error (x, "lr2xhgr~: running at %g Hz — the Haar band mapping is tuned for 48000 Hz",
+                  sp[0]->s_sr);
     dsp_add (lr2xhgr_perform, 8, x, sp[0]->s_vec, sp[1]->s_vec,
              sp[2]->s_vec, sp[3]->s_vec, sp[4]->s_vec, sp[5]->s_vec,
              static_cast<t_int>(sp[0]->s_n));
@@ -63,16 +64,20 @@ static void lr2xhgr_anything (t_lr2xhgr* x, t_symbol* s, int argc, t_atom* argv)
 static void* lr2xhgr_new (t_symbol*, int argc, t_atom* argv)
 {
     auto* x = reinterpret_cast<t_lr2xhgr*>(pd_new (lr2xhgr_class));
+    constexpr int np = Seam::pd::Lr2xhgrEngine::kNumParams;
+    // A non-numeric argument stays in its slot as NaN (the engine uses the
+    // default), so a typo never shifts the later values into other parameters.
     std::vector<double> args;
-    for (int i = 0; i < argc; ++i) {
-        if (argv[i].a_type == A_FLOAT)
-            args.push_back (atom_getfloat (argv + i));
-        else
-            pd_error (x, "lr2xhgr~: ignoring non-numeric argument '%s'",
-                      atom_getsymbol (argv + i)->s_name);
-    }
+    for (int i = 0; i < argc && i < np; ++i)
+        args.push_back (argv[i].a_type == A_FLOAT ? atom_getfloat (argv + i) : NAN);
     x->x_f = 0;
     x->engine = new Seam::pd::Lr2xhgrEngine (args.data (), static_cast<int>(args.size ()));
+    for (int i = 0; i < argc && i < np; ++i)
+        if (argv[i].a_type != A_FLOAT)
+            pd_error (x, "lr2xhgr~: argument %d (%s) is not a number, using the default",
+                      i + 1, x->engine->paramName (i));
+    if (argc > np)
+        pd_error (x, "lr2xhgr~: ignoring %d extra argument%s", argc - np, argc - np > 1 ? "s" : "");
     inlet_new (&x->x_obj, &x->x_obj.ob_pd, &s_signal, &s_signal);
     for (int k = 0; k < 4; ++k)
         outlet_new (&x->x_obj, &s_signal);
