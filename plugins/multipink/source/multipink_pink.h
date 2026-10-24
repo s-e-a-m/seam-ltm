@@ -207,6 +207,19 @@ inline uint32_t whiteNoiseRow(uint32_t state, Sample* row, int numSamples) {
     return state;
 }
 
+// The seed of pool slot `slot` (0..63), derived from the master seed by a
+// splitmix64 avalanche. Here rather than in the processor so that the Pd
+// external (pd/multipink_engine.h) starts the very streams the plug-in
+// starts. Why a hash and not sequential LCG steps: MULTIPINKProcessor::seedLCGs.
+inline uint32_t poolSeed(uint32_t master, int slot) {
+    uint64_t z = (uint64_t)master * 0x9E3779B97F4A7C15ULL
+               + (uint64_t)(slot + 1) * 0xC2B2AE3D27D4EB4FULL;
+    z ^= z >> 30; z *= 0xBF58476D1CE4E5B9ULL;
+    z ^= z >> 27; z *= 0x94D049BB133111EBULL;
+    z ^= z >> 31;
+    return (uint32_t)z;
+}
+
 // The block operation the audio path performs, in one place so that what
 // ships and what is tested are the same code. Before this existed the
 // recurrence lived four times over -- processor, test, IR dump, benchmark --

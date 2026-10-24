@@ -1,15 +1,16 @@
 # Pd externals — the STONE chain
 
-Pure Data externals that run the same DSP as three seam-ltm VST3 plugins, so that the STONE chain can live inside a Pd patch without a plugin host.
+Pure Data externals that run the same DSP as four seam-ltm VST3 plugins, so that the STONE chain and its calibration signal can live inside a Pd patch without a plugin host.
 
 | External | Plugin | What it does |
 |---|---|---|
 | `m2xhgr~` | [M2XHGR](../plugins/m2xhgr) | mono → AmbiX by Haar wavelet decomposition, trims and rotation |
 | `lr2xhgr~` | [LR2XHGR](../plugins/lr2xhgr) | stereo → AmbiX: two Haar banks, a divergence, shared trims, rotation |
 | `bamodulex~` | [BAMODULEX](../plugins/bamodulex) | AmbiX → the four feeds of an upright tetrahedron (LFU RFD RBU LBD) |
+| `multipink~` | [MULTIPINK](../plugins/multipink) | four independent calibrated pink-noise streams, for calibrating the stone |
 
 Each external is two files.
-`<name>_engine.h` holds everything that computes — parameters, ramps, clipping, block processing — and includes the plugin's own `*_dsp.h`; it knows nothing about Pd and is tested under ctest (`tests/pd_*_engine_test.cpp`).
+`<name>_engine.h` holds everything that computes — parameters, ramps, clipping, block processing, noise streams — and includes the plugin's own `*_dsp.h`; it knows nothing about Pd and is tested under ctest (`tests/pd_*_engine_test.cpp`).
 `<name>~.cpp` only talks to Pd's `m_pd.h`.
 Design: `docs/superpowers/specs/2026-10-23-pd-stone-externals-design.md`.
 
@@ -40,6 +41,7 @@ Creation arguments carry the values and are saved with the patch; messages to th
 - `[m2xhgr~ yaw pitch roll a1 a2 a3]`
 - `[lr2xhgr~ divergence yaw pitch roll a1 a2 a3]` — divergence default 90
 - `[bamodulex~]` — no parameters
+- `[multipink~]` — no parameters and no inlet: a standard generator, nothing to set
 
 Angles in degrees (−180…180, divergence 0…360), trims in dB (−12…+12); out-of-range values are clipped.
 A message reaches its value along a 20 ms ramp so that rehearsal tweaks don't click — the VST3 plugins have no ramp; at steady state the output is the same.
@@ -49,3 +51,10 @@ A message reaches its value along a 20 ms ramp so that rehearsal tweaks don't cl
 The Haar decomposition splits at fixed fractions of the sample rate (≈ fs/4 and fs/8), tuned at **48 kHz**.
 At any other rate `m2xhgr~` and `lr2xhgr~` post a warning in the console; they correct nothing.
 `bamodulex~` is rate-independent.
+
+## multipink~ calibration
+
+Each outlet carries −23 dBFS RMS at 48 kHz, which puts every third-octave band at −39.5 dBFS.
+At other rates the bands stay where they are and the total RMS moves by about 0.28 dB per doubling (`plugins/multipink/doc/calibration.md`).
+The four streams are the ones a 4-channel SEAM MULTIPINK instance plays on pool slots 1–4 at Reference −23, Trim 0, sample for sample (`tests/pd_multipink_engine_test.cpp`).
+They restart from their seeds whenever DSP is switched on.

@@ -312,14 +312,8 @@ void MULTIPINKProcessor::seedLCGs() {
     // Faust's no.multinoise(N) achieves the same end via noise_env's
     // internal seed dispersion; this is functionally equivalent though
     // not bit-identical to Faust's stream.
-    for (int i = 0; i < kPoolSize; ++i) {
-        uint64_t z = (uint64_t)kFaustSeed * 0x9E3779B97F4A7C15ULL
-                   + (uint64_t)(i + 1)    * 0xC2B2AE3D27D4EB4FULL;
-        z ^= z >> 30; z *= 0xBF58476D1CE4E5B9ULL;
-        z ^= z >> 27; z *= 0x94D049BB133111EBULL;
-        z ^= z >> 31;
-        lcgState_[i] = (uint32_t)z;
-    }
+    for (int i = 0; i < kPoolSize; ++i)
+        lcgState_[i] = Seam::multipink::poolSeed(kFaustSeed, i);
 }
 void MULTIPINKProcessor::resetPinkFilters() {
     for (int s = 0; s < Seam::multipink::PinkDesign::kMaxSections; ++s)

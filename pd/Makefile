@@ -15,7 +15,7 @@ PDINCLUDEDIR ?= $(PDAPP)/Contents/Resources/src
 PDBIN        ?= $(PDAPP)/Contents/Resources/bin/pd
 INSTALLDIR   ?= $(HOME)/Library/Pd/seam-ltm
 
-EXTERNALS = m2xhgr~ lr2xhgr~ bamodulex~
+EXTERNALS = m2xhgr~ lr2xhgr~ bamodulex~ multipink~
 
 CXX      ?= c++
 ARCHS     = -arch x86_64 -arch arm64
@@ -37,6 +37,9 @@ lr2xhgr~.d_fat: lr2xhgr~.cpp lr2xhgr_engine.h seam_pd_param.h \
 
 bamodulex~.d_fat: bamodulex~.cpp bamodulex_engine.h ../plugins/bamodulex/source/bamodulex_dsp.h
 	$(CXX) $(CXXFLAGS) -I../plugins/bamodulex/source $(LDFLAGS) -o $@ $<
+
+multipink~.d_fat: multipink~.cpp multipink_engine.h ../plugins/multipink/source/multipink_pink.h
+	$(CXX) $(CXXFLAGS) -I../plugins/multipink/source $(LDFLAGS) -o $@ $<
 
 install: all
 	mkdir -p "$(INSTALLDIR)"
