@@ -3,7 +3,8 @@
 //
 // [multipink~]
 //   no inlet, no arguments, no controls
-//   outlets: four independent pink streams, -23 dBFS RMS each at 48 kHz
+//   outlets: four independent pink streams, every third-octave band at
+//            -39.5 dBFS at any rate (total RMS -23 dBFS at 48 kHz)
 //
 // Everything that computes lives in multipink_engine.h; this file only talks
 // to Pd. See README.md for build and install.

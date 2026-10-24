@@ -1,6 +1,6 @@
 #N canvas 40 40 760 560 12;
 #X text 20 15 multipink~ - four calibrated pink-noise streams (seam-ltm);
-#X text 20 45 No inlet \, no arguments \, no controls. Four independent pink streams at -23 dBFS RMS each at 48 kHz - the reference for calibrating the stone band by band. At any sample rate every third-octave band stays at -39.5 dBFS (the total RMS moves a little with the rate \, the bands do not). Same DSP as the seam-ltm VST3 MULTIPINK: these are the streams of a 4-channel instance on pool slots 1-4 at Reference -23 Trim 0 \, sample for sample. The streams restart from their seeds whenever DSP is switched on., f 95;
+#X text 20 45 No inlet \, no arguments \, no controls. Four independent pink streams - the reference for calibrating the stone band by band. Every third-octave band is at -39.5 dBFS at any sample rate. The total RMS is the sum of the bands up to fs/2 \, so it moves with the rate: -23.0 dBFS at 48 kHz (hence the name -23) \, about +0.28 dB per doubling (-22.7 at 96 kHz). Same DSP as the seam-ltm VST3 MULTIPINK: these are the streams of a 4-channel instance on pool slots 1-4 at Reference -23 Trim 0 \, sample for sample. The streams restart from their seeds whenever DSP is switched on., f 95;
 #X obj 20 170 multipink~;
 #X obj 420 170 tgl 19 0 empty empty listen on dac~ 1-4 24 10 0 12 #dfdfdf #000000 #000000 0 1;
 #X obj 20 220 env~ 4096;

@@ -5,8 +5,9 @@
 //
 // No parameters: the output is what a 4-channel SEAM MULTIPINK instance on
 // pool slots 1-4 gives at Reference -23 dBFS, Trim 0 — sample for sample.
-// Total RMS -23 dBFS per channel at 48 kHz; at other rates the third-octave
-// band level holds still and the total RMS moves (doc/calibration.md).
+// Every third-octave band at -39.5 dBFS at any sample rate; the total RMS,
+// the sum of the bands up to fs/2, is -23 dBFS at 48 kHz and rises about
+// 0.28 dB per doubling of fs (doc/calibration.md).
 //
 // Only the four streams are run, not the plug-in's 64: each stream depends
 // on its own seed and state alone, so the other 60 change nothing here.

@@ -54,7 +54,8 @@ At any other rate `m2xhgr~` and `lr2xhgr~` post a warning in the console; they c
 
 ## multipink~ calibration
 
-Each outlet carries −23 dBFS RMS at 48 kHz, which puts every third-octave band at −39.5 dBFS.
-At other rates the bands stay where they are and the total RMS moves by about 0.28 dB per doubling (`plugins/multipink/doc/calibration.md`).
+Every third-octave band of every outlet is at −39.5 dBFS, at any sample rate: this is the level the calibration holds, and the one strx reads band by band.
+The total RMS is the sum of the bands up to fs/2, so it moves with the rate — each doubling adds an octave of pink, about +0.28 dB: ≈ −23.03 dBFS at 44.1 kHz, −23.00 at 48 kHz, −22.72 at 96 kHz.
+"−23" names the level by its total RMS at 48 kHz, as MULTIPINK's Reference menu does (`plugins/multipink/doc/calibration.md`).
 The four streams are the ones a 4-channel SEAM MULTIPINK instance plays on pool slots 1–4 at Reference −23, Trim 0, sample for sample (`tests/pd_multipink_engine_test.cpp`).
 They restart from their seeds whenever DSP is switched on.
