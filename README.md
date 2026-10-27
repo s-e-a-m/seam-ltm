@@ -69,7 +69,7 @@ Every window follows the same grammar, described in
 
 ### Screenshots
 
-The 20 windows photographed after the UI standard landed, in the order
+The 21 windows photographed after the UI standard landed, in the order
 of the families above; a plugin joins the gallery when its photo exists.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |
@@ -91,6 +91,10 @@ of the families above; a plugin joins the gallery when its photo exists.
 | LMO | STUNEDREV | DELRM | CHOIR |
 |:---:|:---:|:---:|:---:|
 | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) | ![CHOIR](docs/img/choir.png) |
+
+| INPHIREV |
+|:---:|
+| ![INPHIREV](docs/img/inphirev.png) |
 
 <!-- END plugins -->
 
