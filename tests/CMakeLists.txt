@@ -719,3 +719,14 @@ target_include_directories(alogos_dsp_test PRIVATE
 )
 target_compile_features(alogos_dsp_test PRIVATE cxx_std_17)
 add_test(NAME alogos_dsp_test COMMAND alogos_dsp_test)
+
+# alogos: the engine against sgs.alogos (ref/alogos_ref.h), the change of
+# setting, the arena broker, RESET; global new/delete counted on the audio thread.
+add_executable(alogos_engine_test alogos_engine_test.cpp)
+target_include_directories(alogos_engine_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(alogos_engine_test PRIVATE cxx_std_17)
+add_test(NAME alogos_engine_test COMMAND alogos_engine_test)
