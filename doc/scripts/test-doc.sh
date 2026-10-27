@@ -8,7 +8,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/_data"; : > "$TMP/_data/navigation.yml"
 
-EXPECTED_CHECKS=13
+EXPECTED_CHECKS=15
 fail=0; checks=0
 ok()  { checks=$((checks+1)); echo "  ok   $1"; }
 bad() { checks=$((checks+1)); echo "  FAIL $1"; fail=1; }
@@ -35,14 +35,29 @@ if grep -q '^generated_from: seam-ltm$' "$P"; then ok "provenienza"; else bad "p
 if [ "$(grep -c '^### ' "$P")" -eq 21 ]; then ok "21 schede"; else bad "21 schede"; fi
 if grep -q '### MULTIPINK' "$P"; then ok "MULTIPINK presente"; else bad "MULTIPINK presente"; fi
 if grep -q 'seam.ambisonics.lib' "$P"; then ok "rimando alla libreria Faust"; else bad "rimando alla libreria Faust"; fi
-# gli screenshot attesi sono quelli del registro che esistono in docs/img
-# (una scheda nuova ne e priva finche non c'e la prova in sala; lo segnala check-uidesc)
-shots="$(python3 -c "
+# ogni scheda del registro ha il suo screenshot, salvo quelli in attesa della
+# prova in sala; un'attesa che sopravvive alla foto e un errore, cosi la lista
+# non puo restare piu a lungo della foto.
+PENDING_SHOTS="inphirev.png"
+missing=""; stale=""
+for s in $(python3 -c "
 import sys; sys.path.insert(0,'$HERE')
-import registry, os
+import registry
+print(' '.join(p['screenshot'] for f in registry.load() for p in f['plugin']))
+"); do
+  pend=0; for q in $PENDING_SHOTS; do [ "$q" = "$s" ] && pend=1; done
+  if [ -f "$ROOT/docs/img/$s" ]; then [ $pend -eq 1 ] && stale="$stale $s"
+  else [ $pend -eq 0 ] && missing="$missing $s"; fi
+done
+if [ -z "$missing" ]; then ok "screenshot presenti (in attesa: $PENDING_SHOTS)"; else bad "screenshot mancanti:$missing"; fi
+if [ -z "$stale" ]; then ok "nessuna attesa scaduta"; else bad "la foto esiste: togliere dalla lista PENDING_SHOTS:$stale"; fi
+n_present="$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')"
+n_expected="$(python3 -c "
+import sys, os; sys.path.insert(0,'$HERE')
+import registry
 print(sum(os.path.exists('$ROOT/docs/img/'+p['screenshot']) for f in registry.load() for p in f['plugin']))
 ")"
-if [ "$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')" -eq "$shots" ]; then ok "$shots screenshot copiati (tutti quelli presenti)"; else bad "screenshot copiati ($shots presenti)"; fi
+if [ "$n_present" -eq "$n_expected" ]; then ok "$n_present screenshot copiati"; else bad "screenshot copiati ($n_present, attesi $n_expected)"; fi
 
 # build e installazione restano nel README, non sul sito
 if ! grep -qi 'cmake' "$P"; then ok "niente istruzioni di build sul sito"; else bad "niente istruzioni di build sul sito"; fi

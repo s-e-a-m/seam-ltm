@@ -28,12 +28,12 @@ for fam in families:
 
 out.append("### Screenshots")
 out.append("")
-out.append("All twenty-one windows, photographed after the UI standard landed, in the order")
-out.append("of the three families above.")
-out.append("")
-
-names = [p["name"] for _f, p in registry.plugins(families)]
+names = [p["name"] for _f, p in registry.plugins(families)
+         if (registry.ROOT / "docs" / "img" / p["screenshot"]).exists()]
 shots = {p["name"]: p["screenshot"] for _f, p in registry.plugins(families)}
+out.append(f"The {len(names)} windows photographed after the UI standard landed, in the order")
+out.append("of the families above; a plugin joins the gallery when its photo exists.")
+out.append("")
 for i in range(0, len(names), 4):
     row = names[i:i + 4]
     out.append("| " + " | ".join(row) + " |")
@@ -53,4 +53,4 @@ else:
     sys.exit("render-readme: marker BEGIN/END assenti nel README")
 
 readme.write_text(text)
-print(f"  README: {len(names)} plugin in {len(families)} famiglie")
+print(f"  README: {sum(len(f['plugin']) for f in families)} plugin, {len(names)} in the gallery, in {len(families)} famiglie")
