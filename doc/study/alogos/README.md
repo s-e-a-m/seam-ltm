@@ -6,6 +6,9 @@ This folder holds the measurements and generators behind ALOGOS.
 
 - `inphirev-table.cpp` writes INPHIREV's delay table as the fixture `tests/ref/alogos_inphirev_table.h`.
 - `cpu-spike.cpp` measures the cost of ALOGOS's heaviest setting.
+- `gen-ref.sh` renders the Faust spec (`sgs.aldel`, `sgs.algrid`, `sgs.alogos`) into `tests/ref/alogos_ref.h`; it needs `faust` and runs by hand when the spec changes.
+- `refdump.cpp` is the driver that `gen-ref.sh` compiles against each generated DSP; its header comment lists the modes and the array layouts.
+- `dsp/aldel.dsp` exposes the delay and the grid through entries; `dsp/alogos.dsp` is the whole reverb, with its constants substituted by `gen-ref.sh`.
 
 ## CPU spike
 
