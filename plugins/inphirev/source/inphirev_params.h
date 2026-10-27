@@ -71,6 +71,8 @@ struct Plain {
 class ParamBox {
 public:
     ParamBox() { for (int i = 0; i < kNumParams; ++i) v_[i].store(defaultNormalized((Param)i)); }
+    // The processor and the engine read only plain(); normalized() and store()
+    // are for the host's queues, the state and the editor.
     void   store(Param p, double norm) { v_[(int)p].store(norm); }
     double normalized(Param p) const   { return v_[(int)p].load(); }
 

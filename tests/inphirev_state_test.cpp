@@ -19,7 +19,7 @@ TEST_CASE("the processor's state round-trips every parameter") {
     writeState(&stream, a);
     rewindStream(stream);
     ParamBox b;
-    CHECK(readState(&stream, b) == kStateFields);
+    CHECK(readState(&stream, b) == kNumParams);
     for (int i = 0; i < kNumParams; ++i) CHECK(b.normalized((Param)i) == a.normalized((Param)i));
     const Plain p = b.plain();
     CHECK(p.power);
@@ -32,8 +32,8 @@ TEST_CASE("a short blob keeps the defaults for the fields it lacks") {
     MemoryStream stream;
     {
         Steinberg::IBStreamer w(&stream, kLittleEndian);
-        w.writeDouble(kStateVersion);
-        w.writeDouble(1.0);                          // Power only
+        w.writeDouble(1.0);                          // Power
+        w.writeDouble(stoneIdToNormalized(4));       // StoneId
     }
     rewindStream(stream);
     ParamBox b;
@@ -43,7 +43,7 @@ TEST_CASE("a short blob keeps the defaults for the fields it lacks") {
     CHECK(p.power);
     CHECK(p.grid == kDefaultGrid);
     CHECK(p.sections == kDefaultSections);
-    CHECK(p.stoneId == 0);
+    CHECK(p.stoneId == 4);
 }
 
 TEST_CASE("recalled out-of-range values clamp (id 9, j 20, sections 0 and 40)") {
@@ -51,15 +51,14 @@ TEST_CASE("recalled out-of-range values clamp (id 9, j 20, sections 0 and 40)") 
         MemoryStream stream;
         {
             Steinberg::IBStreamer w(&stream, kLittleEndian);
-            w.writeDouble(kStateVersion);
-            w.writeDouble(0.0);
+                w.writeDouble(0.0);
             w.writeDouble(stoneIdToNormalized(9));
             w.writeDouble(gridToNormalized(20));
             w.writeDouble(sectionsToNormalized(pass == 0 ? 0 : 40));
         }
         rewindStream(stream);
         ParamBox b;
-        CHECK(readState(&stream, b) == kStateFields);
+        CHECK(readState(&stream, b) == kNumParams);
         const Plain p = b.plain();
         CHECK(p.stoneId == kMaxStoneId);
         CHECK(p.grid == kGridMax);
