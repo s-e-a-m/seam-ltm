@@ -708,3 +708,14 @@ if(APPLE)
 endif()
 target_compile_features(inphirev_state_test PRIVATE cxx_std_17)
 add_test(NAME inphirev_state_test COMMAND inphirev_state_test)
+
+# alogos: scales, grid and delay table against sgs.algrid / sgs.aldel; references in
+# ref/alogos_ref.h (doc/study/alogos/gen-ref.sh) and ref/alogos_inphirev_table.h.
+add_executable(alogos_dsp_test alogos_dsp_test.cpp)
+target_include_directories(alogos_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(alogos_dsp_test PRIVATE cxx_std_17)
+add_test(NAME alogos_dsp_test COMMAND alogos_dsp_test)
