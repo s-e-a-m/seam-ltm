@@ -37,6 +37,18 @@ TEST_CASE("design figures: (1, 10, 17) at 96 kHz") {
     }
 }
 
+TEST_CASE("beyond the horizon: +inf, not the clipped grid") {
+    const double fs = 48000.0;
+    const uint32_t d500 = (uint32_t)(500.0 * fs), d300 = (uint32_t)(300.0 * fs);
+    const Decay a = estimateDecay(&d500, 1, fs);
+    CHECK(std::isinf(a.t30));
+    CHECK(std::isinf(a.t60));
+    const Decay b = estimateDecay(&d300, 1, fs);   // t30 at 2100 s, t60 at 4200 s
+    CHECK(std::isfinite(b.t30));
+    CHECK(std::fabs(b.t30 - 2100.0) <= kBin + 1e-9);
+    CHECK(std::isinf(b.t60));
+}
+
 TEST_CASE("estimate vs engine") {
     const double fs = 48000.0;
     Engine e;

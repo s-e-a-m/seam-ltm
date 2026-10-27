@@ -10,9 +10,11 @@
 // the decay measured on the engine.
 #pragma once
 #include "inphirev_dsp.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <utility>
 #include <vector>
 
 namespace inphirev {
@@ -43,17 +45,18 @@ inline Decay estimateDecay(const uint32_t* delays, int sections, double fs) {
                 nxt[(size_t)(b + tp.first)] += cur[(size_t)b] * tp.second;
         cur.swap(nxt);
     }
-    // Backwards: the energy that arrives after bin b.
-    double total = 0.0;
-    for (double v : cur) total += v;
+    // Each section is all-pass: a unit input carries energy 1 in all, so the
+    // energy still to come after bin b is 1 minus what has arrived by b.
+    // What the grid clips (taps past the horizon) therefore counts as still
+    // to come, and a threshold not crossed within the horizon stays +inf.
     const double inf = std::numeric_limits<double>::infinity();
     Decay d { inf, inf };
-    double after = 0.0;
-    std::vector<double> rest((size_t)bins);
-    for (int b = bins - 1; b >= 0; --b) { rest[(size_t)b] = after; after += cur[(size_t)b]; }
+    double arrived = 0.0;
     for (int b = 0; b < bins; ++b) {
-        if (d.t30 == inf && rest[(size_t)b] <= 1e-3 * total) d.t30 = b * kBin;
-        if (rest[(size_t)b] <= 1e-6 * total) { d.t60 = b * kBin; break; }
+        arrived += cur[(size_t)b];
+        const double rest = 1.0 - arrived;
+        if (d.t30 == inf && rest <= 1e-3) d.t30 = b * kBin;
+        if (rest <= 1e-6) { d.t60 = b * kBin; break; }
     }
     return d;
 }

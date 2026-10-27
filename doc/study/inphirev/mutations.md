@@ -19,3 +19,4 @@
 | `inphirev_dsp_test` hours of silence | `ScopedNoDenormals` removed | RED (`subnormal == 0` fails), restored |
 | `inphirev_decay_test` decay estimate | drop the backward integration (curve used as is) | RED (closed form, design figures, estimate vs engine: t30 = 0 s on every face), restored |
 | `inphirev_decay_test` decay estimate | g instead of g^2 as the energy gain | RED (closed form, design figures, estimate vs engine: errors 80 %), restored |
+| `inphirev_decay_test` beyond the horizon | threshold against the truncated (clipped) total instead of 1 | RED (single section at 500 s and 300 s: t30/t60 finite instead of +inf, 3 checks), restored |
