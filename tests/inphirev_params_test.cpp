@@ -31,13 +31,17 @@ TEST_CASE("step counts: StoneId 9 values, Grid 15, Sections 18") {
     CHECK(sectionsToNormalized(kMaxSections) == 1.0);
 }
 
-TEST_CASE("off-grid host values map as the SDK's stepped parameters display them") {
+TEST_CASE("off-grid host values map as the SDK's FromNormalized (StringList, Range and stepped alike)") {
     for (int k = 0; k <= 1000; ++k) {
         const double norm = k / 1000.0;
         CHECK(normalizedToGrid(norm) == std::min(14, (int)(norm * 15.0)));
         CHECK(normalizedToSections(norm) == 1 + std::min(17, (int)(norm * 18.0)));
-        CHECK(normalizedToStoneId(norm) == (int)(norm * 8 + 0.5));
+        CHECK(normalizedToStoneId(norm) == std::min(8, (int)(norm * 9.0)));
     }
+    // the SDK's FromNormalized (futils.h): min(steps, int(norm * (steps + 1)))
+    CHECK(normalizedToStoneId(0.56) == 5);    // rounding would give 4
+    CHECK(normalizedToGrid(0.56) == 8);
+    CHECK(normalizedToSections(0.56) == 11);
 }
 
 TEST_CASE("out-of-range recalled values clamp to the table (id 9, j 20, sections 0 and 40)") {

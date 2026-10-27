@@ -128,6 +128,8 @@ One arena of `double`, allocated and zeroed when the host activates the plugin, 
 If the memory cannot be allocated, the plugin stays silent and the footer says "allocation failed"; the host keeps running.
 The footer's status reads "STONE id undeclared" while the id is "?".
 
+The plugin reports an infinite tail: the memory is the second part of the piece, and a host that suspends processing on silent input (Cubase by default, Reaper with auto-bypass) would otherwise freeze it the moment the input closes.
+
 ## State
 
 The state is a bare array of doubles: power, stoneId, grid, sections.
@@ -148,6 +150,7 @@ The ancestor `apphirev(N,t) = seq(i,N, sapf(int(t*(i+1)*phi),0.708))` (2020, `fa
 The speed of sound is `Seam::speedOfSound(T)` = 331.3·√(1 + T/273.15) at 20 °C, additive to `seam.math.lib`; `isos` and `esos` are untouched (seam-ltm issue #15).
 
 The tests (`tests/inphirev_dsp_test.cpp`, `inphirev_decay_test.cpp`, `inphirev_params_test.cpp`, `inphirev_state_test.cpp`) check the delay table of every id and grid point at 44.1, 48, 96 and 192 kHz against the Faust reference exactly, the engine against `sgs.inphirev` at 96 and 48 kHz, the change of setting, the arena, RESET, the parameters and state, and the decay estimate against the engine.
+The engine-versus-`sgs.inphirev` test runs on the noise burst only, not also on a clarinet note as the design asks: the engine is linear and time-invariant between setting changes, so the burst's broadband response covers every input, and no clarinet render was added.
 Every test was verified by mutation; the record, the reference generator and the CPU measure are in `doc/study/inphirev/`.
 
 ## Cost

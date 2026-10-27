@@ -187,8 +187,14 @@ public:
             servedGen_ = gen;
             beginClear();
         } else if (phase_ == Phase::Run && !(pending_ == applied_) && settle_ <= 0) {
-            snap_ = pending_;                     // stable for 250 ms: apply it
-            beginClear();
+            if (sameTable(pending_, applied_)) {
+                applied_ = pending_;              // e.g. "?" -> 1, both phase 0: the
+                snap_    = pending_;              // table is the same, only the readouts move
+                publish(pending_);
+            } else {
+                snap_ = pending_;                 // stable for 250 ms: apply it
+                beginClear();
+            }
         }
         if (phase_ == Phase::Clear) {
             clearChunk(n);
@@ -234,6 +240,11 @@ private:
         int id, j, n;
         bool operator==(const Settings& o) const { return id == o.id && j == o.j && n == o.n; }
     };
+
+    // Two settings that build the identical delay table and section count.
+    static bool sameTable(const Settings& a, const Settings& b) {
+        return a.j == b.j && a.n == b.n && gridPhase(a.id) == gridPhase(b.id);
+    }
 
     void beginClear() {
         phase_ = Phase::FadeOut;

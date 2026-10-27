@@ -39,11 +39,12 @@ inline double stoneIdToNormalized(int id)       { return (double)id / kStoneIdSt
 inline double gridToNormalized(int j)           { return (double)j / kGridSteps; }
 inline double sectionsToNormalized(int n)       { return (double)(n - kSectionsMin) / kSectionsSteps; }
 
-// StoneId is a StringListParameter, whose entries sit at idx/steps exactly:
-// rounded, as multipink reads its own (index = norm * steps + 0.5).
+// StoneId is a StringListParameter (stepCount 8): its toPlain is the same
+// FromNormalized as every stepped parameter here, so the menu, the distance
+// text and the engine always agree (an off-grid 0.56 is entry 5, not 4).
 inline int normalizedToStoneId(double norm) {
-    if (std::isnan(norm)) return 0;
-    return (int)(clamp01(norm) * kStoneIdSteps + 0.5);
+    const int v = steppedFloor(norm, kStoneIdSteps);
+    return v < 0 ? 0 : v;
 }
 inline int normalizedToGrid(double norm) {
     const int v = steppedFloor(norm, kGridSteps);

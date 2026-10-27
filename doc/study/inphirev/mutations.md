@@ -22,3 +22,5 @@
 | `inphirev_decay_test` beyond the horizon | threshold against the truncated (clipped) total instead of 1 | RED (single section at 500 s and 300 s: t30/t60 finite instead of +inf, 3 checks), restored |
 | `inphirev_params_test` clamps | upper clamp removed from the stepped toPlain (`min(steps, ...)`) | RED (3 cases, 8 assertions: round-trip, off-grid, id 9 / j 20 / sections 40), restored |
 | `inphirev_state_test` short read | a short blob keeps the box's previous values instead of the defaults (re-done after the fix round, no version field) | RED (short-blob case, 1 assertion), restored |
+| `inphirev_dsp_test` identical table | always run the fade/clear sequence (skip the `sameTable` shortcut) | RED (`clears() == 0` fails, output differs from the untouched engine), restored |
+| `inphirev_params_test` off-grid | `normalizedToStoneId` rounds (`norm * 8 + 0.5`) instead of `FromNormalized` | RED (0.56 gives 4 instead of 5, plus the sweep), restored |

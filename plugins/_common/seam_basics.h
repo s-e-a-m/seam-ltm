@@ -1,5 +1,5 @@
 //──────────────────────────────────────────────────────────────────────────
-// SEAM-LTM · seam_basics.h — the C++ side of basics.lib (ba)
+// SEAM-LTM · seam_basics.h — the C++ side of basics.lib (ba) and of sma.tsos (seam.math.lib)
 //
 // FAUST REFERENCE (basics.lib, standard):
 //   ba.tau2pole(tau) = 0 when |tau| < ma.EPSILON, else exp(-1/(tau*ma.SR));

@@ -61,6 +61,9 @@ public:
     Steinberg::tresult PLUGIN_API setBusArrangements(
         Steinberg::Vst::SpeakerArrangement* in, Steinberg::int32 numIn,
         Steinberg::Vst::SpeakerArrangement* out, Steinberg::int32 numOut) SMTG_OVERRIDE;
+    // The memory is the piece's second part: a host that suspends processing
+    // on silent input must not freeze it when the input closes.
+    Steinberg::uint32 PLUGIN_API getTailSamples() SMTG_OVERRIDE { return Steinberg::Vst::kInfiniteTail; }
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) SMTG_OVERRIDE;
 
     // The distance's text depends on the STONE id: a new id redraws it.

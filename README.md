@@ -65,7 +65,7 @@ Every window follows the same grammar, described in
 
 | Plugin | I/O | Description |
 |---|---|---|
-| **INPHIREV** | 4ch → 4ch | The golden all-pass memory for canto alla durata (Silvi), first used in the Dialogo Angelico: four faces of Schroeder all-pass sections with g = 1/φ, whose delays follow one golden spiral through A B C D A′ B′ … The first delay is the acoustic distance from STONE to TETRAREC on a grid of φ^¼ steps, one grid per STONE id so that two STONEs never share a delay; every later delay is a power of φ above it, moved to the next prime. STONE id, distance and 1–18 sections set the sound; the window prints the decay that follows, and a RESET empties the memory while playing |
+| **INPHIREV** | 4ch → 4ch | The golden all-pass memory for canto alla durata (Silvi), first used in the Dialogo Angelico: four faces of Moorer all-pass sections with g = 1/φ, whose delays follow one golden spiral through A B C D A′ B′ … The first delay is the acoustic distance from STONE to TETRAREC on a grid of φ^¼ steps, one grid per STONE id, so that ids 1 and 2 never share a delay (other pairs may, see the plugin README); every later delay is a power of φ above it, moved to the next prime. STONE id, distance and 1–18 sections set the sound; the window prints the decay that follows, and a RESET empties the memory while playing |
 
 ### Screenshots
 

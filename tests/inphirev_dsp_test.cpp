@@ -236,6 +236,30 @@ TEST_CASE("a setting equal to the applied one starts nothing") {
     CHECK(e.stoneId() == 8); CHECK(e.grid() == 0); CHECK(e.sections() == 18);
 }
 
+// Review fix: "?" and 1 are both phase 0, so the table and the section count
+// are identical; only the readouts move, with no fade and no clear.
+TEST_CASE("a setting with the identical table changes the readouts only: no clear, output continuous") {
+    const double fs = 48000.0;
+    Engine e; settle(e, fs, 0, 10, 17);
+    Engine ref; settle(ref, fs, 0, 10, 17);
+    std::vector<double> ib((size_t)4 * 256), oa((size_t)4 * 256), ob((size_t)4 * 256);
+    double* in[4]; double* oe[4]; double* orf[4];
+    for (int c = 0; c < 4; ++c) { in[c] = ib.data() + (size_t)c * 256; oe[c] = oa.data() + (size_t)c * 256; orf[c] = ob.data() + (size_t)c * 256; }
+    Burst burst(fs);
+    double worst = 0.0;
+    for (int blk = 0; blk < 400; ++blk) {          // 2.1 s: past the 250 ms settle
+        if (blk == 4) e.setSettings(1, 10, 17);
+        burst.fill(in, 256);
+        e.process(in, oe, 256);
+        ref.process(in, orf, 256);
+        for (int c = 0; c < 4; ++c) for (int k = 0; k < 256; ++k)
+            worst = std::max(worst, std::fabs(oe[c][k] - orf[c][k]));
+    }
+    CHECK(e.clears() == 0);
+    CHECK(e.stoneId() == 1);
+    CHECK(worst == 0.0);                           // identical to the engine never touched
+}
+
 // Test 6: the arena holds every delay.
 TEST_CASE("arena holds every delay: every id, grid point, section and face, at every rate") {
     for (double fs : {44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0}) {
