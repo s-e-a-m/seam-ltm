@@ -659,3 +659,14 @@ if(APPLE)
 endif()
 target_compile_features(abmodulex_state_test PRIVATE cxx_std_17)
 add_test(NAME abmodulex_state_test COMMAND abmodulex_state_test)
+
+# inphirev: the grid and the delay table against sgs.ipdel; references in
+# ref/inphirev_ref.h (doc/study/inphirev/gen-ref.sh).
+add_executable(inphirev_dsp_test inphirev_dsp_test.cpp)
+target_include_directories(inphirev_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(inphirev_dsp_test PRIVATE cxx_std_17)
+add_test(NAME inphirev_dsp_test COMMAND inphirev_dsp_test)
