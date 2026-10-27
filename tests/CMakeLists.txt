@@ -680,3 +680,31 @@ target_include_directories(inphirev_decay_test PRIVATE
 )
 target_compile_features(inphirev_decay_test PRIVATE cxx_std_17)
 add_test(NAME inphirev_decay_test COMMAND inphirev_decay_test)
+
+# inphirev: the parameters' ranges and clamps (SDK-free), and the state codec.
+add_executable(inphirev_params_test inphirev_params_test.cpp)
+target_include_directories(inphirev_params_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(inphirev_params_test PRIVATE cxx_std_17)
+add_test(NAME inphirev_params_test COMMAND inphirev_params_test)
+
+add_executable(inphirev_state_test
+    inphirev_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(inphirev_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(inphirev_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    find_library(CORE_FOUNDATION CoreFoundation)
+    target_link_libraries(inphirev_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(inphirev_state_test PRIVATE cxx_std_17)
+add_test(NAME inphirev_state_test COMMAND inphirev_state_test)

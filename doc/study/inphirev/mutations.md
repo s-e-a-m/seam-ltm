@@ -20,3 +20,5 @@
 | `inphirev_decay_test` decay estimate | drop the backward integration (curve used as is) | RED (closed form, design figures, estimate vs engine: t30 = 0 s on every face), restored |
 | `inphirev_decay_test` decay estimate | g instead of g^2 as the energy gain | RED (closed form, design figures, estimate vs engine: errors 80 %), restored |
 | `inphirev_decay_test` beyond the horizon | threshold against the truncated (clipped) total instead of 1 | RED (single section at 500 s and 300 s: t30/t60 finite instead of +inf, 3 checks), restored |
+| `inphirev_params_test` clamps | upper clamp removed from the stepped toPlain (`min(steps, ...)`) | RED (3 cases, 8 assertions: round-trip, off-grid, id 9 / j 20 / sections 40), restored |
+| `inphirev_state_test` short read | a short blob keeps the box's previous values instead of the defaults | RED (short-blob case, 1 assertion), restored |
