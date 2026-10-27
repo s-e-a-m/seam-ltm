@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="11"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="Structure" rgba="#888888ff"/>
+    </colors>
+
+    <!-- L width, from the template: no fine control at all, the width is the
+         footer's, which prints a line per decay threshold over four faces.
+         Zone order HEADER, SETUP, OPS, FOOTER; no FINE (the three settings
+         are soundcheck values, not gestures). -->
+    <template name="view" class="CViewContainer" origin="0, 0" size="460, 352"
+              minSize="460, 352" maxSize="460, 352"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- ── HEADER ─────────────────────────────────────────────────── -->
+        <view class="CTextLabel" origin="0, 14" size="460, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM INPHIREV" transparent="true"/>
+        <view class="CTextLabel" origin="0, 42" size="460, 18" font="SubtitleFont"
+              font-color="TextLight" text-alignment="center" title="Golden All-Pass Memory" transparent="true"/>
+        <view class="CTextLabel" origin="0, 60" size="460, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="center"
+              title="4 faces &#xB7; d &#x3C6;^(i+k/4) &#x2192; next prime &#xB7; g = 1/&#x3C6;" transparent="true"/>
+
+        <!-- ── SETUP — what the user tells the plugin ───────────────────
+             Three menu blocks in one row (label 14 px, menu 20 px): the
+             STONE id sets the grid's phase, the distance is a point of that
+             grid shown in metres (it follows the id at once), the sections
+             are the length of the cascade. A new value is heard once stable
+             for 250 ms, after a reset of the memory. -->
+        <view class="CTextLabel" origin="30, 90" size="120, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="STONE" transparent="true"/>
+        <view class="COptionMenu" origin="30, 106" size="120, 20" control-tag="StoneId"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <view class="CTextLabel" origin="170, 90" size="120, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="distance" transparent="true"/>
+        <view class="COptionMenu" origin="170, 106" size="120, 20" control-tag="Grid"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <view class="CTextLabel" origin="310, 90" size="120, 14" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="center" title="sections" transparent="true"/>
+        <view class="COptionMenu" origin="310, 106" size="120, 20" control-tag="Sections"
+              font="ValueFont" font-color="TextLight" back-color="SliderTrack"
+              frame-color="SliderTrack" frame-width="1" style-no-frame="false"/>
+
+        <!-- ── OPS ───────────────────────────────────────────────────────
+             POWER over the left half, RESET over the right one. RESET is
+             UI-only: it empties the memory, it is not a parameter. -->
+        <view class="CCheckBox" origin="93, 146" size="14, 14" control-tag="Power"
+              boxframe-color="Structure" boxfill-color="BgDark" checkmark-color="SliderActive"
+              title="" transparent="true"/>
+        <view class="CTextLabel" origin="111, 144" size="52, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="POWER" transparent="true"/>
+        <view class="CView" origin="313, 146" size="14, 14" custom-view-name="InphirevReset"
+              tooltip="empty the four memories"/>
+        <view class="CTextLabel" origin="331, 144" size="52, 16" font="KnobLabelFont"
+              font-color="TextLight" text-alignment="left" title="RESET" transparent="true"/>
+
+        <!-- ── FOOTER — what the plugin tells the user, then the logo ────
+             The decay each face prints to -30 and -60 dB (an estimate), the
+             first and longest delay of the table, the arena and the status. -->
+        <view class="CView" origin="30, 180" size="400, 70" custom-view-name="InphirevFooter"/>
+
+        <!-- SEAM logo (native 240x77 — CView does not scale bitmaps) -->
+        <view class="CView" origin="110, 264" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+        <control-tag name="Power"    tag="100"/>
+        <control-tag name="StoneId"  tag="101"/>
+        <control-tag name="Grid"     tag="102"/>
+        <control-tag name="Sections" tag="103"/>
+    </control-tags>
+</vstgui-ui-description>
