@@ -17,3 +17,5 @@
 | `inphirev_dsp_test` prepare at a new rate | `fs_ = fs` removed from `prepare` | RED (delays of the old rate; first version of the test passed by coincidence because 96 kHz is the default, so the 96 -> 48 leg was added), restored |
 | `inphirev_dsp_test` allocation failure | byte limit ignored | RED (`prepare` returns true, `failed()` false), restored |
 | `inphirev_dsp_test` hours of silence | `ScopedNoDenormals` removed | RED (`subnormal == 0` fails), restored |
+| `inphirev_decay_test` decay estimate | drop the backward integration (curve used as is) | RED (closed form, design figures, estimate vs engine: t30 = 0 s on every face), restored |
+| `inphirev_decay_test` decay estimate | g instead of g^2 as the energy gain | RED (closed form, design figures, estimate vs engine: errors 80 %), restored |

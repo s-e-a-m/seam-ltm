@@ -670,3 +670,13 @@ target_include_directories(inphirev_dsp_test PRIVATE
 )
 target_compile_features(inphirev_dsp_test PRIVATE cxx_std_17)
 add_test(NAME inphirev_dsp_test COMMAND inphirev_dsp_test)
+
+# inphirev: the printed decay against the closed form, the design table and the engine.
+add_executable(inphirev_decay_test inphirev_decay_test.cpp)
+target_include_directories(inphirev_decay_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(inphirev_decay_test PRIVATE cxx_std_17)
+add_test(NAME inphirev_decay_test COMMAND inphirev_decay_test)
