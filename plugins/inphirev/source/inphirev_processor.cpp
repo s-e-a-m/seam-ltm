@@ -196,8 +196,11 @@ tresult PLUGIN_API InphirevProcessor::setParamNormalized(ParamID tag, ParamValue
     const tresult r = SingleComponentEffect::setParamNormalized(tag, value);
     // The distance menu lists the metres of the current id's grid: a new id
     // keeps j and rebuilds the entries (the editor listens to changed()).
-    if (r == kResultOk && tag == kParamStoneId)
+    if (r == kResultOk && tag == kParamStoneId) {
         if (Parameter* grid = parameters.getParameter(kParamGrid)) grid->changed();
+        // The distance text of the host's generic views changed with the id.
+        if (componentHandler) componentHandler->restartComponent(kParamValuesChanged);
+    }
     return r;
 }
 
