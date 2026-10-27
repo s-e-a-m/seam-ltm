@@ -18,7 +18,7 @@ import sys; sys.path.insert(0,'$HERE')
 import registry
 print(sum(len(f['plugin']) for f in registry.load()))
 ")"
-if [ "$n" -eq 20 ]; then ok "20 plugin nel registro"; else bad "20 plugin nel registro (trovati $n)"; fi
+if [ "$n" -eq 21 ]; then ok "21 plugin nel registro"; else bad "21 plugin nel registro (trovati $n)"; fi
 
 # il README deve essere gia rigenerato: se il registro e cambiato senza
 # rigenerare, le due copie sono gia divergenti
@@ -32,10 +32,17 @@ P="$TMP/_ltm/index.md"
 if [ -f "$P" ]; then ok "pagina generata"; else bad "pagina generata"; fi
 if grep -q '^permalink: /seam-ltm/$' "$P"; then ok "permalink"; else bad "permalink"; fi
 if grep -q '^generated_from: seam-ltm$' "$P"; then ok "provenienza"; else bad "provenienza"; fi
-if [ "$(grep -c '^### ' "$P")" -eq 20 ]; then ok "20 schede"; else bad "20 schede"; fi
+if [ "$(grep -c '^### ' "$P")" -eq 21 ]; then ok "21 schede"; else bad "21 schede"; fi
 if grep -q '### MULTIPINK' "$P"; then ok "MULTIPINK presente"; else bad "MULTIPINK presente"; fi
 if grep -q 'seam.ambisonics.lib' "$P"; then ok "rimando alla libreria Faust"; else bad "rimando alla libreria Faust"; fi
-if [ "$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')" -eq 20 ]; then ok "20 screenshot copiati"; else bad "20 screenshot copiati"; fi
+# gli screenshot attesi sono quelli del registro che esistono in docs/img
+# (una scheda nuova ne e priva finche non c'e la prova in sala; lo segnala check-uidesc)
+shots="$(python3 -c "
+import sys; sys.path.insert(0,'$HERE')
+import registry, os
+print(sum(os.path.exists('$ROOT/docs/img/'+p['screenshot']) for f in registry.load() for p in f['plugin']))
+")"
+if [ "$(ls "$TMP/assets/seam-ltm/img" | wc -l | tr -d ' ')" -eq "$shots" ]; then ok "$shots screenshot copiati (tutti quelli presenti)"; else bad "screenshot copiati ($shots presenti)"; fi
 
 # build e installazione restano nel README, non sul sito
 if ! grep -qi 'cmake' "$P"; then ok "niente istruzioni di build sul sito"; else bad "niente istruzioni di build sul sito"; fi

@@ -162,6 +162,14 @@ The generator of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): on each of f
 The APF of Studio sul Corpo d'Ombra #2 (Cortegiani, Tedesco): four independent lines of 42 Moorer all-pass sections in series, one per face of STONED, tuned by √2, φ, e and π. Each delay is a time in milliseconds moved to the next prime at the session's rate, so each face returns the sound on its own time scale, from seconds to minutes. One arena sized exactly at activation, and a RESET that empties it while playing"""
 
   [[family.plugin]]
+  name = "INPHIREV"
+  io = "4ch → 4ch"
+  screenshot = "inphirev.png"
+  faust = "seam.silvi.lib"
+  description = """
+The golden all-pass memory for canto alla durata (Silvi), first used in the Dialogo Angelico: four faces of Schroeder all-pass sections with g = 1/φ, whose delays follow one golden spiral through A B C D A′ B′ … The first delay is the acoustic distance from STONE to TETRAREC on a grid of φ^¼ steps, one grid per STONE id so that two STONEs never share a delay; every later delay is a power of φ above it, moved to the next prime. STONE id, distance and 1–18 sections set the sound; the window prints the decay that follows, and a RESET empties the memory while playing"""
+
+  [[family.plugin]]
   name = "DELRM"
   io = "4ch → 4ch"
   screenshot = "delrm.png"
