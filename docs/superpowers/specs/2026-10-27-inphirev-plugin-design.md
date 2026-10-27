@@ -11,9 +11,17 @@ The first delay is the acoustic distance from STONE to TETRAREC; every later del
 The name comes from the old Faust experiments `in-phi-rev`, the ancestor of this idea and of stunedrev.
 
 It is an exploratory instrument, not a mapping from playing to processing.
-The sound is chosen at soundcheck by two settings (distance, number of sections); the send level is set at the mixer.
+The sound is chosen at soundcheck by three settings (STONE id, distance on that id's grid, number of sections); the send level is set at the mixer.
 
-Success means: the plugin reproduces its Faust specification to numerical precision at 96 and 48 kHz; its delays equal the delay table of the spec exactly; it allocates its memory once, outside the audio thread; its memory can be emptied while it plays without a dropout; the window follows `doc/style/ui-style.md` and prints the duration that the two settings produce.
+**The first use (Giuseppe, 2026-10-27).**
+Two instruments, timpani and contrabass clarinet with mute, and two STONEs facing each other: each STONE is the voice of one instrument's reverberation only, placed behind the *other* instrument.
+So there are two instances of the plugin, one per instrument, each fed by that instrument's TETRAREC and playing into the opposite STONE.
+The distance an instance uses is from the centre of the TETRAREC that feeds it to the centre of the STONE that plays its output; the distance between the two STONEs plays no part.
+The two distances are 3–4 m and deliberately different.
+The piece's first formal level is golden: C = 10′, descent A = C/φ ≈ 6′11″ (371 s), ascent B = C/φ² ≈ 3′49″ (229 s).
+The input closes at the end of A, so the ascent is carried by the two tails, asynchronous and independent, and the tails must die with the form: still audible through B, below −30 dB at its end.
+
+Success means: the plugin reproduces its Faust specification to numerical precision at 96 and 48 kHz; its delays equal the delay table of the spec exactly; two instances with different STONE ids never share a delay; it allocates its memory once, outside the audio thread; its memory can be emptied while it plays without a dropout; the window follows `doc/style/ui-style.md` and prints the decay that the settings produce.
 
 ## Decisions taken in conversation (2026-10-27)
 
@@ -42,18 +50,53 @@ Rejected alternatives, for the record: four neighbouring primes near d₀ growin
 
 **Each delay is the prime strictly above the exact product**, never φ times the previous prime, so the rounding does not accumulate along the sequence.
 
-**Settings at soundcheck, in SETUP: distance and number of sections.**
-The duration is not a control; the window prints it as the consequence of the two settings.
+**Settings at soundcheck, in SETUP: STONE id, distance, number of sections.**
+The duration is not a control; the window prints it as the consequence of the settings.
 Each extra section is as long as all the previous ones together (Σφⁱ for i < n = φⁿ⁺¹ − φ), so the total delay roughly multiplies by φ at each step.
 
-**Ranges.**
-Distance 1.000–10.000 m.
-Sections 1–17: at 7 m, 16 sections give a total delay of 73 s on face A and 104 s on face D, and 17 guarantee a minute even at 3 m.
-Beyond 17 every section multiplies the memory by φ again.
+**The distance grid: no two STONEs can coincide** (Giuseppe, 2026-10-27: the STONEs are moved onto the grid).
+Two instances whose distances stand in a ratio φ^(j/4) play the same spiral shifted by j faces: the same primes, the same echoes, no longer independent.
+What decides it is the *phase* on the spiral, u = 4·log_φ(d) mod 1: equal phases coincide whatever the distances.
+So each STONE id has a fixed phase and the distance slider moves only on that id's grid, in steps of φ^¼ (12.8 %), anchored at 1 m:
+
+```
+d(id, j) = φ^((j + u_id)/4)    u = 0, ½, ¼, ¾, ⅛, ⅝, ⅜, ⅞  for id 1 … 8 (van der Corput)
+```
+
+The van der Corput order keeps the first M ids as far apart as possible for any M: with two STONEs (the Dialogo) the phases are 0 and ½ and the eight faces form one spiral of eight voices in steps of φ^⅛; with four (*Una Radura*) the sixteen faces are equidistant.
+Ids 1–8 and "?" (undeclared) follow the suite's `StoneId` (multipink, ltglide).
+*Agent's call:* an undeclared id uses phase 0 and the footer says "STONE id undeclared".
+The grid between 2 and 6 m:
+
+| id | phase | distances (m) |
+|---|---|---|
+| 1 | 0 | 2.058 · 2.321 · 2.618 · 2.953 · 3.330 · 3.756 · 4.236 · 4.778 · 5.388 |
+| 2 | ½ | 2.186 · 2.465 · 2.780 · 3.136 · 3.537 · 3.989 · 4.499 · 5.074 · 5.722 |
+| 3 | ¼ | 2.121 · 2.392 · 2.698 · 3.043 · 3.432 · 3.871 · 4.365 · 4.923 · 5.553 |
+| 4 | ¾ | 2.253 · 2.540 · 2.865 · 3.232 · 3.645 · 4.111 · 4.636 · 5.229 · 5.897 |
+
+The STONE is placed on a grid point with the laser; the grid value, not a measurement, is the distance the plugin uses.
+
+**Ranges (Giuseppe, 2026-10-27).**
+Distance: the grid points of the id between 1 and 6 m.
+Sections 1–18; the arena depends on distance × φᴺ, so 6 m with 18 sections costs about what 10 m with 17 did.
+
+**The tail against the form.**
+The energy decay after a stationary input closes, estimated by convolving the sections' energy distributions (echoes taken as incoherent; to be measured on the plugin), with 17 sections:
+
+| distance | −30 dB, face A / D | at +229 s (end of B), A / D |
+|---|---|---|
+| 3.136 m (id 2) | 189 s / 272 s | −38 dB / −24 dB |
+| 3.330 m (id 1) | 201 s / 289 s | −35 dB / −22 dB |
+| 3.537 m (id 2) | 214 s / 307 s | −33 dB / −20 dB |
+
+17 sections at 3.1–3.5 m cross −30 dB across the four faces around the end of B: the face A dies first, the face D last, so each STONE goes out face by face as the form closes.
+16 sections would be at −33 dB on face A halfway through B; hence the default of 17 and the cap of 18 for a margin.
 
 **Spiral step φ in this first prototype.**
 Giuseppe wants to try a denser spiral as well (step √φ or φ^¼ per section, which allows more and shorter sections in the same memory).
 That becomes a third SETUP parameter in a later version and is out of scope here; the engine should not make it hard to add (the step is one constant in one function).
+The distance grid is tied to the face spacing (φ^¼ here): a denser spiral changes the grid too, and the grid test (3b) must follow it.
 
 ## Prerequisite: the speed of sound (seam-ltm issue #15)
 
@@ -90,11 +133,12 @@ The README explains Schroeder's form as the equivalent reading, with the golden 
 
 The spec mirrors `sdt.stdel` / `sdt.stline` / `sdt.stunedrev`:
 
-- `ipdel(d, i, k)` — the delay of section i of face k in samples: the distance rounded to the millimetre, `n = floor(mm · SR · φ^(i + k/4) / c + 0.5)`, kept when below 2, otherwise `sff.np(n)`.
-  With k = 0 and i = 0 this is the rule of `sma.imt2npsamp` with c(20 °C) in place of `isos`, so face A's first section is the acoustic path, computed as ddelay computes it.
-- `ipmd(i, k)` — the buffer size of that section, fixed at compile time for 10 m at 192 kHz plus a margin above the largest prime gap (Faust cannot evaluate `sff.np` when sizing).
+- `ipgrid(id, j)` — the distance in metres of grid point j for STONE id, `φ^((j + u_id)/4)`, the phases as above.
+- `ipdel(d, i, k)` — the delay of section i of face k in samples: `n = floor(SR · d · φ^(i + k/4) / c + 0.5)`, kept when below 2, otherwise `sff.np(n)`.
+  With k = 0 and i = 0 this is the acoustic path at c(20 °C), rounded to the sample and moved to the prime above, as ddelay does; no millimetre rounding, because the grid value is exact by definition.
+- `ipmd(i, k)` — the buffer size of that section, fixed at compile time for 6 m at 192 kHz plus a margin above the largest prime gap (Faust cannot evaluate `sff.np` when sizing).
 - `ipline(N, k, d)` — `seq(i, N, sjm.apfv(ipmd(i,k), ipdel(d,i,k), sma.rphi(1)))`, sections in increasing delay.
-- `inphirev(N, d)` — the four lines in parallel, face k on channel k.
+- `inphirev(N, id, j)` — the four lines in parallel at `ipgrid(id, j)`, face k on channel k.
 
 N is a compile-time constant in Faust (`seq`), so the reference is generated per N; the C++ takes N at run time.
 
@@ -118,14 +162,19 @@ Copy stunedrev's shape; the RESET view is stunedrev's GUI-only button.
 
 ### Delay table
 
-`delay(i, k) = msToPrimeSamples`-like helper on metres: millimetre rounding, nearest sample, `nextPrimeAbove`.
-It lives next to the speed of sound in `_common/` if #15 puts the metre conversion there, otherwise in `inphirev_dsp.h`.
-The table (17 × 4) is recomputed when a setting changes, at the start of a block, from the sieve built in `setActive`.
+`delay(i, k)`: grid distance, nearest sample at c(20 °C), `nextPrimeAbove`; in `inphirev_dsp.h`, citing c(T) from `_common/`.
+The table (18 × 4) is recomputed when a setting changes, at the start of a block, from the sieve built in `setActive`.
+
+### The printed decay
+
+When a setting changes, the GUI side (never the audio thread) computes from the table the energy decay curve of each face: the sections' energy distributions (g² at 0, (1−g²)²g^(2(m−1)) at m·t) convolved on a grid of 0.1 s and integrated backwards, as in the design's estimate.
+From it the footer prints, per face, the time to −30 dB and to −60 dB after the input closes.
+It is an estimate and the README says so; test 10 checks it against the decay measured on the engine.
 
 ### Memory
 
-One arena of `double`, allocated in `setActive(true)` for the worst case (10 m, 17 sections) at the session's rate, each section sized exactly for its longest delay + 1, as stunedrev.
-Approximate totals: 298 MiB at 48 kHz, 596 MiB at 96 kHz, 1.19 GiB at 192 kHz; the longest delay is 8 856 221 samples at 96 kHz (92 s).
+One arena of `double`, allocated in `setActive(true)` for the worst case (the largest grid point ≤ 6 m, 18 sections) at the session's rate, each section sized exactly for its longest delay + 1, as stunedrev.
+Approximate totals: 290 MiB at 48 kHz, 579 MiB at 96 kHz, 1.13 GiB at 192 kHz; the longest delay is about 90 s.
 The sieve's bound is the largest product plus a margin above one prime gap.
 Allocation failure: silent engine, `kResultOk`, footer says "allocation failed" (stunedrev's behaviour).
 
@@ -147,7 +196,7 @@ Denormals: `ScopedNoDenormals` around the block.
 ### A change of setting
 
 Distance and N are soundcheck values, not gestures.
-*Agent's call:* a new value is applied only once it has been stable for 250 ms, so dragging the distance (9000 steps) or a burst of automation produces one reset at the end, with the latest value, instead of a muted output restarting its clearing for the whole gesture.
+*Agent's call:* a new value is applied only once it has been stable for 250 ms, so dragging the distance across grid points or a burst of automation produces one reset at the end, with the latest value, instead of a muted output restarting its clearing for the whole gesture.
 The footer shows the pending value at once; the sound follows after the pause.
 Applying a change recomputes the table and runs the RESET sequence (fade out 25 ms, clear the arena in slices, fade in if POWER is on), because a new delay or a newly enabled section would otherwise play the stale contents of its buffer.
 A host automating these parameters gets a reset at every change; the README says so.
@@ -161,26 +210,29 @@ POWER is the output ramp; the faces keep running while it is off.
 
 | Parameter | Zone | Range | Default | Notes |
 |---|---|---|---|---|
-| distance | SETUP | 1.000–10.000 m, step 1 mm | 7.000 | STONE ↔ TETRAREC |
-| sections | SETUP | 1–17, integer | 16 | |
+| STONE id | SETUP | ?, 1–8 (stepped) | ? | the suite's `StoneId`; sets the grid phase |
+| distance | SETUP | grid index j, shown in metres (mm) | the id's point nearest 3.3 m | TETRAREC centre ↔ own STONE centre |
+| sections | SETUP | 1–18, integer | 17 | |
 | POWER | OPS | off / on | off | output ramp, 25 ms |
 | RESET | OPS | GUI-only | — | empties the memory |
 
 No FINE zone (an absent zone is omitted).
-State: distance, sections, POWER, under the append-only contract of `seam_state.h`.
-`tools/check-uidesc.py` recognises SETUP by the `StoneId` tag today; it has to learn this SETUP (by the parameter tags), and the change lands with its own test.
+The distance is stored as the grid index j: changing the id keeps j, so the STONE jumps to the neighbouring point of the new grid, and the window shows the new metres at once.
+*Agent's call:* the default j is the id's grid point nearest 3.3 m.
+State: STONE id, j, sections, POWER, under the append-only contract of `seam_state.h`.
+`tools/check-uidesc.py` recognises this SETUP by the `StoneId` tag as it stands.
 
 ```
 HEADER   inphirev · golden all-pass memory
-SETUP    distance  7.000 m      sections  16
+SETUP    STONE 1     distance  3.330 m     sections  17
 OPS      [■] POWER   [□] RESET
-FOOTER   total delay  A 72.8 s · B 82.1 s · C 92.6 s · D 104.4 s
-         first  A 20.6 ms · last D 39.9 s
-         arena 596 MiB @ 96 kHz · ready | clearing | allocation failed
+FOOTER   −30 dB  A 201 s · B … · C … · D 289 s     −60 dB  A 355 s · … · D 509 s
+         first  A 9.7 ms · last D …
+         arena 579 MiB @ 96 kHz · ready | clearing | allocation failed | STONE id undeclared
 ```
 
-The footer is the printed solution: the sum of each face's N delays divided by fs (exact, from the table), the first and the longest delay.
-Values above are at 7 m, 16 sections, 96 kHz.
+The footer is the printed solution: the estimated decay per face, the first and the longest delay (exact, from the table), the arena and the status.
+The figures for A and D are those of the design's estimate at 3.330 m and 17 sections; the builder fills the rest from the implementation.
 
 Bus: four in, four out, A-format face order as stunedrev (`kAmbi1stOrderACN` as the arrangement, channel k = face k); subcategory `Fx|Reverb`.
 
@@ -192,19 +244,21 @@ A full render is millions of samples, so the reference keeps windows of the resp
 | # | Test | Criterion |
 |---|---|---|
 | 1 | speed of sound | the C++ c(20 °C) equals the library's to the last digit (from #15) |
-| 2 | delay table | every d(i, k) for N = 17, distances on a grid over 1–10 m, at 44.1, 48, 96, 192 kHz, equals `ipdel` exactly |
+| 2 | delay table | every d(i, k) for N = 18, every grid point of every id, at 44.1, 48, 96, 192 kHz, equals `ipdel(ipgrid(id, j), i, k)` exactly |
 | 3 | spiral | the four faces' sets of delays are disjoint, and each face is strictly increasing |
-| 4 | engine | the four faces against `inphirev(N, 7)` for N = 1, 4, 16 at 96 and 48 kHz, on noise and on a clarinet note, within about 1e-12 of the peak |
+| 3b | grid | for every pair of different ids and every pair of their grid points, the two instances' 72 + 72 delays share no value, at every rate; mutation: give two ids the same phase, the test must fail |
+| 4 | engine | the four faces against `inphirev(N, 1, j)` at 3.330 m for N = 1, 4, 17 at 96 and 48 kHz, on noise and on a clarinet note, within about 1e-12 of the peak |
 | 5 | change of setting | after a change, once the clearing ends, the output equals a fresh engine's with the new setting; a burst of changes inside 250 ms produces one reset, with the last value |
 | 6 | arena | every section's length ≥ its longest delay + 1 at all rates; totals reported |
 | 7 | RESET | as stunedrev test 7 |
 | 8 | parameters | ParamBox and state round-trips |
-| 9 | footer | the printed totals equal the table's sums |
+| 9 | footer | the printed first and longest delays equal the table |
+| 10 | decay | the printed −30 dB time is within a stated tolerance of the time measured on the engine (noise in, input closed, backward-integrated output energy), at 3.330 m with N = 12 to keep the render short |
 
 Every test is verified by mutation (break the code, see it fail) and the mutations are recorded in the plugin's `doc/`.
-Suite: VST3 validator, `check-uidesc.py`, ctest; CPU measured at 96 kHz (68 sections per sample at most, with reads scattered over 600 MiB).
+Suite: VST3 validator, `check-uidesc.py`, ctest; CPU measured at 96 kHz (72 sections per sample at most, with reads scattered over 580 MiB).
 
-**Host check (Giuseppe):** TETRAREC → inphirev → STONE in the hall, the clarinet through the four faces at a few (distance, N) pairs; POWER; RESET while sounding; a screenshot for `docs/img/`.
+**Host check (Giuseppe):** the Dialogo's setup, two instances (ids 1 and 2) into two opposed STONEs on grid points; the clarinet and the timpani through the four faces at a few (distance, N) pairs; the input closed and the tails timed against the printed decay; POWER; RESET while sounding; a screenshot for `docs/img/`.
 
 ## Documentation
 
