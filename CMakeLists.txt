@@ -33,7 +33,7 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 project(seam-ltm
-    VERSION 0.6.0
+    VERSION 0.7.0
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
 )
 
@@ -128,7 +128,7 @@ if(SEAM_BUILD_PLUGINS)
     add_subdirectory(plugins/strx)
     add_subdirectory(plugins/lmo)
     add_subdirectory(plugins/stunedrev)
-    add_subdirectory(plugins/inphirev)
+    add_subdirectory(plugins/alogos)
     add_subdirectory(plugins/delrm)
     add_subdirectory(plugins/choir)
 else()

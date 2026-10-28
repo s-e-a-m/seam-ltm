@@ -660,51 +660,64 @@ endif()
 target_compile_features(abmodulex_state_test PRIVATE cxx_std_17)
 add_test(NAME abmodulex_state_test COMMAND abmodulex_state_test)
 
-# inphirev: the grid and the delay table against sgs.ipdel; references in
-# ref/inphirev_ref.h (doc/study/inphirev/gen-ref.sh).
-add_executable(inphirev_dsp_test inphirev_dsp_test.cpp)
-target_include_directories(inphirev_dsp_test PRIVATE
+# alogos: scales, grid and delay table against sgs.algrid / sgs.aldel; references in
+# ref/alogos_ref.h (doc/study/alogos/gen-ref.sh) and ref/alogos_inphirev_table.h.
+add_executable(alogos_dsp_test alogos_dsp_test.cpp)
+target_include_directories(alogos_dsp_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
 )
-target_compile_features(inphirev_dsp_test PRIVATE cxx_std_17)
-add_test(NAME inphirev_dsp_test COMMAND inphirev_dsp_test)
+target_compile_features(alogos_dsp_test PRIVATE cxx_std_17)
+add_test(NAME alogos_dsp_test COMMAND alogos_dsp_test)
 
-# inphirev: the printed decay against the closed form, the design table and the engine.
-add_executable(inphirev_decay_test inphirev_decay_test.cpp)
-target_include_directories(inphirev_decay_test PRIVATE
+# alogos: the engine against sgs.alogos (ref/alogos_ref.h), the change of
+# setting, the arena broker, RESET; global new/delete counted on the audio thread.
+add_executable(alogos_engine_test alogos_engine_test.cpp)
+target_include_directories(alogos_engine_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
 )
-target_compile_features(inphirev_decay_test PRIVATE cxx_std_17)
-add_test(NAME inphirev_decay_test COMMAND inphirev_decay_test)
+target_compile_features(alogos_engine_test PRIVATE cxx_std_17)
+add_test(NAME alogos_engine_test COMMAND alogos_engine_test)
+# It allocates and zeroes tens of GiB in sequence: alone on the machine, and apart from the quick tests.
+set_tests_properties(alogos_engine_test PROPERTIES RUN_SERIAL TRUE LABELS heavy)
 
-# inphirev: the parameters' ranges and clamps (SDK-free), and the state codec.
-add_executable(inphirev_params_test inphirev_params_test.cpp)
-target_include_directories(inphirev_params_test PRIVATE
+# alogos: the printed decay with g against the closed form, the INPHIREV figures and the engine.
+add_executable(alogos_decay_test alogos_decay_test.cpp)
+target_include_directories(alogos_decay_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
 )
-target_compile_features(inphirev_params_test PRIVATE cxx_std_17)
-add_test(NAME inphirev_params_test COMMAND inphirev_params_test)
+target_compile_features(alogos_decay_test PRIVATE cxx_std_17)
+add_test(NAME alogos_decay_test COMMAND alogos_decay_test)
 
-add_executable(inphirev_state_test
-    inphirev_state_test.cpp
+# alogos: the parameters' ranges and clamps (SDK-free), and the state codec.
+add_executable(alogos_params_test alogos_params_test.cpp)
+target_include_directories(alogos_params_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(alogos_params_test PRIVATE cxx_std_17)
+add_test(NAME alogos_params_test COMMAND alogos_params_test)
+
+add_executable(alogos_state_test
+    alogos_state_test.cpp
     ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
 )
-target_include_directories(inphirev_state_test PRIVATE
+target_include_directories(alogos_state_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/inphirev/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
     ${vst3sdk_SOURCE_DIR}
 )
-target_link_libraries(inphirev_state_test PRIVATE base sdk_common pluginterfaces)
+target_link_libraries(alogos_state_test PRIVATE base sdk_common pluginterfaces)
 if(APPLE)
     find_library(CORE_FOUNDATION CoreFoundation)
-    target_link_libraries(inphirev_state_test PRIVATE ${CORE_FOUNDATION})
+    target_link_libraries(alogos_state_test PRIVATE ${CORE_FOUNDATION})
 endif()
-target_compile_features(inphirev_state_test PRIVATE cxx_std_17)
-add_test(NAME inphirev_state_test COMMAND inphirev_state_test)
+target_compile_features(alogos_state_test PRIVATE cxx_std_17)
+add_test(NAME alogos_state_test COMMAND alogos_state_test)

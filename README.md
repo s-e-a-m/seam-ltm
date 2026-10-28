@@ -65,7 +65,7 @@ Every window follows the same grammar, described in
 
 | Plugin | I/O | Description |
 |---|---|---|
-| **INPHIREV** | 4ch → 4ch | The golden all-pass memory for canto alla durata (Silvi), first used in the Dialogo Angelico: four faces of Moorer all-pass sections with g = 1/φ, whose delays follow one golden spiral through A B C D A′ B′ … The first delay is the acoustic distance from STONE to TETRAREC on a grid of φ^¼ steps, one grid per STONE id, so that ids 1 and 2 never share a delay (other pairs may, see the plugin README); every later delay is a power of φ above it, moved to the next prime. STONE id, distance and 1–18 sections set the sound; the window prints the decay that follows, and a RESET empties the memory while playing |
+| **ALOGOS** | 4ch → 4ch | The irrational all-pass memory for canto alla durata (Silvi), successor of INPHIREV: four faces of Moorer all-pass sections whose delays follow one geometric spiral through A B C D A′ B′ … The scale of the spiral is φ, √2, e or π, its density 1, 2 or 4 sections per factor, and g a menu of its own (1/φ, 1/√2, 1/e, 1/π, √(√2−1)). The first delay is the acoustic distance from TETRAREC to STONE on a grid of its own per STONE id; every later delay is a power of the scale above it, moved to the next prime. The memory is sized for the setting by a worker thread, never in the audio thread; the window prints the decay that follows, and a RESET empties the memory while playing. With the defaults it is INPHIREV, delay for delay |
 
 ### Screenshots
 
@@ -92,9 +92,9 @@ of the families above; a plugin joins the gallery when its photo exists.
 |:---:|:---:|:---:|:---:|
 | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) | ![CHOIR](docs/img/choir.png) |
 
-| INPHIREV |
+| ALOGOS |
 |:---:|
-| ![INPHIREV](docs/img/inphirev.png) |
+| ![ALOGOS](docs/img/alogos.png) |
 
 <!-- END plugins -->
 
