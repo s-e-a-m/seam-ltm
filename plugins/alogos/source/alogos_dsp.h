@@ -334,6 +334,9 @@ private:
 
     // The start of a block: a RESET click, a settled setting, the arena.
     void events() {
+        // computeTable runs here, on the audio thread, once per settled change:
+        // up to 512 pow calls, sieve scans and the gridMax/nMax loops, tens of
+        // microseconds, no lock or allocation, while the output is faded or silent.
         const uint32_t gen = resetGen_.load();
         if (gen != servedGen_) {
             servedGen_ = gen;

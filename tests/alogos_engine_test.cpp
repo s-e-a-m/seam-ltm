@@ -296,7 +296,7 @@ TEST_CASE("broker: allocateNow, request, take, retire, cancel, limit") {
         ArenaBroker b;
         std::size_t n = 0;
         b.request((1024u << 20) / sizeof(double));          // 1 GiB, superseded while being zeroed
-        REQUIRE(waitFor([&] { return b.liveArenas() == 1 && !b.delivered(); }, 1.0));
+        REQUIRE(waitFor([&] { return b.liveArenas() == 1 && !b.delivered(); }, 10.0));
         b.request(50);
         double* z = nullptr;
         REQUIRE(waitFor([&] { return (z = b.take(n)) != nullptr; }));

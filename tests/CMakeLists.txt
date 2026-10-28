@@ -681,6 +681,8 @@ target_include_directories(alogos_engine_test PRIVATE
 )
 target_compile_features(alogos_engine_test PRIVATE cxx_std_17)
 add_test(NAME alogos_engine_test COMMAND alogos_engine_test)
+# It allocates and zeroes tens of GiB in sequence: alone on the machine, and apart from the quick tests.
+set_tests_properties(alogos_engine_test PROPERTIES RUN_SERIAL TRUE LABELS heavy)
 
 # alogos: the printed decay with g against the closed form, the INPHIREV figures and the engine.
 add_executable(alogos_decay_test alogos_decay_test.cpp)

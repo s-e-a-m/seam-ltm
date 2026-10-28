@@ -5,8 +5,8 @@ This folder holds the measurements and generators behind ALOGOS.
 ## Files
 
 - `inphirev-table.cpp` writes INPHIREV's delay table as the fixture `tests/ref/alogos_inphirev_table.h`; it builds only at 1b4ac7a and earlier, while `plugins/inphirev` is in the tree.
-- `cpu-spike.cpp` measures the cost of ALOGOS's heaviest setting on bare sections (Task 1, before the engine existed).
-- `cpu.cpp` measures the cost of the engine itself at the default and the heaviest setting (the README's figures).
+- `cpu-spike.cpp` measures the cost of the CPU measurement setting (√2, D 4, 1 m, N 119) on bare sections (Task 1, before the engine existed).
+- `cpu.cpp` measures the cost of the engine itself at the default and the CPU measurement setting (the README's figures).
 - `arena.cpp` prints the README's table of the scales (grid points, N_max, arena per rate).
 - `gen-ref.sh` renders the Faust spec (`sgs.aldel`, `sgs.algrid`, `sgs.alogos`) into `tests/ref/alogos_ref.h`; it needs `faust` and runs by hand when the spec changes.
 - `refdump.cpp` is the driver that `gen-ref.sh` compiles against each generated DSP; its header comment lists the modes and the array layouts.
@@ -25,15 +25,15 @@ Machine: Intel Core i7-8850H @ 2.60 GHz, macOS, one thread.
 
 | setting | sections per sample | longest delay | arena | cost |
 |---|---|---|---|---|
-| heaviest: sqrt 2, D 4, 1 m, N 119, g 1/sqrt 2 | 476 | 85.67 s | 2928.3 MiB | 29.2 % of one core |
+| CPU measurement setting: sqrt 2, D 4, 1 m, N 119, g 1/sqrt 2 | 476 | 85.67 s | 2928.3 MiB | 29.2 % of one core |
 | default: phi, D 1, 3.3302 m, N 17, g 1/phi | 68 | 30.72 s | 198.5 MiB | 3.0 % of one core |
 
-The longest delay of the heaviest setting (face 3, section 118) is 85.674 s, within 90 s.
+The longest delay of the CPU measurement setting (face 3, section 118) is 85.674 s, within 90 s.
 N = 120 would reach 93.428 s, above 90 s, so N_max = 119 holds.
 
 ## Gate
 
-The heaviest setting costs 29.2 % of one core, below the 50 % threshold.
+The CPU measurement setting costs 29.2 % of one core, below the 50 % threshold.
 Outcome: **no ceiling**; there is no `kMaxSectionsPerSample`, and N is limited only by N_max.
 
 ## CPU of the engine
@@ -48,10 +48,10 @@ Machine: Intel Core i7-8850H @ 2.60 GHz, macOS, one thread (2026-10-28, two runs
 | default, 48 kHz | 68 | 99.2 MiB | 1.3 % of one core |
 | default, 96 kHz | 68 | 198.5 MiB | 2.8 % |
 | default, 96 kHz, after 10 min of silence | 68 | 198.5 MiB | 2.7 % |
-| heaviest: sqrt 2, D 4, 1 m, N 119, 96 kHz | 476 | 2928.3 MiB | 21.8 % |
+| CPU measurement setting: sqrt 2, D 4, 1 m, N 119, 96 kHz | 476 | 2928.3 MiB | 21.8 % |
 
 The second run gave 1.3, 2.7, 2.5 and 21.5 %.
-The engine costs less than the spike at the heaviest setting (21.8 % against 29.2 %); the two loops differ (the spike's sections live in vectors, the engine's in fixed arrays), and the difference was not investigated further.
+The engine costs less than the spike at the CPU measurement setting (21.8 % against 29.2 %); the two loops differ (the spike's sections live in vectors, the engine's in fixed arrays), and the difference was not investigated further.
 
 ## Arena table
 

@@ -10,7 +10,7 @@
 // The footer is the printed solution of the settings, read by a GUI timer:
 //   -30 dB  A 201 · B 230 · C 260 · D 289 s       the estimated decay of each
 //   -60 dB  A 355 · B ... · D 509 s               face with the setting's g
-//   first A 9.7 ms · last D 54.6 s · N 17 · max 19   the table's ends (exact),
+//   first A 9.8 ms · last D 54.6 s · N 17 · max 19   the table's ends (exact),
 //                                                 effective sections and N_max
 //   arena 343 MiB @ 96 kHz · ready                memory, rate, status
 // The decay (alogos_decay.h) is computed here, on the GUI thread, only when
@@ -27,6 +27,7 @@
 #include "alogos_decay.h"
 #include "alogos_text.h"
 
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -146,6 +147,8 @@ private:
         for (int f = 0; f < alogos::kFaces; ++f)
             for (int i = 0; i < k.n; ++i) d[f][i] = engine_->delay(f, i);
         const alogos::Readout r = alogos::readout(*engine_);
+        // The loads above are relaxed: keep them before the re-check on ARM.
+        std::atomic_thread_fence(std::memory_order_acquire);
         if (!(readKey() == k) || engine_->clears() != clears ||
             engine_->status() != alogos::Status::Ready) return;
         const double g = alogos::gainValue((alogos::Gain)k.gain);

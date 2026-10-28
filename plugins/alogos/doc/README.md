@@ -156,7 +156,7 @@ At the defaults (φ, D 1, 1/φ, 3.330 m, N 17) the footer reads −30 dB at A 20
 ## A change of setting
 
 The six settings are soundcheck values, not gestures.
-A new value is applied only once it has been stable for 250 ms, so dragging the distance across grid points, or a burst of automation, makes one reset at the end with the latest value.
+A new value is applied only once it has been stable for 250 ms, so a burst of typed or automated changes makes one reset at the end with the latest value.
 Applying a change recomputes the delay table and runs the RESET sequence, because a new delay or a newly enabled section would otherwise play the stale contents of its buffer.
 An identical table (same delays, same N, same g) skips the clear: "?" to id 1, both of phase 0, moves only the readouts.
 A change of g alone clears, because the stored state belongs to the old g.
@@ -214,10 +214,10 @@ Every test was verified by mutation; the record, the reference generator, the ar
 |---|---|---|---|---|
 | default: φ, D 1, 3.330 m, N 17, g 1/φ | 68 | 198.5 MiB at 96 kHz | 1.3 % | 2.8 % |
 | default, after ten minutes of silence | 68 | | | 2.7 % |
-| heaviest: √2, D 4, 1 m, N 119, g 1/√2 | 476 | 2928 MiB at 96 kHz | | 21.8 % |
+| CPU measurement setting: √2, D 4, 1 m, N 119, g 1/√2 | 476 | 2928 MiB at 96 kHz | | 21.8 % |
 
 The flush of subnormals holds: the cost after ten minutes of silence is the cost with the input.
-The heaviest setting runs in real time at 96 kHz with room to spare, so the number of sections per sample has no ceiling beyond N_max.
+The CPU measurement setting runs in real time at 96 kHz with room to spare, so the number of sections per sample has no ceiling beyond N_max.
 The measure is `doc/study/alogos/cpu.cpp`, the whole engine as the plugin runs it; the earlier spike (`cpu-spike.cpp`, bare sections without the engine) gave 3.0 % and 29.2 %.
 
 ## Building and status

@@ -104,7 +104,7 @@ inline void decayLine(char* s, std::size_t size, int db, const Decay (&d)[kFaces
                   secs(t30 ? d[2].t30 : d[2].t60).s, secs(t30 ? d[3].t30 : d[3].t60).s);
 }
 
-// "first A 9.7 ms · last D 88.2 s · N 17 · max 19".
+// "first A 9.8 ms · last D 88.2 s · N 17 · max 19".
 inline void tableLine(char* s, std::size_t size, const Readout& r) {
     if (r.fs <= 0.0) { std::snprintf(s, size, "first \xE2\x80\x94 \xC2\xB7 last \xE2\x80\x94"); return; }
     std::snprintf(s, size, "first A %s \xC2\xB7 last D %s \xC2\xB7 N %d \xC2\xB7 max %d",
