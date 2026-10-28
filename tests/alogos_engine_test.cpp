@@ -288,6 +288,20 @@ TEST_CASE("broker: allocateNow, request, take, retire, cancel, limit") {
     CHECK(ArenaBroker::liveArenasTotal() == 0);
     {
         ArenaBroker b;
+        std::size_t n = 0;
+        b.request((1024u << 20) / sizeof(double));          // 1 GiB, superseded while being zeroed
+        REQUIRE(waitFor([&] { return b.liveArenas() == 1 && !b.delivered(); }, 1.0));
+        b.request(50);
+        double* z = nullptr;
+        REQUIRE(waitFor([&] { return (z = b.take(n)) != nullptr; }));
+        CHECK(n == 50);
+        CHECK(b.liveArenas() == 1);                         // the 1 GiB was abandoned and freed
+        b.retire(z);
+        CHECK(waitFor([&] { return b.liveArenas() == 0; }));
+    }
+    CHECK(ArenaBroker::liveArenasTotal() == 0);
+    {
+        ArenaBroker b;
         b.retire(b.allocateNow(10));
         b.request(10);
         REQUIRE(waitFor([&] { return b.delivered(); }));
@@ -458,6 +472,8 @@ TEST_CASE("a second change while allocating") {
         Engine e; settle(e, fs);
         apply(e, kSqrt2D4);
         untilAllocating(e);
+        // The worker has the 1.4 GiB arena and is zeroing it (it takes ~0.5 s).
+        REQUIRE(waitFor([&] { return e.broker()->liveArenas() == 2 && !e.broker()->delivered(); }));
         apply(e, kE2);
         finish(e, fs, kE2);
         CHECK(e.clears() == 2);
