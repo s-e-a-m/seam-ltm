@@ -38,7 +38,7 @@ if grep -q 'seam.ambisonics.lib' "$P"; then ok "rimando alla libreria Faust"; el
 # ogni scheda del registro ha il suo screenshot, salvo quelli in attesa della
 # prova in sala; un'attesa che sopravvive alla foto e un errore, cosi la lista
 # non puo restare piu a lungo della foto.
-PENDING_SHOTS=""
+PENDING_SHOTS="alogos.png"
 missing=""; stale=""
 for s in $(python3 -c "
 import sys; sys.path.insert(0,'$HERE')

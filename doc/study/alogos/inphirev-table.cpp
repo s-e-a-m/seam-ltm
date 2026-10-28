@@ -3,7 +3,9 @@
 // tests/ref/alogos_inphirev_table.h.  ALOGOS's default must reproduce this
 // table exactly; the header is the fixture that proves it.
 // This generator builds only at commits before INPHIREV's removal from the
-// tree (a later task deletes plugins/inphirev).  From this directory:
+// tree; the last one is 1b4ac7a0ccae7c1dc1b96965c808e7029cf10588:
+// `git worktree add /tmp/inphirev 1b4ac7a` and, from
+// doc/study/alogos in that worktree:
 // c++ -std=c++17 -O2 -I ../../../plugins/inphirev/source -I ../../../plugins/_common inphirev-table.cpp -o inphirev-table && ./inphirev-table > ../../../tests/ref/alogos_inphirev_table.h
 #include "inphirev_dsp.h"
 #include <cstdio>
