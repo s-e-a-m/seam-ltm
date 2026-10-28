@@ -4,8 +4,10 @@ This folder holds the measurements and generators behind ALOGOS.
 
 ## Files
 
-- `inphirev-table.cpp` writes INPHIREV's delay table as the fixture `tests/ref/alogos_inphirev_table.h`.
-- `cpu-spike.cpp` measures the cost of ALOGOS's heaviest setting.
+- `inphirev-table.cpp` writes INPHIREV's delay table as the fixture `tests/ref/alogos_inphirev_table.h`; it builds only at 1b4ac7a and earlier, while `plugins/inphirev` is in the tree.
+- `cpu-spike.cpp` measures the cost of ALOGOS's heaviest setting on bare sections (Task 1, before the engine existed).
+- `cpu.cpp` measures the cost of the engine itself at the default and the heaviest setting (the README's figures).
+- `arena.cpp` prints the README's table of the scales (grid points, N_max, arena per rate).
 - `gen-ref.sh` renders the Faust spec (`sgs.aldel`, `sgs.algrid`, `sgs.alogos`) into `tests/ref/alogos_ref.h`; it needs `faust` and runs by hand when the spec changes.
 - `refdump.cpp` is the driver that `gen-ref.sh` compiles against each generated DSP; its header comment lists the modes and the array layouts.
 - `dsp/aldel.dsp` exposes the delay and the grid through entries; `dsp/alogos.dsp` is the whole reverb, with its constants substituted by `gen-ref.sh`.
@@ -33,3 +35,26 @@ N = 120 would reach 93.428 s, above 90 s, so N_max = 119 holds.
 
 The heaviest setting costs 29.2 % of one core, below the 50 % threshold.
 Outcome: **no ceiling**; there is no `kMaxSectionsPerSample`, and N is limited only by N_max.
+
+## CPU of the engine
+
+    c++ -std=c++17 -O2 -I ../../../plugins/alogos/source -I ../../../plugins/_common -I ../../../tests cpu.cpp -o cpu && ./cpu
+
+`cpu.cpp` is INPHIREV's harness ported onto `alogos::Engine`: the whole engine as the plugin runs it, 20 s of the stunedrev burst in 256-sample blocks.
+Machine: Intel Core i7-8850H @ 2.60 GHz, macOS, one thread (2026-10-28, two runs, the first shown).
+
+| setting | sections per sample | arena | cost |
+|---|---|---|---|
+| default, 48 kHz | 68 | 99.2 MiB | 1.3 % of one core |
+| default, 96 kHz | 68 | 198.5 MiB | 2.8 % |
+| default, 96 kHz, after 10 min of silence | 68 | 198.5 MiB | 2.7 % |
+| heaviest: sqrt 2, D 4, 1 m, N 119, 96 kHz | 476 | 2928.3 MiB | 21.8 % |
+
+The second run gave 1.3, 2.7, 2.5 and 21.5 %.
+The engine costs less than the spike at the heaviest setting (21.8 % against 29.2 %); the two loops differ (the spike's sections live in vectors, the engine's in fixed arrays), and the difference was not investigated further.
+
+## Arena table
+
+    c++ -std=c++17 -O2 -I ../../../plugins/alogos/source -I ../../../plugins/_common arena.cpp -o arena && ./arena
+
+`arena.cpp` prints the table of the scales in the plugin README: grid points, N_max at 3.33 m, and the largest arena of each scale and density over every STONE id and grid point at N_max, at 48, 96 and 192 kHz, with the engine's own functions.
