@@ -33,7 +33,7 @@ if(APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 project(seam-ltm
-    VERSION 0.6.0
+    VERSION 0.7.0
     DESCRIPTION "SEAM – Learning Through Making – VST3 Plugin Suite"
 )
 
