@@ -46,3 +46,15 @@ At the engine level a delivered arena that was not requested last cannot reach `
 
 The φ case of "estimate vs engine" stays GREEN under the first mutation, as it must: at g = 1/φ the constant and the parameter agree.
 Only the π case, and the closed form over the menu, can see that `g` is used.
+
+## alogos_params_test and alogos_state_test (Task 7)
+
+| Rule | Mutation | Tests that failed |
+|---|---|---|
+| clamp to the range | `clamp01` drops its upper bound | params (out-of-range clamp, off-grid mapping); state (recalled out-of-range) |
+| NaN falls back to the default | `normalizedToDistance` returns `kMinMetres` for NaN | params (NaN fallback); state (recalled NaN) |
+| stepped mapping is the SDK's FromNormalized | `steppedFloor` rounds `norm * steps` instead of flooring `norm * (steps + 1)` | params only (off-grid mapping) |
+| a short blob keeps the defaults | `readState` starts from the box's current values instead of the defaults | state only (short blob of 4 doubles) |
+
+Each mutation was restored and both tests were GREEN again.
+The stepped-mapping mutation keeps the state test GREEN because the state test stores exact steps, which both mappings read alike.

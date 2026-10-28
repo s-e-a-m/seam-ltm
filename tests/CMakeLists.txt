@@ -740,3 +740,31 @@ target_include_directories(alogos_decay_test PRIVATE
 )
 target_compile_features(alogos_decay_test PRIVATE cxx_std_17)
 add_test(NAME alogos_decay_test COMMAND alogos_decay_test)
+
+# alogos: the parameters' ranges and clamps (SDK-free), and the state codec.
+add_executable(alogos_params_test alogos_params_test.cpp)
+target_include_directories(alogos_params_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(alogos_params_test PRIVATE cxx_std_17)
+add_test(NAME alogos_params_test COMMAND alogos_params_test)
+
+add_executable(alogos_state_test
+    alogos_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(alogos_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(alogos_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    find_library(CORE_FOUNDATION CoreFoundation)
+    target_link_libraries(alogos_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(alogos_state_test PRIVATE cxx_std_17)
+add_test(NAME alogos_state_test COMMAND alogos_state_test)
