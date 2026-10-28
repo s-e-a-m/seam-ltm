@@ -79,3 +79,15 @@ The footer view and the controller's `toString` both print through `alogos_text.
 
 Each mutation was restored and the tests were GREEN again.
 The existing "readouts equal the table" test stays GREEN under the first mutation, as it must: it reads the engine, not the footer.
+
+## The allocation counter in Release, alogos_engine_test (Task 9)
+
+The full Release ctest failed the counter's self-test: the compiler elided the probe `new int(3); delete p;`, which C++14 allows when the pointer never escapes, so the counter saw nothing.
+The probes now go through a `volatile` pointer, and the self-test passes in Debug and in Release.
+The Task 5 mutation `delete new int(0)` in `process()` is elidable in the same way, so in Release it would not show.
+
+| Rule | Mutation | Tests that failed (Release) |
+|---|---|---|
+| the audio thread does not allocate | `{ static int* volatile mut; mut = new int(0); delete mut; }` at the top of `process()` | 13 of 20 test cases, among them "the audio thread does not allocate" |
+
+The mutation was restored and the tests were GREEN again.

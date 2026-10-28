@@ -221,17 +221,21 @@ static const Set kTiny    { 1, 1.0, 4, 0, 0, 0 };                // a few KiB: a
 
 // ══ Self-test of the allocation counter ══════════════════════════════════
 
+// The probes go through a volatile pointer: a new-expression whose result
+// never escapes may be elided (C++14), and the Release build does elide it.
+static int* volatile gProbe = nullptr;
+
 TEST_CASE("the allocation counter counts on the armed thread only") {
     tArmed = true;
-    int* p = new int(3);
-    delete p;
+    gProbe = new int(3);
+    delete gProbe;
     tArmed = false;
     CHECK(gAudioNews.load() == 1);
     CHECK(gAudioDeletes.load() == 1);
     std::atomic<int> step{0};
     std::thread t([&] {
         while (step.load() == 0) {}
-        int* q = new int(4); delete q;           // another thread, while this one is armed
+        gProbe = new int(4); delete gProbe;      // another thread, while this one is armed
         step.store(2);
     });
     tArmed = true;
