@@ -66,3 +66,16 @@ The stepped-mapping mutation keeps the state test GREEN because the state test s
 | small perturbation | `g2 = (g * 1.05)^2` in the estimator | estimate vs engine, φ and π (all 8 faces, tolerance now 5 %); also the closed form, design figures and beyond the horizon |
 
 The engine tolerance was tightened from 15 % to 5 % (worst observed error 1.4 %).
+
+## Footer and parameter display, alogos_engine_test (Task 8)
+
+The footer view and the controller's `toString` both print through `alogos_text.h`, so the tests read the strings the window shows.
+
+| Rule | Mutation | Tests that failed |
+|---|---|---|
+| the footer's longest delay is face D's last attached section | `readout` takes `delay(kFaces - 1, n - 2)` | footer: first and longest delay (13 assertions, all four settings and the written-out default) |
+| the distance shows the snapped metres | `distanceText` prints the metres asked, clamped, not the grid point | parameter display (177 assertions) |
+| a clamped count shows the effective count | `sectionsText` prints the count asked before "(max N)" | parameter display (194 assertions) |
+
+Each mutation was restored and the tests were GREEN again.
+The existing "readouts equal the table" test stays GREEN under the first mutation, as it must: it reads the engine, not the footer.

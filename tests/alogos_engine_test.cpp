@@ -1,12 +1,14 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 #include "alogos_dsp.h"
+#include "alogos_text.h"
 #include "ref/alogos_ref.h"
 #include "stunedrev_burst.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <new>
 #include <string>
@@ -736,6 +738,97 @@ TEST_CASE("readouts equal the table: first and longest delay, metres") {
             CHECK(e.delay(0, e.sections()) == 0u);         // not attached
         }
     }
+}
+
+// Spec test 9: the footer prints the engine's table. The strings come from
+// alogos_text.h, the same functions the window's footer view calls.
+TEST_CASE("footer: first and longest delay, effective sections and N_max, as printed") {
+    struct Case { Set s; double fs; };
+    const Case cases[] = {
+        { kDefault, 96000.0 },                          // INPHIREV's default: N 17, max 19
+        { { 1, kDefaultMetres, 30, 0, 0, 0 }, 48000.0 }, // asked 30, clamped to 19
+        { kPi1, 96000.0 },                               // pi: N_max 8
+        { { 5, 4.0, 9, 2, 1, 2 }, 48000.0 },             // e, D 2, id 5
+    };
+    for (const Case& c : cases) {
+        Engine e; settle(e, c.fs, c.s);
+        const Scale sc = (Scale)c.s.scale;
+        const int D = density(c.s.dn);
+        const double d = gridMetres(sc, D, c.s.id, snapGrid(sc, D, c.s.id, c.s.m));
+        const int mx = nMax(sc, D, d), n = std::min(c.s.n, mx);
+        const Seam::PrimeSieve sv(sieveBound(c.fs));
+        const uint32_t first = sectionDelay(sc, D, d, 0, 0, c.fs, sv);
+        const uint32_t last  = sectionDelay(sc, D, d, n - 1, kFaces - 1, c.fs, sv);
+        CAPTURE(c.s.scale); CAPTURE(c.s.n); CAPTURE(c.fs);
+
+        const Readout r = readout(e);
+        CHECK(r.first == e.delay(0, 0));
+        CHECK(r.last == e.delay(kFaces - 1, e.sections() - 1));
+        CHECK(r.first == first);
+        CHECK(r.last == last);
+        CHECK(r.n == n);
+        CHECK(r.nMax == mx);
+
+        char line[128], want[128];
+        tableLine(line, sizeof line, r);
+        std::snprintf(want, sizeof want, "first A %s \xC2\xB7 last D %s \xC2\xB7 N %d \xC2\xB7 max %d",
+                      delayText(first / c.fs).s, delayText(last / c.fs).s, n, mx);
+        CHECK(std::string(line) == want);
+    }
+    // The default at 96 kHz, written out: 3.330 m is 931.4 samples, 931 moved
+    // to the prime 937 = 9.76 ms (the spec's sketch "9.7" is d / c before
+    // the prime), 17 of 19 sections, last D 30.7 s.
+    Engine e; settle(e, 96000.0, kDefault);
+    char line[128];
+    tableLine(line, sizeof line, readout(e));
+    CHECK(std::string(line).rfind("first A 9.8 ms \xC2\xB7 last D 30.7 s", 0) == 0);
+    CHECK(std::string(line).find("N 17 \xC2\xB7 max 19") != std::string::npos);
+}
+
+TEST_CASE("footer: status and arena lines") {
+    CHECK(std::string(statusText(Status::Ready, 1)) == "ready");
+    CHECK(std::string(statusText(Status::Ready, 0)) == "STONE id undeclared");
+    CHECK(std::string(statusText(Status::Allocating, 1)) == "allocating\xE2\x80\xA6");
+    CHECK(std::string(statusText(Status::Clearing, 1)) == "clearing\xE2\x80\xA6");
+    CHECK(std::string(statusText(Status::AllocFailed, 1)) == "allocation failed");
+    CHECK(std::string(statusText(Status::Unprepared, 1)) == "inactive");
+    char s[128];
+    arenaLine(s, sizeof s, 579ull * 1024 * 1024, 96000.0, "ready");
+    CHECK(std::string(s) == "arena 579 MiB @ 96 kHz \xC2\xB7 ready");
+    arenaLine(s, sizeof s, 3 * 1024 * 1024 / 2, 44100.0, "allocating");
+    CHECK(std::string(s) == "arena 1.5 MiB @ 44.1 kHz \xC2\xB7 allocating");
+}
+
+// The parameters' display (the controller's toString): the snapped metres
+// and the effective count, equal to what the engine applies.
+TEST_CASE("parameter display: distance snapped, sections effective with (max N)") {
+    char s[32];
+    distanceText(s, sizeof s, 0, 0, 1, kDefaultMetres);
+    CHECK(std::string(s) == "3.330 m");
+    for (int id : { 0, 2, 5, 8 })
+        for (int scale : { 0, 1, 2, 3 })
+            for (int dn : { 0, 1, 2 })
+                for (double m : { 1.0, 2.2, kDefaultMetres, 5.9 }) {
+                    // Before prepare the engine publishes its readouts at once, no arena.
+                    Engine e; apply(e, Set{ id, m, 128, scale, dn, 0 });
+                    char want[32];
+                    std::snprintf(want, sizeof want, "%.3f m", e.metres());
+                    distanceText(s, sizeof s, scale, dn, id, m);
+                    CAPTURE(id); CAPTURE(scale); CAPTURE(dn); CAPTURE(m);
+                    CHECK(std::string(s) == want);
+                    CHECK(sectionsMaxFor(scale, dn, id, m) == e.sectionsMax());
+                    sectionsText(s, sizeof s, 128, scale, dn, id, m);
+                    std::snprintf(want, sizeof want, "%d (max %d)", e.sections(), e.sectionsMax());
+                    CHECK(std::string(s) == want);
+                }
+    sectionsText(s, sizeof s, 17, 0, 0, 1, kDefaultMetres);
+    CHECK(std::string(s) == "17");
+    sectionsText(s, sizeof s, 19, 0, 0, 1, kDefaultMetres);
+    CHECK(std::string(s) == "19");
+    sectionsText(s, sizeof s, 30, 0, 0, 1, kDefaultMetres);
+    CHECK(std::string(s) == "19 (max 19)");
+    sectionsText(s, sizeof s, 17, 3, 0, 1, kDefaultMetres);
+    CHECK(std::string(s) == "8 (max 8)");
 }
 
 // Review focus 5 (INPHIREV): the tails sink through the subnormals.
