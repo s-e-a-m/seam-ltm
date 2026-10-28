@@ -58,3 +58,11 @@ Only the π case, and the closed form over the menu, can see that `g` is used.
 
 Each mutation was restored and both tests were GREEN again.
 The stepped-mapping mutation keeps the state test GREEN because the state test stores exact steps, which both mappings read alike.
+
+### alogos_decay_test, fix round 1
+
+| Rule | Mutation | Tests that failed |
+|---|---|---|
+| small perturbation | `g2 = (g * 1.05)^2` in the estimator | estimate vs engine, φ and π (all 8 faces, tolerance now 5 %); also the closed form, design figures and beyond the horizon |
+
+The engine tolerance was tightened from 15 % to 5 % (worst observed error 1.4 %).

@@ -129,13 +129,13 @@ static void estimateVsEngine(const char* name, Scale sc, Gain gain, int N, doubl
         std::printf("%s N=%d face %d: estimated t30 %.1f s (t60 %.1f), measured t30 %.1f s, error %.1f %%\n",
                     name, N, k, est[k].t30, est[k].t60, t30, 100.0 * err);
         INFO("face " << k << " estimate " << est[k].t30 << " measured " << t30);
-        CHECK(err < 0.15);
+        CHECK(err < 0.05);
     }
 }
 
 // phi, 3.330 m, N = 12 as INPHIREV did. For pi the delays grow by 3.14 per
-// section: N = 6 at 3.330 m (face 3 ends near 16 s) keeps the decay to a few
-// tens of seconds, and so the render short.
+// section: N = 8 at 1.0 m (t30 of 35 to 84 s over the four faces) keeps the
+// decay to a few tens of seconds, and so the render short.
 TEST_CASE("estimate vs engine, phi, g = 1/phi") { estimateVsEngine("phi", Scale::Phi, Gain::InvPhi, 12, 3.33); }
 TEST_CASE("estimate vs engine, pi, g = 1/pi")   { estimateVsEngine("pi", Scale::Pi, Gain::InvPi, 8, 1.0); }
 
