@@ -730,3 +730,13 @@ target_include_directories(alogos_engine_test PRIVATE
 )
 target_compile_features(alogos_engine_test PRIVATE cxx_std_17)
 add_test(NAME alogos_engine_test COMMAND alogos_engine_test)
+
+# alogos: the printed decay with g against the closed form, the INPHIREV figures and the engine.
+add_executable(alogos_decay_test alogos_decay_test.cpp)
+target_include_directories(alogos_decay_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/alogos/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(alogos_decay_test PRIVATE cxx_std_17)
+add_test(NAME alogos_decay_test COMMAND alogos_decay_test)

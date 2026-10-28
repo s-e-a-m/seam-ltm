@@ -36,3 +36,13 @@ After both changes the mutation went RED.
 
 The hand-over mutation is caught by the broker test only.
 At the engine level a delivered arena that was not requested last cannot reach `take()`: the 250 ms settle lets the engine take the first arena before a second request exists.
+
+## alogos_decay_test (Task 6)
+
+| Rule | Mutation | Tests that failed |
+|---|---|---|
+| g is a parameter | `estimateDecay` squares the constant 1/φ instead of its `g` | single section, every g of the menu (4 of 5 values); estimate vs engine, π, g = 1/π (all four faces) |
+| echo ratio | the echo energies fall by `g` per echo instead of `g^2` | single section; design figures; beyond the horizon; estimate vs engine, φ and π |
+
+The φ case of "estimate vs engine" stays GREEN under the first mutation, as it must: at g = 1/φ the constant and the parameter agree.
+Only the π case, and the closed form over the menu, can see that `g` is used.
