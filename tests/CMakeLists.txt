@@ -680,6 +680,25 @@ endif()
 target_compile_features(abmodulex_state_test PRIVATE cxx_std_17)
 add_test(NAME abmodulex_state_test COMMAND abmodulex_state_test)
 
+# bastooge: cut, test and bypass in the processor's state.
+add_executable(bastooge_state_test
+    bastooge_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(bastooge_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bastooge/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bamodulex/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(bastooge_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    target_link_libraries(bastooge_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(bastooge_state_test PRIVATE cxx_std_17)
+add_test(NAME bastooge_state_test COMMAND bastooge_state_test)
+
 # alogos: scales, grid and delay table against sgs.algrid / sgs.aldel; references in
 # ref/alogos_ref.h (doc/study/alogos/gen-ref.sh) and ref/alogos_inphirev_table.h.
 add_executable(alogos_dsp_test alogos_dsp_test.cpp)
