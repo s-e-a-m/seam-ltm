@@ -37,7 +37,7 @@ The division of labour follows:
 
 ## Goals
 
-- A hand-written C++ VST3 plugin in `seam-ltm`, AmbiX 4 ch → tetrahedral 4 ch, whose Faust specification lives in `seam.ambisonics.lib`.
+- A hand-written C++ VST3 plugin in `seam-ltm`, AmbiX 4 ch → tetrahedral 4 ch, whose Faust specification lives in a new library, `seam.st.lib`.
 - One free parameter: the dipole cut frequency.
   The W filter follows it, recomputed so that the crossover between W and the dipoles stays coherent at every setting.
 - A test selector that produces each mode alone, through the decoder, so that `strx` measurements are repeatable without routing tricks.
@@ -66,6 +66,15 @@ The division of labour follows:
 - Filters designed at the host sample rate; nothing in BASTOOGE depends on a fixed rate.
 - Every number in the table traces back to a file: measurements in `dream-stone/stooge/mk2g/misure/`, analysis in `dream-stone/logs/2026-11-18-stooge-mk2g-primo-ruggito.md`, the first proposal in `dream-stone/stooge/mk2g/decoder-proposta.md`.
   `dream-stone` is not public, so the measured ratio table (31 third-octave values) is also copied into the plugin's `doc/`, with its provenance, so that the public repository stands on its own.
+
+### The Faust library: `seam.st.lib`
+
+Material proper to the instruments of the S.T. family — S.T.ONE, S.T.OOGE, S.T.ONED, S.T.ON3L and TetraREC — does not go into `seam.ambisonics.lib` (Giuseppe, 2026-11-18).
+`seam.ambisonics.lib` keeps what is general: Gerzon's matrices, the encoders, the rotations.
+A new library, `seam.st.lib` in `faust-libraries/src/`, holds what belongs to one body or one array: the mk2g constants, the BASTOOGE crossover, and later the TetraREC compensation of the paper (§3.3) and any other measured body.
+It imports the general matrices from `seam.ambisonics.lib` rather than copying them.
+It is registered in `seam.lib` under the environment name `stt` (`sst` is already taken by `seam.stereophony.lib`; agent's call).
+In the registry, BASTOOGE's `faust` field reads `seam.st.lib`.
 
 ## Approaches considered
 
@@ -149,7 +158,7 @@ The target does not depend on the source: it balances the modes, whatever share 
 
 For each fc on a grid over the parameter range, one peaking biquad (f0, Q, gain ≤ 0 dB) is fitted to T_W by least squares in dB, on a dense logarithmic grid from fc/2 to 6.3 kHz.
 The fit runs offline, in a script in `dream-stone` (`src/tools/stone/`, with tests, Italian like the rest of that repository), which writes the table `data/stooge-mk2g-bastooge.dat`.
-The table is copied into `seam.ambisonics.lib` and into the C++ header, with the provenance and the date.
+The table is copied into `seam.st.lib` and into the C++ header, with the provenance and the date.
 
 A trial of this fit (agent, 2026-11-18) gives a smooth, monotone table, with the bell sitting at about twice fc:
 
@@ -231,3 +240,4 @@ Settled after the builder check (2026-11-18), for Giuseppe to review while readi
 - The dipole cut range stays 100–250 Hz, default 160 Hz.
 - The test selector is ordinary saved state; the GUI makes a test mode impossible to miss.
 - The phase of the bell is left open.
+- The environment name `stt` for `seam.st.lib`.
