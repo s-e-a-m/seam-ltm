@@ -3,7 +3,7 @@
 //
 // Three rows, so that a student sees the bell follow the cut:
 //
-//   W BELL 263 Hz · Q 0.88 · -4.0 dB
+//   W BELL 310 Hz · Q 0.91 · -3.1 dB
 //   CUT 160 Hz
 //   NORMAL  |  TEST W  |  TEST X · BYPASS · DIPOLE WITHOUT HIGH-PASS
 //
@@ -13,8 +13,9 @@
 // shows the cut actually in force, and the GUI thread never recomputes the
 // table. Each field is a separate atomic, so a read can mix two consecutive
 // blocks during a glide; the next idle repaints a consistent set, which is
-// all a readout needs. The view is bastooge_readout_view.h; this header is
-// apart so that the copy is testable without the SDK.
+// all a readout needs. With bypass on, the first row is the bell the cut
+// selects, not a filter in the signal. The view is bastooge_readout_view.h;
+// this header is apart so that the copy is testable without the SDK.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include "bastooge_dsp.h"

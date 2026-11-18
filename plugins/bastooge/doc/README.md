@@ -31,7 +31,8 @@ AmbiX in: A0 (W), A1 (Y), A2 (Z), A3 (X)
 
 The bypass removes the bell, the all-pass and the high-passes, and keeps the matrix and the test selector.
 With bypass on, BASTOOGE is `bamodulex`, and the test selector gives the bare modes.
-The filters keep running while bypassed and only the output is chosen, as `select2` does in the Faust, so that switching bypass off continues from live filter state and produces no transient.
+The filters keep running while bypassed and only the output is chosen, as `select2` does in the Faust, so that switching bypass off continues from live filter state rather than from state frozen when bypass was engaged.
+The switch itself, between dry and filtered and between test modes, is instantaneous, as `select2` is: a step in the signal is heard.
 The cut is followed by a one-pole of 20 ms, so that moving the slider does not click.
 Nothing depends on a fixed sample rate: the filters are designed at the host rate.
 
@@ -45,7 +46,7 @@ Nothing depends on a fixed sample rate: the filters are designed at the host rat
 
 Below 100 Hz the dipoles are 11-14 dB under W and the cones work unloaded; above 250 Hz the dipoles already reach W within a few dB.
 A higher cut gives more headroom and less excursion, for loud playing; a lower cut lets the directivity reach lower, for quiet playing.
-The footer reads three rows: `W BELL <f0> Hz, Q <q>, <gain> dB` (the bell in force, which follows the cut), `CUT <fc> Hz`, and a status line.
+The footer reads three rows: `W BELL <f0> Hz, Q <q>, <gain> dB` (the bell the cut selects, shown also while bypassed), `CUT <fc> Hz`, and a status line.
 The status line warns when a dipole test runs with bypass on, because the cones then take the bass unloaded.
 
 ## The dipole/W ratio
@@ -174,14 +175,21 @@ A mono `multipink` stream into channel 1 then gives, with one menu, the W, X, Y 
 
 ## Verification
 
-`tools/faust-bastooge-ab.sh` compares the two chains against `seam.st.lib` compiled by Faust: 28 cases at 48 and 96 kHz, all 16 rows of the table and the clamp, worst difference 1.1e-16 against a gate of 1e-12.
+`tools/faust-bastooge-ab.sh` compares the C++ against `seam.st.lib` compiled by Faust, with a gate of 1e-12.
+The two chains take 28 cases at 48 and 96 kHz, all 16 rows of the table and the clamp, worst difference 1.1e-16.
+The whole decoder takes 64 cases at 160 Hz and 48 kHz, every test mode with and without bypass on every face, worst difference 6.1e-17.
 With bypass on and test Normal, the output equals `bamodulex` sample for sample.
 
 ## Open points
 
-- **The phase of the bell.** The bell is minimum-phase and only W has it; near 250 Hz it leaves a few degrees of mismatch between W and the dipoles. The measurements do not show a problem yet; a later version can give the dipoles a matching all-pass.
-- **One position, one room.** The ratio comes from the frontal pair at 1 m in the LEAP stage area; a second position or room would confirm f1.
+- **The phase of the bell.**
+  The bell is minimum-phase and only W has it; near 250 Hz it leaves a few degrees of mismatch between W and the dipoles.
+  The measurements do not show a problem yet; a later version can give the dipoles a matching all-pass.
+- **One position, one room.**
+  The ratio comes from the frontal pair at 1 m in the LEAP stage area; a second position or room would confirm f1.
 - **The W hump at 160 Hz** is left to the amplifier by construction; at low cut settings the amplifier calibration has to account for it.
-- **Z was not measured.** By symmetry it equals X and Y; the floor is room, not body.
+- **Z was not measured.**
+  By symmetry it equals X and Y; the floor is room, not body.
 - **Validation in the room** is still to do: repeat the `lr2xhgr` measurement with BASTOOGE in place of the equaliser chain, and expect the residual dip at 200-250 Hz within about 1 dB of the power prediction, at fc 160 Hz and at the ends of the range.
-- **Other bodies.** A model menu (S.T.ONE, STONED, S.T.ON3L) waits until a second body has been measured the same way.
+- **Other bodies.**
+  A model menu (S.T.ONE, STONED, S.T.ON3L) waits until a second body has been measured the same way.

@@ -23,8 +23,10 @@
 // elsewhere. Bypass removes the bell, the all-pass and the high-passes; the
 // selector and the matrix remain. As in the Faust, where select2 computes
 // both inputs, the filters keep running during bypass and only the output
-// is chosen: un-bypassing continues from live filter state, with no
-// transient from state frozen at the moment bypass was engaged.
+// is chosen: un-bypassing continues from live filter state, so there is no
+// extra transient from state frozen at the moment bypass was engaged. The
+// switch itself, between dry and filtered and between test modes, is
+// instantaneous, as select2 is in the Faust: a step in the signal is heard.
 //
 // Smoothing of the cut (a choice, not in the Faust): the target cut is
 // followed by a one-pole of 20 ms time constant, stepped once per 16-sample
@@ -33,6 +35,9 @@
 // structure stays stable under coefficient changes. When the smoothed cut
 // is within 1e-4 Hz of the target it snaps to it and stops redesigning, so a
 // static cut costs nothing. prepare() snaps at once, with no ramp.
+//
+// prepare() must precede process(): VST3 calls setActive (which prepares)
+// before the first process call.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include "bamodulex_dsp.h"

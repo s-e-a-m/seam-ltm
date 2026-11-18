@@ -108,3 +108,13 @@ TEST_CASE("the Test list maps its five entries and clamps what lies outside") {
     CHECK(testFromNormalized(std::nan("")) == Test::Normal);
     for (int k = 0; k <= 4; ++k) CHECK(testFromNormalized(testToNormalized((Test)k)) == (Test)k);
 }
+
+TEST_CASE("off-grid automation runs the entry the menu shows (SDK bins of 1/5)") {
+    // The SDK's StringListParameter reads min(4, int(n * 5)); a rounding of
+    // n * 4 would run W at 0.15 and X at 0.38 while the menu shows Normal and W.
+    CHECK(testFromNormalized(0.15) == Test::Normal);
+    CHECK(testFromNormalized(0.38) == Test::W);
+    CHECK(testFromNormalized(0.19) == Test::Normal);
+    CHECK(testFromNormalized(0.21) == Test::W);
+    CHECK(testFromNormalized(0.99) == Test::Z);
+}

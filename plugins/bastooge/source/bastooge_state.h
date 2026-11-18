@@ -18,6 +18,7 @@
 #include "seam_state.h"
 #include "base/source/fstreamer.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 
@@ -49,9 +50,13 @@ inline Test testFromIndex(double v) {
     if (!(v >= -0.5 && v < kTestSteps + 0.5)) return Test::Normal;
     return (Test)(int)std::lround(v);
 }
+// The SDK's own reading of a list parameter (futils.h FromNormalized, used by
+// StringListParameter and the COptionMenu): equal bins of 1/5, the last one
+// closed at 1. Rounding n * 4 instead would show one entry and run another
+// for off-grid automation (0.15 shows Normal but would run W).
 inline Test testFromNormalized(double n) {
     if (!(n >= 0.0 && n <= 1.0)) return Test::Normal;
-    return testFromIndex(n * kTestSteps);
+    return (Test)std::min(kTestSteps, (int)(n * (kTestSteps + 1)));
 }
 inline double testToNormalized(Test t) { return (double)(int)t / kTestSteps; }
 
