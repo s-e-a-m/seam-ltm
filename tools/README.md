@@ -295,3 +295,34 @@ requirement switched to the identity pair `(b0=1, b1=0, a1=0)`, an exact
 no-op rather than an approximation. That is a structural difference from
 the C++ (fixed array with a runtime bypass, vs. a variable-length loop) that
 this A/B is what proves does not become a numerical one.
+
+## `faust-bastooge-ab.sh` — the BASTOOGE chains, Faust against C++
+
+Same idea as the pink A/B, for the S.T.OOGE mk2g decoder's two correction
+chains: `stt.bastooge_w(fc)` (bell from the `mk2g_bell` table, then an
+all-pass at `fc`) and `stt.bastooge_d(fc)` (two cascaded 1/sqrt(2)
+high-passes) in `seam.st.lib`, against `Seam::Svf` and
+`Seam::st::mk2gBell` driven by `bastooge-ir-dump.cpp`
+(`bastooge-ir-dump <w|d> <fc> <fs> <n>`).
+
+```bash
+tools/faust-bastooge-ab.sh
+```
+
+It feeds a unit impulse (8192 samples) through both sides for chain
+w, d x fc 100, 137, 160, 250 Hz x fs 48 kHz, 96 kHz: 16 cases. 137 Hz lies
+between grid points of the bell table, so the interpolation is exercised
+and not only the table rows. Each case prints
+`PASS|FAIL chain fc fs worst=<max |faust-cpp|>`.
+The gate is a worst absolute sample difference of 1e-12, with no flag to
+loosen it. Measured worst differences are between 2e-17 and 1.1e-16, five
+orders of margin. The C++ `Svf` flushes state below 1e-30 to zero and Faust
+does not; that difference is far below the gate.
+Sanity of the gate: perturbing the interpolation parameter `t` by 1e-6
+gives a worst difference of 4.9e-10 and FAIL; perturbing a table `q` entry
+that a case reaches (row 7, 0.906876 -> 0.907876) fails the cases that
+use it.
+
+Requires `faust`, `clang++` (C++17) and `python3`; not wired into ctest, for
+the same reason as the pink A/B (the suite does not require the `faust`
+binary to build). Generated Faust C++ stays in the scratch directory.
