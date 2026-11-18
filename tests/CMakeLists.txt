@@ -103,6 +103,18 @@ target_include_directories(bamodulex_dsp_test PRIVATE
 target_compile_features(bamodulex_dsp_test PRIVATE cxx_std_17)
 add_test(NAME bamodulex_dsp_test COMMAND bamodulex_dsp_test)
 
+add_executable(bastooge_dsp_test
+    bastooge_dsp_test.cpp
+)
+target_include_directories(bastooge_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bastooge/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bamodulex/source
+)
+target_compile_features(bastooge_dsp_test PRIVATE cxx_std_17)
+add_test(NAME bastooge_dsp_test COMMAND bastooge_dsp_test)
+
 add_executable(pd_m2xhgr_engine_test
     pd_m2xhgr_engine_test.cpp
 )
