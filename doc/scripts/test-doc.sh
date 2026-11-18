@@ -18,7 +18,7 @@ import sys; sys.path.insert(0,'$HERE')
 import registry
 print(sum(len(f['plugin']) for f in registry.load()))
 ")"
-if [ "$n" -eq 21 ]; then ok "21 plugin nel registro"; else bad "21 plugin nel registro (trovati $n)"; fi
+if [ "$n" -eq 22 ]; then ok "22 plugin nel registro"; else bad "22 plugin nel registro (trovati $n)"; fi
 
 # il README deve essere gia rigenerato: se il registro e cambiato senza
 # rigenerare, le due copie sono gia divergenti
@@ -32,13 +32,13 @@ P="$TMP/_ltm/index.md"
 if [ -f "$P" ]; then ok "pagina generata"; else bad "pagina generata"; fi
 if grep -q '^permalink: /seam-ltm/$' "$P"; then ok "permalink"; else bad "permalink"; fi
 if grep -q '^generated_from: seam-ltm$' "$P"; then ok "provenienza"; else bad "provenienza"; fi
-if [ "$(grep -c '^### ' "$P")" -eq 21 ]; then ok "21 schede"; else bad "21 schede"; fi
+if [ "$(grep -c '^### ' "$P")" -eq 22 ]; then ok "22 schede"; else bad "22 schede"; fi
 if grep -q '### MULTIPINK' "$P"; then ok "MULTIPINK presente"; else bad "MULTIPINK presente"; fi
 if grep -q 'seam.ambisonics.lib' "$P"; then ok "rimando alla libreria Faust"; else bad "rimando alla libreria Faust"; fi
 # ogni scheda del registro ha il suo screenshot, salvo quelli in attesa della
 # prova in sala; un'attesa che sopravvive alla foto e un errore, cosi la lista
 # non puo restare piu a lungo della foto.
-PENDING_SHOTS=""
+PENDING_SHOTS="bastooge.png"
 missing=""; stale=""
 for s in $(python3 -c "
 import sys; sys.path.insert(0,'$HERE')
