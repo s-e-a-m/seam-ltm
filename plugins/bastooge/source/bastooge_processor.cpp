@@ -3,6 +3,7 @@
 //──────────────────────────────────────────────────────────────────────────
 #include "bastooge_processor.h"
 #include "bastooge_ids.h"
+#include "bastooge_readout_view.h"
 #include "seam_denormals.h"
 #include "version.h"
 
@@ -110,18 +111,18 @@ tresult PLUGIN_API BASTOOGEProcessor::process(ProcessData& data) {
     void** in  = getChannelBuffersPointer(processSetup, data.inputs[0]);
     void** out = getChannelBuffersPointer(processSetup, data.outputs[0]);
 
-    // Silent input -> silent output. As in x2uhj, the filter tails from prior
-    // content are suppressed rather than allowed to decay.
-    if (data.inputs[0].silenceFlags == getChannelMask(inCh)) {
-        data.outputs[0].silenceFlags = getChannelMask(outCh);
-        for (int32 c = 0; c < outCh; ++c) memset(out[c], 0, bytes);
-        readout_.publish(engine_, box_.test(), box_.bypass());
-        return kResultOk;
-    }
+    // No silent-input shortcut: the bell, the all-pass and the high-passes
+    // ring on after the input stops, so the engine always runs and the
+    // tails decay into the loudspeakers instead of stepping to zero (and
+    // resuming later from frozen state). The outputs are never flagged
+    // silent: they are not, while a tail rings.
     data.outputs[0].silenceFlags = 0;
 
+    // Bus arrangements are 4 in / 4 out only (setBusArrangements); a host
+    // that still hands fewer channels gets silence on every output it gave.
     if (inCh < 4 || outCh < 4) {
         for (int32 c = 0; c < outCh; ++c) memset(out[c], 0, bytes);
+        readout_.publish(engine_, box_.test(), box_.bypass());
         return kResultOk;
     }
 
@@ -179,11 +180,11 @@ VSTGUI::CView* PLUGIN_API BASTOOGEProcessor::createCustomView(
     VSTGUI::UTF8StringPtr name, const VSTGUI::UIAttributes&,
     const VSTGUI::IUIDescription* description, VSTGUI::VST3Editor*) {
     if (name && std::string(name) == "BastoogeReadout") {
-        VSTGUI::CFontRef font = description ? description->getFont("ReadoutFont") : nullptr;
+        VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
         VSTGUI::CColor color = VSTGUI::kWhiteCColor;
         if (description) description->getColor("TextLight", color);
         // The uidesc's origin and size are applied to the view after creation.
-        return new bastooge::ReadoutView(VSTGUI::CRect(0, 0, 280, 32), &readout_, font, color);
+        return new bastooge::ReadoutView(VSTGUI::CRect(0, 0, 280, 48), &readout_, font, color);
     }
     return nullptr;
 }

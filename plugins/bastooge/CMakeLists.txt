@@ -12,6 +12,7 @@ set(bastooge_sources
     source/bastooge_ids.h
     source/bastooge_processor.cpp
     source/bastooge_processor.h
+    source/bastooge_readout.h
     source/bastooge_readout_view.h
     source/bastooge_state.h
     source/version.h

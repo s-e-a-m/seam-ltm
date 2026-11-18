@@ -21,7 +21,10 @@
 // Input: AmbiX ACN a0..a3 = W, Y, Z, X. Output: LFU, RFD, RBU, LBD.
 // Test k = 1..4 (W, X, Y, Z) puts 2*a0 on ACN channel 0, 3, 1, 2 and zero
 // elsewhere. Bypass removes the bell, the all-pass and the high-passes; the
-// selector and the matrix remain.
+// selector and the matrix remain. As in the Faust, where select2 computes
+// both inputs, the filters keep running during bypass and only the output
+// is chosen: un-bypassing continues from live filter state, with no
+// transient from state frozen at the moment bypass was engaged.
 //
 // Smoothing of the cut (a choice, not in the Faust): the target cut is
 // followed by a one-pole of 20 ms time constant, stepped once per 16-sample
@@ -96,12 +99,15 @@ public:
                 r[kAcn[t]] = 2.0 * a[0];
             }
 
-            double w = r[0];
-            double d[3] = {r[1], r[2], r[3]};
-            if (!bypass_) {
-                w = wAp_.tick(wBell_.tick(w));
-                for (int c = 0; c < 3; ++c) d[c] = dip_[c][1].tick(dip_[c][0].tick(d[c]));
-            }
+            // Both branches run, as Faust's select2 computes both: the
+            // filters keep ticking during bypass, so leaving it resumes
+            // from live state instead of a stale one.
+            const double wf = wAp_.tick(wBell_.tick(r[0]));
+            double df[3];
+            for (int c = 0; c < 3; ++c) df[c] = dip_[c][1].tick(dip_[c][0].tick(r[c + 1]));
+            const double w = bypass_ ? r[0] : wf;
+            double d[3];
+            for (int c = 0; c < 3; ++c) d[c] = bypass_ ? r[c + 1] : df[c];
             double o[4];
             bamodulex::decode(w, d[0], d[1], d[2], o);
             for (int c = 0; c < 4; ++c) out[c][i] = (T)o[c];

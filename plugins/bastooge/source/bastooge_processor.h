@@ -37,7 +37,7 @@
 #include "pluginterfaces/vst/ivstplugview.h"
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include "bastooge_dsp.h"
-#include "bastooge_readout_view.h"
+#include "bastooge_readout.h"
 #include "bastooge_state.h"
 
 namespace Seam {

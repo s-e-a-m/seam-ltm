@@ -1,71 +1,21 @@
 //──────────────────────────────────────────────────────────────────────────
-// SEAM-LTM · BASTOOGE — the FOOTER readout: the filters in force, the mode
+// SEAM-LTM · BASTOOGE — the FOOTER readout view
 //
-// Two lines, so that a student sees the bell follow the cut:
-//
-//   W BELL 263 Hz · Q 0.88 · -4.0 dB    CUT 160 Hz
-//   NORMAL  |  TEST W  |  TEST X · BYPASS · DIPOLE WITHOUT HIGH-PASS
-//
-// The numbers are the engine's, not the parameter's: the audio thread
-// publishes Engine::cut() and Engine::bell() (the smoothed cut and the bell
-// designed from it) after every block, so during a 20 ms glide the readout
-// shows the cut actually in force, and the GUI thread never recomputes the
-// table. The path is the x2uhj readout's: the view holds a pointer to state
-// the processor owns and polls it on idle. Here each field is a separate
-// atomic, so a read can mix two consecutive blocks during a glide; the next
-// idle repaints a consistent pair, which is all a readout needs.
+// Draws the three rows of bastooge_readout.h (the filters in force and the
+// mode), centred, in InfoFont/TextLight. The path is the x2uhj readout's: the
+// view holds a pointer to the Readout the processor owns, which the audio
+// thread fills with the engine's cut() and bell(), and polls it on idle.
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 #include "vstgui/lib/cview.h"
 #include "vstgui/lib/cdrawcontext.h"
 #include "vstgui/lib/cfont.h"
 #include "vstgui/lib/ccolor.h"
-#include "bastooge_dsp.h"
+#include "bastooge_readout.h"
 
-#include <atomic>
 #include <cmath>
-#include <cstdio>
-#include <cstring>
 
 namespace Seam::bastooge {
-
-// Written by the audio thread (and by setActive), read by the GUI thread.
-struct Readout {
-    std::atomic<double> cutHz{st::kMk2gCutDefault};
-    std::atomic<double> f0Hz{0.0};
-    std::atomic<double> q{0.0};
-    std::atomic<double> gainDb{0.0};
-    std::atomic<int>    test{(int)Test::Normal};
-    std::atomic<bool>   bypass{false};
-
-    void publish(const Engine& e, Test t, bool by) {
-        const st::Bell b = e.bell();
-        cutHz.store(e.cut(), std::memory_order_relaxed);
-        f0Hz.store(b.f0, std::memory_order_relaxed);
-        q.store(b.q, std::memory_order_relaxed);
-        gainDb.store(b.gainDb, std::memory_order_relaxed);
-        test.store((int)t, std::memory_order_relaxed);
-        bypass.store(by, std::memory_order_relaxed);
-    }
-};
-
-// The two lines of the readout, as text. Free so that the copy is one
-// function, whatever draws it.
-inline void formatReadout(double cutHz, double f0, double q, double gainDb,
-                          int test, bool bypass,
-                          char* line1, size_t n1, char* line2, size_t n2) {
-    std::snprintf(line1, n1, "W BELL %ld Hz \xC2\xB7 Q %.2f \xC2\xB7 %+.1f dB    CUT %ld Hz",
-                  std::lround(f0), q, gainDb, std::lround(cutHz));
-    static const char* kNames[5] = {"NORMAL", "TEST W", "TEST X", "TEST Y", "TEST Z"};
-    const char* name = (test >= 0 && test <= 4) ? kNames[test] : kNames[0];
-    const bool dipole = test >= (int)Test::X && test <= (int)Test::Z;
-    if (!bypass)
-        std::snprintf(line2, n2, "%s", name);
-    else if (dipole)
-        std::snprintf(line2, n2, "%s \xC2\xB7 BYPASS \xC2\xB7 DIPOLE WITHOUT HIGH-PASS", name);
-    else
-        std::snprintf(line2, n2, "%s \xC2\xB7 BYPASS", name);
-}
 
 class ReadoutView : public VSTGUI::CView {
 public:
@@ -82,16 +32,16 @@ public:
         CView::draw(c);
         if (!readout_) return;
         shown_ = snapshot();
-        char l1[96], l2[96];
+        char rows[3][96];
         formatReadout(shown_.cut, shown_.f0, shown_.q, shown_.g, shown_.test, shown_.bypass,
-                      l1, sizeof l1, l2, sizeof l2);
+                      rows[0], sizeof rows[0], rows[1], sizeof rows[1], rows[2], sizeof rows[2]);
         if (font_) c->setFont(font_);
         c->setFontColor(color_);
         const CRect r = getViewSize();
-        const CCoord rowH = 14.0;
-        c->drawString(l1, CRect(r.left, r.top, r.right, r.top + rowH), kCenterText);
-        c->drawString(l2, CRect(r.left, r.top + rowH + 4.0, r.right, r.top + 2.0 * rowH + 4.0),
-                      kCenterText);
+        const CCoord rowH = 16.0;
+        for (int i = 0; i < 3; ++i)
+            c->drawString(rows[i], CRect(r.left, r.top + i * rowH, r.right, r.top + (i + 1) * rowH),
+                          kCenterText);
         setDirty(false);
     }
 

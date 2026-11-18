@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 #include "bastooge_dsp.h"
+#include "bastooge_readout.h"
 #include "bamodulex_dsp.h"
 #include "seam_svf.h"
 #include "seam_st.h"
@@ -8,6 +9,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <string>
 #include <vector>
 
 using Seam::bastooge::Engine;
@@ -181,4 +184,59 @@ TEST_CASE("silence after signal leaves no subnormal state") {
     const Frames out = run(e, silence);
     CHECK(e.hasSubnormalState() == false);
     for (int c = 0; c < 4; ++c) CHECK(out[c].back() == 0.0);
+}
+
+TEST_CASE("bypass keeps the filters running: un-bypass equals an engine that never bypassed") {
+    // Faust's select2 computes both branches; so does the engine. A chain
+    // frozen during bypass would resume from stale state and differ here.
+    for (Test t : {Test::Normal, Test::W, Test::X}) {
+        Engine a, b;
+        a.setCut(130.0); b.setCut(130.0);
+        a.setTest(t); b.setTest(t);
+        a.prepare(48000.0); b.prepare(48000.0);
+        const Frames pre = noise(1000, 111u), mid = noise(2000, 222u), post = noise(4000, 333u);
+        run(a, pre); run(b, pre);
+        a.setBypass(true);
+        run(a, mid); run(b, mid);
+        a.setBypass(false);
+        const Frames oa = run(a, post), ob = run(b, post);
+        for (int c = 0; c < 4; ++c)
+            for (int i = 0; i < 4000; ++i) REQUIRE(std::fabs(oa[c][i] - ob[c][i]) <= 1e-12);
+    }
+}
+
+namespace {
+struct Lines { std::string l1, l2, l3; };
+Lines fmt(double cut, double f0, double q, double g, Test t, bool by) {
+    char a[96], b[96], c[96];
+    Seam::bastooge::formatReadout(cut, f0, q, g, (int)t, by, a, sizeof a, b, sizeof b, c, sizeof c);
+    return {a, b, c};
+}
+} // namespace
+
+TEST_CASE("readout row 1: the bell, f0 integer, Q two decimals, gain signed one decimal") {
+    CHECK(fmt(160.0, 263.457, 0.878556, -3.96957, Test::Normal, false).l1 ==
+          "W BELL 263 Hz \xC2\xB7 Q 0.88 \xC2\xB7 -4.0 dB");
+    CHECK(fmt(250.0, 433.407, 0.962313, -1.81001, Test::Normal, false).l1 ==
+          "W BELL 433 Hz \xC2\xB7 Q 0.96 \xC2\xB7 -1.8 dB");
+    CHECK(fmt(160.0, 300.0, 0.9, 1.3, Test::Normal, false).l1 ==
+          "W BELL 300 Hz \xC2\xB7 Q 0.90 \xC2\xB7 +1.3 dB");
+}
+
+TEST_CASE("readout row 2: the cut, integer") {
+    CHECK(fmt(160.0, 263.0, 0.88, -4.0, Test::Normal, false).l2 == "CUT 160 Hz");
+    CHECK(fmt(124.6, 263.0, 0.88, -4.0, Test::Normal, false).l2 == "CUT 125 Hz");
+}
+
+TEST_CASE("readout row 3: the status line") {
+    const char* dot = "\xC2\xB7";
+    CHECK(fmt(160, 263, 0.88, -4, Test::Normal, false).l3 == "NORMAL");
+    CHECK(fmt(160, 263, 0.88, -4, Test::W, false).l3 == "TEST W");
+    CHECK(fmt(160, 263, 0.88, -4, Test::Y, false).l3 == "TEST Y");
+    CHECK(fmt(160, 263, 0.88, -4, Test::Normal, true).l3 == std::string("NORMAL ") + dot + " BYPASS");
+    CHECK(fmt(160, 263, 0.88, -4, Test::W, true).l3 == std::string("TEST W ") + dot + " BYPASS");
+    CHECK(fmt(160, 263, 0.88, -4, Test::X, true).l3 ==
+          std::string("TEST X ") + dot + " BYPASS " + dot + " DIPOLE WITHOUT HIGH-PASS");
+    CHECK(fmt(160, 263, 0.88, -4, Test::Z, true).l3 ==
+          std::string("TEST Z ") + dot + " BYPASS " + dot + " DIPOLE WITHOUT HIGH-PASS");
 }
