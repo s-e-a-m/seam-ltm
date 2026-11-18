@@ -301,9 +301,11 @@ this A/B is what proves does not become a numerical one.
 Same idea as the pink A/B, for the S.T.OOGE mk2g decoder's two correction
 chains: `stt.bastooge_w(fc)` (bell from the `mk2g_bell` table, then an
 all-pass at `fc`) and `stt.bastooge_d(fc)` (two cascaded 1/sqrt(2)
-high-passes) in `seam.st.lib`, against `Seam::Svf` and
-`Seam::st::mk2gBell` driven by `bastooge-ir-dump.cpp`
-(`bastooge-ir-dump <w|d> <fc> <fs> <n>`).
+high-passes, a fourth-order Linkwitz-Riley) in `seam.st.lib`, against
+`Seam::Svf` and `Seam::st::mk2gBell` driven by `bastooge-ir-dump.cpp`
+(`bastooge-ir-dump <w|d> <fc> <fs> <n>`); then the whole decoder,
+`stt.bastooge(fc, test, bypass)`, against `Seam::bastooge::Engine`
+(`bastooge-ir-dump e <fc> <fs> <n> <test> <bypass> <in> <face>`).
 
 ```bash
 tools/faust-bastooge-ab.sh
@@ -313,6 +315,15 @@ It feeds a unit impulse (8192 samples) through both sides at fs 48 kHz and
 96 kHz: chain w at fc 90, 100, 117, 132, 137, 160, 179, 202, 228, 250, 300 Hz
 and chain d at fc 100, 137, 250 Hz, 28 cases in all. Each case prints
 `PASS|FAIL chain fc fs worst=<max |faust-cpp|>`.
+The decoder cases run at fc 160 Hz and fs 48 kHz: test 0..4 (Normal, W, X,
+Y, Z) times bypass 0/1 times the four output faces, with the impulse on a0
+(40 cases), and for test 0 also with the impulse on a1, a2 and a3 (24
+cases), 64 in all and 92 with the chains. The Faust side is
+`process = _ : (_,0,0,0) : stt.bastooge(160,T,B) : ba.selector(F,4);`
+(the impulse moved to the input under test), so the one-in, one-out
+`faust-ab-arch.cpp` serves unchanged; each case is one Faust build, and the
+whole script takes about a minute and a half. Each case prints
+`PASS|FAIL bastooge test= bypass= in= face= worst= peak=`.
 The bell lookup uses rows i and i+1 with i = int(min(u, 14)), so the w list
 is chosen so that all 16 rows of the table are reached (u about 0, 2.5, 4.5,
 5.5, 7.5, 9.5, 11.5, 13.5, 15), and the values between grid points (117, 132,
@@ -322,12 +333,16 @@ is chosen so that all 16 rows of the table are reached (u about 0, 2.5, 4.5,
 the bell, and `bastooge-ir-dump` does the same (`mk2gBell` clamps internally,
 the all-pass receives fc as given).
 The gate is a worst absolute sample difference of 1e-12, with no flag to
-loosen it. Measured worst differences are between 7e-18 and 1.1e-16, five
+loosen it. Measured worst differences are between 7e-18 and 1.1e-16 on the
+chains and at most 6.1e-17 on the decoder (exactly 0 with bypass on), five
 orders of margin. The C++ `Svf` flushes state below 1e-30 to zero and Faust
 does not; that difference is far below the gate.
 Sanity of the gate: perturbing the interpolation parameter `t` by 1e-6
 gives a worst difference of 4.9e-10 and FAIL; perturbing the row-11 `q`
-entry (0.938721 -> 0.938821) fails the fc = 202 cases (6e-07).
+entry (0.938721 -> 0.938821) fails the fc = 202 cases (6e-07). Swapping
+the X and Y entries of the selector's `kAcn` table in `bastooge_dsp.h`
+fails the eight test X and Y cases on faces RFD and LBD (worst 1.94 with
+the filters, 2.0 in bypass), where the two modes differ in sign.
 
 Requires `faust`, `clang++` (C++17) and `python3`; not wired into ctest, for
 the same reason as the pink A/B (the suite does not require the `faust`
