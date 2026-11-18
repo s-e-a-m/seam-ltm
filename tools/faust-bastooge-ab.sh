@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Do the Faust specification (stt.bastooge_w / stt.bastooge_d in seam.st.lib)
 # and the hand-written C++ chains describe the same filters? Compares impulse
-# responses sample by sample: 2 chains x 4 cut frequencies x 2 sample rates.
+# responses sample by sample. W: 11 cut frequencies (every bell-table row is
+# reached, plus 90 and 300 for the clamp) and D: 3, each at 2 sample rates.
 set -euo pipefail
 cd "$(dirname "$0")"
 LIBS=../../faust-libraries/src
@@ -13,7 +14,8 @@ clang++ -O2 -std=c++17 -I../plugins/_common -o "$TMP/cppir" bastooge-ir-dump.cpp
 
 status=0
 for CH in w d; do
-  for FC in 100 137 160 250; do
+  if [ "$CH" = w ]; then FCS="90 100 117 132 137 160 179 202 228 250 300"; else FCS="100 137 250"; fi
+  for FC in $FCS; do
     cat > "$TMP/b.dsp" <<DSP
 import("seam.st.lib");
 process = stt.bastooge_$CH($FC);

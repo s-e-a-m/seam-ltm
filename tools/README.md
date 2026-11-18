@@ -309,19 +309,25 @@ high-passes) in `seam.st.lib`, against `Seam::Svf` and
 tools/faust-bastooge-ab.sh
 ```
 
-It feeds a unit impulse (8192 samples) through both sides for chain
-w, d x fc 100, 137, 160, 250 Hz x fs 48 kHz, 96 kHz: 16 cases. 137 Hz lies
-between grid points of the bell table, so the interpolation is exercised
-and not only the table rows. Each case prints
+It feeds a unit impulse (8192 samples) through both sides at fs 48 kHz and
+96 kHz: chain w at fc 90, 100, 117, 132, 137, 160, 179, 202, 228, 250, 300 Hz
+and chain d at fc 100, 137, 250 Hz, 28 cases in all. Each case prints
 `PASS|FAIL chain fc fs worst=<max |faust-cpp|>`.
+The bell lookup uses rows i and i+1 with i = int(min(u, 14)), so the w list
+is chosen so that all 16 rows of the table are reached (u about 0, 2.5, 4.5,
+5.5, 7.5, 9.5, 11.5, 13.5, 15), and the values between grid points (117, 132,
+137, 179, 202, 228) exercise the interpolation as well as the rows.
+90 and 300 Hz exercise the clamp to [100, 250]: `bastooge_w` in
+`seam.st.lib` hands the unclamped fc to the all-pass and the clamped one to
+the bell, and `bastooge-ir-dump` does the same (`mk2gBell` clamps internally,
+the all-pass receives fc as given).
 The gate is a worst absolute sample difference of 1e-12, with no flag to
-loosen it. Measured worst differences are between 2e-17 and 1.1e-16, five
+loosen it. Measured worst differences are between 7e-18 and 1.1e-16, five
 orders of margin. The C++ `Svf` flushes state below 1e-30 to zero and Faust
 does not; that difference is far below the gate.
 Sanity of the gate: perturbing the interpolation parameter `t` by 1e-6
-gives a worst difference of 4.9e-10 and FAIL; perturbing a table `q` entry
-that a case reaches (row 7, 0.906876 -> 0.907876) fails the cases that
-use it.
+gives a worst difference of 4.9e-10 and FAIL; perturbing the row-11 `q`
+entry (0.938721 -> 0.938821) fails the fc = 202 cases (6e-07).
 
 Requires `faust`, `clang++` (C++17) and `python3`; not wired into ctest, for
 the same reason as the pink A/B (the suite does not require the `faust`
