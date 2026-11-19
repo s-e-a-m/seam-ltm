@@ -71,32 +71,32 @@ Every window follows the same grammar, described in
 
 ### Screenshots
 
-The 21 windows photographed after the UI standard landed, in the order
+The 22 windows photographed after the UI standard landed, in the order
 of the families above; a plugin joins the gallery when its photo exists.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |
 |:---:|:---:|:---:|:---:|
 | ![SDMX](docs/img/sdmx.png) | ![B2XROT](docs/img/b2xrot.png) | ![XYPRROT](docs/img/xyprrot.png) | ![M2XHGR](docs/img/m2xhgr.png) |
 
-| LR2XHGR | ABMODULEX | BAMODULEX | X2UHJ |
+| LR2XHGR | ABMODULEX | BAMODULEX | BASTOOGE |
 |:---:|:---:|:---:|:---:|
-| ![LR2XHGR](docs/img/lr2xhgr.png) | ![ABMODULEX](docs/img/abmodulex.png) | ![BAMODULEX](docs/img/bamodulex.png) | ![X2UHJ](docs/img/x2uhj.png) |
+| ![LR2XHGR](docs/img/lr2xhgr.png) | ![ABMODULEX](docs/img/abmodulex.png) | ![BAMODULEX](docs/img/bamodulex.png) | ![BASTOOGE](docs/img/bastooge.png) |
 
-| LTBURST | LTGLIDE | MULTIPINK | STRX |
+| X2UHJ | LTBURST | LTGLIDE | MULTIPINK |
 |:---:|:---:|:---:|:---:|
-| ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) | ![STRX](docs/img/strx.png) |
+| ![X2UHJ](docs/img/x2uhj.png) | ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) |
 
-| DSLAR | DDELAY | HILBERT | ADDELAY |
+| STRX | DSLAR | DDELAY | HILBERT |
 |:---:|:---:|:---:|:---:|
-| ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) | ![ADDELAY](docs/img/addelay.png) |
+| ![STRX](docs/img/strx.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) |
 
-| LMO | STUNEDREV | DELRM | CHOIR |
+| ADDELAY | LMO | STUNEDREV | DELRM |
 |:---:|:---:|:---:|:---:|
-| ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) | ![CHOIR](docs/img/choir.png) |
+| ![ADDELAY](docs/img/addelay.png) | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) |
 
-| ALOGOS |
-|:---:|
-| ![ALOGOS](docs/img/alogos.png) |
+| CHOIR | ALOGOS |
+|:---:|:---:|
+| ![CHOIR](docs/img/choir.png) | ![ALOGOS](docs/img/alogos.png) |
 
 <!-- END plugins -->
 
