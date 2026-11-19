@@ -65,6 +65,14 @@ Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD → A0 A1 
 Gerzon's BA-module in the AmbiX domain: a decoder to the LFU · RFD · RBU · LBD vertices, which are the four drivers of a STONE loudspeaker. The Gerzon compensation shelves are omitted by design — the STONE amplifier corrects HF/LF downstream"""
 
   [[family.plugin]]
+  name = "BASTOOGE"
+  io = "AmbiX 4ch → tetrahedral 4ch"
+  screenshot = "bastooge.png"
+  faust = "seam.st.lib"
+  description = """
+BAMODULEX with the body of S.T.OOGE mk2g: a bell on W and a Linkwitz-Riley high-pass on X, Y, Z, phase-matched by an all-pass on W, ahead of the BA matrix. The filters come from a measured dipole/W ratio; one control moves the dipole cut (100–250 Hz) and the bell follows it. A TEST menu sends channel 1 to one mode alone, through the filters, for strx measurements"""
+
+  [[family.plugin]]
   name = "X2UHJ"
   io = "AmbiX 4ch → UHJ C-format 4ch"
   screenshot = "x2uhj.png"

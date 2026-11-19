@@ -5,13 +5,13 @@
 A pedagogical VST3 plugin suite for the [SEAM](https://github.com/s-e-a-m)
 project (Sustained Electro-Acoustic Music).
 
-Twenty-one plugins built directly on the Steinberg VST3 SDK — no JUCE, no
+Twenty-two plugins built directly on the Steinberg VST3 SDK — no JUCE, no
 frameworks. Clean C++17, VSTGUI for the interface, and the minimum code
 needed to do the job.
 
 ## Plugins
 
-Sixteen fall into three families: converters that move a signal from one
+Seventeen fall into three families: converters that move a signal from one
 spatial format to another, generators that produce the test signals a room
 is measured with, and the measurement and processing tools that listen to
 the result.
@@ -33,6 +33,7 @@ Every window follows the same grammar, described in
 | **LR2XHGR** | stereo → AmbiX 4ch | Stereo to AmbiX via Haar (Silvi's method): each channel is Haar-decomposed, placed by a Divergence half-angle, summed, and finally oriented by a global Yaw/Pitch/Roll |
 | **ABMODULEX** | A-format 4ch → AmbiX 4ch | Tetrahedral microphone A-format to first-order AmbiX: LFU RFD RBU LBD → A0 A1 A2 A3. Pure matrix, involutory (M² = I), the inverse of BAMODULEX, and the front end of the TETRAREC chain. A SETUP menu reads the four capsules as the dual tetrahedron, LFD RFU RBD LBU: the upright one mirrored in the horizontal plane, Z changing sign |
 | **BAMODULEX** | AmbiX 4ch → tetrahedral 4ch | Gerzon's BA-module in the AmbiX domain: a decoder to the LFU · RFD · RBU · LBD vertices, which are the four drivers of a STONE loudspeaker. The Gerzon compensation shelves are omitted by design — the STONE amplifier corrects HF/LF downstream |
+| **BASTOOGE** | AmbiX 4ch → tetrahedral 4ch | BAMODULEX with the body of S.T.OOGE mk2g: a bell on W and a Linkwitz-Riley high-pass on X, Y, Z, phase-matched by an all-pass on W, ahead of the BA matrix. The filters come from a measured dipole/W ratio; one control moves the dipole cut (100–250 Hz) and the bell follows it. A TEST menu sends channel 1 to one mode alone, through the filters, for strx measurements |
 | **X2UHJ** | AmbiX 4ch → UHJ C-format 4ch | First-order AmbiX (ACN/SN3D) to UHJ C-format (L, R, T, Q) — the "UHJ decoder" that makes an Ambisonic mix audible on two channels. The ±90° quadrature pair is designed live at the host sample rate by the shared `seam_quadrature` engine, and the GUI reads out the resulting coefficients together with the achieved maximum phase error |
 
 ### Signal generators
@@ -70,32 +71,32 @@ Every window follows the same grammar, described in
 
 ### Screenshots
 
-The 21 windows photographed after the UI standard landed, in the order
+The 22 windows photographed after the UI standard landed, in the order
 of the families above; a plugin joins the gallery when its photo exists.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |
 |:---:|:---:|:---:|:---:|
 | ![SDMX](docs/img/sdmx.png) | ![B2XROT](docs/img/b2xrot.png) | ![XYPRROT](docs/img/xyprrot.png) | ![M2XHGR](docs/img/m2xhgr.png) |
 
-| LR2XHGR | ABMODULEX | BAMODULEX | X2UHJ |
+| LR2XHGR | ABMODULEX | BAMODULEX | BASTOOGE |
 |:---:|:---:|:---:|:---:|
-| ![LR2XHGR](docs/img/lr2xhgr.png) | ![ABMODULEX](docs/img/abmodulex.png) | ![BAMODULEX](docs/img/bamodulex.png) | ![X2UHJ](docs/img/x2uhj.png) |
+| ![LR2XHGR](docs/img/lr2xhgr.png) | ![ABMODULEX](docs/img/abmodulex.png) | ![BAMODULEX](docs/img/bamodulex.png) | ![BASTOOGE](docs/img/bastooge.png) |
 
-| LTBURST | LTGLIDE | MULTIPINK | STRX |
+| X2UHJ | LTBURST | LTGLIDE | MULTIPINK |
 |:---:|:---:|:---:|:---:|
-| ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) | ![STRX](docs/img/strx.png) |
+| ![X2UHJ](docs/img/x2uhj.png) | ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) |
 
-| DSLAR | DDELAY | HILBERT | ADDELAY |
+| STRX | DSLAR | DDELAY | HILBERT |
 |:---:|:---:|:---:|:---:|
-| ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) | ![ADDELAY](docs/img/addelay.png) |
+| ![STRX](docs/img/strx.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) |
 
-| LMO | STUNEDREV | DELRM | CHOIR |
+| ADDELAY | LMO | STUNEDREV | DELRM |
 |:---:|:---:|:---:|:---:|
-| ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) | ![CHOIR](docs/img/choir.png) |
+| ![ADDELAY](docs/img/addelay.png) | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) |
 
-| ALOGOS |
-|:---:|
-| ![ALOGOS](docs/img/alogos.png) |
+| CHOIR | ALOGOS |
+|:---:|:---:|
+| ![CHOIR](docs/img/choir.png) | ![ALOGOS](docs/img/alogos.png) |
 
 <!-- END plugins -->
 

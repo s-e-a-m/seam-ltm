@@ -103,6 +103,18 @@ target_include_directories(bamodulex_dsp_test PRIVATE
 target_compile_features(bamodulex_dsp_test PRIVATE cxx_std_17)
 add_test(NAME bamodulex_dsp_test COMMAND bamodulex_dsp_test)
 
+add_executable(bastooge_dsp_test
+    bastooge_dsp_test.cpp
+)
+target_include_directories(bastooge_dsp_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bastooge/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bamodulex/source
+)
+target_compile_features(bastooge_dsp_test PRIVATE cxx_std_17)
+add_test(NAME bastooge_dsp_test COMMAND bastooge_dsp_test)
+
 add_executable(pd_m2xhgr_engine_test
     pd_m2xhgr_engine_test.cpp
 )
@@ -444,6 +456,14 @@ target_include_directories(seam_svf_test PRIVATE
 target_compile_features(seam_svf_test PRIVATE cxx_std_17)
 add_test(NAME seam_svf_test COMMAND seam_svf_test)
 
+add_executable(seam_st_test seam_st_test.cpp)
+target_include_directories(seam_st_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+)
+target_compile_features(seam_st_test PRIVATE cxx_std_17)
+add_test(NAME seam_st_test COMMAND seam_st_test)
+
 add_executable(seam_analyzers_test seam_analyzers_test.cpp)
 target_include_directories(seam_analyzers_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -659,6 +679,25 @@ if(APPLE)
 endif()
 target_compile_features(abmodulex_state_test PRIVATE cxx_std_17)
 add_test(NAME abmodulex_state_test COMMAND abmodulex_state_test)
+
+# bastooge: cut, test and bypass in the processor's state.
+add_executable(bastooge_state_test
+    bastooge_state_test.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/common/memorystream.cpp
+)
+target_include_directories(bastooge_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bastooge/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/bamodulex/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${vst3sdk_SOURCE_DIR}
+)
+target_link_libraries(bastooge_state_test PRIVATE base sdk_common pluginterfaces)
+if(APPLE)
+    target_link_libraries(bastooge_state_test PRIVATE ${CORE_FOUNDATION})
+endif()
+target_compile_features(bastooge_state_test PRIVATE cxx_std_17)
+add_test(NAME bastooge_state_test COMMAND bastooge_state_test)
 
 # alogos: scales, grid and delay table against sgs.algrid / sgs.aldel; references in
 # ref/alogos_ref.h (doc/study/alogos/gen-ref.sh) and ref/alogos_inphirev_table.h.
