@@ -183,6 +183,11 @@ constexpr int32_t kGraceMs = 10000;
 // on a disk longer than this.
 constexpr auto kLastLeaveWait = std::chrono::milliseconds(2000);
 
+// After a failed write the writer leaves the sheet alone this long before it
+// reopens it. A volume that refuses writes (quota, full disk) answers every
+// attempt the same way; trying each 250 ms tick only churns the disk.
+constexpr auto kRetryAfterFailure = std::chrono::seconds(5);
+
 // Lines are formatted by Seam::hubsheet; this is just "now" in unix ms.
 int64_t nowMs() {
     return (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -321,7 +326,9 @@ struct SeamHub {
     // ---- the writer -------------------------------------------------------
     // At most ONE writer thread, possibly lingering. A session (one sheet)
     // runs from the first register until kGraceMs after the last unregister
-    // with nobody back; the writer then closes the sheet and exits by itself.
+    // with nobody back, and no line held for its folder (Sheet, held lines);
+    // the writer then closes the sheet and exits by itself. A register while
+    // lines are still held continues the same sheet.
     //
     // ctlMutex guards the writer's control state below. The writer flips
     // `running` to false as the very last thing it does, after closing the
@@ -363,13 +370,15 @@ struct SeamHub {
     size_t   inFlight = 0;
     uint64_t enqSeq = 0;
 
-    // Writer-thread only. They outlive one writer (held lines wait for the
-    // next session), and successive writers are ordered by the join.
+    // Writer-thread only; successive writers are ordered by the join. Held
+    // lines never outlive their writer: it stays alive while they wait for
+    // their sheet's folder, and spills them before it exits (writerMain).
     bool     unreachable = false;
     uint64_t droppedAtOutage = 0;
 
     // The host quits: ask the writer for a last pass, which drains into a
-    // sheet that is already open and never opens one (writerMain), and wait
+    // sheet that is already open and never opens one, and spills what it
+    // still holds to the local fallback folder (writerMain), and wait
     // for it to exit at most kLastLeaveWait. A writer that has exited is
     // joined; one still stuck in the disk (a hung network share) is detached
     // and left to the process exit. Detaching is safe for two reasons
@@ -1027,18 +1036,48 @@ bool sameState(const SeamHubState& a, const SeamHubState& b) {
     }
 }
 
+// Where held lines go when their sheet's folder never came back: beside the
+// conf, so ~/Library/Application Support/SEAM/sheets-held for the operator,
+// and inside the test tree when SEAM_HUB_CONF points there. A local folder
+// that is not privacy-protected: it cannot hang like a share, and writing it
+// raises no prompt. "" when there is no conf path (HOME unset).
+std::string heldFolder() {
+    const std::string conf = confPath();
+    if (conf.empty()) return "";
+    return (std::filesystem::path(conf).parent_path() / "sheets-held").string();
+}
+
 // The writer thread's own state for one sheet. Only the writer touches it.
+//
+// HELD LINES BELONG TO THEIR SHEET. When the folder is unreachable, the queue
+// is left alone: its entries are the held lines (bounded by enqueue()'s
+// drop-oldest). The sheet's path is kept, and every tick retries it, so when
+// the folder returns the held lines are written into the session's own file,
+// after a notice. The writer does not exit while it holds lines, even after
+// the grace. They leave the sheet's path only in three cases, all spilled to
+// heldFolder()/<the sheet's file name> with a notice: at quit (teardown's
+// last pass, still within its 2 s bound), on sheet_new() (the operator moved
+// on; the new sheet names where they went), and at the end of a session
+// whose sheet has no path at all (no folder, or no free name). If even the
+// spill fails, they are lost, and counted as dropped.
 struct Sheet {
     SeamHub*    hub;
-    std::string path;
+    std::string name;            // the file name, kept even when there is no path
+    std::string path;            // folder/name, "" when there is nowhere to write
     std::time_t start = 0;
     std::FILE*  f = nullptr;
     struct Last { uint32_t epoch; bool written; SeamHubState st; };
     Last        last[SEAM_HUB_MAX_MEMBERS]{};
-    // Set after a failed write: the next open() starts a new file first. Not
-    // begin() on the spot, because begin() touches the disk (conf, exists)
-    // and the failure may happen on the last pass under stop.
-    bool        needBegin = false;
+    // The file's header is written once per sheet; `committed` is the file's
+    // size after the last flush that succeeded. A failed write may have left
+    // a torn fragment (or a whole unflushed batch) after it: the reopen
+    // truncates back to `committed` and the batch is written again, whole, in
+    // the same file. So a failure never splits a session into two files.
+    bool        opened = false;  // this sheet has created its file at `path`
+    bool        headerDone = false;
+    long        committed = 0;
+    std::chrono::steady_clock::time_point retryAfter{};
+    std::string notice;          // a `sheet` notice owed to this file, written after the header
 
     void publishStatus() {
         std::lock_guard<std::mutex> lock(hub->statusMutex);
@@ -1046,37 +1085,72 @@ struct Sheet {
         hub->statusWriting = f ? 1u : 0u;
     }
 
-    // A new sheet: new start time, the conf re-read, states written afresh
-    // so the new file stands on its own. A name already taken (two sheets of
-    // this process in the same second and folder) gets -2, -3, ... after the
-    // pid, so a sheet is never appended to another.
-    void begin() {
-        close();
-        needBegin = false;
-        start = std::time(nullptr);
+    // A line the writer writes itself goes into the recent lines too, so the
+    // detector shows the notices the file carries.
+    void remember(const std::string& line) {
+        std::lock_guard<std::mutex> lock(hub->lineMutex);
+        hub->rememberLocked(line);
+    }
+
+    bool holding() {
+        if (f) return false;
+        std::lock_guard<std::mutex> lock(hub->lineMutex);
+        return !hub->lines.empty();
+    }
+
+    std::string stem() const {
         std::tm tm{};
         localtime_r(&start, &tm);
-        char stem[96];
-        std::snprintf(stem, sizeof stem, "%04d-%02d-%02d-%02d%02d%02d-%d",
+        char b[96];
+        std::snprintf(b, sizeof b, "%04d-%02d-%02d-%02d%02d%02d-%d",
                       tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
                       tm.tm_hour, tm.tm_min, tm.tm_sec, (int)getpid());
-        const std::string folder = sheetFolder();
+        return b;
+    }
+
+    // The first name of this sheet's stem not already on disk in `folder`
+    // (two sheets of this process in the same second and folder: -2, -3, ...
+    // after the pid). A sheet is never appended to another: when every name
+    // is taken, there is no path, and the sheet is unreachable.
+    void pickName(const std::string& folder) {
+        const std::string st = stem();
+        name = st + "-seam-sheet.txt";
         path.clear();
-        if (!folder.empty()) {
-            std::error_code ec;
-            for (int n = 1; n < 1000; ++n) {
-                const std::string name = std::string(stem) + (n > 1 ? "-" + std::to_string(n) : "") +
-                                         "-seam-sheet.txt";
-                path = (std::filesystem::path(folder) / name).string();
-                if (!std::filesystem::exists(path, ec)) break;
-            }
+        opened = false;
+        if (folder.empty()) return;
+        std::error_code ec;
+        for (int n = 1; n < 1000; ++n) {
+            const std::string nm = st + (n > 1 ? "-" + std::to_string(n) : "") + "-seam-sheet.txt";
+            const std::string p = (std::filesystem::path(folder) / nm).string();
+            // An error (the folder is unreachable) reads as free: the name is
+            // checked again when the file is first opened.
+            if (!std::filesystem::exists(p, ec)) { name = nm; path = p; return; }
         }
+    }
+
+    // A new sheet: new start time, the conf re-read, states written afresh
+    // so the new file stands on its own.
+    void begin() {
+        close();
+        start = std::time(nullptr);
+        pickName(sheetFolder());
+        headerDone = false;
+        committed = 0;
+        retryAfter = {};
         std::memset(last, 0, sizeof last);
         publishStatus();
     }
 
     void close() {
         if (f) { std::fclose(f); f = nullptr; publishStatus(); }
+    }
+
+    // The open file's size, after a flush. An append-mode stream need not
+    // report the end before its first write, so it is asked to seek there.
+    long endOffset() {
+        if (std::fseek(f, 0, SEEK_END) != 0) return committed;
+        const long pos = std::ftell(f);
+        return pos >= 0 ? pos : committed;
     }
 
     void markUnreachable(uint64_t droppedNow) {
@@ -1087,21 +1161,45 @@ struct Sheet {
     // alone: its lines are the held lines, bounded by enqueue()'s drop-oldest.
     void open() {
         if (f) return;
-        if (needBegin) begin();
+        if (std::chrono::steady_clock::now() < retryAfter) return;   // backing off a failed write
         uint64_t droppedNow;
         {
             std::lock_guard<std::mutex> lock(hub->lineMutex);
             droppedNow = hub->droppedLines;
         }
-        if (path.empty()) { markUnreachable(droppedNow); return; }
         std::error_code ec;
+        if (!path.empty() && !opened) {
+            // Never append to a file this sheet did not start: the name was
+            // picked while the folder may have been unreachable.
+            if (std::filesystem::exists(path, ec))
+                pickName(std::filesystem::path(path).parent_path().string());
+        }
+        if (path.empty()) { markUnreachable(droppedNow); publishStatus(); return; }
         std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+        if (opened) {
+            // A reopen after a failure: drop whatever followed the last good
+            // flush (it is written again from the queue, or the header is);
+            // a file that has gone missing starts over with a header.
+            const uintmax_t size = std::filesystem::file_size(path, ec);
+            if (ec) { headerDone = false; committed = 0; }
+            else if (size > (uintmax_t)committed && ::truncate(path.c_str(), (off_t)committed) != 0) {
+                markUnreachable(droppedNow);
+                retryAfter = std::chrono::steady_clock::now() + kRetryAfterFailure;
+                return;
+            }
+        }
         f = std::fopen(path.c_str(), "a");
         if (!f) { markUnreachable(droppedNow); return; }
-        std::tm tm{};
-        localtime_r(&start, &tm);
-        bool ok = std::fputs(Seam::hubsheet::header(tm, (int)getpid()).c_str(), f) >= 0;
-        if (ok && hub->unreachable) {
+        opened = true;
+        std::string pre;
+        if (!headerDone) {
+            std::tm tm{};
+            localtime_r(&start, &tm);
+            pre = Seam::hubsheet::header(tm, (int)getpid());
+        }
+        std::vector<std::string> notes;
+        if (!notice.empty()) notes.push_back(Seam::hubsheet::event(nowMs(), "hub", "sheet", notice));
+        if (hub->unreachable) {
             size_t held;
             uint64_t dropped;
             {
@@ -1111,20 +1209,76 @@ struct Sheet {
             }
             std::string what = "folder unreachable, " + std::to_string(held) + " lines held";
             if (dropped) what += ", " + std::to_string(dropped) + " dropped";
-            ok = std::fputs((Seam::hubsheet::event(nowMs(), "hub", "sheet", what) + "\n").c_str(), f) >= 0;
+            notes.push_back(Seam::hubsheet::event(nowMs(), "hub", "sheet", what));
         }
-        ok = (std::fflush(f) == 0) && ok;
+        for (const auto& n : notes) pre += n + "\n";
+        const bool ok = std::fputs(pre.c_str(), f) >= 0 && std::fflush(f) == 0;
         if (!ok) {
-            // The header or the notice did not make it: this file may end in
-            // a torn fragment, so it is abandoned and the next attempt starts
-            // a new one. `unreachable` stays set: the notice is still owed.
+            // The header or a notice did not make it: closed, and the reopen
+            // truncates back to `committed` (0 for a new file) and writes
+            // them again. `unreachable` stays set: the notice is still owed.
             markUnreachable(droppedNow);
             close();
-            needBegin = true;
+            retryAfter = std::chrono::steady_clock::now() + kRetryAfterFailure;
             return;
         }
+        for (const auto& n : notes) remember(n);
+        headerDone = true;
+        notice.clear();
+        committed = endOffset();
         hub->unreachable = false;
         publishStatus();
+    }
+
+    // Moves every held line out of the queue into heldFolder()/<name>, after
+    // a header and a notice saying why. Returns the file written, or "" when
+    // the lines were lost (no fallback folder, or it failed too: they are
+    // then counted as dropped). Nothing held: returns "" and does nothing.
+    std::string spill(const std::string& why, size_t* moved = nullptr) {
+        std::deque<std::string> batch;
+        uint64_t dropped;
+        {
+            std::lock_guard<std::mutex> lock(hub->lineMutex);
+            batch.swap(hub->lines);
+            hub->inFlight = batch.size();
+            dropped = hub->unreachable ? hub->droppedLines - hub->droppedAtOutage : 0;
+        }
+        if (moved) *moved = batch.size();
+        if (batch.empty()) {
+            std::lock_guard<std::mutex> lock(hub->lineMutex);
+            hub->inFlight = 0;
+            return "";
+        }
+        const std::string dir = heldFolder();
+        std::string target;
+        bool ok = false;
+        if (!dir.empty() && !name.empty()) {
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            target = (std::filesystem::path(dir) / name).string();
+            if (std::FILE* g = std::fopen(target.c_str(), "a")) {
+                std::tm tm{};
+                localtime_r(&start, &tm);
+                std::string what = why + " (" + (path.empty() ? std::string("no path") : path) +
+                                   "), " + std::to_string(batch.size()) + " lines held here";
+                if (dropped) what += ", " + std::to_string(dropped) + " dropped";
+                const std::string note = Seam::hubsheet::event(nowMs(), "hub", "sheet", what);
+                ok = std::fputs((Seam::hubsheet::header(tm, (int)getpid()) + note + "\n").c_str(), g) >= 0;
+                for (size_t k = 0; ok && k < batch.size(); ++k)
+                    ok = std::fwrite(batch[k].data(), 1, batch[k].size(), g) == batch[k].size() &&
+                         std::fputc('\n', g) != EOF;
+                ok = (std::fflush(g) == 0) && ok;
+                ok = (std::fclose(g) == 0) && ok;
+                if (ok) remember(note);
+            }
+        }
+        {
+            std::lock_guard<std::mutex> lock(hub->lineMutex);
+            hub->inFlight = 0;
+            if (!ok) hub->droppedLines += batch.size();
+        }
+        hub->unreachable = false;
+        return ok ? target : "";
     }
 
     // A `state` line for each member whose state differs from the last one
@@ -1174,12 +1328,13 @@ struct Sheet {
             hub->inFlight = 0;
             return upTo;
         }
-        size_t done = 0;
-        for (; done < batch.size(); ++done) {
-            const std::string& e = batch[done];
-            if (std::fwrite(e.data(), 1, e.size(), f) != e.size() || std::fputc('\n', f) == EOF) break;
-        }
-        const bool failed = done < batch.size() || std::fflush(f) != 0;
+        bool failed = false;
+        for (const std::string& e : batch)
+            if (std::fwrite(e.data(), 1, e.size(), f) != e.size() || std::fputc('\n', f) == EOF) {
+                failed = true;
+                break;
+            }
+        failed = (std::fflush(f) != 0) || failed;
         {
             std::lock_guard<std::mutex> lock(hub->lineMutex);
             hub->inFlight = 0;
@@ -1187,15 +1342,20 @@ struct Sheet {
                 // The outage starts before the put-back, so the drops the
                 // put-back itself causes are counted in the notice.
                 markUnreachable(hub->droppedLines);
-                // Put back what was not written, ahead of what arrived since,
-                // within the same bound and with the same drop-oldest count.
-                for (size_t k = batch.size(); k-- > done;) hub->lines.push_front(std::move(batch[k]));
+                // Put the WHOLE batch back, ahead of what arrived since: an
+                // fwrite that "succeeded" may only have reached stdio's buffer,
+                // which the failed flush did not empty. The reopen truncates
+                // the file to `committed`, so nothing is written twice.
+                for (size_t k = batch.size(); k-- > 0;) hub->lines.push_front(std::move(batch[k]));
                 while (hub->lines.size() > kMaxQueuedLines) { hub->lines.pop_front(); ++hub->droppedLines; }
             }
         }
-        // A failed write may have left a torn fragment at the end of the
-        // file: never glue the next header onto it, start a new file.
-        if (failed) { close(); needBegin = true; }
+        if (failed) {
+            close();
+            retryAfter = std::chrono::steady_clock::now() + kRetryAfterFailure;
+        } else {
+            committed = endOffset();
+        }
         return upTo;
     }
 };
@@ -1208,8 +1368,13 @@ void writerMain(SeamHub* hub) {
         {
             std::unique_lock<std::mutex> lk(hub->ctlMutex);
             if (!first) {
-                auto until = std::chrono::steady_clock::now() + kWriterTick;
-                if (hub->liveMembers == 0 && hub->lingerUntil < until) until = hub->lingerUntil;
+                const auto now = std::chrono::steady_clock::now();
+                auto until = now + kWriterTick;
+                // The end of the grace wakes the writer early; once it has
+                // passed (a writer kept alive by held lines) the tick rules,
+                // or the wait would return at once, forever.
+                if (hub->liveMembers == 0 && hub->lingerUntil > now && hub->lingerUntil < until)
+                    until = hub->lingerUntil;
                 hub->wake.wait_until(lk, until, [hub] { return hub->stopReq || hub->renewReq || hub->flushReq; });
             }
             stop = hub->stopReq;
@@ -1221,13 +1386,28 @@ void writerMain(SeamHub* hub) {
             hub->renewReq = false;
             hub->flushReq = false;
         }
-        if (renew) sheet.begin();
+        if (renew) {
+            // What the old sheet still has goes into it; what it holds for an
+            // unreachable folder is spilled, and the new sheet says where.
+            sheet.drain();
+            if (sheet.holding()) {
+                const std::string old = sheet.path.empty() ? sheet.name : sheet.path;
+                size_t n = 0;
+                const std::string to = sheet.spill("sheet renewed, folder unreachable", &n);
+                sheet.begin();
+                sheet.notice = "previous sheet " + old + " unreachable, " + std::to_string(n) +
+                               (to.empty() ? " lines lost" : " lines moved to " + to);
+            } else {
+                sheet.begin();
+            }
+        }
         if (members && !stop) sheet.snapshotStates();
         // Under stop no sheet is opened (no create_directories, no fopen on a
         // share that may hang the quit): an open one is drained and closed,
-        // otherwise the held lines stay in memory.
+        // and what is still held is spilled to the local fallback.
         if (!stop) sheet.open();
         const uint64_t acked = sheet.drain();
+        if (stop && sheet.holding()) sheet.spill("quit, folder unreachable");
         {
             std::lock_guard<std::mutex> lk(hub->ctlMutex);
             if (acked > hub->ackSeq) hub->ackSeq = acked;
@@ -1242,6 +1422,13 @@ void writerMain(SeamHub* hub) {
                         std::chrono::steady_clock::now() >= hub->lingerUntil);
         }
         if (!closeNow) continue;
+        if (!stop && sheet.holding()) {
+            // The session is over but its lines wait for its folder: stay,
+            // and retry each tick. With no path at all there is nothing to
+            // wait for: spill now.
+            if (!sheet.path.empty()) continue;
+            sheet.spill("session ended with nowhere to write");
+        }
         sheet.close();
         {
             std::lock_guard<std::mutex> lk(hub->ctlMutex);

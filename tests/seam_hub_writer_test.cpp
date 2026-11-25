@@ -15,6 +15,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <ctime>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -79,14 +81,43 @@ fs::path freshDir(const char* tag) {
 // the writer reads the env and the conf at session start.
 std::string verbOf(const std::string& l);
 
-void useFolder(const fs::path& folder, bool spaced = false) {
+// Returns the conf's folder, where the hub spills held lines (sheets-held/).
+fs::path useFolder(const fs::path& folder, bool spaced = false) {
     REQUIRE(waitWriterGone());
-    const fs::path conf = freshDir("conf") / "hub.conf";
+    const fs::path confDir = freshDir("conf");
+    const fs::path conf = confDir / "hub.conf";
     std::ofstream(conf) << "# test conf\n"
                         << (spaced ? "  sheet-folder =  " : "sheet-folder=") << folder.string()
                         << (spaced ? "  \n" : "\n");
     setenv("SEAM_HUB_CONF", conf.c_str(), 1);
     seam_hub_test_set_grace_ms(kTestGraceMs);
+    return confDir;
+}
+
+// A folder that cannot be created until `blocker` is removed: its parent is
+// a regular file. Removing the file is the folder coming back.
+struct Blocked {
+    fs::path blocker, folder;
+    Blocked() {
+        blocker = freshDir("blocked") / "volume";
+        std::ofstream(blocker) << "not a directory\n";
+        folder = blocker / "sheets";
+    }
+    void release() { fs::remove(blocker); }
+};
+
+SeamHubSheetStatus status() {
+    SeamHubSheetStatus st;
+    std::memset(&st, 0, sizeof st);
+    seam_hub_v1_sheet_status(seam_hub_v1_get(), &st);
+    return st;
+}
+
+std::string fileText(const fs::path& p) {
+    std::ifstream f(p);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
 }
 
 int countVerb(const std::vector<std::string>& lines, const char* verb) {
@@ -241,7 +272,7 @@ TEST_CASE("the last unregister flushes and returns") {
 TEST_CASE("an unreachable folder holds lines and never blocks") {
     Cleanup cleanup;
     SeamHub* hub = seam_hub_v1_get();
-    useFolder("/Volumes/seam-hub-no-such-volume/sheets");
+    const fs::path confDir = useFolder("/Volumes/seam-hub-no-such-volume/sheets");
     const int32_t a = seam_hub_v1_register(hub, "held", kTable, 0, 0);
     const auto t0 = std::chrono::steady_clock::now();
     for (int i = 0; i < 100; ++i) {
@@ -255,12 +286,15 @@ TEST_CASE("an unreachable folder holds lines and never blocks") {
     seam_hub_v1_sheet_status(hub, &st);
     CHECK(st.writing == 0u);
     CHECK(st.pendingLines == 101u);   // 100 says + 1 arrival
+    const std::string oldPath = st.path;
+    REQUIRE(oldPath.rfind("/Volumes/seam-hub-no-such-volume/sheets/", 0) == 0);
 
+    // The operator moves on: a new folder and a new sheet. The held lines
+    // belong to the old sheet, so they do not enter the new one: they are
+    // spilled beside the conf, and the new sheet says where they went.
     const fs::path folder = freshDir("back");
     CHECK(seam_hub_v1_sheet_set_folder(hub, folder.c_str()) == 0);
     seam_hub_v1_sheet_new(hub);
-    // Wait for the writer to open the new sheet, so the held count is exactly
-    // what was held (the leaves line must not be counted with it).
     for (int i = 0; i < 200; ++i) {
         seam_hub_v1_sheet_status(hub, &st);
         if (st.writing) break;
@@ -270,19 +304,154 @@ TEST_CASE("an unreachable folder holds lines and never blocks") {
     CHECK(std::string(st.path).rfind(folder.string(), 0) == 0);
     seam_hub_v1_unregister(hub, a);
 
+    const fs::path spill = confDir / "sheets-held" / fs::path(oldPath).filename();
+    REQUIRE(fs::exists(spill));
+    const auto held = fileLines(spill);
+    REQUIRE(held.size() >= 3);
+    CHECK(held[0] == "# SEAM hub sheet");
+    CHECK(held[2].find("hub           sheet     sheet renewed, folder unreachable (" + oldPath +
+                       "), 101 lines held here") != std::string::npos);
+    CHECK(countVerb(held, "arrives") == 1);
+    CHECK(countVerb(held, "says") == 100);
+
     const auto files = sheets(folder);
     REQUIRE(files.size() == 1);
     const auto lines = fileLines(files[0]);
-    size_t mark = lines.size(), arrives = lines.size();
-    int saysAfter = 0;
-    for (size_t i = 0; i < lines.size(); ++i) {
-        if (lines[i].find("hub           sheet     folder unreachable, 101 lines held") != std::string::npos) mark = i;
-        if (verbOf(lines[i]) == "arrives") arrives = i;
-        if (verbOf(lines[i]) == "says" && i > mark) ++saysAfter;
+    bool notice = false;
+    for (const auto& l : lines)
+        if (l.find("hub           sheet     previous sheet " + oldPath + " unreachable, 101 lines moved to " +
+                   spill.string()) != std::string::npos) notice = true;
+    CHECK(notice);
+    CHECK(countVerb(lines, "says") == 0);
+    CHECK(countVerb(lines, "leaves") == 1);
+}
+
+TEST_CASE("held lines land in their own sheet when the folder returns, even after the grace") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    Blocked blocked;
+    useFolder(blocked.folder);
+    const int32_t a = seam_hub_v1_register(hub, "held", kTable, 0, 0);
+    for (int i = 0; i < 3; ++i) { SeamHubProposal p = table(1); seam_hub_v1_post(hub, a, &p); }
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    const std::string path = status().path;
+    REQUIRE(path.rfind(blocked.folder.string(), 0) == 0);
+    CHECK(status().writing == 0u);
+    seam_hub_v1_unregister(hub, a);
+    // The grace (200 ms) is long over: the writer stays, holding the lines.
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+    CHECK(seam_hub_test_writer_alive() == 1);
+    CHECK(status().pendingLines == 5u);   // arrives, 3 says, leaves
+    CHECK(std::string(status().path) == path);          // the same sheet, not a new one
+
+    blocked.release();
+    REQUIRE(waitWriterGone());
+    const auto files = sheets(blocked.folder);
+    REQUIRE(files.size() == 1);
+    CHECK(files[0].string() == path);
+    const auto lines = fileLines(files[0]);
+    REQUIRE(lines.size() >= 3);
+    CHECK(lines[0] == "# SEAM hub sheet");
+    CHECK(lines[2].find("hub           sheet     folder unreachable, 5 lines held") != std::string::npos);
+    CHECK(countVerb(lines, "arrives") == 1);
+    CHECK(countVerb(lines, "says") == 3);
+    CHECK(countVerb(lines, "leaves") == 1);
+    CHECK(verbOf(lines.back()) == "leaves");
+    CHECK(status().pendingLines == 0u);
+}
+
+TEST_CASE("held lines are spilled to the local fallback at quit") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    Blocked blocked;
+    const fs::path confDir = useFolder(blocked.folder);
+    const int32_t a = seam_hub_v1_register(hub, "held", kTable, 0, 0);
+    for (int i = 0; i < 3; ++i) { SeamHubProposal p = table(1); seam_hub_v1_post(hub, a, &p); }
+    seam_hub_v1_unregister(hub, a);
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    const std::string path = status().path;
+    REQUIRE(!path.empty());
+    REQUIRE(seam_hub_test_writer_alive() == 1);   // holding
+
+    const auto t0 = std::chrono::steady_clock::now();
+    CHECK(seam_hub_test_teardown() == 1);
+    CHECK(msSince(t0) < 2100.0);
+    CHECK(status().pendingLines == 0u);
+    const fs::path spill = confDir / "sheets-held" / fs::path(path).filename();
+    REQUIRE(fs::exists(spill));
+    const auto lines = fileLines(spill);
+    REQUIRE(lines.size() >= 3);
+    CHECK(lines[0] == "# SEAM hub sheet");
+    CHECK(lines[2].find("hub           sheet     quit, folder unreachable (" + path + "), 5 lines held here") !=
+          std::string::npos);
+    CHECK(countVerb(lines, "arrives") == 1);
+    CHECK(countVerb(lines, "says") == 3);
+    CHECK(countVerb(lines, "leaves") == 1);
+    // The released folder never received anything.
+    blocked.release();
+    CHECK(sheets(blocked.folder).empty());
+}
+
+TEST_CASE("a sheet with no free name is never appended to another; its lines are spilled") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("full");
+    const fs::path confDir = useFolder(folder);
+    // Every name this process could take in the next few seconds is taken.
+    const std::time_t now = std::time(nullptr);
+    for (std::time_t t = now; t < now + 4; ++t) {
+        std::tm tm{};
+        localtime_r(&t, &tm);
+        char stem[96];
+        std::snprintf(stem, sizeof stem, "%04d-%02d-%02d-%02d%02d%02d-%d", tm.tm_year + 1900, tm.tm_mon + 1,
+                      tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, (int)getpid());
+        for (int n = 1; n < 1000; ++n)
+            std::ofstream(folder / (std::string(stem) + (n > 1 ? "-" + std::to_string(n) : "") + "-seam-sheet.txt"));
     }
-    REQUIRE(mark < lines.size());
-    CHECK(arrives > mark);
-    CHECK(saysAfter == 100);
+    const size_t before = sheets(folder).size();
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "full", 0, 0, 0));
+    REQUIRE(waitWriterGone());
+    CHECK(status().path[0] == '\0');
+    const auto files = sheets(folder);
+    CHECK(files.size() == before);
+    bool allEmpty = true;
+    for (const auto& f : files) allEmpty = allEmpty && fs::file_size(f) == 0;
+    CHECK(allEmpty);
+    std::vector<fs::path> held;
+    for (const auto& e : fs::directory_iterator(confDir / "sheets-held")) held.push_back(e.path());
+    REQUIRE(held.size() == 1);
+    const auto lines = fileLines(held[0]);
+    CHECK(countVerb(lines, "arrives") == 1);
+    CHECK(countVerb(lines, "leaves") == 1);
+    CHECK(fileText(held[0]).find("session ended with nowhere to write (no path)") != std::string::npos);
+}
+
+TEST_CASE("the recent lines carry rows and state lines") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    useFolder(freshDir("recent"));
+    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink) | kTable, 0, 0);
+    SeamHubState s{};
+    s.kind = kSeamHubPink;
+    s.stoneId = 2;
+    seam_hub_v1_publish_state(hub, a, &s);
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));   // a tick writes the state line
+    SeamHubProposal p = table(2);
+    REQUIRE(seam_hub_v1_post(hub, a, &p) != 0);
+    static char buf[64 * 1024];
+    const int32_t n = seam_hub_v1_recent_lines(hub, buf, sizeof buf);
+    const std::string all(buf);
+    CHECK(n > 3);
+    CHECK(all.find("multipink#1   state     pink  stone 2") != std::string::npos);
+    CHECK(all.find("  | band  hz        comp_db  level_db  settled\n") != std::string::npos);
+    CHECK(all.substr(all.size() - 1) == "\n");
+    // A short cap keeps the newest: the table's last row.
+    char small[64];
+    CHECK(seam_hub_v1_recent_lines(hub, small, sizeof small) >= 1);
+    CHECK(std::string(small).find("  | 20k") == 0);
+    CHECK(seam_hub_v1_recent_lines(nullptr, small, sizeof small) == 0);
+    CHECK(seam_hub_v1_recent_lines(hub, small, 0) == 0);
+    seam_hub_v1_unregister(hub, a);
 }
 
 TEST_CASE("the file name carries the pid") {
