@@ -220,11 +220,12 @@ int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint
         if (s.inUse.load(std::memory_order_relaxed) != 0) continue;
 
         // Clear the previous owner's state — a fresh slot must never expose
-        // it — through the SAME seqlock publish_state() uses. members() does
-        // not take regMutex around the state copy (it must not: the GUI would
-        // then be able to stall on a registering plugin), so regMutex does
-        // nothing to protect this memset from a concurrent reader. Only the
-        // odd/even dance does.
+        // it — through the SAME seqlock publish_state() uses. members() takes
+        // regMutex once per slot, only around the registration data, and
+        // releases it BEFORE the state copy (holding it there would let the
+        // GUI stall on a registering plugin), so regMutex does nothing to
+        // protect this memset from a concurrent state copy. Only the odd/even
+        // dance does.
         //
         // `start | 1u` instead of `start + 1`: if this memset and an
         // in-flight publish_state() on the same slot ever genuinely overlap
@@ -244,9 +245,9 @@ int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint
         s.seq.store(start | 1u, std::memory_order_relaxed);        // -> odd
         std::atomic_thread_fence(std::memory_order_release);
         std::memset(&s.state, 0, sizeof(SeamHubState));
+        s.published.store(0, std::memory_order_relaxed);   // inside the window, with the state
         std::atomic_thread_fence(std::memory_order_release);
         s.seq.store((start | 1u) + 1u, std::memory_order_relaxed); // -> even
-        s.published.store(0, std::memory_order_release);
 
         // Name, masks, instance: registration data, under regMutex.
         std::memset(s.name, 0, sizeof s.name);
@@ -328,9 +329,12 @@ void seam_hub_v1_publish_state(SeamHub* hub, int32_t handle, const SeamHubState*
     s.seq.store(start | 1u, std::memory_order_relaxed);        // -> odd
     std::atomic_thread_fence(std::memory_order_release);
     std::memcpy(&s.state, st, sizeof(SeamHubState));
+    // Inside the window, so the reader's seq check validates the flag with the
+    // state: stored after the final seq, a first-publish reader could see the
+    // state yet hasState 0.
+    s.published.store(1, std::memory_order_relaxed);
     std::atomic_thread_fence(std::memory_order_release);
     s.seq.store((start | 1u) + 1u, std::memory_order_relaxed); // -> even
-    s.published.store(1, std::memory_order_release);
 }
 
 int32_t seam_hub_v1_members(SeamHub* hub, SeamHubMember* out, int32_t max) {
@@ -409,10 +413,17 @@ int32_t seam_hub_v1_members(SeamHub* hub, SeamHubMember* out, int32_t max) {
 SEAM_HUB_API int32_t seam_hub_test_recent_lines(char* out, int32_t cap) {
     if (!out || cap <= 0) return 0;
     std::lock_guard<std::mutex> lock(g_hub.lineMutex);
+    // Keep the NEWEST lines: start from the first line from which the rest
+    // fits (each line costs its size plus '\n'; one byte stays for the NUL).
+    size_t first = g_hub.mirror.size(), used = 1;
+    while (first > 0 && used + g_hub.mirror[first - 1].size() + 1 <= (size_t)cap) {
+        used += g_hub.mirror[first - 1].size() + 1;
+        --first;
+    }
     size_t pos = 0;
     int32_t count = 0;
-    for (const std::string& l : g_hub.mirror) {
-        if (pos + l.size() + 1 >= (size_t)cap) break;
+    for (size_t k = first; k < g_hub.mirror.size(); ++k) {
+        const std::string& l = g_hub.mirror[k];
         std::memcpy(out + pos, l.data(), l.size());
         pos += l.size();
         out[pos++] = '\n';

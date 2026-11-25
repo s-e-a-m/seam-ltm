@@ -401,3 +401,21 @@ TEST_CASE("members carry name, masks and the last state") {
     CHECK(out[0].state.levelDb == -17.5);
     seam_hub_v1_unregister(hub, h);
 }
+
+TEST_CASE("recent lines under a short cap keep the newest") {
+    SeamHub* hub = seam_hub_v1_get();
+    int32_t h = reg(hub, "capq");
+    seam_hub_v1_unregister(hub, h);          // two lines: arrives, leaves
+    char buf[128];
+    // Big enough for the last line alone, too small for both.
+    char full[4096];
+    REQUIRE(seam_hub_test_recent_lines(full, sizeof full) >= 2);
+    std::string all(full);
+    const size_t lastStart = all.rfind('\n', all.size() - 2) + 1;
+    const size_t lastLen = all.size() - lastStart;       // includes '\n'
+    const int32_t cap = (int32_t)lastLen + 1;
+    REQUIRE(cap < (int32_t)sizeof buf);
+    CHECK(seam_hub_test_recent_lines(buf, cap) == 1);
+    CHECK(std::string(buf) == all.substr(lastStart));
+    CHECK(std::string(buf).find("leaves") != std::string::npos);
+}
