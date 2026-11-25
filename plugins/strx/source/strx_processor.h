@@ -4,7 +4,7 @@
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include "strx_ids.h"
 #include "strx_dsp.h"
-#include "strx_calbus_watch.h"
+#include "strx_hub_watch.h"
 
 #include <atomic>
 #include <vector>
@@ -84,21 +84,23 @@ public:
     double sampleRate() const { return sampleRate_; }
 
     // GUI thread only. The one cached bus reading both custom views share.
-    Seam::strx::CalbusWatch& calbusWatch() { return calbusWatch_; }
+    Seam::strx::HubWatch& hubWatch() { return hubWatch_; }
 
 private:
     Seam::strx::Analyzer analyzer_;
     Seam::strx::AnalysisFrame frameCache_;
     double sampleRate_ = 48000.0;
+    // Registered in setActive(true) on the main thread, never from audio.
+    int32_t hubHandle_ = SEAM_HUB_NO_HANDLE;
 
-    // GUI -> DSP. Written by the CalbusWatch on the GUI thread, read by
+    // GUI -> DSP. Written by the HubWatch on the GUI thread, read by
     // process() once per block. The bus itself is never touched from audio.
     std::atomic<bool>     specGlide_{false};
     std::atomic<uint32_t> holdEpoch_{0};
     std::atomic<uint32_t> sessionEpoch_{0};
     uint32_t              lastHoldEpoch_ = 0;
     uint32_t              lastSessionEpoch_ = 0;
-    Seam::strx::CalbusWatch calbusWatch_{specGlide_, holdEpoch_, sessionEpoch_};
+    Seam::strx::HubWatch hubWatch_{specGlide_, holdEpoch_, sessionEpoch_};
 
     // Analyzer::process() always takes float buffers. When the host processes
     // in kSample64 (double), the pass-through copy stays double-precision but

@@ -6,6 +6,7 @@
 #include "strx_bandtable.h"
 #include "strx_savebutton.h"
 #include "strx_status.h"
+#include "seam_hub_client.h"
 #include "version.h"
 
 #include "public.sdk/source/main/pluginfactory.h"
@@ -50,6 +51,17 @@ tresult PLUGIN_API StrxProcessor::setActive(TBool state) {
         // MIN accumulator at -120 dB for the rest of the session.
         lastSessionEpoch_ = sessionEpoch_.load(std::memory_order_relaxed);
         lastHoldEpoch_    = holdEpoch_.load(std::memory_order_relaxed);
+        // strx publishes no state, so it hears and never says. Registering
+        // here (main thread) keeps the audio thread off the hub and logs one
+        // arrives/leaves pair per activation, not per editor open.
+        if (hubHandle_ == SEAM_HUB_NO_HANDLE)
+            hubHandle_ = HubClient::instance().registerMember(
+                "strx", 0,
+                SEAM_HUB_BIT(kSeamHubPink) | SEAM_HUB_BIT(kSeamHubGlide) |
+                SEAM_HUB_BIT(kSeamHubDecoder));
+    } else {
+        HubClient::instance().unregisterMember(hubHandle_);
+        hubHandle_ = SEAM_HUB_NO_HANDLE;
     }
     return SingleComponentEffect::setActive(state);
 }

@@ -1,8 +1,8 @@
 //──────────────────────────────────────────────────────────────────────────
-// SEAM-LTM · strx — the GUI thread's cached view of the calibration bus.
+// SEAM-LTM · strx — the GUI thread's cached view of the hub.
 //
-// GUI THREAD ONLY. strx's audio thread must never touch the bus (calbus
-// Spec 2's contract); what the DSP needs reaches it through the processor's
+// GUI THREAD ONLY. strx's audio thread must never touch the bus (hub
+// contract); what the DSP needs reaches it through the processor's
 // atomics, which this watch writes.
 //
 // Two views want the bus now: the status line at ~10 Hz and the spectrum at
@@ -14,36 +14,36 @@
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "seam_calbus_client.h"
-#include "strx_calbus_digest.h"
+#include "seam_hub_client.h"
+#include "strx_hub_digest.h"
 
 #include <atomic>
 #include <chrono>
 
 namespace Seam { namespace strx {
 
-class CalbusWatch {
+class HubWatch {
 public:
     static constexpr int kMinIntervalMs = 80;   // finer than the 10 Hz status line
 
     // `glideOut`, `holdEpochOut` and `sessionEpochOut` are the processor's
     // atomics, read by the audio thread once per process() block.
-    CalbusWatch(std::atomic<bool>& glideOut, std::atomic<uint32_t>& holdEpochOut,
+    HubWatch(std::atomic<bool>& glideOut, std::atomic<uint32_t>& holdEpochOut,
                 std::atomic<uint32_t>& sessionEpochOut)
         : glide_(glideOut), holdEpoch_(holdEpochOut), sessionEpoch_(sessionEpochOut) {}
 
     // GUI thread. Re-snapshots at most every kMinIntervalMs; otherwise returns
     // the cached digest, so two views polling at different rates see one state.
-    const CalbusDigest& poll() {
+    const HubDigest& poll() {
         const auto now = std::chrono::steady_clock::now();
         const auto ms  = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_).count();
         if (primed_ && ms < kMinIntervalMs) return digest_;
         last_   = now;
         primed_ = true;
 
-        auto& client = CalbusClient::instance();
+        auto& client = HubClient::instance();
         const bool avail = client.available();
-        const int32_t n = avail ? client.snapshot(recs_, SEAM_CALBUS_MAX_SLOTS) : 0;
+        const int32_t n = avail ? client.members(recs_, SEAM_HUB_MAX_MEMBERS) : 0;
         digest_ = digest(recs_, n, avail);
 
         // Drive the DSP. setGlideMode is idempotent, so publishing every poll
@@ -81,14 +81,14 @@ public:
         return digest_;
     }
 
-    const SeamCalbusRecord* records() const { return recs_; }
+    const SeamHubMember* records() const { return recs_; }
 
 private:
     std::atomic<bool>&     glide_;
     std::atomic<uint32_t>& holdEpoch_;
     std::atomic<uint32_t>& sessionEpoch_;
-    SeamCalbusRecord       recs_[SEAM_CALBUS_MAX_SLOTS] = {};
-    CalbusDigest           digest_;
+    SeamHubMember          recs_[SEAM_HUB_MAX_MEMBERS] = {};
+    HubDigest           digest_;
     uint64_t               lastPass_ = 0;
     GlideParams            lastParams_;
     bool                   lastNonGlideActive_ = false;

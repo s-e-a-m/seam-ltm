@@ -64,7 +64,7 @@ public:
         timer_ = new VSTGUI::CVSTGUITimer(
             [this](VSTGUI::CVSTGUITimer*) {
                 if (processor_) {
-                    const auto& d = processor_->calbusWatch().poll();
+                    const auto& d = processor_->hubWatch().poll();
                     glide_  = d.glide;
                     active_ = d.available && d.firstActive >= 0;   // any emitter sounding
                 }
@@ -223,7 +223,7 @@ public:
         // whatever the (possibly stale, possibly pre-takeover) live analysis
         // frame contains. A pink takeover itself invalidates the interrupted
         // glide session at the DSP level (see pinkTakeover() in
-        // strx_calbus_digest.h), so the accumulation this snapshot could
+        // strx_hub_digest.h), so the accumulation this snapshot could
         // ever capture is always the one that was actually on screen.
         if (active_) {
             const bool haveAcc = frame.accPasses > 0;
@@ -293,9 +293,9 @@ private:
     VSTGUI::CColor structureColor_, textColor_, colorM_, colorS_;
     VSTGUI::CVSTGUITimer* timer_ = nullptr;
     // Set by the timer poll (GUI thread), read by draw() (GUI thread). Copied
-    // out of CalbusWatch::poll()'s returned digest immediately — never store
+    // out of HubWatch::poll()'s returned digest immediately — never store
     // the reference itself, which aliases the watch's internal state and
-    // would silently observe a later snapshot (see strx_calbus_watch.h).
+    // would silently observe a later snapshot (see strx_hub_watch.h).
     bool glide_  = false;
     bool active_ = false;   // any emitter (glide or pink) is sounding
 
