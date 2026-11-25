@@ -12,7 +12,7 @@ extern "C" int32_t seam_hub_test_recent_lines(char* out, int32_t cap);
 
 // Registers an anonymous test member that says and hears nothing.
 static int32_t reg(SeamHub* bus, const char* name = "probe", uint32_t says = 0) {
-    return seam_hub_v1_register(bus, name, says, 0);
+    return seam_hub_v1_register(bus, name, says, 0, 0);
 }
 
 static std::vector<std::string> recentLines() {
@@ -398,7 +398,7 @@ TEST_CASE("the 33rd member is refused") {
 TEST_CASE("members carry name, masks and the last state") {
     SeamHub* hub = seam_hub_v1_get();
     const uint32_t hears = SEAM_HUB_BIT(kSeamHubGlide) | SEAM_HUB_BIT(kSeamHubBandTable);
-    int32_t h = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), hears);
+    int32_t h = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), hears, 0);
     SeamHubMember out[SEAM_HUB_MAX_MEMBERS];
     REQUIRE(seam_hub_v1_members(hub, out, SEAM_HUB_MAX_MEMBERS) == 1);
     CHECK(out[0].hasState == 0u);
@@ -432,4 +432,61 @@ TEST_CASE("recent lines under a short cap keep the newest") {
     CHECK(seam_hub_test_recent_lines(buf, cap) == 1);
     CHECK(std::string(buf) == all.substr(lastStart));
     CHECK(std::string(buf).find("leaves") != std::string::npos);
+}
+
+TEST_CASE("members() reports the registration epoch") {
+    SeamHub* hub = seam_hub_v1_get();
+    int32_t h = reg(hub, "epoch");
+    SeamHubMember out[SEAM_HUB_MAX_MEMBERS];
+    REQUIRE(seam_hub_v1_members(hub, out, SEAM_HUB_MAX_MEMBERS) == 1);
+    CHECK(out[0].epoch == seam_hub_handle_epoch(h));
+    CHECK((out[0].epoch & 1u) == 1u);   // a live epoch is odd
+    seam_hub_v1_unregister(hub, h);
+    h = reg(hub, "epoch");
+    REQUIRE(seam_hub_v1_members(hub, out, SEAM_HUB_MAX_MEMBERS) == 1);
+    CHECK(out[0].epoch == seam_hub_handle_epoch(h));
+    seam_hub_v1_unregister(hub, h);
+}
+
+TEST_CASE("register refuses names that are not one short token") {
+    SeamHub* hub = seam_hub_v1_get();
+    for (const char* bad : {(const char*)nullptr, "", "two words", "tab\there", "new\nline",
+                            "sixteen-chars-xx"}) {
+        CHECK(seam_hub_v1_register(hub, bad, 0, 0, 0) == SEAM_HUB_NO_HANDLE);
+    }
+    const int32_t ok = seam_hub_v1_register(hub, "fifteen-chars-x", 0, 0, 0);
+    CHECK(ok != SEAM_HUB_NO_HANDLE);
+    SeamHubMember out[SEAM_HUB_MAX_MEMBERS];
+    CHECK(seam_hub_v1_members(hub, out, SEAM_HUB_MAX_MEMBERS) == 1);
+    seam_hub_v1_unregister(hub, ok);
+}
+
+TEST_CASE("a preferred instance is kept when free") {
+    SeamHub* hub = seam_hub_v1_get();
+    SeamHubMember out[SEAM_HUB_MAX_MEMBERS];
+    auto instanceOf = [&](int32_t h) {
+        const int32_t n = seam_hub_v1_members(hub, out, SEAM_HUB_MAX_MEMBERS);
+        for (int32_t i = 0; i < n; ++i)
+            if (out[i].member == seam_hub_handle_member(h) && out[i].epoch == seam_hub_handle_epoch(h))
+                return out[i].instance;
+        return 0u;
+    };
+    // strx#1 and strx#2; #1 leaves, #2 leaves; #2 comes back first asking
+    // for 2, and keeps it rather than taking the smallest free (1).
+    int32_t one = seam_hub_v1_register(hub, "strx", 0, 0, 0);
+    int32_t two = seam_hub_v1_register(hub, "strx", 0, 0, 0);
+    REQUIRE(instanceOf(two) == 2u);
+    seam_hub_v1_unregister(hub, one);
+    seam_hub_v1_unregister(hub, two);
+    two = seam_hub_v1_register(hub, "strx", 0, 0, 2);
+    CHECK(instanceOf(two) == 2u);
+    one = seam_hub_v1_register(hub, "strx", 0, 0, 1);
+    CHECK(instanceOf(one) == 1u);
+    // Taken: the smallest free instead.
+    const int32_t clash = seam_hub_v1_register(hub, "strx", 0, 0, 2);
+    CHECK(instanceOf(clash) == 3u);
+    // Per name: another name's #2 does not clash.
+    const int32_t other = seam_hub_v1_register(hub, "bastone", 0, 0, 2);
+    CHECK(instanceOf(other) == 2u);
+    for (int32_t h : {one, two, clash, other}) seam_hub_v1_unregister(hub, h);
 }

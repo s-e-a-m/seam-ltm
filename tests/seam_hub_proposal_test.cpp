@@ -34,7 +34,7 @@ SeamHubProposal table(uint32_t stone) {
 
 int32_t member(const char* name, uint32_t says, uint32_t hears, uint32_t stone, bool withState = true) {
     SeamHub* hub = seam_hub_v1_get();
-    const int32_t h = seam_hub_v1_register(hub, name, says, hears);
+    const int32_t h = seam_hub_v1_register(hub, name, says, hears, 0);
     if (withState) {
         SeamHubState st{};
         st.kind = kSeamHubPink;
@@ -101,7 +101,7 @@ TEST_CASE("stone routing") {
     SeamHubProposal z = table(0);
     const uint64_t zid = seam_hub_v1_post(hub, a, &z);
     CHECK(seam_hub_v1_lifecycle(hub, r2, zid) == kSeamHubArrived);
-    CHECK(seam_hub_v1_transition(hub, r2, id, kSeamHubShown, 0) == -2);
+    CHECK(seam_hub_v1_transition(hub, r2, id, kSeamHubShown, 0, nullptr) == -2);
     for (int32_t h : {a, r1, r0, r2, rx}) seam_hub_v1_unregister(hub, h);
 }
 
@@ -112,12 +112,12 @@ TEST_CASE("the lifecycle is per receiver") {
     const int32_t s = member("recv", 0, kTable, 1);
     SeamHubProposal p = table(1);
     const uint64_t id = seam_hub_v1_post(hub, a, &p);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0) == 0);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1) == 0);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr) == 0);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1, nullptr) == 0);
     CHECK(seam_hub_v1_lifecycle(hub, r, id) == kSeamHubApplied);
     CHECK(seam_hub_v1_lifecycle(hub, s, id) == kSeamHubArrived);
-    CHECK(seam_hub_v1_transition(hub, 12345678, id, kSeamHubShown, 0) == -2);   // unknown receiver
-    CHECK(seam_hub_v1_transition(hub, r, id + 1000, kSeamHubShown, 0) == -1);
+    CHECK(seam_hub_v1_transition(hub, 12345678, id, kSeamHubShown, 0, nullptr) == -2);   // unknown receiver
+    CHECK(seam_hub_v1_transition(hub, r, id + 1000, kSeamHubShown, 0, nullptr) == -1);
     for (int32_t h : {a, r, s}) seam_hub_v1_unregister(hub, h);
 }
 
@@ -127,7 +127,7 @@ TEST_CASE("a new member in a reused slot does not inherit the lifecycle") {
     int32_t r = member("recv", 0, kTable, 1);
     SeamHubProposal p = table(1);
     const uint64_t id = seam_hub_v1_post(hub, a, &p);
-    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0) == 0);
+    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr) == 0);
     seam_hub_v1_unregister(hub, r);
     const int32_t r2 = member("recv", 0, kTable, 1);
     CHECK(seam_hub_v1_lifecycle(hub, r2, id) == kSeamHubArrived);
@@ -142,9 +142,9 @@ TEST_CASE("applying needs the operator") {
     const int32_t r = member("recv", 0, kTable, 1);
     SeamHubProposal p = table(1);
     const uint64_t id = seam_hub_v1_post(hub, a, &p);
-    seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 0) == -4);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubIgnored, 0) == -4);
+    seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 0, nullptr) == -4);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubIgnored, 0, nullptr) == -4);
     CHECK(seam_hub_v1_lifecycle(hub, r, id) == kSeamHubShown);
     for (int32_t h : {a, r}) seam_hub_v1_unregister(hub, h);
 }
@@ -155,12 +155,12 @@ TEST_CASE("arrived cannot jump to applied") {
     const int32_t r = member("recv", 0, kTable, 1);
     SeamHubProposal p = table(1);
     const uint64_t id = seam_hub_v1_post(hub, a, &p);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1) == -3);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubIgnored, 1) == -3);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0) == 0);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0) == -3);     // not a loop
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubArrived, 0) == -3);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubNone, 0) == -3);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1, nullptr) == -3);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubIgnored, 1, nullptr) == -3);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr) == 0);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr) == -3);     // not a loop
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubArrived, 0, nullptr) == -3);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubNone, 0, nullptr) == -3);
     for (int32_t h : {a, r}) seam_hub_v1_unregister(hub, h);
 }
 
@@ -170,11 +170,11 @@ TEST_CASE("a proposal can be applied again") {
     const int32_t r = member("bastone", 0, kTable, 1);
     SeamHubProposal p = table(1);
     const uint64_t id = seam_hub_v1_post(hub, a, &p);
-    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0) == 0);
+    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr) == 0);
     const size_t before = recentLines().size();
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1) == 0);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubIgnored, 1) == 0);
-    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1) == 0);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1, nullptr) == 0);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubIgnored, 1, nullptr) == 0);
+    CHECK(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1, nullptr) == 0);
     const auto lines = recentLines();
     REQUIRE(lines.size() == before + 3);
     const std::string idTxt = "#" + std::to_string(id);
@@ -190,14 +190,14 @@ TEST_CASE("post and shows are enqueued with who and the type") {
     const int32_t r = member("strx", 0, kTable, 1);
     SeamHubProposal p = table(1);
     const uint64_t id = seam_hub_v1_post(hub, a, &p);
-    seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0);
+    seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr);
     const auto lines = recentLines();
     const std::string idTxt = "#" + std::to_string(id);
     CHECK(lines[lines.size() - 2].find("bastone#1     says      band-table " + idTxt) != std::string::npos);
     CHECK(lines[lines.size() - 1].find("strx#1        shows     band-table " + idTxt) != std::string::npos);
     // A refused call leaves no line.
     const size_t n = lines.size();
-    seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 0);
+    seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 0, nullptr);
     CHECK(recentLines().size() == n);
     for (int32_t h : {a, r}) seam_hub_v1_unregister(hub, h);
 }
@@ -215,15 +215,100 @@ TEST_CASE("the store keeps the last 64") {
     CHECK(out[SEAM_HUB_STORE - 1].id == first + 69);
     for (int i = 1; i < SEAM_HUB_STORE; ++i) CHECK(out[i].id == out[i - 1].id + 1);
     CHECK(seam_hub_v1_lifecycle(hub, r, first) == kSeamHubNone);
-    CHECK(seam_hub_v1_transition(hub, r, first, kSeamHubShown, 0) == -1);
+    CHECK(seam_hub_v1_transition(hub, r, first, kSeamHubShown, 0, nullptr) == -1);
     CHECK(seam_hub_v1_lifecycle(hub, r, first + 6) == kSeamHubArrived);
     CHECK(seam_hub_v1_proposals(hub, first + 66, out, 100) == 3);   // afterId filters
     CHECK(seam_hub_v1_proposals(hub, 0, out, 5) == 5);              // max limits, oldest first
     CHECK(out[0].id == first + 6);
     // An evicted slot's lifecycle does not leak into the proposal that replaced it.
-    CHECK(seam_hub_v1_transition(hub, r, first + 6, kSeamHubShown, 0) == 0);
+    CHECK(seam_hub_v1_transition(hub, r, first + 6, kSeamHubShown, 0, nullptr) == 0);
     for (int i = 0; i < SEAM_HUB_STORE; ++i) { SeamHubProposal q = table(1); seam_hub_v1_post(hub, a, &q); }
     CHECK(seam_hub_v1_lifecycle(hub, r, first + 6) == kSeamHubNone);
     CHECK(seam_hub_v1_lifecycle(hub, r, first + 70 + SEAM_HUB_STORE - 1) == kSeamHubArrived);
+    for (int32_t h : {a, r}) seam_hub_v1_unregister(hub, h);
+}
+
+TEST_CASE("post fills the author's name") {
+    SeamHub* hub = seam_hub_v1_get();
+    const int32_t a = member("strx", kTable, 0, 1);
+    SeamHubProposal p = table(1);
+    std::memcpy(p.authorName, "forged", 7);
+    REQUIRE(seam_hub_v1_post(hub, a, &p) != 0);
+    CHECK(std::string(p.authorName) == "strx");
+    SeamHubProposal out[1];
+    REQUIRE(seam_hub_v1_proposals(hub, p.id - 1, out, 1) == 1);
+    CHECK(std::string(out[0].authorName) == "strx");
+    seam_hub_v1_unregister(hub, a);
+}
+
+TEST_CASE("post refuses the state types") {
+    SeamHub* hub = seam_hub_v1_get();
+    const uint32_t all = 0xFFFFFFFFu;   // says everything: only the type rule can refuse
+    const int32_t a = member("author", all, 0, 1);
+    for (uint32_t t : {0u, (uint32_t)kSeamHubPink, (uint32_t)kSeamHubGlide, (uint32_t)kSeamHubDecoder, 15u}) {
+        SeamHubProposal p = table(1);
+        p.type = t;
+        CHECK(seam_hub_v1_post(hub, a, &p) == 0);
+    }
+    SeamHubProposal ok = table(1);
+    CHECK(seam_hub_v1_post(hub, a, &ok) != 0);
+    seam_hub_v1_unregister(hub, a);
+}
+
+TEST_CASE("proposals after the newest id is empty, even at UINT64_MAX") {
+    SeamHub* hub = seam_hub_v1_get();
+    const int32_t a = member("author", kTable, 0, 1);
+    SeamHubProposal p = table(1);
+    const uint64_t id = seam_hub_v1_post(hub, a, &p);
+    REQUIRE(id != 0);
+    static SeamHubProposal out[SEAM_HUB_STORE];
+    CHECK(seam_hub_v1_proposals(hub, UINT64_MAX, out, SEAM_HUB_STORE) == 0);
+    CHECK(seam_hub_v1_proposals(hub, UINT64_MAX - 1, out, SEAM_HUB_STORE) == 0);
+    CHECK(seam_hub_v1_proposals(hub, id, out, SEAM_HUB_STORE) == 0);
+    CHECK(seam_hub_v1_proposals(hub, id - 1, out, SEAM_HUB_STORE) == 1);
+    seam_hub_v1_unregister(hub, a);
+}
+
+TEST_CASE("lifecycle_of reads any receiver by member and epoch") {
+    SeamHub* hub = seam_hub_v1_get();
+    const int32_t a = member("author", kTable, 0, 1);
+    const int32_t r = member("recv", 0, kTable, 1);
+    SeamHubProposal p = table(1);
+    const uint64_t id = seam_hub_v1_post(hub, a, &p);
+    const uint32_t m = seam_hub_handle_member(r), e = seam_hub_handle_epoch(r);
+    CHECK(seam_hub_v1_lifecycle_of(hub, m, e, id) == kSeamHubArrived);
+    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, nullptr) == 0);
+    CHECK(seam_hub_v1_lifecycle_of(hub, m, e, id) == kSeamHubShown);
+    CHECK(seam_hub_v1_lifecycle_of(hub, m, e + 2, id) == kSeamHubNone);   // another registration
+    CHECK(seam_hub_v1_lifecycle_of(hub, SEAM_HUB_MAX_MEMBERS, e, id) == kSeamHubNone);
+    CHECK(seam_hub_v1_lifecycle_of(nullptr, m, e, id) == kSeamHubNone);
+    // The author does not hear band tables: nothing to read for it.
+    CHECK(seam_hub_v1_lifecycle_of(hub, seam_hub_handle_member(a), seam_hub_handle_epoch(a), id) == kSeamHubNone);
+    seam_hub_v1_unregister(hub, r);
+    CHECK(seam_hub_v1_lifecycle_of(hub, m, e, id) == kSeamHubNone);       // that registration ended
+    seam_hub_v1_unregister(hub, a);
+}
+
+TEST_CASE("a transition's detail is written in its line, cleaned and bounded") {
+    SeamHub* hub = seam_hub_v1_get();
+    const int32_t a = member("strx", kTable, 0, 1);
+    const int32_t r = member("bastone", 0, kTable, 1);
+    SeamHubProposal p = table(1);
+    const uint64_t id = seam_hub_v1_post(hub, a, &p);
+    const std::string idTxt = "#" + std::to_string(id);
+    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0, "") == 0);
+    CHECK(recentLines().back().find("shows     band-table " + idTxt) != std::string::npos);
+    CHECK(recentLines().back().find("(") == std::string::npos);   // an empty detail adds nothing
+    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 1, "block common") == 0);
+    CHECK(recentLines().back().find("applies   band-table " + idTxt + "  on bastone#1  (block common)") !=
+          std::string::npos);
+    REQUIRE(seam_hub_v1_transition(hub, r, id, kSeamHubIgnored, 1,
+                                   "a\nb\tc 0123456789012345678901234567890123456789") == 0);
+    const std::string last = recentLines().back();
+    const size_t open = last.find("  (");
+    REQUIRE(open != std::string::npos);
+    const std::string d = last.substr(open + 3, last.size() - open - 4);
+    CHECK(d == "a b c 0123456789012345678901234");
+    CHECK(d.size() == SEAM_HUB_DETAIL_LEN - 1);
     for (int32_t h : {a, r}) seam_hub_v1_unregister(hub, h);
 }

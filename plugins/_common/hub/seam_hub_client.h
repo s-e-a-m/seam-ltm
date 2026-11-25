@@ -55,7 +55,23 @@ public:
     bool available() const { return hub_ != nullptr; }
 
     int32_t registerMember(const char* name, uint32_t says, uint32_t hears) {
-        return available() ? register_(hub_, name, says, hears) : SEAM_HUB_NO_HANDLE;
+        return available() ? register_(hub_, name, says, hears, 0) : SEAM_HUB_NO_HANDLE;
+    }
+
+    // Registers asking for `instance` back (0 = any) and stores the instance
+    // actually given, so the next activation can ask for it again and the
+    // member keeps its name in the sheet (strx#2 stays strx#2). A member
+    // keeps one such number for its lifetime. Main thread: it reads members().
+    int32_t registerMember(const char* name, uint32_t says, uint32_t hears, uint32_t& instance) {
+        if (!available()) return SEAM_HUB_NO_HANDLE;
+        const int32_t h = register_(hub_, name, says, hears, instance);
+        if (h == SEAM_HUB_NO_HANDLE) return h;
+        SeamHubMember all[SEAM_HUB_MAX_MEMBERS];
+        const int32_t n = members_(hub_, all, SEAM_HUB_MAX_MEMBERS);
+        for (int32_t i = 0; i < n; ++i)
+            if (all[i].member == seam_hub_handle_member(h) && all[i].epoch == seam_hub_handle_epoch(h))
+                instance = all[i].instance;
+        return h;
     }
 
     void unregisterMember(int32_t handle) {
@@ -85,9 +101,25 @@ public:
         return lifecycle_(hub_, receiver, id);
     }
 
-    int32_t transition(int32_t receiver, uint64_t id, int32_t to, bool byOperator) {
-        if (!available() || receiver == SEAM_HUB_NO_HANDLE) return kSeamHubNone;
-        return transition_(hub_, receiver, id, to, byOperator ? 1 : 0);
+    // Any receiver's lifecycle, by the member and epoch members() reports.
+    int32_t lifecycleOf(uint32_t member, uint32_t epoch, uint64_t id) {
+        return available() ? lifecycle_of_(hub_, member, epoch, id) : kSeamHubNone;
+    }
+
+    // SEAM_HUB_OK, a hub error, or SEAM_HUB_ERR_NO_HUB when there is no hub
+    // or no handle: never 0 for a transition that was not recorded.
+    int32_t transition(int32_t receiver, uint64_t id, int32_t to, bool byOperator,
+                       const char* detail = nullptr) {
+        if (!available() || receiver == SEAM_HUB_NO_HANDLE) return SEAM_HUB_ERR_NO_HUB;
+        return transition_(hub_, receiver, id, to, byOperator ? 1 : 0, detail);
+    }
+
+    // The last sheet lines (seam_hub_v1_recent_lines); "" in null mode.
+    std::string recentLines(int32_t cap = 32768) {
+        if (!available() || cap <= 0) return std::string();
+        std::vector<char> buf((size_t)cap);
+        recent_lines_(hub_, buf.data(), cap);
+        return std::string(buf.data());
     }
 
     SeamHubSheetStatus sheetStatus() {
@@ -123,7 +155,7 @@ private:
             if (!version || version() != SEAM_HUB_VERSION) { ::dlclose(h); continue; }
 
             auto get = (SeamHub* (*)(void))::dlsym(h, "seam_hub_v1_get");
-            register_   = (int32_t (*)(SeamHub*, const char*, uint32_t, uint32_t))
+            register_   = (int32_t (*)(SeamHub*, const char*, uint32_t, uint32_t, uint32_t))
                           ::dlsym(h, "seam_hub_v1_register");
             unregister_ = (void (*)(SeamHub*, int32_t))::dlsym(h, "seam_hub_v1_unregister");
             publish_    = (void (*)(SeamHub*, int32_t, const SeamHubState*))
@@ -136,8 +168,12 @@ private:
                           ::dlsym(h, "seam_hub_v1_proposals");
             lifecycle_  = (int32_t (*)(SeamHub*, int32_t, uint64_t))
                           ::dlsym(h, "seam_hub_v1_lifecycle");
-            transition_ = (int32_t (*)(SeamHub*, int32_t, uint64_t, int32_t, int32_t))
+            lifecycle_of_ = (int32_t (*)(SeamHub*, uint32_t, uint32_t, uint64_t))
+                          ::dlsym(h, "seam_hub_v1_lifecycle_of");
+            transition_ = (int32_t (*)(SeamHub*, int32_t, uint64_t, int32_t, int32_t, const char*))
                           ::dlsym(h, "seam_hub_v1_transition");
+            recent_lines_ = (int32_t (*)(SeamHub*, char*, int32_t))
+                          ::dlsym(h, "seam_hub_v1_recent_lines");
             sheet_status_ = (void (*)(SeamHub*, SeamHubSheetStatus*))
                           ::dlsym(h, "seam_hub_v1_sheet_status");
             sheet_set_folder_ = (int32_t (*)(SeamHub*, const char*))
@@ -145,7 +181,8 @@ private:
             sheet_new_  = (void (*)(SeamHub*))::dlsym(h, "seam_hub_v1_sheet_new");
 
             if (!get || !register_ || !unregister_ || !publish_ || !members_ || !post_ ||
-                !proposals_ || !lifecycle_ || !transition_ || !sheet_status_ ||
+                !proposals_ || !lifecycle_ || !lifecycle_of_ || !transition_ ||
+                !recent_lines_ || !sheet_status_ ||
                 !sheet_set_folder_ || !sheet_new_) {
                 clear();
                 ::dlclose(h);   // rejected before use
@@ -161,7 +198,8 @@ private:
     void clear() {
         register_ = nullptr; unregister_ = nullptr; publish_ = nullptr;
         members_ = nullptr; post_ = nullptr; proposals_ = nullptr;
-        lifecycle_ = nullptr; transition_ = nullptr; sheet_status_ = nullptr;
+        lifecycle_ = nullptr; lifecycle_of_ = nullptr; transition_ = nullptr;
+        recent_lines_ = nullptr; sheet_status_ = nullptr;
         sheet_set_folder_ = nullptr; sheet_new_ = nullptr;
     }
 
@@ -193,14 +231,16 @@ private:
     }
 
     SeamHub* hub_ = nullptr;
-    int32_t  (*register_)(SeamHub*, const char*, uint32_t, uint32_t) = nullptr;
+    int32_t  (*register_)(SeamHub*, const char*, uint32_t, uint32_t, uint32_t) = nullptr;
     void     (*unregister_)(SeamHub*, int32_t) = nullptr;
     void     (*publish_)(SeamHub*, int32_t, const SeamHubState*) = nullptr;
     int32_t  (*members_)(SeamHub*, SeamHubMember*, int32_t) = nullptr;
     uint64_t (*post_)(SeamHub*, int32_t, SeamHubProposal*) = nullptr;
     int32_t  (*proposals_)(SeamHub*, uint64_t, SeamHubProposal*, int32_t) = nullptr;
     int32_t  (*lifecycle_)(SeamHub*, int32_t, uint64_t) = nullptr;
-    int32_t  (*transition_)(SeamHub*, int32_t, uint64_t, int32_t, int32_t) = nullptr;
+    int32_t  (*lifecycle_of_)(SeamHub*, uint32_t, uint32_t, uint64_t) = nullptr;
+    int32_t  (*transition_)(SeamHub*, int32_t, uint64_t, int32_t, int32_t, const char*) = nullptr;
+    int32_t  (*recent_lines_)(SeamHub*, char*, int32_t) = nullptr;
     void     (*sheet_status_)(SeamHub*, SeamHubSheetStatus*) = nullptr;
     int32_t  (*sheet_set_folder_)(SeamHub*, const char*) = nullptr;
     void     (*sheet_new_)(SeamHub*) = nullptr;

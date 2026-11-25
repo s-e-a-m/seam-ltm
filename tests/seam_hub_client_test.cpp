@@ -111,5 +111,45 @@ TEST_CASE("null mode refuses to post and transition") {
     p.type = kSeamHubBandTable;
     CHECK(null.post(0, p) == 0);
     CHECK(p.id == 0);
-    CHECK(null.transition(0, 1, kSeamHubApplied, true) == kSeamHubNone);
+    // Not 0: nothing was recorded, and 0 is the hub's success.
+    CHECK(null.transition(0, 1, kSeamHubApplied, true) == SEAM_HUB_ERR_NO_HUB);
+    CHECK(null.transition(0, 1, kSeamHubShown, false, "x") == SEAM_HUB_ERR_NO_HUB);
+    CHECK(null.lifecycleOf(0, 1, 1) == kSeamHubNone);
+    CHECK(null.recentLines().empty());
+}
+
+TEST_CASE("a receiver without a handle cannot transition, hub or not") {
+    auto& c = Seam::HubClient::instance();
+    REQUIRE(c.available());
+    CHECK(c.transition(SEAM_HUB_NO_HANDLE, 1, kSeamHubShown, false) == SEAM_HUB_ERR_NO_HUB);
+}
+
+TEST_CASE("the client remembers the instance it was given and asks for it back") {
+    auto& c = Seam::HubClient::instance();
+    REQUIRE(c.available());
+    uint32_t first = 0, second = 0;
+    const int32_t a = c.registerMember("strx", 0, 0, first);
+    const int32_t b = c.registerMember("strx", 0, 0, second);
+    REQUIRE(a != SEAM_HUB_NO_HANDLE);
+    REQUIRE(b != SEAM_HUB_NO_HANDLE);
+    CHECK(first == 1u);
+    CHECK(second == 2u);
+    c.unregisterMember(a);
+    c.unregisterMember(b);
+    // The second one comes back first: it is still #2.
+    const int32_t b2 = c.registerMember("strx", 0, 0, second);
+    CHECK(second == 2u);
+    const int32_t a2 = c.registerMember("strx", 0, 0, first);
+    CHECK(first == 1u);
+    c.unregisterMember(a2);
+    c.unregisterMember(b2);
+}
+
+TEST_CASE("the client reads the recent lines") {
+    auto& c = Seam::HubClient::instance();
+    REQUIRE(c.available());
+    const int32_t h = c.registerMember("recent", 0, 0);
+    const std::string r = c.recentLines();
+    CHECK(r.find("recent#1      arrives") != std::string::npos);
+    c.unregisterMember(h);
 }

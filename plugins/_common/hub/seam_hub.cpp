@@ -129,9 +129,11 @@ constexpr int kMaxReadAttempts = 8;
 // on EACH transition (register AND unregister), so it wraps after 2^26
 // transitions of the SAME slot, i.e. 2^25 register/unregister CYCLES; an ABA
 // collision would need exactly that many cycles inside one members() call.
-constexpr int32_t  kIndexBits = 5;
+// The layout is declared in seam_hub.h (seam_hub_handle_member/_epoch), so a
+// member can find its own entry in members(); these are the same numbers.
+constexpr int32_t  kIndexBits = SEAM_HUB_HANDLE_INDEX_BITS;
 constexpr int32_t  kIndexMask = (1 << kIndexBits) - 1;
-constexpr uint32_t kGenMask   = 0x03FFFFFFu;
+constexpr uint32_t kGenMask   = SEAM_HUB_HANDLE_EPOCH_MASK;
 
 static_assert(SEAM_HUB_MAX_MEMBERS <= kIndexMask + 1,
               "slot index must fit in kIndexBits");
@@ -141,11 +143,11 @@ inline int32_t encodeHandle(int32_t index, uint32_t gen) {
 }
 
 inline int32_t handleIndex(int32_t handle) {
-    return handle & kIndexMask;
+    return (int32_t)seam_hub_handle_member(handle);
 }
 
 inline uint32_t handleGen(int32_t handle) {
-    return ((uint32_t)handle >> kIndexBits) & kGenMask;
+    return seam_hub_handle_epoch(handle);
 }
 
 // ---- the line queue -------------------------------------------------------
@@ -162,6 +164,9 @@ constexpr size_t kMaxQueuedLines = 10000;
 // 250 ms tick, so mirroring them would put lines a test cannot predict
 // between the ones it called for.
 constexpr size_t kMirrorLines = 256;
+// The public recent lines (seam_hub_v1_recent_lines): every sheet line, rows
+// and the writer's state lines included, as the detector shows them.
+constexpr size_t kRecentLines = 256;
 
 // The writer's tick: how often states are compared and the queue is written.
 constexpr auto kWriterTick = std::chrono::milliseconds(250);
@@ -187,7 +192,7 @@ int64_t nowMs() {
 std::string maskNames(uint32_t mask) {
     static const struct { uint32_t type; const char* name; } kNames[] = {
         {kSeamHubPink, "pink"}, {kSeamHubGlide, "glide"}, {kSeamHubDecoder, "decoder"},
-        {kSeamHubBandTable, "bandtable"}, {kSeamHubSections, "sections"}};
+        {kSeamHubBandTable, "band-table"}, {kSeamHubSections, "sections"}};
     std::string s;
     for (const auto& n : kNames)
         if (mask & SEAM_HUB_BIT(n.type)) { if (!s.empty()) s += ','; s += n.name; }
@@ -208,8 +213,11 @@ const char* proposalName(uint32_t type) {
 
 // The stone a member is on: its last published state's stoneId, 0 without one.
 // Read through the seqlock like members() does, bounded: a GUI-side lookup
-// must return, so 0 if every attempt tears.
-uint32_t stoneOf(const Slot& s) {
+// must return. False when every attempt tore: the caller then treats the
+// receiver as hearing nothing this time (fails closed). Returning 0 would
+// mean "undeclared", which hears every stone, so a busy publisher would
+// briefly route another unit's proposals to it.
+bool stoneOf(const Slot& s, uint32_t& out) {
     for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
         const uint32_t s1 = s.seq.load(std::memory_order_acquire);
         if (s1 & 1u) continue;
@@ -218,9 +226,31 @@ uint32_t stoneOf(const Slot& s) {
         std::memcpy(&tmp, &s.state, sizeof tmp);
         std::atomic_thread_fence(std::memory_order_acquire);
         if (s.seq.load(std::memory_order_relaxed) != s1) continue;
-        return pub ? tmp.stoneId : 0u;
+        out = pub ? tmp.stoneId : 0u;
+        return true;
     }
-    return 0u;
+    return false;
+}
+
+// A member name is the sheet's `who` before "#<instance>": one token the
+// parser reads with \S+, within the 15 characters a name field holds.
+bool validName(const char* name) {
+    if (!name || !*name) return false;
+    size_t n = 0;
+    for (const char* c = name; *c; ++c, ++n)
+        if (n >= SEAM_HUB_NAME_LEN - 1 || (unsigned char)*c <= ' ' || *c == 0x7f) return false;
+    return true;
+}
+
+// A transition's detail as it may appear in a line: at most
+// SEAM_HUB_DETAIL_LEN - 1 characters, control characters as spaces.
+std::string cleanDetail(const char* d) {
+    std::string out;
+    if (!d) return out;
+    for (; *d && out.size() < SEAM_HUB_DETAIL_LEN - 1; ++d)
+        out += ((unsigned char)*d < ' ' || *d == 0x7f) ? ' ' : *d;
+    const size_t e = out.find_last_not_of(' ');
+    return e == std::string::npos ? std::string() : out.substr(0, e + 1);
 }
 
 } // namespace
@@ -236,6 +266,7 @@ struct SeamHub {
     std::mutex                lineMutex;
     std::deque<std::string>   lines;
     std::deque<std::string>   mirror;
+    std::deque<std::string>   recent;       // kRecentLines, for seam_hub_v1_recent_lines
     uint64_t                  droppedLines = 0;
 
     // ---- proposals --------------------------------------------------------
@@ -270,9 +301,21 @@ struct SeamHub {
             mirror.push_back(line.substr(0, line.find('\n')));
             if (mirror.size() > kMirrorLines) mirror.pop_front();
         }
+        rememberLocked(line);
         if (lines.size() >= kMaxQueuedLines) { lines.pop_front(); ++droppedLines; }
         lines.push_back(std::move(line));
         return ++enqSeq;
+    }
+
+    // Every line of an entry into `recent`, bounded. lineMutex held.
+    void rememberLocked(const std::string& entry) {
+        for (size_t p = 0; p <= entry.size();) {
+            size_t e = entry.find('\n', p);
+            if (e == std::string::npos) e = entry.size();
+            recent.push_back(entry.substr(p, e - p));
+            if (recent.size() > kRecentLines) recent.pop_front();
+            p = e + 1;
+        }
     }
 
     // ---- the writer -------------------------------------------------------
@@ -395,7 +438,8 @@ SeamHub* seam_hub_v1_get(void) { return &g_hub; }
 
 namespace {
 
-int32_t registerLocked(SeamHub* hub, const char* name, uint32_t says, uint32_t hears) {
+int32_t registerLocked(SeamHub* hub, const char* name, uint32_t says, uint32_t hears,
+                       uint32_t preferred) {
     std::lock_guard<std::mutex> lock(hub->regMutex);
     for (int32_t i = 0; i < SEAM_HUB_MAX_MEMBERS; ++i) {
         Slot& s = hub->slots[i];
@@ -433,23 +477,27 @@ int32_t registerLocked(SeamHub* hub, const char* name, uint32_t says, uint32_t h
 
         // Name, masks, instance: registration data, under regMutex.
         std::memset(s.name, 0, sizeof s.name);
-        if (name) std::strncpy(s.name, name, SEAM_HUB_NAME_LEN - 1);
+        std::strncpy(s.name, name, SEAM_HUB_NAME_LEN - 1);
         s.says = says;
         s.hears = hears;
         // Instances are numbered per name, smallest free from 1, so a name
         // that left and came back is #1 again rather than an ever-growing
         // counter; the sheet's `who` then names the same role across sessions.
-        uint32_t inst = 1;
-        for (bool clash = true; clash;) {
-            clash = false;
+        // A member that asks for the number it had gets it back when it is
+        // free: without that, two strx toggling activation in turn would swap
+        // #1 and #2 and the sheet would confuse them.
+        auto taken = [&](uint32_t inst) {
             for (int32_t j = 0; j < SEAM_HUB_MAX_MEMBERS; ++j) {
                 const Slot& o = hub->slots[j];
                 if (j != i && o.inUse.load(std::memory_order_relaxed) &&
-                    o.instance == inst && std::strncmp(o.name, s.name, SEAM_HUB_NAME_LEN) == 0) {
-                    ++inst; clash = true; break;
-                }
+                    o.instance == inst && std::strncmp(o.name, s.name, SEAM_HUB_NAME_LEN) == 0)
+                    return true;
             }
-        }
+            return false;
+        };
+        uint32_t inst = preferred;
+        if (inst == 0 || taken(inst))
+            for (inst = 1; taken(inst); ++inst) {}
         s.instance = inst;
 
         // Open the new epoch, then advertise the slot. Both are release
@@ -489,9 +537,10 @@ uint64_t unregisterLocked(SeamHub* hub, int32_t handle) {
 
 } // namespace
 
-int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint32_t hears) {
-    if (!hub) return SEAM_HUB_NO_HANDLE;
-    const int32_t h = registerLocked(hub, name, says, hears);
+int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint32_t hears,
+                             uint32_t preferredInstance) {
+    if (!hub || !validName(name)) return SEAM_HUB_NO_HANDLE;
+    const int32_t h = registerLocked(hub, name, says, hears, preferredInstance);
     if (h == SEAM_HUB_NO_HANDLE) return h;
     bool start = false;
     {
@@ -638,6 +687,7 @@ bool readMember(SeamHub* hub, int32_t i, SeamHubMember& out, uint32_t& epoch) {
     }
     if (!ok) return false;
     m.hasState = pub ? 1u : 0u;
+    m.epoch = g1;
     m.state = tmp;
     out = m;
     epoch = g1;
@@ -655,23 +705,21 @@ int32_t seam_hub_v1_members(SeamHub* hub, SeamHubMember* out, int32_t max) {
     return n;
 }
 
-// Test-only: the last 256 lines enqueued, newline-separated, NUL-terminated
-// within `cap`. Returns the number of lines written. Declared in the tests,
-// never in seam_hub.h: it is not part of the ABI.
-SEAM_HUB_API int32_t seam_hub_test_recent_lines(char* out, int32_t cap) {
-    if (!out || cap <= 0) return 0;
-    std::lock_guard<std::mutex> lock(g_hub.lineMutex);
+// The newest lines of `src` that fit `cap` with their '\n' and a final NUL.
+// lineMutex held by the caller.
+namespace {
+int32_t copyNewest(const std::deque<std::string>& src, char* out, int32_t cap) {
     // Keep the NEWEST lines: start from the first line from which the rest
     // fits (each line costs its size plus '\n'; one byte stays for the NUL).
-    size_t first = g_hub.mirror.size(), used = 1;
-    while (first > 0 && used + g_hub.mirror[first - 1].size() + 1 <= (size_t)cap) {
-        used += g_hub.mirror[first - 1].size() + 1;
+    size_t first = src.size(), used = 1;
+    while (first > 0 && used + src[first - 1].size() + 1 <= (size_t)cap) {
+        used += src[first - 1].size() + 1;
         --first;
     }
     size_t pos = 0;
     int32_t count = 0;
-    for (size_t k = first; k < g_hub.mirror.size(); ++k) {
-        const std::string& l = g_hub.mirror[k];
+    for (size_t k = first; k < src.size(); ++k) {
+        const std::string& l = src[k];
         std::memcpy(out + pos, l.data(), l.size());
         pos += l.size();
         out[pos++] = '\n';
@@ -679,6 +727,24 @@ SEAM_HUB_API int32_t seam_hub_test_recent_lines(char* out, int32_t cap) {
     }
     out[pos] = '\0';
     return count;
+}
+} // namespace
+
+int32_t seam_hub_v1_recent_lines(SeamHub* hub, char* out, int32_t cap) {
+    if (!hub || !out || cap <= 0) return 0;
+    std::lock_guard<std::mutex> lock(hub->lineMutex);
+    return copyNewest(hub->recent, out, cap);
+}
+
+// Test-only: the last 256 EVENT lines enqueued (no rows, no writer state
+// lines, see kMirrorLines), newline-separated, NUL-terminated within `cap`.
+// Returns the number of lines written. Declared in the tests, never in
+// seam_hub.h: it is not part of the ABI. The tests keep it beside the public
+// recent lines because its content is exactly what they called for.
+SEAM_HUB_API int32_t seam_hub_test_recent_lines(char* out, int32_t cap) {
+    if (!out || cap <= 0) return 0;
+    std::lock_guard<std::mutex> lock(g_hub.lineMutex);
+    return copyNewest(g_hub.mirror, out, cap);
 }
 
 // ---- proposals ------------------------------------------------------------
@@ -710,11 +776,14 @@ SeamHubProposal* find(SeamHub* hub, uint64_t id) {
 } // namespace
 
 uint64_t seam_hub_v1_post(SeamHub* hub, int32_t handle, SeamHubProposal* inout) {
-    if (!hub || !inout || inout->type >= 32) return 0;
+    // Types below 16 are states: they are published, never posted, and the
+    // store and the sheet have no shape for them.
+    if (!hub || !inout || inout->type < 16 || inout->type >= 32) return 0;
     std::lock_guard<std::mutex> store(hub->storeMutex);
 
     std::string who;
     uint32_t member = 0, instance = 0;
+    char name[SEAM_HUB_NAME_LEN];
     {
         std::lock_guard<std::mutex> lock(hub->regMutex);
         Slot* s = nullptr;
@@ -722,6 +791,7 @@ uint64_t seam_hub_v1_post(SeamHub* hub, int32_t handle, SeamHubProposal* inout) 
         if (!(s->says & SEAM_HUB_BIT(inout->type))) return 0;
         member = (uint32_t)handleIndex(handle);
         instance = s->instance;
+        std::memcpy(name, s->name, sizeof name);
         who = whoOf(s->name, s->instance);
     }
 
@@ -729,6 +799,9 @@ uint64_t seam_hub_v1_post(SeamHub* hub, int32_t handle, SeamHubProposal* inout) 
     inout->authorMember = member;
     inout->authorInstance = instance;
     inout->postedUnixMs = nowMs();
+    // The author's name with the record: a reader of an old proposal must not
+    // have to find a member that may have left long ago.
+    std::memcpy(inout->authorName, name, sizeof inout->authorName);
 
     // The position of the oldest proposal is reused: that IS the eviction. Its
     // lifecycle row goes with it, so the newcomer starts at "arrived" for all.
@@ -759,6 +832,9 @@ int32_t seam_hub_v1_proposals(SeamHub* hub, uint64_t afterId, SeamHubProposal* o
     if (!hub || !out || max <= 0) return 0;
     std::lock_guard<std::mutex> store(hub->storeMutex);
     // Ids are contiguous: the store holds [nextId - SEAM_HUB_STORE, nextId).
+    // An afterId at or past the newest asks for nothing; checked first, since
+    // afterId + 1 wraps to 0 at UINT64_MAX and would return the whole store.
+    if (afterId >= hub->nextId - 1) return 0;
     uint64_t from = hub->nextId > SEAM_HUB_STORE ? hub->nextId - SEAM_HUB_STORE : 1;
     if (afterId + 1 > from) from = afterId + 1;
     int32_t n = 0;
@@ -767,67 +843,78 @@ int32_t seam_hub_v1_proposals(SeamHub* hub, uint64_t afterId, SeamHubProposal* o
     return n;
 }
 
-int32_t seam_hub_v1_lifecycle(SeamHub* hub, int32_t receiver, uint64_t id) {
-    if (!hub) return kSeamHubNone;
-    std::lock_guard<std::mutex> store(hub->storeMutex);
+namespace {
+
+// Where proposal `id` stands for the registration (idx, gen), and that
+// registration's who. kSeamHubNone when the proposal is unknown, the
+// registration has ended, or it does not hear the proposal (its stone read
+// tore: fails closed). storeMutex held by the caller.
+struct Receiver { int32_t idx; uint32_t gen; std::string who; };
+int32_t standing(SeamHub* hub, int32_t idx, uint32_t gen, uint64_t id, Receiver* r) {
     const SeamHubProposal* p = find(hub, id);
-    if (!p) return kSeamHubNone;
-    uint32_t hears = 0, gen = 0, stone = 0;
-    int32_t idx = 0;
+    if (!p || idx < 0 || idx >= SEAM_HUB_MAX_MEMBERS) return kSeamHubNone;
+    uint32_t hears = 0, stone = 0;
     {
         std::lock_guard<std::mutex> lock(hub->regMutex);
-        Slot* s = nullptr;
-        if (!liveSlot(hub, receiver, s)) return kSeamHubNone;
-        idx = handleIndex(receiver);
-        hears = s->hears;
-        gen = s->gen.load(std::memory_order_relaxed);
-        stone = stoneOf(*s);
+        Slot& s = hub->slots[idx];
+        if (s.inUse.load(std::memory_order_relaxed) == 0 ||
+            s.gen.load(std::memory_order_relaxed) != gen) return kSeamHubNone;
+        hears = s.hears;
+        if (!stoneOf(s, stone)) return kSeamHubNone;
+        if (r) *r = Receiver{idx, gen, whoOf(s.name, s.instance)};
     }
     if (!heard(hears, stone, *p)) return kSeamHubNone;
     const auto& c = hub->life[(id - 1) % SEAM_HUB_STORE][idx];
     return (c.gen == gen && c.st != 0) ? c.st : kSeamHubArrived;
 }
 
-int32_t seam_hub_v1_transition(SeamHub* hub, int32_t receiver, uint64_t id, int32_t to, int32_t byOperator) {
-    if (!hub) return -1;
+} // namespace
+
+int32_t seam_hub_v1_lifecycle(SeamHub* hub, int32_t receiver, uint64_t id) {
+    if (!hub || receiver < 0) return kSeamHubNone;
+    std::lock_guard<std::mutex> store(hub->storeMutex);
+    return standing(hub, handleIndex(receiver), handleGen(receiver), id, nullptr);
+}
+
+int32_t seam_hub_v1_lifecycle_of(SeamHub* hub, uint32_t member, uint32_t epoch, uint64_t id) {
+    if (!hub || member >= SEAM_HUB_MAX_MEMBERS) return kSeamHubNone;
+    std::lock_guard<std::mutex> store(hub->storeMutex);
+    return standing(hub, (int32_t)member, epoch & kGenMask, id, nullptr);
+}
+
+int32_t seam_hub_v1_transition(SeamHub* hub, int32_t receiver, uint64_t id, int32_t to, int32_t byOperator,
+                               const char* detail) {
+    if (!hub) return SEAM_HUB_ERR_UNKNOWN;
     std::lock_guard<std::mutex> store(hub->storeMutex);
     const SeamHubProposal* p = find(hub, id);
-    if (!p) return -1;
-    uint32_t hears = 0, gen = 0, stone = 0;
-    int32_t idx = 0;
-    std::string who;
-    {
-        std::lock_guard<std::mutex> lock(hub->regMutex);
-        Slot* s = nullptr;
-        if (!liveSlot(hub, receiver, s)) return -2;     // no such receiver: it hears nothing
-        idx = handleIndex(receiver);
-        hears = s->hears;
-        gen = s->gen.load(std::memory_order_relaxed);
-        stone = stoneOf(*s);
-        who = whoOf(s->name, s->instance);
-    }
-    if (!heard(hears, stone, *p)) return -2;
+    if (!p) return SEAM_HUB_ERR_UNKNOWN;
+    Receiver r{};
+    const int32_t from = receiver < 0 ? (int32_t)kSeamHubNone
+                       : standing(hub, handleIndex(receiver), handleGen(receiver), id, &r);
+    if (from == kSeamHubNone) return SEAM_HUB_ERR_NOT_HEARD;   // no such receiver, or it hears nothing
 
     const bool decision = (to == kSeamHubApplied || to == kSeamHubIgnored);
     // Checked before legality: applying without the operator is refused
     // whatever the state (no member acts on what it hears by itself).
-    if (decision && !byOperator) return -4;
+    if (decision && !byOperator) return SEAM_HUB_ERR_OPERATOR;
 
-    auto& c = hub->life[(id - 1) % SEAM_HUB_STORE][idx];
-    const int32_t from = (c.gen == gen && c.st != 0) ? c.st : kSeamHubArrived;
     const bool legal = (from == kSeamHubArrived) ? (to == kSeamHubShown)
                                                  : decision;   // shown/applied/ignored -> applied|ignored
-    if (!legal) return -3;
-    c.gen = gen;
+    if (!legal) return SEAM_HUB_ERR_ILLEGAL;
+    auto& c = hub->life[(id - 1) % SEAM_HUB_STORE][r.idx];
+    c.gen = r.gen;
     c.st = (uint8_t)to;
 
-    const std::string obj = std::string(proposalName(p->type)) + " #" + std::to_string(p->id);
+    std::string obj = std::string(proposalName(p->type)) + " #" + std::to_string(p->id);
+    std::string tail;
+    const std::string d = cleanDetail(detail);
+    if (!d.empty()) tail = "  (" + d + ")";
     if (to == kSeamHubShown)
-        hub->enqueue(Seam::hubsheet::event(nowMs(), who, "shows", obj));
+        hub->enqueue(Seam::hubsheet::event(nowMs(), r.who, "shows", obj + tail));
     else
         hub->enqueue(Seam::hubsheet::event(nowMs(), "operator",
-                     to == kSeamHubApplied ? "applies" : "ignores", obj + "  on " + who));
-    return 0;
+                     to == kSeamHubApplied ? "applies" : "ignores", obj + "  on " + r.who + tail));
+    return SEAM_HUB_OK;
 }
 
 // ---- the session sheet ----------------------------------------------------

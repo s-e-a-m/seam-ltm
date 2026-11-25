@@ -141,8 +141,8 @@ TEST_CASE("a session writes one file with arrivals and departures") {
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("one");
     useFolder(folder);
-    const int32_t a = seam_hub_v1_register(hub, "strx", kTable, 0);
-    const int32_t b = seam_hub_v1_register(hub, "bastone", 0, kTable);
+    const int32_t a = seam_hub_v1_register(hub, "strx", kTable, 0, 0);
+    const int32_t b = seam_hub_v1_register(hub, "bastone", 0, kTable, 0);
     SeamHubProposal p = table(1);
     REQUIRE(seam_hub_v1_post(hub, a, &p) != 0);
     seam_hub_v1_unregister(hub, a);
@@ -183,7 +183,7 @@ TEST_CASE("lines from four threads are never interleaved") {
 
     std::vector<int32_t> handles;
     const char* names[4] = {"strx", "bastone", "bastooge", "detector"};
-    for (const char* n : names) handles.push_back(seam_hub_v1_register(hub, n, kTable, 0));
+    for (const char* n : names) handles.push_back(seam_hub_v1_register(hub, n, kTable, 0, 0));
     std::vector<std::thread> ts;
     for (int t = 0; t < 4; ++t)
         ts.emplace_back([hub, h = handles[t], t] {
@@ -223,7 +223,7 @@ TEST_CASE("the last unregister flushes and returns") {
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("flush");
     useFolder(folder);
-    const int32_t a = seam_hub_v1_register(hub, "flusher", kTable, 0);
+    const int32_t a = seam_hub_v1_register(hub, "flusher", kTable, 0, 0);
     SeamHubProposal p = table(3);
     const uint64_t id = seam_hub_v1_post(hub, a, &p);
     REQUIRE(id != 0);
@@ -242,7 +242,7 @@ TEST_CASE("an unreachable folder holds lines and never blocks") {
     Cleanup cleanup;
     SeamHub* hub = seam_hub_v1_get();
     useFolder("/Volumes/seam-hub-no-such-volume/sheets");
-    const int32_t a = seam_hub_v1_register(hub, "held", kTable, 0);
+    const int32_t a = seam_hub_v1_register(hub, "held", kTable, 0, 0);
     const auto t0 = std::chrono::steady_clock::now();
     for (int i = 0; i < 100; ++i) {
         SeamHubProposal p = table(1);
@@ -290,7 +290,7 @@ TEST_CASE("the file name carries the pid") {
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("pid");
     useFolder(folder, /*spaced=*/true);   // also: spaces around key, '=' and value
-    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "pid", 0, 0));
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "pid", 0, 0, 0));
     const auto files = sheets(folder);
     REQUIRE(files.size() == 1);
     const std::string name = files[0].filename().string();
@@ -303,7 +303,7 @@ TEST_CASE("a state change is written once, not every tick") {
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("state");
     useFolder(folder);
-    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0);
+    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0, 0);
     SeamHubState s{};
     s.kind = kSeamHubPink;
     s.stoneId = 1;
@@ -336,7 +336,7 @@ TEST_CASE("a NaN level is written once, not every tick") {
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("nan");
     useFolder(folder);
-    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0);
+    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0, 0);
     SeamHubState s{};
     s.kind = kSeamHubPink;
     s.levelDb = std::nan("");
@@ -365,7 +365,7 @@ TEST_CASE("a state change produces a second line") {
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("state2");
     useFolder(folder);
-    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0);
+    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0, 0);
     SeamHubState s{};
     s.kind = kSeamHubPink;
     s.stoneId = 1;
@@ -388,13 +388,13 @@ TEST_CASE("a toggle within the grace continues the same sheet") {
     const fs::path folder = freshDir("toggle");
     useFolder(folder);
     seam_hub_test_set_grace_ms(2000);
-    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     CHECK(seam_hub_test_writer_alive() == 1);   // lingering
     SeamHubSheetStatus st;
     seam_hub_v1_sheet_status(hub, &st);
     CHECK(st.writing == 1u);                     // the sheet stays open while it lingers
-    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
     REQUIRE(waitWriterGone());
     const auto files = sheets(folder);
     REQUIRE(files.size() == 1);
@@ -411,7 +411,7 @@ TEST_CASE("after the grace the sheet is closed and the writer is gone") {
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("grace");
     useFolder(folder);
-    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
     REQUIRE(waitWriterGone());
     SeamHubSheetStatus st;
     seam_hub_v1_sheet_status(hub, &st);
@@ -419,7 +419,7 @@ TEST_CASE("after the grace the sheet is closed and the writer is gone") {
     CHECK(sheets(folder).size() == 1);
     // A later register opens a new sheet (a new file, even within the same
     // second: the name takes a -2 suffix).
-    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
     REQUIRE(waitWriterGone());
     CHECK(sheets(folder).size() == 2);
 }
@@ -429,7 +429,7 @@ TEST_CASE("the last unregister returns within 2.1 s even if the writer is stuck"
     SeamHub* hub = seam_hub_v1_get();
     const fs::path folder = freshDir("stuck");
     useFolder(folder);
-    const int32_t a = seam_hub_v1_register(hub, "stuck", 0, 0);
+    const int32_t a = seam_hub_v1_register(hub, "stuck", 0, 0, 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));   // the first pass is done
     seam_hub_test_stall_writer(5000);
     const auto t0 = std::chrono::steady_clock::now();
@@ -439,7 +439,7 @@ TEST_CASE("the last unregister returns within 2.1 s even if the writer is stuck"
     CHECK(ms > 1500.0);   // it did wait for the leaves line, up to the bound
     // A register racing the stuck writer does not wait on the disk either.
     const auto t1 = std::chrono::steady_clock::now();
-    const int32_t b = seam_hub_v1_register(hub, "stuck", 0, 0);
+    const int32_t b = seam_hub_v1_register(hub, "stuck", 0, 0, 0);
     CHECK(msSince(t1) < 100.0);
     seam_hub_test_stall_writer(0);
     seam_hub_v1_unregister(hub, b);
@@ -456,7 +456,7 @@ TEST_CASE("quit with a lingering idle writer returns at once and the sheet ends 
     const fs::path folder = freshDir("quit");
     useFolder(folder);
     seam_hub_test_set_grace_ms(10000);   // the real grace: the writer is lingering at quit
-    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
     REQUIRE(seam_hub_test_writer_alive() == 1);
     const auto t0 = std::chrono::steady_clock::now();
     CHECK(seam_hub_test_teardown() == 1);
@@ -477,7 +477,7 @@ TEST_CASE("quit with a stuck writer returns within 2.1 s") {
     seam_hub_test_set_grace_ms(10000);
     // Members gone first, so nothing is left held after the detached writer
     // finishes (a held line would land in the next case's sheet).
-    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
     seam_hub_test_stall_writer(5000);
     std::this_thread::sleep_for(std::chrono::milliseconds(400));   // a lingering tick is now stuck
     const auto t0 = std::chrono::steady_clock::now();
@@ -490,7 +490,7 @@ TEST_CASE("quit with a stuck writer returns within 2.1 s") {
     seam_hub_test_stall_writer(0);
     REQUIRE(waitWriterGone());
     // And the hub works again: a new session starts a new writer.
-    const int32_t a = seam_hub_v1_register(hub, "strx", 0, 0);
+    const int32_t a = seam_hub_v1_register(hub, "strx", 0, 0, 0);
     CHECK(seam_hub_test_writer_alive() == 1);
     seam_hub_test_set_grace_ms(kTestGraceMs);   // before the unregister that starts the grace
     seam_hub_v1_unregister(hub, a);
@@ -507,7 +507,7 @@ TEST_CASE("quit never joins a writer a racing register just started") {
     seam_hub_test_teardown_gap_ms(300);
     auto quit = std::async(std::launch::async, [] { return seam_hub_test_teardown(); });
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    const int32_t a = seam_hub_v1_register(hub, "strx", 0, 0);
+    const int32_t a = seam_hub_v1_register(hub, "strx", 0, 0, 0);
     REQUIRE(seam_hub_test_writer_alive() == 1);
     const bool returned = quit.wait_for(std::chrono::milliseconds(1500)) == std::future_status::ready;
     CHECK(returned);
