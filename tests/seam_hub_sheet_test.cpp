@@ -71,13 +71,79 @@ TEST_CASE("sections rows") {
 TEST_CASE("objects") {
     SeamHubBandTable t{};
     t.bandCount = 31; t.hasDecoder = 1; t.decoder.test = 1; t.decoder.cutHz = 160; t.integrationSec = 646.6;
-    CHECK(tableObject(12, 1, t) == "band-table #12  stone 1  decoder W cut 160  31 bands  646.6 s");
+    t.sampleRate = 48000; t.sourceLevelDb = -23.0; t.emitterKind = kSeamHubPink; t.emitterSlots = 4;
+    t.decoder.commonId = 9; t.decoder.stoneOfModel = 1;
+    std::strcpy(t.source, "multipink#1 slots 0-3\nsecond line");
+    CHECK(tableObject(12, 1, t) ==
+          "band-table #12  stone 1  decoder test W  cut 160  bypass off  model 1  common #9  difference -"
+          "  piece off  sub off 0 Hz  31 bands  646.6 s  48000 Hz  level -23.0 dB  emitter pink slots 4"
+          "  source \"multipink#1 slots 0-3 second line\"");
+    SeamHubBandTable bare{};
+    CHECK(tableObject(3, 0, bare) == "band-table #3  stone 0  0 bands  0.0 s  0 Hz  level 0.0 dB  emitter none");
+    bare.bandCount = 99;   // clamped to the 31 bands a table has
+    CHECK(tableObject(3, 0, bare).find("  31 bands") != std::string::npos);
+    std::memset(bare.source, 'x', sizeof bare.source);   // no NUL: bounded by the field
+    CHECK(tableObject(3, 0, bare).find("source \"" + std::string(128, 'x') + "\"") != std::string::npos);
+
     SeamHubSections p{};
     p.block = kSeamHubBlockCommon; p.count = 6; p.residualRmsDb = 0.8; p.residualMaxDb = 1.9; p.offsetDb = -3.2;
-    CHECK(sectionsObject(13, p) == "sections #13  common  6  rms 0.8  max 1.9  offset -3.2");
+    p.fitLoHz = 63; p.fitHiHz = 16000; p.roomLimitHz = 200; p.fromIds[0] = 12;
+    CHECK(sectionsObject(13, p) ==
+          "sections #13  common  6  rms 0.8  max 1.9  offset -3.2  fit 63-16000 Hz  room 200 Hz  from #12");
+    SeamHubSections d{};
+    d.block = kSeamHubBlockDifference; d.count = 2; d.fitLoHz = 160; d.fitHiHz = 2000;
+    d.fromIds[0] = 14; d.fromIds[2] = 15;
+    CHECK(sectionsObject(16, d) ==
+          "sections #16  difference  2  rms 0.0  max 0.0  offset +0.0  fit 160-2000 Hz  room 0 Hz  from #14 #15");
+    d.fromIds[0] = d.fromIds[2] = 0;
+    CHECK(sectionsObject(16, d).substr(sectionsObject(16, d).size() - 8) == "  from -");
+
     SeamHubState s{};
-    s.kind = kSeamHubPink; s.stoneId = 1; s.levelDb = -23.0; s.active = 1;
+    s.kind = kSeamHubPink; s.stoneId = 1; s.levelDb = -23.0; s.active = 1; s.sampleRate = 48000;
     s.u.pink.slotStart = 0; s.u.pink.slotCount = 4;
-    CHECK(stateObject(s) == "pink  stone 1  slots 0-3  -23.0 dB  active");
+    CHECK(stateObject(s) == "pink  stone 1  slots 0-3  -23.0 dB  active  48000 Hz");
     CHECK(rows(s) == "");
+    s.u.pink.slotStart = -1; s.u.pink.slotCount = 0; s.active = 0;
+    CHECK(stateObject(s) == "pink  stone 1  slots -1+0  -23.0 dB  idle  48000 Hz");
+}
+
+TEST_CASE("a glide state prints every field the writer compares") {
+    SeamHubState s{};
+    s.kind = kSeamHubGlide; s.stoneId = 2; s.levelDb = -18.0; s.active = 1; s.sampleRate = 96000;
+    s.u.glide.passCounter = 7; s.u.glide.passStartSample = 123456789;
+    s.u.glide.f0 = 20; s.u.glide.f1 = 20000; s.u.glide.durationSec = 30; s.u.glide.deltaSec = -0.25;
+    s.u.glide.sweepMode = 1; s.u.glide.diracMode = 2;
+    CHECK(stateObject(s) == "glide  stone 2  pass 7 start 123456789  -18.0 dB  active  96000 Hz");
+    CHECK(rows(s) == "  | 20 .. 20000 Hz  T 30 s  delta -0.25 s  sweep 1  dirac 2\n");
+    s.u.glide.passStartSample = -1;
+    CHECK(stateObject(s).find("pass 7 start -1") != std::string::npos);
+}
+
+TEST_CASE("a decoder state prints every field the writer compares") {
+    SeamHubState s{};
+    s.kind = kSeamHubDecoder; s.stoneId = 1; s.levelDb = 0; s.active = 1; s.sampleRate = 48000;
+    SeamHubDecoder& d = s.u.decoder;
+    d.test = 2; d.bypass = 1; d.stoneOfModel = 3; d.cutHz = 344; d.commonId = 13; d.differenceId = 21;
+    d.pieceOn = 1; d.subOn = 1; d.subHz = 142;
+    CHECK(stateObject(s) ==
+          "decoder  stone 1  test X  cut 344  bypass on  model 3  common #13  difference #21"
+          "  piece on  sub on 142 Hz  0.0 dB  active  48000 Hz");
+    CHECK(rows(s) == "");
+    s.kind = 9;   // an unknown kind: the common fields only
+    CHECK(stateObject(s) == "unknown  stone 1  0.0 dB  active  48000 Hz");
+}
+
+TEST_CASE("section words") {
+    SeamHubSections p{};
+    p.count = 3;
+    p.sections[0] = {kSeamHubLowShelf, 0, 65.5, 0.71, -15.0};
+    p.sections[1] = {kSeamHubPeak, 0, 1516.0, 4.0, 3.0};
+    p.sections[2] = {99, 0, 1000.0, 1.0, 0.0};
+    CHECK(rows(p) == "  | lowshelf     65.5  0.71  -15.0\n"
+                     "  | peak       1516.0  4.00  +3.0\n"
+                     "  | unknown    1000.0  1.00  +0.0\n");
+    p.count = 99;   // clamped to SEAM_HUB_MAX_SECTIONS rows
+    size_t lines = 0;
+    for (char c : rows(p)) lines += (c == '\n');
+    CHECK(lines == SEAM_HUB_MAX_SECTIONS);
 }

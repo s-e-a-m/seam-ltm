@@ -309,6 +309,7 @@ TEST_CASE("a state change is written once, not every tick") {
     s.stoneId = 1;
     s.active = 1;
     s.levelDb = -23.0;
+    s.sampleRate = 48000.0;
     s.u.pink.slotStart = 0;
     s.u.pink.slotCount = 4;
     const auto t0 = std::chrono::steady_clock::now();
@@ -326,7 +327,7 @@ TEST_CASE("a state change is written once, not every tick") {
     for (const auto& l : fileLines(files[0]))
         if (verbOf(l) == "state") {
             ++states;
-            CHECK(l.find("multipink#1   state     pink  stone 1  slots 0-3  -23.0 dB  active") != std::string::npos);
+            CHECK(l.find("multipink#1   state     pink  stone 1  slots 0-3  -23.0 dB  active  48000 Hz") != std::string::npos);
         }
     CHECK(states == 1);
 }

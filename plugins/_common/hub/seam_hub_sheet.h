@@ -29,15 +29,30 @@
 //               exactly bandCount rows (0..31): a withheld band has no row
 //   sections    row    type word (peak|lowshelf|highshelf|unknown) left in 10,
 //                      hz = "%7.1f", "  ", q = "%.2f", "  ", gain = "%+.1f"
-//   state       pink: no rows; glide: one row "f0 .. f1 hz  dur s  delta s";
-//               decoder: one row "common <id> difference <id>"
-// Object texts (inline, after the verb):
-//   band table  "band-table #<id>  stone <n>  decoder <N|W|X|Y|Z> cut <%g>
-//                <count> bands  <%.1f> s"   (decoder part only when hasDecoder)
+//   state       pink and decoder: no rows; glide: one row
+//               "<f0 %g> .. <f1 %g> Hz  T <%g> s  delta <%+g> s  sweep <n>  dirac <n>"
+// Object texts (inline, after the verb). Every field the writer compares to
+// decide that a state changed (sameState in seam_hub.cpp) is printed, so two
+// state lines in a row never read the same:
+//   band table  "band-table #<id>  stone <n>  [decoder <decoder>]  <count> bands
+//                <%.1f> s  <%g> Hz  level <%.1f> dB  emitter <pink|glide|none>
+//                [slots <n>]  [source "<text>"]"
+//               (decoder part only when hasDecoder; slots only when nonzero;
+//               source only when not empty, control characters as spaces)
 //   sections    "sections #<id>  common|difference  <count>  rms <%.1f>
-//                max <%.1f>  offset <%+.1f>"
-//   state       "<pink|glide|decoder>  stone <n>  <detail>  <%.1f> dB  <active|idle>"
-//               pink detail "slots <a>-<b>"
+//                max <%.1f>  offset <%+.1f>  fit <%g>-<%g> Hz  room <%g> Hz
+//                from <#id ...|->"
+//   state       "<pink|glide|decoder>  stone <n>  <detail>  <%.1f> dB
+//                <active|idle>  <%g> Hz"
+//               pink detail    "slots <a>-<b>", or "slots <a>+0" when empty
+//               glide detail   "pass <counter> start <sample>"
+//               decoder detail "<decoder>"
+//   <decoder>   "test <N|W|X|Y|Z>  cut <%g>  bypass <on|off>  model <n>
+//                common <#id|->  difference <#id|->  piece <on|off>
+//                sub <on|off> <%g> Hz"
+//   transitions "<type> #<id>[  (<detail>)]" for shows,
+//               "<type> #<id>  on <who>[  (<detail>)]" for applies/ignores;
+//               detail at most 31 characters, from the receiver
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -45,6 +60,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <string>
 
@@ -78,6 +94,26 @@ inline const char* testWord(uint32_t t) {
     static const char* k[] = {"N", "W", "X", "Y", "Z"};
     return t < 5 ? k[t] : "?";
 }
+inline const char* onOff(uint32_t v) { return v ? "on" : "off"; }
+inline std::string idRef(uint64_t id) { return id ? "#" + std::to_string(id) : std::string("-"); }
+inline const char* kindWord(uint32_t k) {
+    return k == kSeamHubPink ? "pink" : k == kSeamHubGlide ? "glide"
+         : k == kSeamHubDecoder ? "decoder" : k == 0 ? "none" : "unknown";
+}
+// Free text from a fixed field, made safe for one line: bounded by the field
+// (it may lack a NUL), control characters as spaces.
+inline std::string oneLine(const char* p, size_t cap) {
+    std::string s(p, strnlen(p, cap));
+    for (char& c : s) if ((unsigned char)c < ' ' || c == 0x7f) c = ' ';
+    return s;
+}
+// The decoder's setting, all of it: the state line and a table's object share it.
+inline std::string decoderText(const SeamHubDecoder& d) {
+    return std::string("test ") + testWord(d.test) + "  cut " + fmt("%g", d.cutHz) +
+           "  bypass " + onOff(d.bypass) + "  model " + std::to_string(d.stoneOfModel) +
+           "  common " + idRef(d.commonId) + "  difference " + idRef(d.differenceId) +
+           "  piece " + onOff(d.pieceOn) + "  sub " + onOff(d.subOn) + " " + fmt("%g", d.subHz) + " Hz";
+}
 } // namespace detail
 
 inline std::string header(const std::tm& start, int pid) {
@@ -110,32 +146,45 @@ inline std::string event(int64_t unixMs, const std::string& w, const char* verb,
 
 inline std::string tableObject(uint64_t id, uint32_t stone, const SeamHubBandTable& t) {
     std::string s = "band-table #" + std::to_string(id) + "  stone " + std::to_string(stone);
-    if (t.hasDecoder)
-        s += std::string("  decoder ") + detail::testWord(t.decoder.test) + " cut " +
-             detail::fmt("%g", t.decoder.cutHz);
-    s += "  " + std::to_string(detail::clampBands(t.bandCount)) + " bands  " + detail::fmt("%.1f", t.integrationSec) + " s";
+    if (t.hasDecoder) s += "  decoder " + detail::decoderText(t.decoder);
+    s += "  " + std::to_string(detail::clampBands(t.bandCount)) + " bands  " +
+         detail::fmt("%.1f", t.integrationSec) + " s  " + detail::fmt("%g", t.sampleRate) + " Hz" +
+         "  level " + detail::fmt("%.1f", t.sourceLevelDb) + " dB" +
+         "  emitter " + detail::kindWord(t.emitterKind);
+    if (t.emitterSlots) s += " slots " + std::to_string(t.emitterSlots);
+    const std::string src = detail::oneLine(t.source, sizeof t.source);
+    if (!src.empty()) s += "  source \"" + src + "\"";
     return s;
 }
 
 inline std::string sectionsObject(uint64_t id, const SeamHubSections& p) {
+    std::string from;
+    for (uint64_t f : p.fromIds) if (f) from += (from.empty() ? "" : " ") + detail::idRef(f);
     return "sections #" + std::to_string(id) + "  " +
            (p.block == kSeamHubBlockDifference ? "difference" : "common") + "  " +
            std::to_string(p.count) + "  rms " + detail::fmt("%.1f", p.residualRmsDb) +
            "  max " + detail::fmt("%.1f", p.residualMaxDb) +
-           "  offset " + detail::fmt("%+.1f", p.offsetDb);
+           "  offset " + detail::fmt("%+.1f", p.offsetDb) +
+           "  fit " + detail::fmt("%g", p.fitLoHz) + "-" + detail::fmt("%g", p.fitHiHz) + " Hz" +
+           "  room " + detail::fmt("%g", p.roomLimitHz) + " Hz" +
+           "  from " + (from.empty() ? std::string("-") : from);
 }
 
 inline std::string stateObject(const SeamHubState& s) {
-    const char* kind = s.kind == kSeamHubPink ? "pink" : s.kind == kSeamHubGlide ? "glide"
-                     : s.kind == kSeamHubDecoder ? "decoder" : "unknown";
-    std::string o = std::string(kind) + "  stone " + std::to_string(s.stoneId);
-    if (s.kind == kSeamHubPink)
-        o += "  slots " + std::to_string(s.u.pink.slotStart) + "-" +
-             std::to_string(s.u.pink.slotStart + s.u.pink.slotCount - 1);
-    else if (s.kind == kSeamHubDecoder)
-        o += std::string("  decoder ") + detail::testWord(s.u.decoder.test) + " cut " +
-             detail::fmt("%g", s.u.decoder.cutHz);
-    o += "  " + detail::fmt("%.1f", s.levelDb) + " dB  " + (s.active ? "active" : "idle");
+    std::string o = std::string(s.kind == 0 ? "unknown" : detail::kindWord(s.kind)) +
+                    "  stone " + std::to_string(s.stoneId);
+    if (s.kind == kSeamHubPink) {
+        const auto& p = s.u.pink;
+        o += "  slots " + std::to_string(p.slotStart) +
+             (p.slotCount > 0 ? "-" + std::to_string(p.slotStart + p.slotCount - 1) : std::string("+0"));
+    } else if (s.kind == kSeamHubGlide) {
+        o += "  pass " + std::to_string(s.u.glide.passCounter) +
+             " start " + std::to_string(s.u.glide.passStartSample);
+    } else if (s.kind == kSeamHubDecoder) {
+        o += "  " + detail::decoderText(s.u.decoder);
+    }
+    o += "  " + detail::fmt("%.1f", s.levelDb) + " dB  " + (s.active ? "active" : "idle") +
+         "  " + detail::fmt("%g", s.sampleRate) + " Hz";
     return o;
 }
 
@@ -167,13 +216,12 @@ inline std::string rows(const SeamHubSections& p) {
 }
 
 inline std::string rows(const SeamHubState& s) {
-    if (s.kind == kSeamHubGlide)
-        return "  | " + detail::fmt("%.1f", s.u.glide.f0) + " .. " + detail::fmt("%.1f", s.u.glide.f1) +
-               " hz  " + detail::fmt("%.1f", s.u.glide.durationSec) + " s  " +
-               detail::fmt("%+.1f", s.u.glide.deltaSec) + " s\n";
-    if (s.kind == kSeamHubDecoder)
-        return "  | common " + std::to_string(s.u.decoder.commonId) + " difference " +
-               std::to_string(s.u.decoder.differenceId) + "\n";
+    if (s.kind == kSeamHubGlide) {
+        const auto& g = s.u.glide;
+        return "  | " + detail::fmt("%g", g.f0) + " .. " + detail::fmt("%g", g.f1) + " Hz  T " +
+               detail::fmt("%g", g.durationSec) + " s  delta " + detail::fmt("%+g", g.deltaSec) +
+               " s  sweep " + std::to_string(g.sweepMode) + "  dirac " + std::to_string(g.diracMode) + "\n";
+    }
     return "";
 }
 
