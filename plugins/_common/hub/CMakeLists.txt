@@ -28,7 +28,16 @@ endif()
 # Install into the user domain so no sudo is needed, consistent with VST3
 # bundles landing in ~/Library/Audio/Plug-Ins/VST3. The client searches
 # SEAM_HUB_PATH, then ~/Library/Application Support/SEAM, then /Library/...
-if(APPLE)
+#
+# ONLY FROM THE TREE THAT FEEDS THE DAW: plugins built, and the SDK's links
+# into ~/Library/Audio/Plug-Ins/VST3 made (SMTG_CREATE_PLUGIN_LINK). The
+# installed dylib is the one every loaded plugin talks through, so a tests-only
+# tree or a throwaway plugin tree (build-test, build-hub) installing its own
+# would swap the hub under the DAW's plugins, possibly for one of another
+# layout. Tests never need it: they link this target, or point SEAM_HUB_PATH
+# at $<TARGET_FILE:seam_hub> (tests/CMakeLists.txt). Both variables are
+# defined before this directory is added (root CMakeLists.txt).
+if(APPLE AND SEAM_BUILD_PLUGINS AND SMTG_CREATE_PLUGIN_LINK)
     set(SEAM_HUB_INSTALL_DIR "$ENV{HOME}/Library/Application Support/SEAM")
     add_custom_command(TARGET seam_hub POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "${SEAM_HUB_INSTALL_DIR}"
@@ -36,4 +45,7 @@ if(APPLE)
                 $<TARGET_FILE:seam_hub> "${SEAM_HUB_INSTALL_DIR}/"
         COMMENT "[SEAM] Installing libseamhub.dylib to ${SEAM_HUB_INSTALL_DIR}"
     )
+else()
+    message(STATUS "[SEAM] libseamhub.dylib is not installed from this tree "
+                   "(it installs only with SEAM_BUILD_PLUGINS=ON and SMTG_CREATE_PLUGIN_LINK=ON)")
 endif()
