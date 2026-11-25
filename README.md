@@ -160,8 +160,11 @@ The hub also writes a text sheet of each calibration session, by default to
 `~/Documents/SEAM/sheets` (change it with `sheet-folder = <path>` in
 `~/Library/Application Support/SEAM/hub.conf`).
 
-A source build installs it automatically. Installing from a release, copy it
-by hand from `seam-ltm-<version>-macOS-all.zip`:
+A source build installs it automatically, from the tree that builds the
+plugins and links them into the VST3 folder (the default); a tests-only tree
+or one configured with `-DSMTG_CREATE_PLUGIN_LINK=OFF` leaves the installed
+copy alone. Installing from a release, copy it by hand from
+`seam-ltm-<version>-macOS-all.zip`:
 
 ```bash
 mkdir -p ~/Library/Application\ Support/SEAM

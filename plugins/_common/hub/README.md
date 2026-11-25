@@ -15,11 +15,11 @@ The files are:
 
 | File | What it is |
 |---|---|
-| `seam_hub.h` | The C ABI: structs with pinned sizes, the eleven `seam_hub_v1_*` functions. |
+| `seam_hub.h` | The C ABI: structs with pinned sizes and offsets, the fifteen `seam_hub_v1_*` functions. |
 | `seam_hub.cpp` | The implementation: registry, seqlock slots, proposal store, session writer. |
 | `seam_hub_client.h` | What the plugins include: loads the dylib, adapts the C ABI, degrades to null mode. |
 | `seam_hub_sheet.h` | The sheet grammar and its pure formatter (no I/O). |
-| `CMakeLists.txt` | Builds `libseamhub.dylib` and installs it under `~/Library/Application Support/SEAM`. |
+| `CMakeLists.txt` | Builds `libseamhub.dylib`, and installs it under `~/Library/Application Support/SEAM` from the DAW's tree only. |
 
 ## Why a dylib, not a header
 
@@ -54,6 +54,29 @@ Peer awareness is a deliberate anomaly here, justified because calibrating a phy
 C++ has no stable ABI across separately compiled binaries: name mangling, vtable layout, STL layout and the exception ABI can differ between compilers or flags, and the bundles that load this dylib are separate CMake targets that may drift.
 Every struct has its `sizeof` pinned by a `static_assert` in `seam_hub.h`, and padding is spelled out (`_pad`).
 A layout change must bump `SEAM_HUB_VERSION`, so an old plugin never reads a new struct through the wrong shape.
+Version 1 was amended once, on 2026-11-25, before anything outside its branch depended on it (see the comment on `SEAM_HUB_VERSION`); from there on every change bumps.
+
+### The functions
+
+| Function | Thread | What it does |
+|---|---|---|
+| `seam_hub_v1_version` | any | The ABI version; the client checks it before looking up anything else. |
+| `seam_hub_v1_get` | any | The one hub of the process. |
+| `seam_hub_v1_register` | main | A new member: name, `says`, `hears`, preferred instance; returns the handle. |
+| `seam_hub_v1_unregister` | main | The member leaves. |
+| `seam_hub_v1_publish_state` | audio | The member's state, wait-free (the only call allowed on the audio thread). |
+| `seam_hub_v1_members` | GUI | Every member: name, instance, masks, epoch, last state. |
+| `seam_hub_v1_post` | GUI | A proposal; returns its id, 0 when refused. |
+| `seam_hub_v1_proposals` | GUI | The stored proposals after an id, oldest first. |
+| `seam_hub_v1_lifecycle` | GUI | Where a proposal stands for the caller's own handle. |
+| `seam_hub_v1_lifecycle_of` | GUI | Where it stands for any receiver, named by `member` and `epoch` (the detector). |
+| `seam_hub_v1_transition` | GUI | Moves a proposal for a receiver, with an optional detail for the sheet. |
+| `seam_hub_v1_recent_lines` | GUI | The last sheet lines, rows and states included, newest kept. |
+| `seam_hub_v1_sheet_status` | GUI | The sheet's path, whether it is written, pending and dropped lines. |
+| `seam_hub_v1_sheet_set_folder` | GUI | The folder of the next sheet, written to the conf. |
+| `seam_hub_v1_sheet_new` | GUI | Closes the sheet and starts a new one. |
+
+Exported functions named `seam_hub_test_*` are test hooks, never declared in `seam_hub.h` and not part of the ABI.
 
 ## `multipink_pool` stays separate
 
@@ -72,8 +95,13 @@ So the pool allocates independently of the hub, and always will.
 ## Members, and the handle
 
 A **member** is one registered plugin instance.
-`register(name, says, hears)` returns a handle; `says` and `hears` are masks of `SEAM_HUB_BIT(type)` (`seam_hub.h`), declaring which message types the member emits and which it listens to.
+`register(name, says, hears, preferredInstance)` returns a handle; `says` and `hears` are masks of `SEAM_HUB_BIT(type)` (`seam_hub.h`), declaring which message types the member emits and which it listens to.
 There are at most `SEAM_HUB_MAX_MEMBERS` = 32.
+
+The name is the sheet's `who` before `#<instance>`, so it is one token: 1 to 15 characters, no whitespace, or `register` refuses it with `SEAM_HUB_NO_HANDLE`.
+Instances are numbered per name, the smallest free from 1.
+A member that passes back the number it had (`preferredInstance`) gets it when it is free, so `strx#2` stays `strx#2` across the host's `setActive` cycles instead of swapping names with `strx#1`.
+`HubClient::registerMember(name, says, hears, instance)` does this: it passes `instance` and stores the number actually given, which it finds in `members()` by the handle's `member` and `epoch` (`seam_hub_handle_member`, `seam_hub_handle_epoch`).
 
 The handle is opaque.
 It packs the slot's registration epoch (`gen`) above the 5-bit slot index (`encodeHandle` in `seam_hub.cpp`), so that `publish_state` can reject a handle whose slot has since been reclaimed, in one relaxed load and a compare, with no lock.
@@ -83,6 +111,10 @@ Never index anything with it.
 The API cannot save you here: a member that defaults its handle to `0` looks registered at slot 0, and would publish into whatever plugin owns that slot.
 Every handle member must be initialised to `SEAM_HUB_NO_HANDLE` explicitly (`hubHandle_` in `multipink_processor.h` and the other two emitters do).
 This is discipline, not a guarantee; say it out loud when you add an emitter.
+
+**A handle is registered once and always released.**
+A plugin registers in `setActive(true)` only when it holds no handle, and unregisters in `setActive(false)` and again in `terminate()`.
+A host may activate twice in a row, and may terminate without a last deactivation; either way, a handle overwritten or never released leaves a ghost member on the hub, in the detector and in the sheet, for the life of the process.
 
 ## States: wait-free, per-slot seqlock
 
@@ -119,17 +151,29 @@ It returns 0 (refused) if the handle is stale, the type is out of range, or the 
 
 The store holds the last `SEAM_HUB_STORE` = 64 proposals and evicts the oldest; ids are contiguous, so `proposals(afterId, ...)` is a simple range.
 A proposal is heard by a receiver only if the type is in its `hears` and the STONE ids are compatible (`heard()` in `seam_hub.cpp`: either side undeclared, or equal).
+`post` refuses state types (below 16), and fills `authorName` beside the author's member and instance, so a proposal names its author after the author has gone.
+The payload is a union with a reserve arm `raw[SEAM_HUB_PAYLOAD]` (4096 bytes), room for the tetrahedral and cubic tables of the next design.
+A band table carries its sample rate and what was sounding when it was saved (`emitterKind`, and `emitterSlots` for `multipink`), so a decorrelated D measurement can be told from a correlated Normal one.
 
 ### Lifecycle, per receiver
 
 Each receiver sees each proposal move through `kSeamHubArrived` → `kSeamHubShown` → `kSeamHubApplied` or `kSeamHubIgnored`.
-`transition()` returns 0 on success, and a negative code when the proposal is unknown (-1), not heard by that receiver (-2), an illegal step (-3), or a decision without the operator (-4).
+`transition()` returns `SEAM_HUB_OK` (0) on success, and a negative code when the proposal is unknown (-1), not heard by that receiver (-2), an illegal step (-3), or a decision without the operator (-4).
+The client adds -5 (`SEAM_HUB_ERR_NO_HUB`) when there is no hub or the receiver holds no handle: nothing was recorded, so it must never read as success.
+A `detail` (up to 31 characters) goes into the sheet line, so the line says what the operator did: `applies band-table #12  on bastone#1  (block common)`.
+`lifecycle_of(member, epoch, id)` reads where a proposal stands for any receiver, by the `member` and `epoch` that `members()` reports; it is how the detector shows every receiver's state without holding their handles.
 
 **Applying or ignoring requires `byOperator = 1`.**
 No member acts on what it hears by itself: a proposal changes a loudspeaker's equalisation, and that change must be a person's decision, taken at the screen.
 The refusal is checked before legality, so it holds in every state.
 A table showing itself (`Arrived` → `Shown`) needs no operator; it is only the presentation.
 The lifecycle row is tied to the receiver's registration epoch, so a newcomer in a freed slot starts at `Arrived` and never inherits its predecessor's decisions.
+
+**The lifecycle follows the receiver's current stone.**
+Whether a receiver hears a proposal is decided at each call, from the `stoneId` of the receiver's last published state.
+A decoder whose stone changes from 1 to 2 stops hearing the stone-1 tables it had shown or applied: `lifecycle` then answers `None` for them, and the row recorded under stone 1 can no longer be read, even though the sheet keeps the transitions.
+A receiver's window should therefore list proposals from what `lifecycle` says now, and keep its own record of what it applied (BASTOOGE keeps the applied sections in its state).
+When a stone read tears eight times in a row (a publisher hammering its slot), the receiver hears nothing for that call rather than everything.
 
 ## The session sheet
 
@@ -167,6 +211,23 @@ The writer ticks every `kWriterTick` = 250 ms, comparing member states and writi
   Both halves are needed: the first protects the data, the second the code.
   Only a library rejected before any use (version mismatch, missing symbols) is closed.
 
+### Held lines belong to their sheet
+
+When the folder cannot be written (an unmounted share, a missing volume), the lines wait in the queue, bounded as above, and `sheet_status()` reports them as pending.
+The sheet keeps its path, and the writer retries it every tick; it does not exit while it holds lines, even after the grace, and a member that registers meanwhile continues the same sheet.
+When the folder returns, the lines are written into that same file, after a `sheet` notice saying how many were held (and dropped).
+A failed write does not start a new file either: the whole batch goes back to the queue, and the reopen truncates the file to its last good flush, so a session is never split and no line is written twice.
+After a failure the writer waits 5 s before it reopens, so a volume that refuses writes (quota, full disk) is not hammered.
+
+Held lines leave their sheet's path in three cases, and always for the same place, `sheets-held/` beside the conf (`~/Library/Application Support/SEAM/sheets-held/<the sheet's file name>`), with a header and a notice naming the original path:
+
+- **at quit**, in the writer's last pass, still within the 2 s bound: a local folder cannot hang like a share;
+- **on `sheet_new()`**: the operator has moved on, and the new sheet carries a notice saying where the old one's lines went;
+- **at the end of a session whose sheet has no path at all** (no folder, or no free name), since there is nothing to wait for.
+
+If even the local spill fails, those lines are lost: they are counted in `droppedLines`, and nothing else records them.
+A sheet is never appended to another file: when every name of its second (`-2` … `-999`) is taken it has no path, and a name found taken at the first open (picked while the folder was unreachable) is picked again.
+
 ### The folder and the conf
 
 The next sheet goes to the folder named by `sheet-folder = <path>` in `~/Library/Application Support/SEAM/hub.conf` (`~` is expanded), else `~/Documents/SEAM/sheets`.
@@ -175,6 +236,13 @@ The conf is re-read at every sheet start, so a change takes effect on the next s
 With `HOME` unset there is no default folder, and the sheet is treated as unreachable instead of being written relative to the host's working directory.
 `sheet_set_folder()` rewrites the conf by `rename()`, so the writer can read it without a lock.
 `sheet_status()` reports the path, whether it is writing, the pending lines and the dropped count; `sheet_new()` asks for a fresh sheet.
+`recent_lines()` returns the last 256 lines as written or held, table rows and the writer's state lines included, the newest kept when the buffer is short: the detector's "last lines".
+
+**The privacy prompt.**
+`~/Documents` is protected by macOS: the first process that writes there triggers a "would like to access files in your Documents folder" prompt, per application.
+The hub writes from inside whatever process loaded it, so the prompt can come from the DAW, and also from a host's separate plugin scanner or a validator, which may have no window to show it in: the write is then refused, the folder reads as unreachable, and the lines are held, and spilled to `sheets-held/` at quit.
+Point `sheet-folder` outside `~/Documents` (or grant the host access in System Settings, Privacy & Security, Files and Folders) on a machine where this matters.
+The suite's own build never writes there: the validator runs with `SEAM_HUB_CONF` naming a conf in the build tree (root `CMakeLists.txt`).
 
 ## The client, and null mode
 
@@ -190,14 +258,20 @@ The suite's plugins must keep working with no dylib at all; `strx` reports the a
 
 1. Add the type to `SeamHubType` in `seam_hub.h` (states below 16, proposals from 16; the number is a bit position, so it stays below 32), and a new arm in the relevant union if needed.
    Pin the new `sizeof` with a `static_assert`, and update the formatter and `tools/hub-sheet.py` if it adds a verb or row shape.
-2. In the plugin: include `seam_hub_client.h`, register in `setActive(true)` with the right `says`/`hears`, initialise the handle to `SEAM_HUB_NO_HANDLE`, and unregister in `setActive(false)`.
+2. In the plugin: include `seam_hub_client.h`, initialise the handle to `SEAM_HUB_NO_HANDLE` and keep a `uint32_t` instance at 0; register in `setActive(true)` only when the handle is `SEAM_HUB_NO_HANDLE`, passing the instance (`registerMember(name, says, hears, instance)`), and unregister in `setActive(false)` and in `terminate()`.
    Publish states from `process()` only through `publishState`.
-3. Bump `SEAM_HUB_VERSION` only when an existing struct changes shape or meaning; adding an enum value to a new arm does not need it.
+3. Bump `SEAM_HUB_VERSION` only when an existing struct changes shape or meaning; adding an enum value to a new arm that fits in `raw` does not need it.
 4. Test the pure decision logic SDK-free (the `BusAnchor` and `HubWatch` tests are the model), and the hub through its tests in `tests/` (`seam_hub_*_test`).
 
 ## Building and installing
 
 `cmake --build <tree>` builds `libseamhub.dylib`, universal like the plugins (`smtg_target_setup_universal_binary`), because an x86_64-only dylib would be refused by an arm64 host and the plugins would load and play with no hub, silently.
-On Apple a post-build step copies it into `~/Library/Application Support/SEAM` (no `sudo`).
-A release installs it by hand; see the root `README.md`.
+On Apple a post-build step copies it into `~/Library/Application Support/SEAM` (no `sudo`), **only from the tree that feeds the DAW**: `SEAM_BUILD_PLUGINS=ON` and `SMTG_CREATE_PLUGIN_LINK=ON`.
+Every plugin loaded by the DAW talks through that one file, so a tests-only tree (`build-test`) or a throwaway plugin tree (`build-hub`, links off) must not replace it, perhaps with one of another layout.
+The tests never need it: they link the `seam_hub` target, or point `SEAM_HUB_PATH` at it (`tests/CMakeLists.txt`).
+
+The SDK's validator, which loads every plugin after it is built, is turned off and run again by the root `CMakeLists.txt` with `SEAM_HUB_CONF` naming `<build>/validator-hub.conf` and `SEAM_HUB_PATH` the dylib of the same tree, so a build writes its sheets into `<build>/validator-sheets` and never among the operator's.
+
+**A release must carry `libseamhub.dylib`.**
+A release is installed by hand (root `README.md`), and the bundles do not contain the hub: without the dylib in `seam-ltm-<version>-macOS-all.zip`, `multipink`, `ltglide` and `strx` load and play in null mode, and nothing says why the exchange never happens except `strx`'s status line.
 `tools/check-minos.py` lints its minimum macOS version along with the bundles.
