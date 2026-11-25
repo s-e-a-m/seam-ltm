@@ -861,3 +861,40 @@ set_tests_properties(seam_hub_writer_test PROPERTIES
     ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF};SEAM_HUB_TEST_SHEET_DIR=${CMAKE_BINARY_DIR}/hub-sheet-roundtrip"
     FIXTURES_SETUP hub_sheet
     FIXTURES_REQUIRED hub_test_sheets)
+
+# The client against the real dylib, and against a stub that must be refused.
+# Both go through SEAM_HUB_PATH, the only candidate when set.
+add_executable(seam_hub_client_test
+    seam_hub_client_test.cpp
+)
+target_include_directories(seam_hub_client_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+# The client loads the dylib at runtime: it must exist before the test runs.
+add_dependencies(seam_hub_client_test seam_hub)
+target_compile_features(seam_hub_client_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_client_test COMMAND seam_hub_client_test)
+set_tests_properties(seam_hub_client_test PROPERTIES
+    ENVIRONMENT "SEAM_HUB_PATH=$<TARGET_FILE:seam_hub>;SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
+
+add_library(hub_badversion_stub SHARED hub_badversion_stub.cpp)
+target_include_directories(hub_badversion_stub PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(hub_badversion_stub PRIVATE cxx_std_17)
+
+add_executable(seam_hub_version_test
+    seam_hub_version_test.cpp
+)
+target_include_directories(seam_hub_version_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+add_dependencies(seam_hub_version_test hub_badversion_stub)
+target_compile_features(seam_hub_version_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_version_test COMMAND seam_hub_version_test)
+set_tests_properties(seam_hub_version_test PROPERTIES
+    ENVIRONMENT "SEAM_HUB_PATH=$<TARGET_FILE:hub_badversion_stub>;SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
