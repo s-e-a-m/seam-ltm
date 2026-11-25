@@ -1,0 +1,16 @@
+# SEAM hub sheet
+# started: 2026-11-25 14:30:02   pid: 4711   hub: 1
+14:30:05.100  strx#1        arrives   says pink  hears -
+14:30:06.250  multipink#1   state     pink  stone 1  slots 0-3  -23.0 dB  active
+14:32:07.412  strx#1        says      band-table #12  stone 1  decoder W cut 160  31 bands  646.6 s
+  | band  hz        comp_db  level_db  settled
+  | 20    19.95     +3.0     -41.2     1.00
+  | 25    25.12     -1.5     -38.0     0.98
+14:33:40.020  bastone#1     shows     band-table #12
+14:33:52.881  operator      applies   band-table #12  on bastone#1
+14:33:52.903  bastone#1     says      sections #13  common  6  rms 0.8  max 1.9  offset -3.2
+  | peak        111.4  2.00  -6.0
+  | highshelf  8000.0  0.71  +2.5
+14:34:10.000  operator      ignores   band-table #12  on strx#2
+14:40:00.000  hub           sheet     folder unreachable, 120 lines held
+14:41:00.000  strx#1        leaves

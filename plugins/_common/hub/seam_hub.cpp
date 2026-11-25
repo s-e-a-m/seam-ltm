@@ -6,6 +6,7 @@
 // What is new: each slot also carries the member's name, instance and masks,
 // kept under the registration mutex, and a line queue for the session sheet.
 #include "seam_hub.h"
+#include "seam_hub_sheet.h"
 
 #include <atomic>
 #include <chrono>
@@ -150,19 +151,10 @@ constexpr size_t kMaxQueuedLines = 10000;
 // test can see what was enqueued without racing the consumer.
 constexpr size_t kMirrorLines = 256;
 
-// Minimal private formatter, "HH:MM:SS.mmm  who  arrives  says pink  hears -".
-// Task 4 replaces this with Seam::hubsheet; kept in one place so the swap is
-// local.
-std::string clockStamp() {
-    using namespace std::chrono;
-    const auto now = system_clock::now();
-    const std::time_t t = system_clock::to_time_t(now);
-    const int ms = (int)(duration_cast<milliseconds>(now.time_since_epoch()).count() % 1000);
-    std::tm tm{};
-    localtime_r(&t, &tm);
-    char buf[32];
-    std::snprintf(buf, sizeof buf, "%02d:%02d:%02d.%03d", tm.tm_hour, tm.tm_min, tm.tm_sec, ms);
-    return buf;
+// Lines are formatted by Seam::hubsheet; this is just "now" in unix ms.
+int64_t nowMs() {
+    return (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 std::string maskNames(uint32_t mask) {
@@ -176,7 +168,7 @@ std::string maskNames(uint32_t mask) {
 }
 
 std::string whoOf(const char* name, uint32_t instance) {
-    return std::string(name) + "#" + std::to_string(instance);
+    return Seam::hubsheet::who(name, instance);
 }
 
 const char* proposalName(uint32_t type) {
@@ -322,8 +314,8 @@ int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint
         s.gen.store(g, std::memory_order_release);
         s.inUse.store(1, std::memory_order_release);
 
-        hub->enqueue(clockStamp() + "  " + whoOf(s.name, inst) + "  arrives  says " +
-                     maskNames(says) + "  hears " + maskNames(hears));
+        hub->enqueue(Seam::hubsheet::event(nowMs(), whoOf(s.name, inst), "arrives",
+                     "says " + maskNames(says) + "  hears " + maskNames(hears)));
         return encodeHandle(i, g);
     }
     return SEAM_HUB_NO_HANDLE;
@@ -339,7 +331,7 @@ void seam_hub_v1_unregister(SeamHub* hub, int32_t handle) {
     if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return;
     if (s.inUse.load(std::memory_order_relaxed) == 0) return;
 
-    hub->enqueue(clockStamp() + "  " + whoOf(s.name, s.instance) + "  leaves");
+    hub->enqueue(Seam::hubsheet::event(nowMs(), whoOf(s.name, s.instance), "leaves", ""));
 
     // Close the epoch before retiring the slot: a reader that captured the old
     // gen sees it change and rejects whatever it copied.
@@ -525,8 +517,7 @@ uint64_t seam_hub_v1_post(SeamHub* hub, int32_t handle, SeamHubProposal* inout) 
     inout->id = hub->nextId++;
     inout->authorMember = member;
     inout->authorInstance = instance;
-    inout->postedUnixMs = (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
+    inout->postedUnixMs = nowMs();
 
     // The position of the oldest proposal is reused: that IS the eviction. Its
     // lifecycle row goes with it, so the newcomer starts at "arrived" for all.
@@ -534,8 +525,9 @@ uint64_t seam_hub_v1_post(SeamHub* hub, int32_t handle, SeamHubProposal* inout) 
     hub->store[pos] = *inout;
     std::memset(hub->life[pos], 0, sizeof hub->life[pos]);
 
-    hub->enqueue(clockStamp() + "  " + who + "  says  " + proposalName(inout->type) +
-                 " #" + std::to_string(inout->id) + "  stone " + std::to_string(inout->stoneId));
+    hub->enqueue(Seam::hubsheet::event(inout->postedUnixMs, who, "says",
+                 std::string(proposalName(inout->type)) + " #" + std::to_string(inout->id) +
+                 "  stone " + std::to_string(inout->stoneId)));
     return inout->id;
 }
 
@@ -607,10 +599,10 @@ int32_t seam_hub_v1_transition(SeamHub* hub, int32_t receiver, uint64_t id, int3
 
     const std::string obj = std::string(proposalName(p->type)) + " #" + std::to_string(p->id);
     if (to == kSeamHubShown)
-        hub->enqueue(clockStamp() + "  " + who + "  shows  " + obj);
+        hub->enqueue(Seam::hubsheet::event(nowMs(), who, "shows", obj));
     else
-        hub->enqueue(clockStamp() + "  operator  " +
-                     (to == kSeamHubApplied ? "applies  " : "ignores  ") + obj + "  on " + who);
+        hub->enqueue(Seam::hubsheet::event(nowMs(), "operator",
+                     to == kSeamHubApplied ? "applies" : "ignores", obj + "  on " + who));
     return 0;
 }
 

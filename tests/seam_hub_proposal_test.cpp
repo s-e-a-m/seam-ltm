@@ -179,8 +179,8 @@ TEST_CASE("a proposal can be applied again") {
     REQUIRE(lines.size() == before + 3);
     const std::string idTxt = "#" + std::to_string(id);
     const std::string& last = lines[lines.size() - 1];
-    CHECK(last.find("operator  applies  band-table " + idTxt + "  on bastone#2") != std::string::npos);
-    CHECK(lines[lines.size() - 2].find("operator  ignores  band-table " + idTxt + "  on bastone#2") != std::string::npos);
+    CHECK(last.find("operator      applies   band-table " + idTxt + "  on bastone#2") != std::string::npos);
+    CHECK(lines[lines.size() - 2].find("operator      ignores   band-table " + idTxt + "  on bastone#2") != std::string::npos);
     for (int32_t h : {a, r}) seam_hub_v1_unregister(hub, h);
 }
 
@@ -193,8 +193,8 @@ TEST_CASE("post and shows are enqueued with who and the type") {
     seam_hub_v1_transition(hub, r, id, kSeamHubShown, 0);
     const auto lines = recentLines();
     const std::string idTxt = "#" + std::to_string(id);
-    CHECK(lines[lines.size() - 2].find("bastone#1  says  band-table " + idTxt) != std::string::npos);
-    CHECK(lines[lines.size() - 1].find("strx#1  shows  band-table " + idTxt) != std::string::npos);
+    CHECK(lines[lines.size() - 2].find("bastone#1     says      band-table " + idTxt) != std::string::npos);
+    CHECK(lines[lines.size() - 1].find("strx#1        shows     band-table " + idTxt) != std::string::npos);
     // A refused call leaves no line.
     const size_t n = lines.size();
     seam_hub_v1_transition(hub, r, id, kSeamHubApplied, 0);

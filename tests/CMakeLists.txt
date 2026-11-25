@@ -324,6 +324,12 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-uidesc.py)
 
+    # The hub sheet grammar's parser against the golden sheet.
+    add_test(NAME hub_sheet_golden
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../tools/hub-sheet.py
+                     --check ${CMAKE_CURRENT_SOURCE_DIR}/ref/hub-sheet-golden.txt)
+
     # ─── Minimum macOS the built binaries declare ────────────────────────────
     # Reads the bundles and the calibration bus as they come out of this build
     # tree, so the thing checked is the artefact a release ships and not the
@@ -797,3 +803,14 @@ target_include_directories(seam_hub_proposal_test PRIVATE
 target_link_libraries(seam_hub_proposal_test PRIVATE seam_hub)
 target_compile_features(seam_hub_proposal_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_proposal_test COMMAND seam_hub_proposal_test)
+
+# The sheet grammar: pure formatter, nothing to link but doctest.
+add_executable(seam_hub_sheet_test
+    seam_hub_sheet_test.cpp
+)
+target_include_directories(seam_hub_sheet_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(seam_hub_sheet_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_sheet_test COMMAND seam_hub_sheet_test)

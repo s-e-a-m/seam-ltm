@@ -359,9 +359,9 @@ TEST_CASE("arrivals and departures are enqueued") {
     REQUIRE(v.size() >= 2);
     const std::string& arrives = v[v.size() - 2];
     const std::string& leaves = v[v.size() - 1];
-    CHECK(arrives.find("queuetest#1  arrives") != std::string::npos);
+    CHECK(arrives.find("queuetest#1   arrives") != std::string::npos);
     CHECK(arrives.find("says pink") != std::string::npos);
-    CHECK(leaves.find("queuetest#1  leaves") != std::string::npos);
+    CHECK(leaves.find("queuetest#1   leaves") != std::string::npos);
 }
 
 TEST_CASE("the 33rd member is refused") {
