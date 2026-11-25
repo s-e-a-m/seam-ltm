@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <future>
 #include <fstream>
 #include <regex>
 #include <sstream>
@@ -32,6 +33,7 @@ extern "C" void    seam_hub_test_set_grace_ms(int32_t ms);
 extern "C" void    seam_hub_test_stall_writer(int32_t ms);
 extern "C" int32_t seam_hub_test_writer_alive(void);
 extern "C" int32_t seam_hub_test_teardown(void);
+extern "C" void    seam_hub_test_teardown_gap_ms(int32_t ms);
 
 namespace {
 
@@ -492,4 +494,25 @@ TEST_CASE("quit with a stuck writer returns within 2.1 s") {
     CHECK(seam_hub_test_writer_alive() == 1);
     seam_hub_test_set_grace_ms(kTestGraceMs);   // before the unregister that starts the grace
     seam_hub_v1_unregister(hub, a);
+}
+
+TEST_CASE("quit never joins a writer a racing register just started") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("quitrace");
+    useFolder(folder);   // no writer alive now: teardown's bounded wait ends at once
+    // Teardown sees no writer, then sleeps before it takes lifeMutex; a
+    // register in that gap starts a new writer, which stays alive while the
+    // member is registered. Teardown must not join it.
+    seam_hub_test_teardown_gap_ms(300);
+    auto quit = std::async(std::launch::async, [] { return seam_hub_test_teardown(); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    const int32_t a = seam_hub_v1_register(hub, "strx", 0, 0);
+    REQUIRE(seam_hub_test_writer_alive() == 1);
+    const bool returned = quit.wait_for(std::chrono::milliseconds(1500)) == std::future_status::ready;
+    CHECK(returned);
+    seam_hub_test_teardown_gap_ms(0);
+    seam_hub_v1_unregister(hub, a);      // lets a wrongly joined writer exit, so a RED run ends
+    const int32_t r = quit.get();
+    CHECK(r == 0);                       // the live writer was detached, not joined
 }

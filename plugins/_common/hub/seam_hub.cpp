@@ -307,6 +307,7 @@ struct SeamHub {
     uint64_t ackSeq = 0;                    // every entry <= this is written, or held
     std::atomic<int32_t> graceMs{kGraceMs}; // a test hook can shorten it
     std::atomic<int32_t> stallMs{0};        // test hook: the writer stalls before writing
+    std::atomic<int32_t> teardownGapMs{0};  // test hook: widens teardown's window between its locks
 
     // What sheet_status() reports, published by the writer after each change.
     std::mutex statusMutex;
@@ -324,21 +325,38 @@ struct SeamHub {
     bool     unreachable = false;
     uint64_t droppedAtOutage = 0;
 
-    // The host quits (or the dylib is unloaded): ask the writer for a last
-    // pass, which drains into a sheet that is already open and never opens
-    // one (writerMain), and wait for it to exit at most kLastLeaveWait. A
-    // writer that has exited is joined; one still stuck in the disk (a hung
-    // network share) is detached and left to the process exit. That is safe
-    // only because the hub is never destroyed (see g_hub below): the detached
-    // thread can never touch freed memory. Returns 1 when the writer exited
-    // (or there was none), 0 when it was detached.
+    // The host quits: ask the writer for a last pass, which drains into a
+    // sheet that is already open and never opens one (writerMain), and wait
+    // for it to exit at most kLastLeaveWait. A writer that has exited is
+    // joined; one still stuck in the disk (a hung network share) is detached
+    // and left to the process exit. Detaching is safe for two reasons
+    // together: the hub is never destroyed (see g_hub below), so the
+    // detached thread never touches freed DATA; and the dylib is never
+    // unloaded (the hub client never dlclose()s a hub it loaded), so it
+    // never runs unmapped CODE. Returns 1 when the writer had exited (or
+    // there was none), 0 when it was detached.
     int teardown() {
-        std::unique_lock<std::mutex> lk(ctlMutex);
-        stopReq = true;
-        wake.notify_all();
-        const bool exited = wake.wait_for(lk, kLastLeaveWait, [this] { return !running; });
-        lk.unlock();
+        {
+            std::unique_lock<std::mutex> lk(ctlMutex);
+            stopReq = true;
+            wake.notify_all();
+            wake.wait_for(lk, kLastLeaveWait, [this] { return !running; });
+        }
+        if (const int32_t gap = teardownGapMs.load(std::memory_order_relaxed))
+            std::this_thread::sleep_for(std::chrono::milliseconds(gap));
         std::lock_guard<std::mutex> life(lifeMutex);
+        // Re-read under lifeMutex, not the result of the wait above: between
+        // the two locks a register may have found `running` false, joined the
+        // old thread and started a new writer (it resets stopReq), and joining
+        // THAT one would wait for as long as it lives. With lifeMutex held,
+        // `writer` cannot change; `running` false means it is the thread that
+        // has done its last act (a register that sets `running` now waits on
+        // lifeMutex and finds nothing to join).
+        bool exited;
+        {
+            std::lock_guard<std::mutex> lk(ctlMutex);
+            exited = !running;
+        }
         if (writer.joinable()) {
             if (exited) writer.join();     // returned, or returning: no disk left
             else        writer.detach();
@@ -354,15 +372,19 @@ struct SeamHub {
 // the disk at quit is detached (SeamHub::teardown), and it may wake up while
 // the process is being torn down; with a destroyed hub it would lock freed
 // mutexes and write into freed queues. Never destroying it costs one object
-// the process exit reclaims anyway.
+// the process exit reclaims anyway. This protects the DATA only: the CODE the
+// detached thread runs stays mapped because the dylib is never unloaded (the
+// hub client never dlclose()s a hub it loaded, as calbus_client never did;
+// seam_calbus_client.h:78). A real dlclose with a detached writer alive would
+// run unmapped code; that rule is what makes detaching safe.
 static SeamHub& g_hub = *new SeamHub;
 
 // The bounded stop runs from the dylib's own teardown. A destructor
-// function rather than an atexit handler: it runs both at process exit and
-// if the dylib is ever unloaded (an atexit handler would have to be
-// registered from register(), on a host's thread, and would still run after
-// an unload), and it needs no registration that a failed first start could
-// skip. It never waits more than kLastLeaveWait.
+// function rather than an atexit handler: it needs no registration from
+// register() on a host's thread, none that a failed first start could skip,
+// and it is tied to this image rather than to whoever called atexit. In
+// practice it runs at process exit only, since the dylib is never unloaded
+// (see g_hub). It never waits more than kLastLeaveWait.
 __attribute__((destructor)) static void seamHubTeardown() { g_hub.teardown(); }
 
 namespace { void writerMain(SeamHub* hub); }
@@ -1218,6 +1240,12 @@ SEAM_HUB_API void seam_hub_test_stall_writer(int32_t ms) {
 // 1 when the writer exited within the bound, 0 when it was detached.
 SEAM_HUB_API int32_t seam_hub_test_teardown(void) {
     return g_hub.teardown();
+}
+
+// Makes teardown() sleep `ms` after its bounded wait and before it takes
+// lifeMutex: the window in which a register can start a new writer.
+SEAM_HUB_API void seam_hub_test_teardown_gap_ms(int32_t ms) {
+    g_hub.teardownGapMs.store(ms < 0 ? 0 : ms, std::memory_order_relaxed);
 }
 
 // 1 while a writer thread is alive (working or lingering), 0 once it exited.
