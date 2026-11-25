@@ -149,29 +149,32 @@ Alternatively, after the first blocked load attempt you can authorize each
 plugin via **System Settings → Privacy & Security → "Open Anyway"** — but the
 `xattr` route is faster and covers every plugin in one command.
 
-#### The calibration bus
+#### The hub
 
 **MULTIPINK**, **LTGLIDE** and **STRX** reach each other through
-`libseamcalbus.dylib`, a small shared library that lives outside the bundles.
+`libseamhub.dylib`, a small shared library that lives outside the bundles.
 Static state stops at the edge of a `.vst3` module, so three separate bundles
-need one shared object to hold the bus — see
-`plugins/_common/calbus/seam_calbus.h` for the full rationale.
+need one shared object to hold the hub — see
+`plugins/_common/hub/README.md` for the full rationale.
+The hub also writes a text sheet of each calibration session, by default to
+`~/Documents/SEAM/sheets` (change it with `sheet-folder = <path>` in
+`~/Library/Application Support/SEAM/hub.conf`).
 
 A source build installs it automatically. Installing from a release, copy it
 by hand from `seam-ltm-<version>-macOS-all.zip`:
 
 ```bash
 mkdir -p ~/Library/Application\ Support/SEAM
-cp libseamcalbus.dylib ~/Library/Application\ Support/SEAM/
-xattr -dr com.apple.quarantine ~/Library/Application\ Support/SEAM/libseamcalbus.dylib
+cp libseamhub.dylib ~/Library/Application\ Support/SEAM/
+xattr -dr com.apple.quarantine ~/Library/Application\ Support/SEAM/libseamhub.dylib
 ```
 
 The client looks in `~/Library/Application Support/SEAM` first and in
-`/Library/Application Support/SEAM` second. Setting `SEAM_CALBUS_PATH`
+`/Library/Application Support/SEAM` second. Setting `SEAM_HUB_PATH`
 overrides both: it then becomes the only location tried, so that an
 explicitly pointed-at library is the one that loads.
 When the library is missing the three plugins still load and play, and STRX
-reports `calbus unavailable` on its status line.
+reports `hub unavailable` on its status line.
 
 ### Linux
 
@@ -292,7 +295,7 @@ it re-implements by hand, so that a student can read the DSP from the source
 in front of them.
 Code shared between plugins lives in `plugins/_common/` — the Haar bank, the
 quadrature designer, the FFT, the rotation matrices, the meters — and the
-peer-aware calibration bus lives in `plugins/_common/calbus/`, compiled once
+peer-aware message hub lives in `plugins/_common/hub/`, compiled once
 into its own dylib because static state does not cross `.vst3` module
 boundaries.
 

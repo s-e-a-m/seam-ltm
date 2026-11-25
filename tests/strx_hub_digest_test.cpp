@@ -133,7 +133,7 @@ TEST_CASE("digest follows the same record the status line names") {
 
 //──────────────────────────────────────────────────────────────────────────
 // holdAction (via its boolean edge, "!= HoldAction::None") — the new-pass
-// decision CalbusWatch::poll() drives the hold epoch with. Exercised through
+// decision HubWatch::poll() drives the hold epoch with. Exercised through
 // digest() + real record builders (not hand-built HubDigest values) so
 // the tests cover the actual seam between the two functions, the same seam
 // that hid the cross-instance collision. These five cases used to pin
@@ -334,7 +334,7 @@ TEST_CASE("digest captures the active glide's generation parameters") {
 
 //──────────────────────────────────────────────────────────────────────────
 // pinkTakeover — the edge detector that fires exactly once when a non-glide
-// (pink) emitter becomes the active one, so CalbusWatch can bump the session
+// (pink) emitter becomes the active one, so HubWatch can bump the session
 // epoch and permanently discard the glide accumulation the pink interrupted
 // (GS's "last measure wins" decision, 2026-07-21): a stopped pink must never
 // let a stale glide accumulation reappear on the spectrum.

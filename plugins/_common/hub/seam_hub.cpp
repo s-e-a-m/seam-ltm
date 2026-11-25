@@ -1,8 +1,8 @@
 // libseamhub — members, states, proposals and the session sheet's single
 // writer (Tasks 2-5). The sheet's grammar is seam_hub_sheet.h.
 //
-// The slot machinery below is ported from seam_calbus.cpp with the logic
-// unchanged (Slot, encodeHandle, seqlock, epoch check, kMaxReadAttempts).
+// The slot machinery below is the suite's earlier peer-aware bus, carried
+// over with its logic unchanged (Slot, encodeHandle, seqlock, epoch check, kMaxReadAttempts).
 // What is new: each slot also carries the member's name, instance and masks,
 // kept under the registration mutex, and a line queue for the session sheet.
 #include "seam_hub.h"
@@ -374,8 +374,7 @@ struct SeamHub {
 // mutexes and write into freed queues. Never destroying it costs one object
 // the process exit reclaims anyway. This protects the DATA only: the CODE the
 // detached thread runs stays mapped because the dylib is never unloaded (the
-// hub client never dlclose()s a hub it loaded, as calbus_client never did;
-// seam_calbus_client.h:78). A real dlclose with a detached writer alive would
+// hub client never dlclose()s a hub it loaded, seam_hub_client.h). A real dlclose with a detached writer alive would
 // run unmapped code; that rule is what makes detaching safe.
 static SeamHub& g_hub = *new SeamHub;
 

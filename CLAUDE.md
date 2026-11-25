@@ -73,6 +73,14 @@ retrofit peer awareness into existing plugins speculatively** — only when a
 real user-facing problem motivates it. Each candidate upgrade gets its own
 brainstorming and spec.
 
+Cross-*bundle* awareness (plugins from different `.vst3` files that need to
+see each other) cannot use static state, which stops at the module edge. The
+shared ground for that is `libseamhub` (`plugins/_common/hub/`, read its
+`README.md` first): a dylib the plugins `dlopen`, carrying states, proposals
+and the session sheet. The same rule holds there — no speculative retrofit; a
+plugin joins the hub only when a real problem motivates it, and `multipink_pool`
+stays separate because an allocator must not depend on an optional dylib.
+
 ## Documentation and web publishing
 
 `doc/plugins.toml` is the registry of the twenty-two plugins and the single source for two outputs: the tables in `README.md` and the page at `/seam-ltm/` on the SEAM site.

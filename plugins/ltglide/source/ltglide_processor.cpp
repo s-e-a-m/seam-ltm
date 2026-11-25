@@ -261,7 +261,7 @@ tresult PLUGIN_API LTGLIDEProcessor::setState(IBStream* state) {
     if (!s.readDouble(t))     return kResultFalse;
     if (!s.readInt32(loop))   return kResultFalse;
     // stoneId gets a local default like every other parameter above: if the
-    // read fails (pre-calbus preset) or the range is invalid, this stores 0
+    // read fails (a preset saved before the bus existed) or the range is invalid, this stores 0
     // (undeclared) unconditionally, rather than leaving whatever stoneId the
     // instance already had in place -- a stale STONE id would attribute a
     // calibration pass to a loudspeaker the loaded preset never named.
@@ -434,7 +434,7 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
     prevGainLin_ = targetGain;
 
     // Edge-detect the run/idle transition instead of publishing every idle
-    // block. -1 has exactly one contracted meaning (seam_calbus.h: "the host
+    // block. -1 has exactly one contracted meaning (the glide state in ltglide_hub.h: "the host
     // gave no valid continuous clock"), so an idle heartbeat that republished
     // passStartSample=-1 every block would make a COMPLETED pass (passCounter
     // already at N) indistinguishable from a pass that was never anchored.

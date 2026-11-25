@@ -93,7 +93,6 @@ add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
 # plugin targets here had no effect (they never test it), so it is omitted.
 
 # ─── Shared compiled libraries ───────────────────────────────────────────────
-add_subdirectory(plugins/_common/calbus)
 add_subdirectory(plugins/_common/hub)
 
 # ─── Plugins ─────────────────────────────────────────────────────────────────
@@ -106,7 +105,7 @@ add_subdirectory(plugins/_common/hub)
 #
 # Turn this OFF for any build tree that is not the one feeding the DAW:
 #   cmake -B build-test -DSEAM_BUILD_TESTS=ON -DSEAM_BUILD_PLUGINS=OFF
-# The unit tests need only the SDK-free cores (headers) and libseamcalbus, both
+# The unit tests need only the SDK-free cores (headers) and libseamhub, both
 # of which are configured above, outside this block.
 option(SEAM_BUILD_PLUGINS "Build the VST3 plugins (owns the ~/Library/Audio/Plug-Ins/VST3 symlinks)" ON)
 

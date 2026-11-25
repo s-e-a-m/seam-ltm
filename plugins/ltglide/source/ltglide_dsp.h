@@ -158,7 +158,7 @@ public:
 
     // Monotone pass counter, +1 at each pass start. The receiver samples this
     // at GUI rate and cannot otherwise distinguish a new pass from the
-    // previous one when the parameters are identical (calbus, Spec 2).
+    // previous one when the parameters are identical (hub, Spec 2).
     uint64_t passCount() const { return passCounter_; }
 
     Tick process() {
@@ -216,10 +216,10 @@ private:
     bool playedThisRun_ = false;    // LOOP-off latch: one pass per play edge
 };
 
-// Bus-publish bookkeeping (calbus, Spec 2): decides WHEN to publish and WHAT
+// Bus-publish bookkeeping (hub, Spec 2): decides WHEN to publish and WHAT
 // anchor to publish, without touching the bus itself. SDK-free and pure
 // logic over primitives (uint64_t/int64_t/bool), so the processor's publish
-// policy is unit-testable even though CalbusClient/SeamCalbusRecord are not
+// policy is unit-testable even though HubClient/SeamHubState are not
 // (see ltglide_processor.h/.cpp, which own the actual publish() calls).
 //
 // Two independent edges feed the calibration bus:
@@ -227,7 +227,7 @@ private:
 //   - the transport's running/idle state CHANGING across a block boundary
 //     (per-block, via onRunningChanged()).
 //
-// The load-bearing rule (seam_calbus.h's passStartSample contract): -1 means
+// The load-bearing rule (the passStartSample contract of the glide state, ltglide_hub.h): -1 means
 // exactly one thing, "no valid host clock for this pass's anchor" -- never
 // "the transport happens to be idle right now". A completed pass's anchor
 // must therefore survive the run->idle transition instead of being

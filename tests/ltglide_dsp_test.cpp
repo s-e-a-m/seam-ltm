@@ -415,7 +415,7 @@ TEST_CASE("passCount survives reset() and prepare()") {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// BusAnchor -- the calbus publish-policy bookkeeping extracted from
+// BusAnchor -- the hub publish-policy bookkeeping extracted from
 // LTGLIDEProcessor (ltglide_processor.cpp). SDK-free, pure logic over
 // uint64_t/int64_t/bool, so it is exercised here exactly as it runs in the
 // processor: per-sample onSample() calls inside a block's loop, then one

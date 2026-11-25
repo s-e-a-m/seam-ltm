@@ -1,6 +1,6 @@
 # libseamhub — the SEAM message hub.
 #
-# The suite's in-process message hub (replaces calbus). A shared library, not a
+# The suite's in-process message hub (it replaced the suite's earlier bus). A shared library, not a
 # header, because static state does not cross .vst3 module boundaries.
 # See seam_hub.h for the rationale.
 add_library(seam_hub SHARED seam_hub.cpp)

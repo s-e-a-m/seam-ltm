@@ -243,7 +243,7 @@ tresult PLUGIN_API MULTIPINKProcessor::setState(IBStream* state) {
     // parameter existed simply fail the read below. Store unconditionally
     // (0 = undeclared on failure or out-of-range) like every other parameter
     // above, rather than only inside the success branch -- otherwise loading
-    // a pre-calbus preset into an instance where the user had set a STONE id
+    // a preset saved before the bus existed into an instance where the user had set a STONE id
     // would leave that stale id in place, attributing a calibration pass to
     // a loudspeaker the loaded preset never named.
     int32 stoneId = 0;

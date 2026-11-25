@@ -119,9 +119,9 @@ private:
     std::atomic<int>    paramPower_{1};          // 1 = sounding (POWER on)
     std::atomic<int>    paramStoneId_{0};        // 0 = undeclared, 1..8
 
-    // Calibration bus (Spec 2). The handle is claimed in setActive and
+    // Calibration hub (Spec 2). The handle is claimed in setActive and
     // released there; publishing happens from process() on the audio thread,
-    // which is why the bus uses a seqlock and not a mutex.
+    // which is why the hub uses a seqlock and not a mutex.
     int32_t hubHandle_ = SEAM_HUB_NO_HANDLE;
 
     // Build and publish this instance's record. Safe to call from the audio

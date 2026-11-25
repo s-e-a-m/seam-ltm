@@ -1,7 +1,7 @@
 # SEAM-LTM unit tests (doctest; SDK-free DSP cores, except seam_state_test
 # which links the SDK base/common layers to test the IBStream decode rule)
 
-# seam_calbus_test spawns std::thread for its seqlock hammer/churn stress
+# seam_hub_state_test spawns std::thread for its seqlock hammer/churn stress
 # tests. Links fine without this on macOS/libc++ (pthread is pulled in
 # transitively), but not on Linux, which this suite also targets
 # (linuxmain.cpp exists in the plugin CMake files) — find and link it
@@ -244,52 +244,6 @@ target_include_directories(strx_dsp_test PRIVATE
 target_compile_features(strx_dsp_test PRIVATE cxx_std_17)
 add_test(NAME strx_dsp_test COMMAND strx_dsp_test)
 
-add_executable(seam_calbus_test
-    seam_calbus_test.cpp
-)
-target_include_directories(seam_calbus_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-target_link_libraries(seam_calbus_test PRIVATE seam_calbus Threads::Threads)
-target_compile_features(seam_calbus_test PRIVATE cxx_std_17)
-add_test(NAME seam_calbus_test COMMAND seam_calbus_test)
-
-add_executable(seam_calbus_client_test
-    seam_calbus_client_test.cpp
-)
-target_include_directories(seam_calbus_client_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-# The client loads the dylib at runtime — it must exist before the test runs.
-add_dependencies(seam_calbus_client_test seam_calbus)
-target_compile_features(seam_calbus_client_test PRIVATE cxx_std_17)
-add_test(NAME seam_calbus_client_test COMMAND seam_calbus_client_test)
-set_tests_properties(seam_calbus_client_test PROPERTIES
-    ENVIRONMENT "SEAM_CALBUS_PATH=$<TARGET_FILE:seam_calbus>"
-)
-
-add_library(calbus_badversion_stub SHARED calbus_badversion_stub.cpp)
-target_include_directories(calbus_badversion_stub PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-target_compile_features(calbus_badversion_stub PRIVATE cxx_std_17)
-
-add_executable(seam_calbus_version_test
-    seam_calbus_version_test.cpp
-)
-target_include_directories(seam_calbus_version_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-add_dependencies(seam_calbus_version_test calbus_badversion_stub)
-target_compile_features(seam_calbus_version_test PRIVATE cxx_std_17)
-add_test(NAME seam_calbus_version_test COMMAND seam_calbus_version_test)
-set_tests_properties(seam_calbus_version_test PROPERTIES
-    ENVIRONMENT "SEAM_CALBUS_PATH=$<TARGET_FILE:calbus_badversion_stub>"
-)
-
 add_executable(strx_hub_digest_test
     strx_hub_digest_test.cpp
 )
@@ -359,7 +313,7 @@ if(Python3_Interpreter_FOUND)
                  COMMAND ${Python3_EXECUTABLE}
                          ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-minos.py
                          ${_minos_bundles}
-                         $<TARGET_FILE:seam_calbus>)
+                         $<TARGET_FILE:seam_hub>)
     endif()
 else()
     message(STATUS "Python3 not found — uidesc lint tests will not be registered")
@@ -805,7 +759,7 @@ add_test(NAME seam_hub_layout_test COMMAND seam_hub_layout_test)
 set_tests_properties(seam_hub_layout_test PROPERTIES ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
     FIXTURES_REQUIRED hub_test_sheets)
 
-# Members and wait-free states, ported from the calbus tests. Spawns threads
+# Members and wait-free states, ported from the earlier bus's tests. Spawns threads
 # for the seqlock hammer and churn cases, hence Threads.
 add_executable(seam_hub_state_test
     seam_hub_state_test.cpp

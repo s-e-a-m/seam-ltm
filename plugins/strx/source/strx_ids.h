@@ -28,8 +28,8 @@ static const char* kViewBandTable  = "StrxBandTable";
 static const char* kViewSaveButton = "StrxSaveButton";
 static const char* kViewMeters     = "StrxMeters";
 
-// Calibration-bus status line (calbus Task 5, strx_status.h): the one
-// user-visible feature of the calibration bus and its own diagnostic. Not
+// Hub status line (strx_status.h): the one
+// user-visible feature of the hub link and its own diagnostic. Not
 // one of the three analysis panes above; sits in the footer strip.
 static const char* kViewStatus = "StrxStatus";
 

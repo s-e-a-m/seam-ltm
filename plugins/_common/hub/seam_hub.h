@@ -1,13 +1,14 @@
 //──────────────────────────────────────────────────────────────────────────
 // SEAM-LTM · hub — the suite's in-process message hub
 //
-// Replaces calbus. Where calbus carried one record per emitter, the hub
+// It replaced the suite's earlier bus, which carried one record per
+// emitter. The hub
 // carries two kinds of thing: STATES (what a member is doing right now,
 // overwritten in place, read by anyone) and PROPOSALS (something one member
 // suggests to the others, kept in a bounded store with a lifecycle per
 // receiver).
 //
-// WHY A SEPARATE DYLIB: same reason as calbus. Static state does not cross
+// WHY A SEPARATE DYLIB: same reason as for the earlier bus. Static state does not cross
 // .vst3 module boundaries, and the plugins are separate bundles. The shared
 // ground is declared explicitly here, in one dylib they all load.
 //
@@ -72,8 +73,8 @@ typedef struct {
     double   subHz;
 } SeamHubDecoder;
 
-// One member's current state. Field names are kept from SeamCalbusRecord on
-// purpose, so the emitters port with a rename and nothing else.
+// One member's current state. Field names are kept from the earlier bus's
+// record on purpose, so the emitters ported with a rename and nothing else.
 typedef struct SeamHubState {
     uint32_t kind;          // SeamHubType (a state type)
     uint32_t stoneId;
