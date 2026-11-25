@@ -1,4 +1,4 @@
-// libseamhub — members and states (Task 2). Proposals, the sheet writer and
+// libseamhub — members, states and proposals (Tasks 2-3). The sheet writer and
 // the real line formatter arrive in later tasks; their entry points stay stubs.
 //
 // The slot machinery below is ported from seam_calbus.cpp with the logic
@@ -179,6 +179,31 @@ std::string whoOf(const char* name, uint32_t instance) {
     return std::string(name) + "#" + std::to_string(instance);
 }
 
+const char* proposalName(uint32_t type) {
+    switch (type) {
+        case kSeamHubBandTable: return "band-table";
+        case kSeamHubSections:  return "sections";
+        default:                return "unknown";
+    }
+}
+
+// The stone a member is on: its last published state's stoneId, 0 without one.
+// Read through the seqlock like members() does, bounded: a GUI-side lookup
+// must return, so 0 if every attempt tears.
+uint32_t stoneOf(const Slot& s) {
+    for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
+        const uint32_t s1 = s.seq.load(std::memory_order_acquire);
+        if (s1 & 1u) continue;
+        const uint32_t pub = s.published.load(std::memory_order_acquire);
+        SeamHubState tmp;
+        std::memcpy(&tmp, &s.state, sizeof tmp);
+        std::atomic_thread_fence(std::memory_order_acquire);
+        if (s.seq.load(std::memory_order_relaxed) != s1) continue;
+        return pub ? tmp.stoneId : 0u;
+    }
+    return 0u;
+}
+
 } // namespace
 
 struct SeamHub {
@@ -187,12 +212,32 @@ struct SeamHub {
     // Never taken by publish_state.
     std::mutex regMutex;
 
-    // Lock order: regMutex, then lineMutex. Separate from regMutex so the
+    // Lock order: (storeMutex,) regMutex, then lineMutex. Separate from regMutex so the
     // writer draining the queue never holds up a registering plugin.
     std::mutex                lineMutex;
     std::deque<std::string>   lines;
     std::deque<std::string>   mirror;
     uint64_t                  droppedLines = 0;
+
+    // ---- proposals --------------------------------------------------------
+    // LOCK ORDER, whole file: storeMutex, then regMutex, then lineMutex.
+    // Proposals are a GUI-thread business, so one mutex guards the store and
+    // the lifecycle table; the audio thread never touches it. post() and
+    // transition() need member data (masks, name, stone id), so they take
+    // regMutex INSIDE storeMutex, copy what they need into locals and release
+    // it before enqueueing. Nothing takes storeMutex while holding regMutex
+    // or lineMutex, so there is no cycle.
+    std::mutex       storeMutex;
+    SeamHubProposal  store[SEAM_HUB_STORE]{};   // id N lives at (N - 1) % SEAM_HUB_STORE
+    uint64_t         nextId = 1;                // monotone, never reused
+
+    // Lifecycle per (store position, member slot). A cell only counts while
+    // its `gen` equals the member slot's current epoch: a member that leaves
+    // and a newcomer in the same slot have different gens, so the newcomer
+    // never inherits the old lifecycle, and nothing walks the table on
+    // (un)registration. `st` 0 = never transitioned.
+    struct Cell { uint32_t gen; uint8_t st; };
+    Cell             life[SEAM_HUB_STORE][SEAM_HUB_MAX_MEMBERS]{};
 
     void enqueue(std::string line) {
         std::lock_guard<std::mutex> lock(lineMutex);
@@ -433,11 +478,142 @@ SEAM_HUB_API int32_t seam_hub_test_recent_lines(char* out, int32_t cap) {
     return count;
 }
 
-// Later tasks.
-uint64_t seam_hub_v1_post(SeamHub*, int32_t, SeamHubProposal*) { return 0; }
-int32_t  seam_hub_v1_proposals(SeamHub*, uint64_t, SeamHubProposal*, int32_t) { return 0; }
-int32_t  seam_hub_v1_lifecycle(SeamHub*, int32_t, uint64_t) { return kSeamHubNone; }
-int32_t  seam_hub_v1_transition(SeamHub*, int32_t, uint64_t, int32_t, int32_t) { return 0; }
+// ---- proposals ------------------------------------------------------------
+namespace {
+
+// A live slot for this handle, checked under regMutex (the caller holds it).
+bool liveSlot(SeamHub* hub, int32_t handle, Slot*& out) {
+    if (handle < 0) return false;
+    Slot& s = hub->slots[handleIndex(handle)];
+    if (s.inUse.load(std::memory_order_relaxed) == 0 ||
+        s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return false;
+    out = &s;
+    return true;
+}
+
+// Does a receiver with these hears/stone hear this proposal?
+bool heard(uint32_t hears, uint32_t recvStone, const SeamHubProposal& p) {
+    if (p.type >= 32 || !(hears & SEAM_HUB_BIT(p.type))) return false;
+    return p.stoneId == 0 || recvStone == 0 || p.stoneId == recvStone;
+}
+
+// The stored record for an id, or null when unknown or evicted. storeMutex held.
+SeamHubProposal* find(SeamHub* hub, uint64_t id) {
+    if (id == 0 || id >= hub->nextId) return nullptr;
+    SeamHubProposal& p = hub->store[(id - 1) % SEAM_HUB_STORE];
+    return p.id == id ? &p : nullptr;
+}
+
+} // namespace
+
+uint64_t seam_hub_v1_post(SeamHub* hub, int32_t handle, SeamHubProposal* inout) {
+    if (!hub || !inout || inout->type >= 32) return 0;
+    std::lock_guard<std::mutex> store(hub->storeMutex);
+
+    std::string who;
+    uint32_t member = 0, instance = 0;
+    {
+        std::lock_guard<std::mutex> lock(hub->regMutex);
+        Slot* s = nullptr;
+        if (!liveSlot(hub, handle, s)) return 0;
+        if (!(s->says & SEAM_HUB_BIT(inout->type))) return 0;
+        member = (uint32_t)handleIndex(handle);
+        instance = s->instance;
+        who = whoOf(s->name, s->instance);
+    }
+
+    inout->id = hub->nextId++;
+    inout->authorMember = member;
+    inout->authorInstance = instance;
+    inout->postedUnixMs = (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+
+    // The position of the oldest proposal is reused: that IS the eviction. Its
+    // lifecycle row goes with it, so the newcomer starts at "arrived" for all.
+    const size_t pos = (inout->id - 1) % SEAM_HUB_STORE;
+    hub->store[pos] = *inout;
+    std::memset(hub->life[pos], 0, sizeof hub->life[pos]);
+
+    hub->enqueue(clockStamp() + "  " + who + "  says  " + proposalName(inout->type) +
+                 " #" + std::to_string(inout->id) + "  stone " + std::to_string(inout->stoneId));
+    return inout->id;
+}
+
+int32_t seam_hub_v1_proposals(SeamHub* hub, uint64_t afterId, SeamHubProposal* out, int32_t max) {
+    if (!hub || !out || max <= 0) return 0;
+    std::lock_guard<std::mutex> store(hub->storeMutex);
+    // Ids are contiguous: the store holds [nextId - SEAM_HUB_STORE, nextId).
+    uint64_t from = hub->nextId > SEAM_HUB_STORE ? hub->nextId - SEAM_HUB_STORE : 1;
+    if (afterId + 1 > from) from = afterId + 1;
+    int32_t n = 0;
+    for (uint64_t id = from; id < hub->nextId && n < max; ++id)
+        out[n++] = hub->store[(id - 1) % SEAM_HUB_STORE];
+    return n;
+}
+
+int32_t seam_hub_v1_lifecycle(SeamHub* hub, int32_t receiver, uint64_t id) {
+    if (!hub) return kSeamHubNone;
+    std::lock_guard<std::mutex> store(hub->storeMutex);
+    const SeamHubProposal* p = find(hub, id);
+    if (!p) return kSeamHubNone;
+    uint32_t hears = 0, gen = 0, stone = 0;
+    int32_t idx = 0;
+    {
+        std::lock_guard<std::mutex> lock(hub->regMutex);
+        Slot* s = nullptr;
+        if (!liveSlot(hub, receiver, s)) return kSeamHubNone;
+        idx = handleIndex(receiver);
+        hears = s->hears;
+        gen = s->gen.load(std::memory_order_relaxed);
+        stone = stoneOf(*s);
+    }
+    if (!heard(hears, stone, *p)) return kSeamHubNone;
+    const auto& c = hub->life[(id - 1) % SEAM_HUB_STORE][idx];
+    return (c.gen == gen && c.st != 0) ? c.st : kSeamHubArrived;
+}
+
+int32_t seam_hub_v1_transition(SeamHub* hub, int32_t receiver, uint64_t id, int32_t to, int32_t byOperator) {
+    if (!hub) return -1;
+    std::lock_guard<std::mutex> store(hub->storeMutex);
+    const SeamHubProposal* p = find(hub, id);
+    if (!p) return -1;
+    uint32_t hears = 0, gen = 0, stone = 0;
+    int32_t idx = 0;
+    std::string who;
+    {
+        std::lock_guard<std::mutex> lock(hub->regMutex);
+        Slot* s = nullptr;
+        if (!liveSlot(hub, receiver, s)) return -2;     // no such receiver: it hears nothing
+        idx = handleIndex(receiver);
+        hears = s->hears;
+        gen = s->gen.load(std::memory_order_relaxed);
+        stone = stoneOf(*s);
+        who = whoOf(s->name, s->instance);
+    }
+    if (!heard(hears, stone, *p)) return -2;
+
+    const bool decision = (to == kSeamHubApplied || to == kSeamHubIgnored);
+    // Checked before legality: applying without the operator is refused
+    // whatever the state (no member acts on what it hears by itself).
+    if (decision && !byOperator) return -4;
+
+    auto& c = hub->life[(id - 1) % SEAM_HUB_STORE][idx];
+    const int32_t from = (c.gen == gen && c.st != 0) ? c.st : kSeamHubArrived;
+    const bool legal = (from == kSeamHubArrived) ? (to == kSeamHubShown)
+                                                 : decision;   // shown/applied/ignored -> applied|ignored
+    if (!legal) return -3;
+    c.gen = gen;
+    c.st = (uint8_t)to;
+
+    const std::string obj = std::string(proposalName(p->type)) + " #" + std::to_string(p->id);
+    if (to == kSeamHubShown)
+        hub->enqueue(clockStamp() + "  " + who + "  shows  " + obj);
+    else
+        hub->enqueue(clockStamp() + "  operator  " +
+                     (to == kSeamHubApplied ? "applies  " : "ignores  ") + obj + "  on " + who);
+    return 0;
+}
+
 void     seam_hub_v1_sheet_status(SeamHub*, SeamHubSheetStatus*) {}
 int32_t  seam_hub_v1_sheet_set_folder(SeamHub*, const char*) { return -1; }
 void     seam_hub_v1_sheet_new(SeamHub*) {}

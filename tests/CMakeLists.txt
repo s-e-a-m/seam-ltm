@@ -785,3 +785,15 @@ target_include_directories(seam_hub_state_test PRIVATE
 target_link_libraries(seam_hub_state_test PRIVATE seam_hub Threads::Threads)
 target_compile_features(seam_hub_state_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_state_test COMMAND seam_hub_state_test)
+
+# Proposals and the per-receiver lifecycle.
+add_executable(seam_hub_proposal_test
+    seam_hub_proposal_test.cpp
+)
+target_include_directories(seam_hub_proposal_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_link_libraries(seam_hub_proposal_test PRIVATE seam_hub)
+target_compile_features(seam_hub_proposal_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_proposal_test COMMAND seam_hub_proposal_test)
