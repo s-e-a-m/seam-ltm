@@ -94,6 +94,7 @@ add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
 
 # ─── Shared compiled libraries ───────────────────────────────────────────────
 add_subdirectory(plugins/_common/calbus)
+add_subdirectory(plugins/_common/hub)
 
 # ─── Plugins ─────────────────────────────────────────────────────────────────
 # smtg_add_vst3plugin installs a POST_BUILD symlink into

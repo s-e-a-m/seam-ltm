@@ -760,3 +760,15 @@ if(APPLE)
 endif()
 target_compile_features(alogos_state_test PRIVATE cxx_std_17)
 add_test(NAME alogos_state_test COMMAND alogos_state_test)
+
+# The hub's ABI contract: sizeof pins and the version, against the real dylib.
+add_executable(seam_hub_layout_test
+    seam_hub_layout_test.cpp
+)
+target_include_directories(seam_hub_layout_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_link_libraries(seam_hub_layout_test PRIVATE seam_hub)
+target_compile_features(seam_hub_layout_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_layout_test COMMAND seam_hub_layout_test)
