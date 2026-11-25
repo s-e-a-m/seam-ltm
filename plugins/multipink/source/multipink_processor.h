@@ -4,7 +4,8 @@
 
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "multipink_ids.h"
-#include "seam_calbus_client.h"
+#include "seam_hub_client.h"
+#include "multipink_hub.h"
 
 #include <algorithm>
 #include <atomic>
@@ -121,11 +122,11 @@ private:
     // Calibration bus (Spec 2). The handle is claimed in setActive and
     // released there; publishing happens from process() on the audio thread,
     // which is why the bus uses a seqlock and not a mutex.
-    int32_t busHandle_ = SEAM_CALBUS_NO_HANDLE;
+    int32_t hubHandle_ = SEAM_HUB_NO_HANDLE;
 
     // Build and publish this instance's record. Safe to call from the audio
     // thread; a no-op when the bus is unavailable or the slot is unclaimed.
-    void publishBusRecord();
+    void publishHubState();
 
     // DSP state — full pool always advanced.
     uint32_t lcgState_[kPoolSize] = {};

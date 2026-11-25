@@ -141,7 +141,8 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         lastTickWasGlide_ = false;         // no in-flight grain carries across (re)activation
         prevGainLin_ = computeGainLin();
 
-        busHandle_ = CalbusClient::instance().registerSlot();
+        hubHandle_ = HubClient::instance().registerMember(
+            "ltglide", SEAM_HUB_BIT(kSeamHubGlide), 0);
         // (Re)activation always lands in Idle (see transport_.reset() above,
         // which never resumes a pass mid-way), so there is no pass to anchor
         // yet; reset the edge-detect state so a reactivated instance does not
@@ -154,10 +155,10 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         // than its absolute value -- which is the documented reason the
         // counter is monotone in the first place. Left as-is (behaviour
         // unchanged); flagging here for whoever implements that receiver.
-        publishBusRecord(-1);
+        publishHubState(-1);
     } else {
-        CalbusClient::instance().unregisterSlot(busHandle_);
-        busHandle_ = SEAM_CALBUS_NO_HANDLE;
+        HubClient::instance().unregisterMember(hubHandle_);
+        hubHandle_ = SEAM_HUB_NO_HANDLE;
     }
     return SingleComponentEffect::setActive(state);
 }
@@ -172,25 +173,15 @@ tresult PLUGIN_API LTGLIDEProcessor::setupProcessing(ProcessSetup& setup) {
     return SingleComponentEffect::setupProcessing(setup);
 }
 
-void LTGLIDEProcessor::publishBusRecord(int64_t hostStartSample) {
-    if (busHandle_ == SEAM_CALBUS_NO_HANDLE) return;
+void LTGLIDEProcessor::publishHubState(int64_t hostStartSample) {
+    if (hubHandle_ == SEAM_HUB_NO_HANDLE) return;
 
-    SeamCalbusRecord r{};
-    r.kind    = kSeamCalbusGlide;
-    r.stoneId = (uint32_t)paramStoneId_.load();
-    r.active  = transport_.running() ? 1u : 0u;
-    r.levelDb = paramLevelDb_.load();
-    r.sampleRate = processSetup.sampleRate;
-    r.u.glide.passCounter     = transport_.passCount();
-    r.u.glide.passStartSample = hostStartSample;
-    r.u.glide.f0          = paramF0Hz_.load();
-    r.u.glide.f1          = paramF1Hz_.load();
-    r.u.glide.durationSec = paramTSec_.load();
-    r.u.glide.deltaSec    = paramDeltaSec_.load();
-    r.u.glide.sweepMode   = (uint32_t)paramSmode_.load();
-    r.u.glide.diracMode   = (uint32_t)paramDmode_.load();
-
-    CalbusClient::instance().publish(busHandle_, r);
+    HubClient::instance().publishState(hubHandle_, ltglide::makeGlideState(
+        (uint32_t)paramStoneId_.load(), transport_.running(), paramLevelDb_.load(),
+        processSetup.sampleRate, transport_.passCount(), hostStartSample,
+        paramF0Hz_.load(), paramF1Hz_.load(), paramTSec_.load(),
+        paramDeltaSec_.load(), (uint32_t)paramSmode_.load(),
+        (uint32_t)paramDmode_.load()));
 }
 
 tresult PLUGIN_API LTGLIDEProcessor::process(ProcessData& data) {
@@ -438,7 +429,7 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
         // unit-tested in tests/ltglide_dsp_test.cpp).
         int64_t anchor = -1;
         if (busAnchor_.onSample(transport_.passCount(), blockStartSample, s, &anchor))
-            publishBusRecord(anchor);
+            publishHubState(anchor);
     }
     prevGainLin_ = targetGain;
 
@@ -454,7 +445,7 @@ void LTGLIDEProcessor::processBlock(SampleType** outputs, int numChannels, int n
     // twice instead of emitting a false unanchored one.
     int64_t anchor = -1;
     if (busAnchor_.onRunningChanged(transport_.running(), &anchor))
-        publishBusRecord(anchor);
+        publishHubState(anchor);
 }
 
 template void LTGLIDEProcessor::processBlock<float>(float**, int, int, int64_t);

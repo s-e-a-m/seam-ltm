@@ -2,6 +2,7 @@
 #include "doctest/doctest.h"
 #include "multipink_pink.h"
 #include "strx_bands.h"
+#include "multipink_hub.h"
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -159,4 +160,19 @@ TEST_CASE("the error does not grow with the sample rate, as an Hz-anchored desig
     const double at48  = worstDeviation(48000.0);
     const double at192 = worstDeviation(192000.0);
     CHECK(std::fabs(at192 - at48) < 0.05);
+}
+
+TEST_CASE("pink state is active only when claimed and powered") {
+    using Seam::multipink::makePinkState;
+    auto s = makePinkState(3, true, true, -20.0 + 1.5, 48000.0, 4, 4);
+    CHECK(s.kind == kSeamHubPink);
+    CHECK(s.stoneId == 3u);
+    CHECK(s.active == 1u);
+    CHECK(s.levelDb == doctest::Approx(-18.5));
+    CHECK(s.sampleRate == 48000.0);
+    CHECK(s.u.pink.slotStart == 4);
+    CHECK(s.u.pink.slotCount == 4);
+    CHECK(makePinkState(3, true, false, -20, 48000, 4, 4).active == 0u);
+    CHECK(makePinkState(3, false, true, -20, 48000, -1, 0).active == 0u);
+    CHECK(makePinkState(3, false, false, -20, 48000, -1, 0).active == 0u);
 }

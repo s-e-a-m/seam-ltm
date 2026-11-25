@@ -113,8 +113,9 @@ tresult PLUGIN_API MULTIPINKProcessor::setActive(TBool state) {
         seedLCGs();
         resetPinkFilters();
 
-        busHandle_ = CalbusClient::instance().registerSlot();
-        publishBusRecord();
+        hubHandle_ = HubClient::instance().registerMember(
+            "multipink", SEAM_HUB_BIT(kSeamHubPink), 0);
+        publishHubState();
     } else {
         if (claimedStart_ >= 0) {
             MultipinkPool::release(claimedStart_, claimedChannels_);
@@ -123,8 +124,8 @@ tresult PLUGIN_API MULTIPINKProcessor::setActive(TBool state) {
         claimedChannels_ = 0;
         poolStatus_.store((int)PoolStatus::Unclaimed);
 
-        CalbusClient::instance().unregisterSlot(busHandle_);
-        busHandle_ = SEAM_CALBUS_NO_HANDLE;
+        HubClient::instance().unregisterMember(hubHandle_);
+        hubHandle_ = SEAM_HUB_NO_HANDLE;
     }
     return SingleComponentEffect::setActive(state);
 }
@@ -140,31 +141,21 @@ tresult PLUGIN_API MULTIPINKProcessor::setupProcessing(ProcessSetup& setup) {
     return SingleComponentEffect::setupProcessing(setup);
 }
 
-void MULTIPINKProcessor::publishBusRecord() {
-    if (busHandle_ == SEAM_CALBUS_NO_HANDLE) return;
+void MULTIPINKProcessor::publishHubState() {
+    if (hubHandle_ == SEAM_HUB_NO_HANDLE) return;
 
-    SeamCalbusRecord r{};
-    r.kind    = kSeamCalbusPink;
-    r.stoneId = (uint32_t)paramStoneId_.load();
-    // "active" is the conjunction that exists nowhere else: the pool tracks
-    // ownership, so with four instances loaded it reports slots 0/4/8/12 all
-    // claimed and cannot say which one is sounding. Level stays a separate
-    // field — reference (-23/-20/-18) plus trim (±6) never reaches silence,
-    // so an "audible level" test would need a threshold nobody can justify.
-    r.active  = (claimedStart_ >= 0 && paramPower_.load() != 0) ? 1u : 0u;
-    r.levelDb = kReferenceLevelsDb[paramReferenceIdx_.load()] + paramTrimDb_.load();
-    r.sampleRate = processSetup.sampleRate;
-    r.u.pink.slotStart = claimedStart_;
-    r.u.pink.slotCount = claimedChannels_;
-
-    CalbusClient::instance().publish(busHandle_, r);
+    HubClient::instance().publishState(hubHandle_, multipink::makePinkState(
+        (uint32_t)paramStoneId_.load(),
+        claimedStart_ >= 0, paramPower_.load() != 0,
+        kReferenceLevelsDb[paramReferenceIdx_.load()] + paramTrimDb_.load(),
+        processSetup.sampleRate, claimedStart_, claimedChannels_));
 }
 
 tresult PLUGIN_API MULTIPINKProcessor::process(ProcessData& data) {
     readParameterChanges(data);
 
-    // Parameter changes arrive here, on the audio thread — hence the seqlock.
-    publishBusRecord();
+    // Parameter changes arrive here, on the audio thread; publishState is RT-safe.
+    publishHubState();
 
     // Push display state for the GUI (read-only parameters).
     if (auto* outChanges = data.outputParameterChanges) {
