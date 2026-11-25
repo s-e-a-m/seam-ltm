@@ -275,3 +275,36 @@ The SDK's validator, which loads every plugin after it is built, is turned off a
 **A release must carry `libseamhub.dylib`.**
 A release is installed by hand (root `README.md`), and the bundles do not contain the hub: without the dylib in `seam-ltm-<version>-macOS-all.zip`, `multipink`, `ltglide` and `strx` load and play in null mode, and nothing says why the exchange never happens except `strx`'s status line.
 `tools/check-minos.py` lints its minimum macOS version along with the bundles.
+
+## Open points
+
+Minor findings from the reviews of plan 1 (`docs/superpowers/plans/2026-11-25-seam-hub.md`), left for later because none changes what an operator sees today.
+They were recorded in the plan's working ledger, which is not kept; this list replaces it.
+
+**Behaviour.**
+
+- Reaper switches a plugin off and on again within the same millisecond, so the sheet shows `leaves` and `arrives` pairs for one instance.
+  Plan 2 should fold a leave and arrive of the same `name#instance` within about 1 s into nothing, or into one "reactivated" line.
+- When a member arrives in a held sheet after the grace period or after midnight, no date marker is written.
+- `sheet_new` is ignored while the writer is holding lines after the grace period with no members.
+- On a volume with a quota, the writer leaves nearly empty `-N` sheets at every pass; it should back off.
+- `levelDb` is printed with `%.1f` but compared exactly, so two state lines can look the same.
+- The proposal lifecycle follows the receiver's current stone, so a recorded state cannot be reached after a stone change; the rivelatore's GUI has to say so.
+- `stoneOf` fails open (0, hears everything) after 8 torn reads, and `members()` drops a live member after 8 torn attempts, as `calbus` did.
+- `proposals(afterId = UINT64_MAX)` wraps around and returns the whole store.
+
+**ABI and build.**
+
+- Only struct sizes are pinned: add `offsetof` pins for `State::u`, `Proposal::u` and `Decoder::cutHz`.
+- A C consumer's `static_assert` needs `<assert.h>` or `_Static_assert`.
+- Windows `dllexport` on the consumer side is not handled, because the suite is macOS-only today.
+- Add `static_assert(SEAM_HUB_BANDS == 31)` next to the band-name table.
+
+**Tests and tools.**
+
+- Not covered by tests: `rows(State)` for glide and decoder, `stateObject`, the difference block of `sectionsObject`, the lowshelf and unknown words, and the clamp when `bandCount > 31`.
+- The reclaim test lacks a `hasState == 0` assertion; the stateless-member test lacks count assertions; the client test assumes one member.
+- The version test cannot tell "rejected" from "stub not found"; an empty `SEAM_HUB_PATH` is not tested.
+- `tools/hub-sheet.py` parses leniently (no column-width check, `# ` accepted anywhere, header not required) and prints a traceback on an unreadable file with `--check`.
+- `makeGlideState` takes 12 positional arguments, and adjacent doubles can be swapped by mistake.
+- The test for "applied again" depends on the 256-entry mirror; some strings are formatted under `storeMutex`.
