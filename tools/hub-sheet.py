@@ -5,8 +5,13 @@ parse(path) -> list of dicts(time, who, verb, object, rows).
   --check FILE   exit 0 if every non-header line is an event or a continuation
                  following an event; else print the first bad line number, exit 1.
   --count FILE   print the number of events.
+  --check-dir DIR  --check on the single *-seam-sheet.txt in DIR; exit 1 when
+                 there is none or more than one (ctest hub_sheet_roundtrip,
+                 which does not know the file name: it carries time and pid).
 Standard library only.
 """
+import glob
+import os
 import re
 import sys
 
@@ -67,6 +72,16 @@ def main(argv):
         bad = check(argv[2])
         if bad:
             print("bad line %d" % bad)
+            return 1
+        return 0
+    if len(argv) == 3 and argv[1] == "--check-dir":
+        found = glob.glob(os.path.join(argv[2], "*-seam-sheet.txt"))
+        if len(found) != 1:
+            print("expected one sheet in %s, found %d" % (argv[2], len(found)))
+            return 1
+        bad = check(found[0])
+        if bad:
+            print("%s: bad line %d" % (found[0], bad))
             return 1
         return 0
     if len(argv) == 3 and argv[1] == "--count":

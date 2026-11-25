@@ -1,0 +1,282 @@
+// The hub's single writer of the session sheet (Task 5).
+//
+// The hub is one static per process, so every case here shares it. Each case
+// starts with no member registered, points SEAM_HUB_CONF at a fresh conf whose
+// folder is a fresh temp dir, and ends with every member unregistered: the
+// last unregister stops the writer after its final flush, and the next first
+// register starts a new session that re-reads the conf (seam_hub.cpp, the
+// writer's session start). That is what makes the cases independent.
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "doctest/doctest.h"
+#include "seam_hub.h"
+
+#include <unistd.h>
+
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <regex>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+namespace fs = std::filesystem;
+
+namespace {
+
+const uint32_t kTable = SEAM_HUB_BIT(kSeamHubBandTable);
+
+fs::path freshDir(const char* tag) {
+    std::string tmpl = (fs::temp_directory_path() / (std::string("seam-hub-") + tag + "-XXXXXX")).string();
+    std::vector<char> buf(tmpl.begin(), tmpl.end());
+    buf.push_back('\0');
+    REQUIRE(mkdtemp(buf.data()) != nullptr);
+    return fs::path(buf.data());
+}
+
+// A fresh conf naming `folder`, set as SEAM_HUB_CONF. Only between sessions:
+// the writer reads the env and the conf at session start.
+void useFolder(const fs::path& folder) {
+    const fs::path conf = freshDir("conf") / "hub.conf";
+    std::ofstream(conf) << "# test conf\nsheet-folder=" << folder.string() << "\n";
+    setenv("SEAM_HUB_CONF", conf.c_str(), 1);
+}
+
+std::vector<fs::path> sheets(const fs::path& folder) {
+    std::vector<fs::path> v;
+    std::error_code ec;
+    for (const auto& e : fs::directory_iterator(folder, ec)) {
+        const std::string n = e.path().filename().string();
+        if (n.size() > 15 && n.compare(n.size() - 15, 15, "-seam-sheet.txt") == 0) v.push_back(e.path());
+    }
+    return v;
+}
+
+std::vector<std::string> fileLines(const fs::path& p) {
+    std::ifstream f(p);
+    std::vector<std::string> v;
+    for (std::string l; std::getline(f, l);) v.push_back(l);
+    return v;
+}
+
+// The verb of an event line, "" for a header or a continuation.
+std::string verbOf(const std::string& l) {
+    static const std::regex ev(R"(^\d\d:\d\d:\d\d\.\d\d\d  \S+ *  (\S+).*$)");
+    std::smatch m;
+    return std::regex_match(l, m, ev) ? m[1].str() : std::string();
+}
+
+SeamHubProposal table(uint32_t stone) {
+    SeamHubProposal p;
+    std::memset(&p, 0, sizeof p);
+    p.type = kSeamHubBandTable;
+    p.stoneId = stone;
+    p.u.table.bandCount = SEAM_HUB_BANDS;
+    p.u.table.integrationSec = 2.0;
+    for (int i = 0; i < SEAM_HUB_BANDS; ++i) p.u.table.bands[i].hz = 20.0 * (i + 1);
+    return p;
+}
+
+double msSince(std::chrono::steady_clock::time_point t0) {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+}
+
+} // namespace
+
+TEST_CASE("a session writes one file with arrivals and departures") {
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("one");
+    useFolder(folder);
+    const int32_t a = seam_hub_v1_register(hub, "strx", kTable, 0);
+    const int32_t b = seam_hub_v1_register(hub, "bastone", 0, kTable);
+    SeamHubProposal p = table(1);
+    REQUIRE(seam_hub_v1_post(hub, a, &p) != 0);
+    seam_hub_v1_unregister(hub, a);
+    seam_hub_v1_unregister(hub, b);
+
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    std::vector<std::string> verbs;
+    size_t rows = 0;
+    for (const auto& l : fileLines(files[0])) {
+        const std::string v = verbOf(l);
+        if (!v.empty()) verbs.push_back(v);
+        if (l.rfind("  | ", 0) == 0) ++rows;
+    }
+    CHECK(verbs == std::vector<std::string>{"arrives", "arrives", "says", "leaves", "leaves"});
+    CHECK(rows == 1 + SEAM_HUB_BANDS);   // the table in full: title plus one row per band
+    const auto all = fileLines(files[0]);
+    REQUIRE(all.size() >= 2);
+    CHECK(all[0] == "# SEAM hub sheet");
+    CHECK(all[1].rfind("# started: ", 0) == 0);
+}
+
+TEST_CASE("lines from four threads are never interleaved") {
+    SeamHub* hub = seam_hub_v1_get();
+    // The ctest hub_sheet_roundtrip runs tools/hub-sheet.py --check-dir on this
+    // folder after this binary, so the folder must hold this sheet alone.
+    fs::path folder;
+    if (const char* d = std::getenv("SEAM_HUB_TEST_SHEET_DIR")) {
+        folder = d;
+        std::error_code ec;
+        fs::remove_all(folder, ec);
+        fs::create_directories(folder);
+    } else {
+        folder = freshDir("four");
+    }
+    useFolder(folder);
+
+    std::vector<int32_t> handles;
+    const char* names[4] = {"strx", "bastone", "bastooge", "detector"};
+    for (const char* n : names) handles.push_back(seam_hub_v1_register(hub, n, kTable, 0));
+    std::vector<std::thread> ts;
+    for (int t = 0; t < 4; ++t)
+        ts.emplace_back([hub, h = handles[t], t] {
+            for (int i = 0; i < 250; ++i) {
+                SeamHubProposal p = table((uint32_t)t + 1);
+                seam_hub_v1_post(hub, h, &p);
+            }
+        });
+    for (auto& t : ts) t.join();
+    for (int32_t h : handles) seam_hub_v1_unregister(hub, h);
+
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    int says = 0, arrives = 0, leaves = 0, rowsAfterSays = 0;
+    bool inSays = false, ok = true;
+    for (const auto& l : fileLines(files[0])) {
+        const std::string v = verbOf(l);
+        if (!v.empty()) {
+            if (inSays && rowsAfterSays != 1 + SEAM_HUB_BANDS) ok = false;
+            inSays = (v == "says");
+            rowsAfterSays = 0;
+            says += v == "says"; arrives += v == "arrives"; leaves += v == "leaves";
+        } else if (l.rfind("  | ", 0) == 0) {
+            ++rowsAfterSays;
+        } else if (l.rfind("# ", 0) != 0) {
+            ok = false;   // neither event, row nor header: a broken line
+        }
+    }
+    CHECK(ok);
+    CHECK(says == 1000);
+    CHECK(arrives == 4);
+    CHECK(leaves == 4);
+}
+
+TEST_CASE("the last unregister flushes and returns") {
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("flush");
+    useFolder(folder);
+    const int32_t a = seam_hub_v1_register(hub, "flusher", kTable, 0);
+    SeamHubProposal p = table(3);
+    const uint64_t id = seam_hub_v1_post(hub, a, &p);
+    REQUIRE(id != 0);
+    const auto t0 = std::chrono::steady_clock::now();
+    seam_hub_v1_unregister(hub, a);
+    CHECK(msSince(t0) < 1000.0);
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    bool found = false;
+    for (const auto& l : fileLines(files[0]))
+        if (l.find("says      band-table #" + std::to_string(id) + "  stone 3") != std::string::npos) found = true;
+    CHECK(found);
+}
+
+TEST_CASE("an unreachable folder holds lines and never blocks") {
+    SeamHub* hub = seam_hub_v1_get();
+    useFolder("/Volumes/seam-hub-no-such-volume/sheets");
+    const int32_t a = seam_hub_v1_register(hub, "held", kTable, 0);
+    const auto t0 = std::chrono::steady_clock::now();
+    for (int i = 0; i < 100; ++i) {
+        SeamHubProposal p = table(1);
+        seam_hub_v1_post(hub, a, &p);
+    }
+    CHECK(msSince(t0) < 50.0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));   // the writer has tried at least once
+    SeamHubSheetStatus st;
+    std::memset(&st, 0xff, sizeof st);
+    seam_hub_v1_sheet_status(hub, &st);
+    CHECK(st.writing == 0u);
+    CHECK(st.pendingLines == 101u);   // 100 says + 1 arrival
+
+    const fs::path folder = freshDir("back");
+    CHECK(seam_hub_v1_sheet_set_folder(hub, folder.c_str()) == 0);
+    seam_hub_v1_sheet_new(hub);
+    // Wait for the writer to open the new sheet, so the held count is exactly
+    // what was held (the leaves line must not be counted with it).
+    for (int i = 0; i < 200; ++i) {
+        seam_hub_v1_sheet_status(hub, &st);
+        if (st.writing) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    CHECK(st.writing == 1u);
+    CHECK(std::string(st.path).rfind(folder.string(), 0) == 0);
+    seam_hub_v1_unregister(hub, a);
+
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    const auto lines = fileLines(files[0]);
+    size_t mark = lines.size(), arrives = lines.size();
+    int saysAfter = 0;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        if (lines[i].find("hub           sheet     folder unreachable, 101 lines held") != std::string::npos) mark = i;
+        if (verbOf(lines[i]) == "arrives") arrives = i;
+        if (verbOf(lines[i]) == "says" && i > mark) ++saysAfter;
+    }
+    REQUIRE(mark < lines.size());
+    CHECK(arrives > mark);
+    CHECK(saysAfter == 100);
+}
+
+TEST_CASE("the file name carries the pid") {
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("pid");
+    useFolder(folder);
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "pid", 0, 0));
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    const std::string name = files[0].filename().string();
+    CHECK(name.find("-" + std::to_string(getpid()) + "-") != std::string::npos);
+    CHECK(std::regex_match(name, std::regex(R"(\d{4}-\d\d-\d\d-\d{6}-\d+-seam-sheet\.txt)")));
+}
+
+TEST_CASE("a state change is written once, not every tick") {
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("state");
+    useFolder(folder);
+    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0);
+    SeamHubState s{};
+    s.kind = kSeamHubPink;
+    s.stoneId = 1;
+    s.active = 1;
+    s.levelDb = -23.0;
+    s.u.pink.slotStart = 0;
+    s.u.pink.slotCount = 4;
+    const auto t0 = std::chrono::steady_clock::now();
+    while (msSince(t0) < 1000.0) {
+        seam_hub_v1_publish_state(hub, a, &s);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    seam_hub_v1_unregister(hub, a);
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    int states = 0;
+    for (const auto& l : fileLines(files[0]))
+        if (verbOf(l) == "state") {
+            ++states;
+            CHECK(l.find("multipink#1   state     pink  stone 1  slots 0-3  -23.0 dB  active") != std::string::npos);
+        }
+    CHECK(states == 1);
+}
+
+TEST_CASE("sheet_status and sheet_set_folder refuse nulls") {
+    SeamHubSheetStatus st;
+    seam_hub_v1_sheet_status(nullptr, &st);
+    seam_hub_v1_sheet_status(seam_hub_v1_get(), nullptr);
+    CHECK(seam_hub_v1_sheet_set_folder(seam_hub_v1_get(), nullptr) != 0);
+    CHECK(seam_hub_v1_sheet_set_folder(seam_hub_v1_get(), "") != 0);
+    seam_hub_v1_sheet_new(nullptr);
+}

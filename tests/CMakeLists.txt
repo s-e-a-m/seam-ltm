@@ -330,6 +330,16 @@ if(Python3_Interpreter_FOUND)
                      ${CMAKE_CURRENT_SOURCE_DIR}/../tools/hub-sheet.py
                      --check ${CMAKE_CURRENT_SOURCE_DIR}/ref/hub-sheet-golden.txt)
 
+    # The sheet the writer really wrote, read back by the same parser:
+    # seam_hub_writer_test ("lines from four threads are never interleaved")
+    # leaves its one sheet in hub-sheet-roundtrip/ (the hub_sheet fixture),
+    # and --check-dir checks the single *-seam-sheet.txt found there.
+    add_test(NAME hub_sheet_roundtrip
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../tools/hub-sheet.py
+                     --check-dir ${CMAKE_BINARY_DIR}/hub-sheet-roundtrip)
+    set_tests_properties(hub_sheet_roundtrip PROPERTIES FIXTURES_REQUIRED hub_sheet)
+
     # ─── Minimum macOS the built binaries declare ────────────────────────────
     # Reads the bundles and the calibration bus as they come out of this build
     # tree, so the thing checked is the artefact a release ships and not the
@@ -767,6 +777,18 @@ endif()
 target_compile_features(alogos_state_test PRIVATE cxx_std_17)
 add_test(NAME alogos_state_test COMMAND alogos_state_test)
 
+# Every hub test registers members, and the first register starts a session
+# sheet. Without a conf of their own they would write into the operator's
+# ~/Documents/SEAM/sheets, so each hub test target gets SEAM_HUB_CONF pointing
+# at a conf in the build tree whose folder is in the build tree too.
+set(SEAM_HUB_TEST_CONF "${CMAKE_BINARY_DIR}/hub-test/hub.conf")
+file(WRITE "${SEAM_HUB_TEST_CONF}" "sheet-folder=${CMAKE_BINARY_DIR}/hub-test/sheets\n")
+# The churn case alone writes tens of MB of arrivals and departures there:
+# removed after the hub tests that use it, so repeated runs do not pile up.
+add_test(NAME hub_test_sheets_clean
+         COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/hub-test/sheets")
+set_tests_properties(hub_test_sheets_clean PROPERTIES FIXTURES_CLEANUP hub_test_sheets)
+
 # The hub's ABI contract: sizeof pins and the version, against the real dylib.
 add_executable(seam_hub_layout_test
     seam_hub_layout_test.cpp
@@ -778,6 +800,8 @@ target_include_directories(seam_hub_layout_test PRIVATE
 target_link_libraries(seam_hub_layout_test PRIVATE seam_hub)
 target_compile_features(seam_hub_layout_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_layout_test COMMAND seam_hub_layout_test)
+set_tests_properties(seam_hub_layout_test PROPERTIES ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
 
 # Members and wait-free states, ported from the calbus tests. Spawns threads
 # for the seqlock hammer and churn cases, hence Threads.
@@ -791,6 +815,8 @@ target_include_directories(seam_hub_state_test PRIVATE
 target_link_libraries(seam_hub_state_test PRIVATE seam_hub Threads::Threads)
 target_compile_features(seam_hub_state_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_state_test COMMAND seam_hub_state_test)
+set_tests_properties(seam_hub_state_test PROPERTIES ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
 
 # Proposals and the per-receiver lifecycle.
 add_executable(seam_hub_proposal_test
@@ -803,6 +829,8 @@ target_include_directories(seam_hub_proposal_test PRIVATE
 target_link_libraries(seam_hub_proposal_test PRIVATE seam_hub)
 target_compile_features(seam_hub_proposal_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_proposal_test COMMAND seam_hub_proposal_test)
+set_tests_properties(seam_hub_proposal_test PROPERTIES ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
 
 # The sheet grammar: pure formatter, nothing to link but doctest.
 add_executable(seam_hub_sheet_test
@@ -814,3 +842,22 @@ target_include_directories(seam_hub_sheet_test PRIVATE
 )
 target_compile_features(seam_hub_sheet_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_sheet_test COMMAND seam_hub_sheet_test)
+
+# The single writer of the session sheet. Each case sets its own conf at run
+# time; the default conf here only keeps a stray session out of ~/Documents.
+# The four-thread case leaves its sheet in hub-sheet-roundtrip/, which
+# hub_sheet_roundtrip (Python block above) checks with tools/hub-sheet.py.
+add_executable(seam_hub_writer_test
+    seam_hub_writer_test.cpp
+)
+target_include_directories(seam_hub_writer_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_link_libraries(seam_hub_writer_test PRIVATE seam_hub Threads::Threads)
+target_compile_features(seam_hub_writer_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_writer_test COMMAND seam_hub_writer_test)
+set_tests_properties(seam_hub_writer_test PROPERTIES
+    ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF};SEAM_HUB_TEST_SHEET_DIR=${CMAKE_BINARY_DIR}/hub-sheet-roundtrip"
+    FIXTURES_SETUP hub_sheet
+    FIXTURES_REQUIRED hub_test_sheets)

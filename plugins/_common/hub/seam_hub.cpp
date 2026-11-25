@@ -1,5 +1,5 @@
-// libseamhub — members, states and proposals (Tasks 2-3). The sheet writer and
-// the real line formatter arrive in later tasks; their entry points stay stubs.
+// libseamhub — members, states, proposals and the session sheet's single
+// writer (Tasks 2-5). The sheet's grammar is seam_hub_sheet.h.
 //
 // The slot machinery below is ported from seam_calbus.cpp with the logic
 // unchanged (Slot, encodeHandle, seqlock, epoch check, kMaxReadAttempts).
@@ -8,14 +8,22 @@
 #include "seam_hub.h"
 #include "seam_hub_sheet.h"
 
+#include <unistd.h>
+
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <deque>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace {
 
@@ -148,8 +156,15 @@ inline uint32_t handleGen(int32_t handle) {
 // the newest lines are the ones that describe the present.
 constexpr size_t kMaxQueuedLines = 10000;
 // Test-only mirror: the last lines enqueued, untouched by the writer, so a
-// test can see what was enqueued without racing the consumer.
+// test can see what was enqueued without racing the consumer. It keeps the
+// EVENT line of each entry (a table's continuation rows stay out), and it
+// does not see the writer's own `state` lines: those arrive on the writer's
+// 250 ms tick, so mirroring them would put lines a test cannot predict
+// between the ones it called for.
 constexpr size_t kMirrorLines = 256;
+
+// The writer's tick: how often states are compared and the queue is written.
+constexpr auto kWriterTick = std::chrono::milliseconds(250);
 
 // Lines are formatted by Seam::hubsheet; this is just "now" in unix ms.
 int64_t nowMs() {
@@ -231,12 +246,63 @@ struct SeamHub {
     struct Cell { uint32_t gen; uint8_t st; };
     Cell             life[SEAM_HUB_STORE][SEAM_HUB_MAX_MEMBERS]{};
 
-    void enqueue(std::string line) {
+    // One queue entry is one event: its line, then its continuation rows,
+    // '\n'-separated, no trailing newline. The writer writes an entry whole,
+    // so an event and its rows can never be split by another event.
+    void enqueue(std::string line, bool mirrored = true) {
         std::lock_guard<std::mutex> lock(lineMutex);
-        mirror.push_back(line);
-        if (mirror.size() > kMirrorLines) mirror.pop_front();
+        if (mirrored) {
+            mirror.push_back(line.substr(0, line.find('\n')));
+            if (mirror.size() > kMirrorLines) mirror.pop_front();
+        }
         if (lines.size() >= kMaxQueuedLines) { lines.pop_front(); ++droppedLines; }
         lines.push_back(std::move(line));
+    }
+
+    // ---- the writer -------------------------------------------------------
+    // ONE writer thread per session. A session runs from the first register
+    // to the last unregister; the thread is started and stopped there.
+    //
+    // lifeMutex is the OUTERMOST lock and only register()/unregister() take
+    // it, around their regMutex section and around the writer's start or
+    // stop+join. The join therefore happens with regMutex released (members()
+    // and the proposal calls never wait on a flushing disk), and a register
+    // racing the last unregister waits on lifeMutex until the old writer is
+    // joined, then starts a new one. Holding lifeMutex for the whole
+    // transition is what guarantees exactly one writer while members exist
+    // and none otherwise: memberCount and `writer` only change under it.
+    // Full lock order: lifeMutex, storeMutex, regMutex, lineMutex; wakeMutex
+    // and statusMutex are leaves, never held while taking another.
+    std::mutex   lifeMutex;
+    std::thread  writer;                // guarded by lifeMutex
+    int32_t      memberCount = 0;       // guarded by regMutex (and changed under lifeMutex)
+
+    std::mutex              wakeMutex;  // stopReq/renewReq
+    std::condition_variable wake;
+    bool                    stopReq = false, renewReq = false;
+
+    // What sheet_status() reports, published by the writer after each change.
+    std::mutex statusMutex;
+    char       statusPath[512]{};
+    uint32_t   statusWriting = 0;
+
+    // Under lineMutex: entries the writer has swapped out and not yet written,
+    // so pendingLines does not dip while a batch is on its way to the disk.
+    size_t inFlight = 0;
+
+    // Writer-thread only. They outlive one writer (held lines wait for the
+    // next session), and successive writers are ordered by the join.
+    bool     unreachable = false;
+    uint64_t droppedAtOutage = 0;
+
+    void startWriter();
+    void stopWriter();
+
+    ~SeamHub() {
+        // A host that quits with members still registered: stop and flush
+        // rather than let a joinable std::thread terminate the process.
+        std::lock_guard<std::mutex> life(lifeMutex);
+        if (writer.joinable()) stopWriter();
     }
 };
 
@@ -249,8 +315,9 @@ extern "C" {
 uint32_t seam_hub_v1_version(void) { return SEAM_HUB_VERSION; }
 SeamHub* seam_hub_v1_get(void) { return &g_hub; }
 
-int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint32_t hears) {
-    if (!hub) return SEAM_HUB_NO_HANDLE;
+namespace {
+
+int32_t registerLocked(SeamHub* hub, const char* name, uint32_t says, uint32_t hears) {
     std::lock_guard<std::mutex> lock(hub->regMutex);
     for (int32_t i = 0; i < SEAM_HUB_MAX_MEMBERS; ++i) {
         Slot& s = hub->slots[i];
@@ -316,20 +383,21 @@ int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint
 
         hub->enqueue(Seam::hubsheet::event(nowMs(), whoOf(s.name, inst), "arrives",
                      "says " + maskNames(says) + "  hears " + maskNames(hears)));
+        ++hub->memberCount;
         return encodeHandle(i, g);
     }
     return SEAM_HUB_NO_HANDLE;
 }
 
-void seam_hub_v1_unregister(SeamHub* hub, int32_t handle) {
-    if (!hub || handle < 0) return;
+// True when this unregister retired the last member.
+bool unregisterLocked(SeamHub* hub, int32_t handle) {
     Slot& s = hub->slots[handleIndex(handle)];
     std::lock_guard<std::mutex> lock(hub->regMutex);
 
     // A stale handle must not evict the slot's current owner. Checked under
     // regMutex, so gen cannot move under us.
-    if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return;
-    if (s.inUse.load(std::memory_order_relaxed) == 0) return;
+    if (s.gen.load(std::memory_order_relaxed) != handleGen(handle)) return false;
+    if (s.inUse.load(std::memory_order_relaxed) == 0) return false;
 
     hub->enqueue(Seam::hubsheet::event(nowMs(), whoOf(s.name, s.instance), "leaves", ""));
 
@@ -338,6 +406,27 @@ void seam_hub_v1_unregister(SeamHub* hub, int32_t handle) {
     s.gen.store((s.gen.load(std::memory_order_relaxed) + 1u) & kGenMask,
                 std::memory_order_release);
     s.inUse.store(0, std::memory_order_release);
+    return --hub->memberCount == 0;
+}
+
+} // namespace
+
+int32_t seam_hub_v1_register(SeamHub* hub, const char* name, uint32_t says, uint32_t hears) {
+    if (!hub) return SEAM_HUB_NO_HANDLE;
+    std::lock_guard<std::mutex> life(hub->lifeMutex);
+    const int32_t h = registerLocked(hub, name, says, hears);
+    // `joinable()` rather than "was first": under lifeMutex the two agree,
+    // and this form cannot start a second writer whatever the count says.
+    if (h != SEAM_HUB_NO_HANDLE && !hub->writer.joinable()) hub->startWriter();
+    return h;
+}
+
+void seam_hub_v1_unregister(SeamHub* hub, int32_t handle) {
+    if (!hub || handle < 0) return;
+    std::lock_guard<std::mutex> life(hub->lifeMutex);
+    // regMutex is released when unregisterLocked returns: the join below
+    // (a final flush to the disk) holds lifeMutex only.
+    if (unregisterLocked(hub, handle) && hub->writer.joinable()) hub->stopWriter();
 }
 
 void seam_hub_v1_publish_state(SeamHub* hub, int32_t handle, const SeamHubState* st) {
@@ -374,73 +463,86 @@ void seam_hub_v1_publish_state(SeamHub* hub, int32_t handle, const SeamHubState*
     s.seq.store((start | 1u) + 1u, std::memory_order_relaxed); // -> even
 }
 
+namespace {
+
+// One member's registration data and state, consistent with each other, and
+// the epoch they belong to; false when the slot is free or every attempt
+// tore. Shared by members() and the writer's state snapshot.
+bool readMember(SeamHub* hub, int32_t i, SeamHubMember& out, uint32_t& epoch) {
+    Slot& s = hub->slots[i];
+
+    // Registration data and the epoch it belongs to, together, under the
+    // lock: name/instance/masks are only ever written under regMutex, so
+    // this copy is consistent, and `g` names the epoch it came from. The
+    // state copy below then has to see the same epoch.
+    SeamHubMember m;
+    std::memset(&m, 0, sizeof m);
+    uint32_t g1;
+    {
+        std::lock_guard<std::mutex> lock(hub->regMutex);
+        if (s.inUse.load(std::memory_order_relaxed) == 0) return false;   // free
+        g1 = s.gen.load(std::memory_order_relaxed);
+        m.member = (uint32_t)i;
+        m.instance = s.instance;
+        m.says = s.says;
+        m.hears = s.hears;
+        std::memcpy(m.name, s.name, SEAM_HUB_NAME_LEN);
+    }
+
+    SeamHubState tmp;
+    uint32_t pub = 0;
+    bool ok = false;
+    for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
+        // Acquire, so the state loads below cannot be hoisted above it.
+        if (s.gen.load(std::memory_order_acquire) != g1) break;       // churned already
+        const uint32_t s1 = s.seq.load(std::memory_order_acquire);
+        if (s1 & 1u) continue;                            // writer inside
+
+        pub = s.published.load(std::memory_order_acquire);
+        std::memcpy(&tmp, &s.state, sizeof(SeamHubState));
+
+        // Acquire fence: the state loads above may not be reordered after
+        // the validation loads below, so what follows really is a check on
+        // a completed copy.
+        std::atomic_thread_fence(std::memory_order_acquire);
+
+        if (s.seq.load(std::memory_order_relaxed) != s1) continue;  // torn
+
+        // Re-capture the epoch. Unchanged {gen, inUse} means one single
+        // uninterrupted registration epoch spanned the whole copy: the
+        // slot was neither released (inUse would drop, gen would move) nor
+        // released-and-reclaimed (gen would move twice and never returns
+        // to an earlier value).
+        //
+        // HONEST NOTE: register()'s memset runs inside the seqlock, so
+        // every ownership transition already moves `seq` by 2 and the
+        // `s1 != s2` check above rejects every ABA'd copy on its own. This
+        // gen/inUse re-check is DEFENCE-IN-DEPTH for the day something
+        // touches the state without going through the seqlock (e.g. "skip
+        // the memset when the slot is already zero"). Keep it for that,
+        // but don't credit it with ABA detection in the current code.
+        const uint32_t u2 = s.inUse.load(std::memory_order_acquire);
+        const uint32_t g2 = s.gen.load(std::memory_order_acquire);
+        if (u2 == 0 || g2 != g1) continue;                // churned
+        ok = true;
+        break;
+    }
+    if (!ok) return false;
+    m.hasState = pub ? 1u : 0u;
+    m.state = tmp;
+    out = m;
+    epoch = g1;
+    return true;
+}
+
+} // namespace
+
 int32_t seam_hub_v1_members(SeamHub* hub, SeamHubMember* out, int32_t max) {
     if (!hub || !out || max <= 0) return 0;
     int32_t n = 0;
-    for (int32_t i = 0; i < SEAM_HUB_MAX_MEMBERS && n < max; ++i) {
-        Slot& s = hub->slots[i];
-
-        // Registration data and the epoch it belongs to, together, under the
-        // lock: name/instance/masks are only ever written under regMutex, so
-        // this copy is consistent, and `g` names the epoch it came from. The
-        // state copy below then has to see the same epoch.
-        SeamHubMember m;
-        std::memset(&m, 0, sizeof m);
-        uint32_t g1;
-        {
-            std::lock_guard<std::mutex> lock(hub->regMutex);
-            if (s.inUse.load(std::memory_order_relaxed) == 0) continue;   // free
-            g1 = s.gen.load(std::memory_order_relaxed);
-            m.member = (uint32_t)i;
-            m.instance = s.instance;
-            m.says = s.says;
-            m.hears = s.hears;
-            std::memcpy(m.name, s.name, SEAM_HUB_NAME_LEN);
-        }
-
-        SeamHubState tmp;
-        uint32_t pub = 0;
-        bool ok = false;
-        for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
-            // Acquire, so the state loads below cannot be hoisted above it.
-            if (s.gen.load(std::memory_order_acquire) != g1) break;       // churned already
-            const uint32_t s1 = s.seq.load(std::memory_order_acquire);
-            if (s1 & 1u) continue;                            // writer inside
-
-            pub = s.published.load(std::memory_order_acquire);
-            std::memcpy(&tmp, &s.state, sizeof(SeamHubState));
-
-            // Acquire fence: the state loads above may not be reordered after
-            // the validation loads below, so what follows really is a check on
-            // a completed copy.
-            std::atomic_thread_fence(std::memory_order_acquire);
-
-            if (s.seq.load(std::memory_order_relaxed) != s1) continue;  // torn
-
-            // Re-capture the epoch. Unchanged {gen, inUse} means one single
-            // uninterrupted registration epoch spanned the whole copy: the
-            // slot was neither released (inUse would drop, gen would move) nor
-            // released-and-reclaimed (gen would move twice and never returns
-            // to an earlier value).
-            //
-            // HONEST NOTE: register()'s memset runs inside the seqlock, so
-            // every ownership transition already moves `seq` by 2 and the
-            // `s1 != s2` check above rejects every ABA'd copy on its own. This
-            // gen/inUse re-check is DEFENCE-IN-DEPTH for the day something
-            // touches the state without going through the seqlock (e.g. "skip
-            // the memset when the slot is already zero"). Keep it for that,
-            // but don't credit it with ABA detection in the current code.
-            const uint32_t u2 = s.inUse.load(std::memory_order_acquire);
-            const uint32_t g2 = s.gen.load(std::memory_order_acquire);
-            if (u2 == 0 || g2 != g1) continue;                // churned
-            ok = true;
-            break;
-        }
-        if (!ok) continue;
-        m.hasState = pub ? 1u : 0u;
-        m.state = tmp;
-        out[n++] = m;
-    }
+    uint32_t epoch = 0;
+    for (int32_t i = 0; i < SEAM_HUB_MAX_MEMBERS && n < max; ++i)
+        if (readMember(hub, i, out[n], epoch)) ++n;
     return n;
 }
 
@@ -525,9 +627,22 @@ uint64_t seam_hub_v1_post(SeamHub* hub, int32_t handle, SeamHubProposal* inout) 
     hub->store[pos] = *inout;
     std::memset(hub->life[pos], 0, sizeof hub->life[pos]);
 
-    hub->enqueue(Seam::hubsheet::event(inout->postedUnixMs, who, "says",
-                 std::string(proposalName(inout->type)) + " #" + std::to_string(inout->id) +
-                 "  stone " + std::to_string(inout->stoneId)));
+    // Tables and sections in full (spec, The sheet): the object, then one
+    // continuation row per band or section, as one queue entry.
+    std::string object, rows;
+    if (inout->type == kSeamHubBandTable) {
+        object = Seam::hubsheet::tableObject(inout->id, inout->stoneId, inout->u.table);
+        rows = Seam::hubsheet::rows(inout->u.table);
+    } else if (inout->type == kSeamHubSections) {
+        object = Seam::hubsheet::sectionsObject(inout->id, inout->u.sections);
+        rows = Seam::hubsheet::rows(inout->u.sections);
+    } else {
+        object = std::string(proposalName(inout->type)) + " #" + std::to_string(inout->id) +
+                 "  stone " + std::to_string(inout->stoneId);
+    }
+    std::string entry = Seam::hubsheet::event(inout->postedUnixMs, who, "says", object);
+    if (!rows.empty()) { rows.pop_back(); entry += "\n" + rows; }   // drop the last '\n'
+    hub->enqueue(std::move(entry));
     return inout->id;
 }
 
@@ -606,8 +721,274 @@ int32_t seam_hub_v1_transition(SeamHub* hub, int32_t receiver, uint64_t id, int3
     return 0;
 }
 
-void     seam_hub_v1_sheet_status(SeamHub*, SeamHubSheetStatus*) {}
-int32_t  seam_hub_v1_sheet_set_folder(SeamHub*, const char*) { return -1; }
-void     seam_hub_v1_sheet_new(SeamHub*) {}
+// ---- the session sheet ----------------------------------------------------
+//
+// Nothing below runs on the audio thread, and the disk is touched only by the
+// writer thread (the sheet) and by sheet_set_folder() on its caller's thread
+// (the conf). No hub mutex is ever held across a disk access.
+
+void seam_hub_v1_sheet_status(SeamHub* hub, SeamHubSheetStatus* out) {
+    if (!hub || !out) return;
+    std::memset(out, 0, sizeof *out);
+    {
+        std::lock_guard<std::mutex> lock(hub->statusMutex);
+        std::memcpy(out->path, hub->statusPath, sizeof out->path);
+        out->writing = hub->statusWriting;
+    }
+    std::lock_guard<std::mutex> lock(hub->lineMutex);
+    out->pendingLines = (uint32_t)(hub->lines.size() + hub->inFlight);
+    out->droppedLines = hub->droppedLines;
+}
+
+} // extern "C"
+
+namespace {
+
+std::string homeDir() {
+    const char* h = std::getenv("HOME");
+    return h ? h : "";
+}
+
+// SEAM_HUB_CONF wins, so tests and odd setups never touch the operator's conf.
+std::string confPath() {
+    if (const char* c = std::getenv("SEAM_HUB_CONF")) if (*c) return c;
+    return homeDir() + "/Library/Application Support/SEAM/hub.conf";
+}
+
+std::string expandHome(std::string p) {
+    if (p == "~" || p.rfind("~/", 0) == 0) p = homeDir() + p.substr(1);
+    return p;
+}
+
+// The folder of the next sheet: `sheet-folder=<path>` in the conf, else the
+// default. Read at every session start and every sheet_new(), so a changed
+// conf takes effect on the next sheet, as sheet_set_folder() promises.
+std::string sheetFolder() {
+    std::ifstream f(confPath());
+    std::string folder;
+    for (std::string l; std::getline(f, l);) {
+        while (!l.empty() && (l.back() == '\r' || l.back() == ' ' || l.back() == '\t')) l.pop_back();
+        if (l.rfind("sheet-folder=", 0) == 0) folder = l.substr(13);
+    }
+    if (folder.empty()) folder = homeDir() + "/Documents/SEAM/sheets";
+    return expandHome(folder);
+}
+
+// Serialises sheet_set_folder() callers; the writer reads the conf without
+// it, which is safe because the conf is replaced by rename().
+std::mutex g_confMutex;
+
+// The writer thread's own state for one session. Only the writer touches it.
+struct Sheet {
+    SeamHub*    hub;
+    std::string path;
+    std::time_t start = 0;
+    std::FILE*  f = nullptr;
+    struct Last { uint32_t epoch; bool written; SeamHubState st; };
+    Last        last[SEAM_HUB_MAX_MEMBERS]{};
+
+    void publishStatus() {
+        std::lock_guard<std::mutex> lock(hub->statusMutex);
+        std::snprintf(hub->statusPath, sizeof hub->statusPath, "%s", path.c_str());
+        hub->statusWriting = f ? 1u : 0u;
+    }
+
+    // A new sheet: new start time, the conf re-read, states written afresh
+    // so the new file stands on its own.
+    void begin() {
+        close();
+        start = std::time(nullptr);
+        std::tm tm{};
+        localtime_r(&start, &tm);
+        char name[96];
+        std::snprintf(name, sizeof name, "%04d-%02d-%02d-%02d%02d%02d-%d-seam-sheet.txt",
+                      tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                      tm.tm_hour, tm.tm_min, tm.tm_sec, (int)getpid());
+        path = (std::filesystem::path(sheetFolder()) / name).string();
+        std::memset(last, 0, sizeof last);
+        publishStatus();
+    }
+
+    void close() {
+        if (f) { std::fclose(f); f = nullptr; publishStatus(); }
+    }
+
+    // Opens the sheet when it is not open. On failure the queue is left
+    // alone: its lines are the held lines, bounded by enqueue()'s drop-oldest.
+    void open() {
+        if (f) return;
+        std::error_code ec;
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+        // "a": two sessions of one process in the same second and folder
+        // share a name; the second appends its own header rather than
+        // truncating the first (the parser accepts headers anywhere).
+        f = std::fopen(path.c_str(), "a");
+        if (!f) {
+            if (!hub->unreachable) {
+                hub->unreachable = true;
+                std::lock_guard<std::mutex> lock(hub->lineMutex);
+                hub->droppedAtOutage = hub->droppedLines;
+            }
+            return;
+        }
+        std::tm tm{};
+        localtime_r(&start, &tm);
+        std::fputs(Seam::hubsheet::header(tm, (int)getpid()).c_str(), f);
+        if (hub->unreachable) {
+            size_t held;
+            uint64_t dropped;
+            {
+                std::lock_guard<std::mutex> lock(hub->lineMutex);
+                held = hub->lines.size();
+                dropped = hub->droppedLines - hub->droppedAtOutage;
+            }
+            std::string what = "folder unreachable, " + std::to_string(held) + " lines held";
+            if (dropped) what += ", " + std::to_string(dropped) + " dropped";
+            std::fputs((Seam::hubsheet::event(nowMs(), "hub", "sheet", what) + "\n").c_str(), f);
+            hub->unreachable = false;
+        }
+        std::fflush(f);
+        publishStatus();
+    }
+
+    // A `state` line for each member whose state differs from the last one
+    // written for its epoch. Read through readMember(), the same seqlock read
+    // as members(); enqueued like any line, so order stays order of arrival.
+    void snapshotStates() {
+        for (int32_t i = 0; i < SEAM_HUB_MAX_MEMBERS; ++i) {
+            SeamHubMember m;
+            uint32_t epoch = 0;
+            if (!readMember(hub, i, m, epoch) || !m.hasState) continue;
+            Last& l = last[i];
+            if (l.written && l.epoch == epoch && std::memcmp(&l.st, &m.state, sizeof m.state) == 0)
+                continue;
+            l = Last{epoch, true, m.state};
+            std::string entry = Seam::hubsheet::event(nowMs(), whoOf(m.name, m.instance), "state",
+                                                      Seam::hubsheet::stateObject(m.state));
+            std::string rows = Seam::hubsheet::rows(m.state);
+            if (!rows.empty()) { rows.pop_back(); entry += "\n" + rows; }
+            hub->enqueue(std::move(entry), /*mirrored=*/false);
+        }
+    }
+
+    // Swap the queue out under lineMutex, write with it released: a slow or
+    // full disk must never stall a GUI caller of members() through the
+    // regMutex -> lineMutex chain.
+    void drain() {
+        if (!f) return;
+        std::deque<std::string> batch;
+        {
+            std::lock_guard<std::mutex> lock(hub->lineMutex);
+            batch.swap(hub->lines);
+            hub->inFlight = batch.size();
+        }
+        if (batch.empty()) return;
+        size_t done = 0;
+        for (; done < batch.size(); ++done) {
+            const std::string& e = batch[done];
+            if (std::fwrite(e.data(), 1, e.size(), f) != e.size() || std::fputc('\n', f) == EOF) break;
+        }
+        const bool failed = done < batch.size() || std::fflush(f) != 0;
+        {
+            std::lock_guard<std::mutex> lock(hub->lineMutex);
+            hub->inFlight = 0;
+            if (failed) {
+                // Put back what was not written, ahead of what arrived since,
+                // within the same bound and with the same drop-oldest count.
+                for (size_t k = batch.size(); k-- > done;) hub->lines.push_front(std::move(batch[k]));
+                while (hub->lines.size() > kMaxQueuedLines) { hub->lines.pop_front(); ++hub->droppedLines; }
+                hub->unreachable = true;
+                hub->droppedAtOutage = hub->droppedLines;
+            }
+        }
+        if (failed) close();   // the next tick retries the open
+    }
+};
+
+void writerMain(SeamHub* hub) {
+    Sheet sheet{hub};
+    sheet.begin();
+    for (bool first = true;; first = false) {
+        bool stop, renew;
+        {
+            std::unique_lock<std::mutex> lk(hub->wakeMutex);
+            if (!first)
+                hub->wake.wait_for(lk, kWriterTick, [hub] { return hub->stopReq || hub->renewReq; });
+            stop = hub->stopReq;
+            renew = hub->renewReq;
+            hub->renewReq = false;
+        }
+        if (renew) sheet.begin();
+        if (!stop) sheet.snapshotStates();   // after the last unregister there is no one left
+        sheet.open();
+        sheet.drain();
+        if (stop) break;
+    }
+    sheet.close();
+}
+
+} // namespace
+
+void SeamHub::startWriter() {
+    {
+        std::lock_guard<std::mutex> lk(wakeMutex);
+        stopReq = false;
+        renewReq = false;   // a sheet_new() between sessions: this session is new anyway
+    }
+    // No exception may cross the C ABI. If the thread cannot be made the
+    // session runs without a sheet: lines stay queued (bounded) and the next
+    // register() tries again, since `writer` is still not joinable.
+    try {
+        writer = std::thread(writerMain, this);
+    } catch (...) {
+    }
+}
+
+void SeamHub::stopWriter() {
+    {
+        std::lock_guard<std::mutex> lk(wakeMutex);
+        stopReq = true;
+    }
+    wake.notify_all();
+    writer.join();   // the final flush has happened when this returns
+}
+
+extern "C" {
+
+int32_t seam_hub_v1_sheet_set_folder(SeamHub* hub, const char* folder) {
+    if (!hub || !folder || !*folder || std::strchr(folder, '\n')) return -1;
+    std::lock_guard<std::mutex> lock(g_confMutex);
+    const std::string conf = confPath();
+    // Keep every other line of the conf; replace the folder line.
+    std::vector<std::string> keep;
+    {
+        std::ifstream in(conf);
+        for (std::string l; std::getline(in, l);)
+            if (l.rfind("sheet-folder=", 0) != 0) keep.push_back(l);
+    }
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(conf).parent_path(), ec);
+    const std::string tmp = conf + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::trunc);
+        if (!out) return -1;
+        for (const auto& l : keep) out << l << "\n";
+        out << "sheet-folder=" << folder << "\n";
+        if (!out.flush()) return -1;
+    }
+    return std::rename(tmp.c_str(), conf.c_str()) == 0 ? 0 : -1;
+}
+
+// Closes the current sheet and opens a new one at once: the writer is woken
+// rather than waited for, so the detector's button never blocks on the disk.
+// Outside a session it does nothing (the next session opens a new sheet).
+void seam_hub_v1_sheet_new(SeamHub* hub) {
+    if (!hub) return;
+    {
+        std::lock_guard<std::mutex> lk(hub->wakeMutex);
+        hub->renewReq = true;
+    }
+    hub->wake.notify_all();
+}
 
 } // extern "C"

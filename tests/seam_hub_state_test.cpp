@@ -230,6 +230,17 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     SeamHub* bus = seam_hub_v1_get();
     std::atomic<bool> stop{false};
 
+    // An anchor member stays registered for the whole run. Without it every
+    // churn cycle would be a whole sheet session (the first register starts
+    // the writer thread, the last unregister flushes and joins it), and the
+    // cycle rate collapses from millions to about a thousand: the very
+    // "register()/unregister() more expensive" failure described at the
+    // `cycles` check below. The anchor keeps this test on what it hunts, the
+    // seqlock under slot churn; the session lifecycle has its own tests in
+    // seam_hub_writer_test.cpp.
+    const int32_t anchor = reg(bus, "anchor");
+    REQUIRE(anchor != SEAM_HUB_NO_HANDLE);
+
     // Announced BEFORE the register that opens the epoch, so at any instant the
     // bus's live epoch is <= liveEpoch. Hence a returned record whose epoch is
     // strictly below the value read before snapshot() started is proof the
@@ -273,9 +284,10 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
         const uint64_t e0 = liveEpoch.load(std::memory_order_acquire);
         const int32_t n = seam_hub_v1_members(bus, out, SEAM_HUB_MAX_MEMBERS);
         const uint64_t e1 = liveEpoch.load(std::memory_order_acquire);
-        if (n == 0) continue;
+        if (n <= 1) continue;   // the anchor alone: the churned slot was free
         ++reads;
         for (int32_t k = 0; k < n; ++k) {
+            if (std::strcmp(out[k].name, "anchor") == 0) continue;
             if (isFresh(out[k].state)) { ++fresh; continue; }  // registered, unpublished
             if (!probeIsConsistent(out[k].state)) { ++torn; continue; }
             const uint64_t e = out[k].state.u.glide.passCounter / kEpochStride;
@@ -284,6 +296,7 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     }
     stop.store(true);
     churn.join();
+    seam_hub_v1_unregister(bus, anchor);
 
     const uint64_t finalEpoch = liveEpoch.load(std::memory_order_relaxed);
     const uint64_t finalCycles = cycles.load(std::memory_order_relaxed);
