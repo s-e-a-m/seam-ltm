@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -30,6 +31,7 @@ namespace fs = std::filesystem;
 extern "C" void    seam_hub_test_set_grace_ms(int32_t ms);
 extern "C" void    seam_hub_test_stall_writer(int32_t ms);
 extern "C" int32_t seam_hub_test_writer_alive(void);
+extern "C" int32_t seam_hub_test_teardown(void);
 
 namespace {
 
@@ -327,6 +329,23 @@ TEST_CASE("a state change is written once, not every tick") {
     CHECK(states == 1);
 }
 
+TEST_CASE("a NaN level is written once, not every tick") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("nan");
+    useFolder(folder);
+    const int32_t a = seam_hub_v1_register(hub, "multipink", SEAM_HUB_BIT(kSeamHubPink), 0);
+    SeamHubState s{};
+    s.kind = kSeamHubPink;
+    s.levelDb = std::nan("");
+    seam_hub_v1_publish_state(hub, a, &s);
+    std::this_thread::sleep_for(std::chrono::milliseconds(800));   // three ticks or more
+    seam_hub_v1_unregister(hub, a);
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    CHECK(countVerb(fileLines(files[0]), "state") == 1);
+}
+
 TEST_CASE("sheet_status and sheet_set_folder refuse nulls") {
     Cleanup cleanup;
     useFolder(freshDir("nulls"));
@@ -427,4 +446,50 @@ TEST_CASE("the last unregister returns within 2.1 s even if the writer is stuck"
     REQUIRE(files.size() == 1);
     const auto lines = fileLines(files[0]);
     CHECK(countVerb(lines, "leaves") == 2);   // nothing lost, only late
+}
+
+TEST_CASE("quit with a lingering idle writer returns at once and the sheet ends with leaves") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("quit");
+    useFolder(folder);
+    seam_hub_test_set_grace_ms(10000);   // the real grace: the writer is lingering at quit
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    REQUIRE(seam_hub_test_writer_alive() == 1);
+    const auto t0 = std::chrono::steady_clock::now();
+    CHECK(seam_hub_test_teardown() == 1);
+    CHECK(msSince(t0) < 300.0);
+    CHECK(seam_hub_test_writer_alive() == 0);
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    const auto lines = fileLines(files[0]);
+    REQUIRE(!lines.empty());
+    CHECK(verbOf(lines.back()) == "leaves");
+}
+
+TEST_CASE("quit with a stuck writer returns within 2.1 s") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("quitstuck");
+    useFolder(folder);
+    seam_hub_test_set_grace_ms(10000);
+    // Members gone first, so nothing is left held after the detached writer
+    // finishes (a held line would land in the next case's sheet).
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0));
+    seam_hub_test_stall_writer(5000);
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));   // a lingering tick is now stuck
+    const auto t0 = std::chrono::steady_clock::now();
+    CHECK(seam_hub_test_teardown() == 0);   // detached, not joined
+    const double ms = msSince(t0);
+    CHECK(ms < 2100.0);
+    CHECK(ms > 1500.0);
+    // Released, the detached writer finishes its pass under stop, closes the
+    // sheet and exits; the hub it touches was never destroyed.
+    seam_hub_test_stall_writer(0);
+    REQUIRE(waitWriterGone());
+    // And the hub works again: a new session starts a new writer.
+    const int32_t a = seam_hub_v1_register(hub, "strx", 0, 0);
+    CHECK(seam_hub_test_writer_alive() == 1);
+    seam_hub_test_set_grace_ms(kTestGraceMs);   // before the unregister that starts the grace
+    seam_hub_v1_unregister(hub, a);
 }

@@ -291,7 +291,7 @@ struct SeamHub {
     // acknowledgement of its `leaves` line at most kLastLeaveWait.
     //
     // Lock order: lifeMutex, storeMutex, regMutex, lineMutex. lifeMutex only
-    // guards the std::thread object (register and ~SeamHub); ctlMutex and
+    // guards the std::thread object (register and teardown()); ctlMutex and
     // statusMutex are leaves, never held while taking another.
     std::mutex   lifeMutex;
     std::thread  writer;                    // guarded by lifeMutex
@@ -299,7 +299,7 @@ struct SeamHub {
     std::mutex              ctlMutex;
     std::condition_variable wake;           // the writer waits on it, and so does the last unregister
     bool     running = false;               // a writer thread exists and has not exited
-    bool     stopReq = false;               // ~SeamHub only
+    bool     stopReq = false;               // teardown() only
     bool     renewReq = false;              // sheet_new()
     bool     flushReq = false;              // the last unregister: a pass now
     int32_t  liveMembers = 0;
@@ -324,24 +324,46 @@ struct SeamHub {
     bool     unreachable = false;
     uint64_t droppedAtOutage = 0;
 
-    ~SeamHub() {
-        // A host that quits with a writer alive (members registered, or
-        // lingering): ask for a final pass and join, rather than let a
-        // joinable std::thread terminate the process. Process teardown is the
-        // one place a join may wait on the disk.
-        std::lock_guard<std::mutex> life(lifeMutex);
-        {
-            std::lock_guard<std::mutex> lk(ctlMutex);
-            stopReq = true;
-        }
+    // The host quits (or the dylib is unloaded): ask the writer for a last
+    // pass, which drains into a sheet that is already open and never opens
+    // one (writerMain), and wait for it to exit at most kLastLeaveWait. A
+    // writer that has exited is joined; one still stuck in the disk (a hung
+    // network share) is detached and left to the process exit. That is safe
+    // only because the hub is never destroyed (see g_hub below): the detached
+    // thread can never touch freed memory. Returns 1 when the writer exited
+    // (or there was none), 0 when it was detached.
+    int teardown() {
+        std::unique_lock<std::mutex> lk(ctlMutex);
+        stopReq = true;
         wake.notify_all();
-        if (writer.joinable()) writer.join();
+        const bool exited = wake.wait_for(lk, kLastLeaveWait, [this] { return !running; });
+        lk.unlock();
+        std::lock_guard<std::mutex> life(lifeMutex);
+        if (writer.joinable()) {
+            if (exited) writer.join();     // returned, or returning: no disk left
+            else        writer.detach();
+        }
+        return exited ? 1 : 0;
     }
 };
 
 // The one copy in the process. Static here is correct precisely because this
 // translation unit is compiled into exactly one dylib.
-static SeamHub g_hub;
+//
+// IMMORTAL ON PURPOSE: allocated once and never destroyed. A writer stuck in
+// the disk at quit is detached (SeamHub::teardown), and it may wake up while
+// the process is being torn down; with a destroyed hub it would lock freed
+// mutexes and write into freed queues. Never destroying it costs one object
+// the process exit reclaims anyway.
+static SeamHub& g_hub = *new SeamHub;
+
+// The bounded stop runs from the dylib's own teardown. A destructor
+// function rather than an atexit handler: it runs both at process exit and
+// if the dylib is ever unloaded (an atexit handler would have to be
+// registered from register(), on a host's thread, and would still run after
+// an unload), and it needs no registration that a failed first start could
+// skip. It never waits more than kLastLeaveWait.
+__attribute__((destructor)) static void seamHubTeardown() { g_hub.teardown(); }
 
 namespace { void writerMain(SeamHub* hub); }
 
@@ -870,23 +892,27 @@ std::mutex g_confMutex;
 // Does the state differ in a field that means something? Field by field, by
 // kind: a memcmp of the whole record would also compare the bytes of the
 // union's inactive members and any padding, which a publisher need not zero.
+// Equal doubles, with NaN equal to NaN: a member that publishes a NaN level
+// must not write a state line every tick.
+bool same(double x, double y) { return x == y || (x != x && y != y); }
+
 bool sameState(const SeamHubState& a, const SeamHubState& b) {
     if (a.kind != b.kind || a.stoneId != b.stoneId || a.active != b.active ||
-        a.levelDb != b.levelDb || a.sampleRate != b.sampleRate) return false;
+        !same(a.levelDb, b.levelDb) || !same(a.sampleRate, b.sampleRate)) return false;
     switch (a.kind) {
         case kSeamHubPink:
             return a.u.pink.slotStart == b.u.pink.slotStart && a.u.pink.slotCount == b.u.pink.slotCount;
         case kSeamHubGlide: {
             const auto &x = a.u.glide, &y = b.u.glide;
             return x.passCounter == y.passCounter && x.passStartSample == y.passStartSample &&
-                   x.f0 == y.f0 && x.f1 == y.f1 && x.durationSec == y.durationSec &&
-                   x.deltaSec == y.deltaSec && x.sweepMode == y.sweepMode && x.diracMode == y.diracMode;
+                   same(x.f0, y.f0) && same(x.f1, y.f1) && same(x.durationSec, y.durationSec) &&
+                   same(x.deltaSec, y.deltaSec) && x.sweepMode == y.sweepMode && x.diracMode == y.diracMode;
         }
         case kSeamHubDecoder: {
             const auto &x = a.u.decoder, &y = b.u.decoder;
             return x.test == y.test && x.bypass == y.bypass && x.stoneOfModel == y.stoneOfModel &&
-                   x.cutHz == y.cutHz && x.commonId == y.commonId && x.differenceId == y.differenceId &&
-                   x.pieceOn == y.pieceOn && x.subOn == y.subOn && x.subHz == y.subHz;
+                   same(x.cutHz, y.cutHz) && x.commonId == y.commonId && x.differenceId == y.differenceId &&
+                   x.pieceOn == y.pieceOn && x.subOn == y.subOn && same(x.subHz, y.subHz);
         }
         default:
             return true;   // an unknown kind: only the common fields are known
@@ -901,6 +927,10 @@ struct Sheet {
     std::FILE*  f = nullptr;
     struct Last { uint32_t epoch; bool written; SeamHubState st; };
     Last        last[SEAM_HUB_MAX_MEMBERS]{};
+    // Set after a failed write: the next open() starts a new file first. Not
+    // begin() on the spot, because begin() touches the disk (conf, exists)
+    // and the failure may happen on the last pass under stop.
+    bool        needBegin = false;
 
     void publishStatus() {
         std::lock_guard<std::mutex> lock(hub->statusMutex);
@@ -914,6 +944,7 @@ struct Sheet {
     // pid, so a sheet is never appended to another.
     void begin() {
         close();
+        needBegin = false;
         start = std::time(nullptr);
         std::tm tm{};
         localtime_r(&start, &tm);
@@ -948,6 +979,7 @@ struct Sheet {
     // alone: its lines are the held lines, bounded by enqueue()'s drop-oldest.
     void open() {
         if (f) return;
+        if (needBegin) begin();
         uint64_t droppedNow;
         {
             std::lock_guard<std::mutex> lock(hub->lineMutex);
@@ -979,7 +1011,8 @@ struct Sheet {
             // a torn fragment, so it is abandoned and the next attempt starts
             // a new one. `unreachable` stays set: the notice is still owed.
             markUnreachable(droppedNow);
-            begin();
+            close();
+            needBegin = true;
             return;
         }
         hub->unreachable = false;
@@ -1054,7 +1087,7 @@ struct Sheet {
         }
         // A failed write may have left a torn fragment at the end of the
         // file: never glue the next header onto it, start a new file.
-        if (failed) begin();
+        if (failed) { close(); needBegin = true; }
         return upTo;
     }
 };
@@ -1082,7 +1115,10 @@ void writerMain(SeamHub* hub) {
         }
         if (renew) sheet.begin();
         if (members && !stop) sheet.snapshotStates();
-        sheet.open();
+        // Under stop no sheet is opened (no create_directories, no fopen on a
+        // share that may hang the quit): an open one is drained and closed,
+        // otherwise the held lines stay in memory.
+        if (!stop) sheet.open();
         const uint64_t acked = sheet.drain();
         {
             std::lock_guard<std::mutex> lk(hub->ctlMutex);
@@ -1176,6 +1212,12 @@ SEAM_HUB_API void seam_hub_test_set_grace_ms(int32_t ms) {
 // a stuck disk, as the last unregister must survive it. 0 releases it.
 SEAM_HUB_API void seam_hub_test_stall_writer(int32_t ms) {
     g_hub.stallMs.store(ms < 0 ? 0 : ms, std::memory_order_relaxed);
+}
+
+// Runs the dylib's teardown routine (the same one its destructor runs):
+// 1 when the writer exited within the bound, 0 when it was detached.
+SEAM_HUB_API int32_t seam_hub_test_teardown(void) {
+    return g_hub.teardown();
 }
 
 // 1 while a writer thread is alive (working or lingering), 0 once it exited.
