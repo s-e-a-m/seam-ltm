@@ -231,9 +231,10 @@ TEST_CASE("churn: reader never observes a torn or phantom record while slots chu
     std::atomic<bool> stop{false};
 
     // An anchor member stays registered for the whole run. Without it every
-    // churn cycle would be a whole sheet session (the first register starts
-    // the writer thread, the last unregister flushes and joins it), and the
-    // cycle rate collapses from millions to about a thousand: the very
+    // churn cycle ends in a LAST unregister, which waits (up to 2 s) for the
+    // sheet writer to acknowledge its `leaves` line: the churned member is
+    // then unregistered nearly all the time and the reader almost never sees
+    // it (measured: reads=22 of 200000, cycles=13382). That is the very
     // "register()/unregister() more expensive" failure described at the
     // `cycles` check below. The anchor keeps this test on what it hunts, the
     // seqlock under slot churn; the session lifecycle has its own tests in
