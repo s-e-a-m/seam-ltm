@@ -20,7 +20,8 @@
 //
 // Rows (columns padded with spaces, last column never padded):
 //   band table  title  "band  hz        comp_db  level_db  settled"
-//               row    band  = hz rounded to an integer, left in 6
+//               row    band  = ISO 266 nominal name by row index (20, 25, 31.5 .. 1k,
+//                              1.25k .. 20k, as strx prints them), left in 6
 //                      hz    = "%.2f", left in 10
 //                      comp  = "%+.1f", left in 9
 //                      level = "%.1f", left in 10
@@ -65,6 +66,14 @@ inline const char* sectionWord(uint32_t t) {
         default:                return "unknown";
     }
 }
+inline const char* bandName(int i) {
+    static const char* k[SEAM_HUB_BANDS] = {
+        "20","25","31.5","40","50","63","80","100","125","160","200","250",
+        "315","400","500","630","800","1k","1.25k","1.6k","2k","2.5k","3.15k",
+        "4k","5k","6.3k","8k","10k","12.5k","16k","20k"};
+    return (i >= 0 && i < SEAM_HUB_BANDS) ? k[i] : "?";
+}
+inline int clampBands(int n) { return n < 0 ? 0 : (n > SEAM_HUB_BANDS ? SEAM_HUB_BANDS : n); }
 inline const char* testWord(uint32_t t) {
     static const char* k[] = {"N", "W", "X", "Y", "Z"};
     return t < 5 ? k[t] : "?";
@@ -104,7 +113,7 @@ inline std::string tableObject(uint64_t id, uint32_t stone, const SeamHubBandTab
     if (t.hasDecoder)
         s += std::string("  decoder ") + detail::testWord(t.decoder.test) + " cut " +
              detail::fmt("%g", t.decoder.cutHz);
-    s += "  " + std::to_string(t.bandCount) + " bands  " + detail::fmt("%.1f", t.integrationSec) + " s";
+    s += "  " + std::to_string(detail::clampBands(t.bandCount)) + " bands  " + detail::fmt("%.1f", t.integrationSec) + " s";
     return s;
 }
 
@@ -133,10 +142,10 @@ inline std::string stateObject(const SeamHubState& s) {
 // Continuation lines, each "  | row\n".
 inline std::string rows(const SeamHubBandTable& t) {
     std::string r = "  | band  hz        comp_db  level_db  settled\n";
-    int n = t.bandCount < 0 ? 0 : (t.bandCount > SEAM_HUB_BANDS ? SEAM_HUB_BANDS : t.bandCount);
+    int n = detail::clampBands(t.bandCount);
     for (int i = 0; i < n; ++i) {
         const SeamHubBand& b = t.bands[i];
-        r += "  | " + detail::pad(detail::fmt("%.0f", b.hz), 6) +
+        r += "  | " + detail::pad(detail::bandName(i), 6) +
              detail::pad(detail::fmt("%.2f", b.hz), 10) +
              detail::pad(detail::fmt("%+.1f", b.compDb), 9) +
              detail::pad(detail::fmt("%.1f", b.levelDb), 10) +

@@ -50,8 +50,13 @@ TEST_CASE("band table rows, with a withheld band") {
     CHECK(lines == 30);   // title + 29
     CHECK(r.rfind("  | band  hz        comp_db  level_db  settled\n", 0) == 0);
     CHECK(r.find("  | 20    19.95     +3.0     -41.2     1.00\n") != std::string::npos);
-    CHECK(r.find("  | 40    39.90     -0.0     12.3      0.50\n") != std::string::npos);
-    CHECK(r.find("  | 580") == std::string::npos);   // band 30 withheld
+    t.bands[2] = {31.62, 0.0, -40.0, 1.0};
+    t.bands[18] = {1258.93, 1.25, -30.0, 0.9};
+    const std::string r2 = rows(t);
+    CHECK(r2.find("  | 31.5  31.62     +0.0     -40.0     1.00\n") != std::string::npos);
+    CHECK(r2.find("  | 1.25k 1258.93   +1.2     -30.0     0.90\n") != std::string::npos);
+    CHECK(r.find("  | 25    39.90     -0.0     12.3      0.50\n") != std::string::npos);
+    CHECK(r.find("  | 20k") == std::string::npos);   // band 30 withheld
 }
 
 TEST_CASE("sections rows") {
