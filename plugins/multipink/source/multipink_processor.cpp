@@ -93,6 +93,11 @@ tresult PLUGIN_API MULTIPINKProcessor::initialize(FUnknown* context) {
 }
 
 tresult PLUGIN_API MULTIPINKProcessor::terminate() {
+    // A host may terminate without a final setActive(false): the member
+    // must not outlive the instance, or it stays on the hub as a ghost
+    // (in the detector, and as a member that never leaves the sheet).
+    HubClient::instance().unregisterMember(hubHandle_);
+    hubHandle_ = SEAM_HUB_NO_HANDLE;
     return SingleComponentEffect::terminate();
 }
 
@@ -113,8 +118,12 @@ tresult PLUGIN_API MULTIPINKProcessor::setActive(TBool state) {
         seedLCGs();
         resetPinkFilters();
 
-        hubHandle_ = HubClient::instance().registerMember(
-            "multipink", SEAM_HUB_BIT(kSeamHubPink), 0);
+        // A second setActive(true) without a setActive(false) between them
+        // must not register again: the first handle would be lost while its
+        // member stayed registered, a ghost nothing can unregister.
+        if (hubHandle_ == SEAM_HUB_NO_HANDLE)
+            hubHandle_ = HubClient::instance().registerMember(
+                "multipink", SEAM_HUB_BIT(kSeamHubPink), 0, hubInstance_);
         publishHubState();
     } else {
         if (claimedStart_ >= 0) {

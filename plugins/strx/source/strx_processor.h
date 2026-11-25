@@ -92,6 +92,10 @@ private:
     double sampleRate_ = 48000.0;
     // Registered in setActive(true) on the main thread, never from audio.
     int32_t hubHandle_ = SEAM_HUB_NO_HANDLE;
+    // The instance number the hub gave this member, asked for again at the
+    // next registration so the sheet keeps calling it by the same name
+    // across the host's setActive cycles (0 until the first registration).
+    uint32_t hubInstance_ = 0;
 
     // GUI -> DSP. Written by the HubWatch on the GUI thread, read by
     // process() once per block. The bus itself is never touched from audio.

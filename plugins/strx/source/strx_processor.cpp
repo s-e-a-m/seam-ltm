@@ -36,7 +36,14 @@ tresult PLUGIN_API StrxProcessor::initialize(FUnknown* context) {
     return kResultOk;
 }
 
-tresult PLUGIN_API StrxProcessor::terminate() { return SingleComponentEffect::terminate(); }
+tresult PLUGIN_API StrxProcessor::terminate() {
+    // A host may terminate without a final setActive(false): the member
+    // must not outlive the instance, or it stays on the hub as a ghost
+    // (in the detector, and as a member that never leaves the sheet).
+    HubClient::instance().unregisterMember(hubHandle_);
+    hubHandle_ = SEAM_HUB_NO_HANDLE;
+    return SingleComponentEffect::terminate();
+}
 
 tresult PLUGIN_API StrxProcessor::setActive(TBool state) {
     if (state) {
@@ -58,7 +65,7 @@ tresult PLUGIN_API StrxProcessor::setActive(TBool state) {
             hubHandle_ = HubClient::instance().registerMember(
                 "strx", 0,
                 SEAM_HUB_BIT(kSeamHubPink) | SEAM_HUB_BIT(kSeamHubGlide) |
-                SEAM_HUB_BIT(kSeamHubDecoder));
+                SEAM_HUB_BIT(kSeamHubDecoder), hubInstance_);
     } else {
         HubClient::instance().unregisterMember(hubHandle_);
         hubHandle_ = SEAM_HUB_NO_HANDLE;

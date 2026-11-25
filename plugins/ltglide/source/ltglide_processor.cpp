@@ -127,6 +127,11 @@ tresult PLUGIN_API LTGLIDEProcessor::initialize(FUnknown* context) {
 }
 
 tresult PLUGIN_API LTGLIDEProcessor::terminate() {
+    // A host may terminate without a final setActive(false): the member
+    // must not outlive the instance, or it stays on the hub as a ghost
+    // (in the detector, and as a member that never leaves the sheet).
+    HubClient::instance().unregisterMember(hubHandle_);
+    hubHandle_ = SEAM_HUB_NO_HANDLE;
     return SingleComponentEffect::terminate();
 }
 
@@ -141,8 +146,12 @@ tresult PLUGIN_API LTGLIDEProcessor::setActive(TBool state) {
         lastTickWasGlide_ = false;         // no in-flight grain carries across (re)activation
         prevGainLin_ = computeGainLin();
 
-        hubHandle_ = HubClient::instance().registerMember(
-            "ltglide", SEAM_HUB_BIT(kSeamHubGlide), 0);
+        // A second setActive(true) without a setActive(false) between them
+        // must not register again: the first handle would be lost while its
+        // member stayed registered, a ghost nothing can unregister.
+        if (hubHandle_ == SEAM_HUB_NO_HANDLE)
+            hubHandle_ = HubClient::instance().registerMember(
+                "ltglide", SEAM_HUB_BIT(kSeamHubGlide), 0, hubInstance_);
         // (Re)activation always lands in Idle (see transport_.reset() above,
         // which never resumes a pass mid-way), so there is no pass to anchor
         // yet; reset the edge-detect state so a reactivated instance does not

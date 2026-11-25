@@ -72,6 +72,10 @@ private:
 
     // Calibration bus (Spec 2).
     int32_t  hubHandle_ = SEAM_HUB_NO_HANDLE;
+    // The instance number the hub gave this member, asked for again at the
+    // next registration so the sheet keeps calling it by the same name
+    // across the host's setActive cycles (0 until the first registration).
+    uint32_t hubInstance_ = 0;
     // Publish-policy bookkeeping (pass-start detect, running/idle edge
     // detect, anchor latch) -- extracted to the SDK-free ltglide::BusAnchor
     // so it is unit-tested (tests/ltglide_dsp_test.cpp) without depending on
