@@ -45,7 +45,7 @@ public:
         timer_ = new VSTGUI::CVSTGUITimer(
             [this](VSTGUI::CVSTGUITimer*) {
                 if (processor_) {
-                    const auto& d = processor_->calbusWatch().poll();
+                    const auto& d = processor_->hubWatch().poll();
                     // A sweep is not a pink field: the table is meaningless
                     // while ltglide is running, and says so rather than
                     // drawing numbers nobody should act on.

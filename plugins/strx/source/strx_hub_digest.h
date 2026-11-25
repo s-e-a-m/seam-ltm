@@ -1,5 +1,5 @@
 //──────────────────────────────────────────────────────────────────────────
-// SEAM-LTM · strx — one reading of a calibration-bus snapshot.
+// SEAM-LTM · strx — one reading of a hub members snapshot.
 //
 // Both the status line and the spectrum need to know which emitter is
 // sounding. Two independent walks of the snapshot would be duplicated logic
@@ -11,7 +11,7 @@
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 
-#include "seam_calbus.h"
+#include "seam_hub.h"
 
 #include <cstdint>
 
@@ -34,9 +34,9 @@ inline bool operator==(const GlideParams& a, const GlideParams& b) {
 }
 inline bool operator!=(const GlideParams& a, const GlideParams& b) { return !(a == b); }
 
-struct CalbusDigest {
+struct HubDigest {
     bool        available   = false;  // the dylib loaded and the version matched
-    int32_t     count       = 0;      // records in the snapshot
+    int32_t     count       = 0;      // emitters (pink/glide states) in the snapshot
     int32_t     firstActive = -1;     // index of the sounding emitter, or -1
     int32_t     activeCount = 0;      // how many are sounding (>1 = method violated)
     int32_t     idleCount   = 0;      // registered but silent
@@ -45,20 +45,28 @@ struct CalbusDigest {
     GlideParams params;                 // that sweep's generation params (meaningful only when glide)
 };
 
-// `recs` may be null when count is 0. `available` comes from the client.
-inline CalbusDigest digest(const SeamCalbusRecord* recs, int32_t n, bool available) {
-    CalbusDigest d;
+// `recs` may be null when n is 0. `available` comes from the client.
+// Only members with a state of kind pink or glide are emitters: a decoder
+// state, or a member that has published nothing, is never counted.
+// `firstActive` indexes `recs`.
+inline HubDigest digest(const SeamHubMember* recs, int32_t n, bool available) {
+    HubDigest d;
     d.available = available;
     if (!available || !recs || n <= 0) return d;
-    d.count = n;
+    auto emitter = [](const SeamHubMember& m) {
+        return m.hasState && (m.state.kind == (uint32_t)kSeamHubPink ||
+                              m.state.kind == (uint32_t)kSeamHubGlide);
+    };
     for (int32_t i = 0; i < n; ++i) {
-        if (!recs[i].active) { ++d.idleCount; continue; }
+        if (!emitter(recs[i])) continue;
+        ++d.count;
+        if (!recs[i].state.active) { ++d.idleCount; continue; }
         if (d.firstActive < 0) d.firstActive = i;
         ++d.activeCount;
     }
-    if (d.firstActive >= 0 && recs[d.firstActive].kind == (uint32_t)kSeamCalbusGlide) {
+    if (d.firstActive >= 0 && recs[d.firstActive].state.kind == (uint32_t)kSeamHubGlide) {
         d.glide = true;
-        const SeamCalbusRecord& r = recs[d.firstActive];
+        const SeamHubState& r = recs[d.firstActive].state;
         d.passCounter = r.u.glide.passCounter;
         d.params.stoneId     = r.stoneId;
         d.params.levelDb     = r.levelDb;
@@ -107,7 +115,7 @@ inline CalbusDigest digest(const SeamCalbusRecord* recs, int32_t n, bool availab
 // boundary, checked before the passCounter comparison.
 enum class HoldAction { None, SessionStart, PassBoundary };
 
-inline HoldAction holdAction(const CalbusDigest& d, uint64_t& lastPass, GlideParams& lastParams) {
+inline HoldAction holdAction(const HubDigest& d, uint64_t& lastPass, GlideParams& lastParams) {
     if (!d.glide) {
         lastPass = 0;
         return HoldAction::None;
@@ -133,7 +141,7 @@ inline HoldAction holdAction(const CalbusDigest& d, uint64_t& lastPass, GlidePar
 // (pink takeover). The measurement session it interrupts is over for good —
 // GS's "last measure wins" rule — so the watch clears the accumulation via
 // the session epoch. `lastNonGlideActive` is caller-owned edge state.
-inline bool pinkTakeover(const CalbusDigest& d, bool& lastNonGlideActive) {
+inline bool pinkTakeover(const HubDigest& d, bool& lastNonGlideActive) {
     const bool nowActive = d.available && d.firstActive >= 0 && !d.glide;
     const bool edge = nowActive && !lastNonGlideActive;
     lastNonGlideActive = nowActive;

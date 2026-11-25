@@ -4,7 +4,8 @@
 
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
 #include "multipink_ids.h"
-#include "seam_calbus_client.h"
+#include "seam_hub_client.h"
+#include "multipink_hub.h"
 
 #include <algorithm>
 #include <atomic>
@@ -118,14 +119,18 @@ private:
     std::atomic<int>    paramPower_{1};          // 1 = sounding (POWER on)
     std::atomic<int>    paramStoneId_{0};        // 0 = undeclared, 1..8
 
-    // Calibration bus (Spec 2). The handle is claimed in setActive and
+    // Calibration hub (Spec 2). The handle is claimed in setActive and
     // released there; publishing happens from process() on the audio thread,
-    // which is why the bus uses a seqlock and not a mutex.
-    int32_t busHandle_ = SEAM_CALBUS_NO_HANDLE;
+    // which is why the hub uses a seqlock and not a mutex.
+    int32_t hubHandle_ = SEAM_HUB_NO_HANDLE;
+    // The instance number the hub gave this member, asked for again at the
+    // next registration so the sheet keeps calling it by the same name
+    // across the host's setActive cycles (0 until the first registration).
+    uint32_t hubInstance_ = 0;
 
     // Build and publish this instance's record. Safe to call from the audio
     // thread; a no-op when the bus is unavailable or the slot is unclaimed.
-    void publishBusRecord();
+    void publishHubState();
 
     // DSP state — full pool always advanced.
     uint32_t lcgState_[kPoolSize] = {};

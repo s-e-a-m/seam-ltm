@@ -84,13 +84,13 @@ private:
     // collision flags and sweep parameters this does not need.
     std::string describeSource(strx::ExportContext& ctx) const {
         if (!processor_) return "no processor";
-        const auto& d = processor_->calbusWatch().poll();
-        if (!d.available)      return "calibration bus not available";
-        if (d.firstActive < 0) return "nothing sounding on the calibration bus";
-        const SeamCalbusRecord& rec = processor_->calbusWatch().records()[d.firstActive];
+        const auto& d = processor_->hubWatch().poll();
+        if (!d.available)      return "hub not available";
+        if (d.firstActive < 0) return "nothing sounding on the hub";
+        const SeamHubState& rec = processor_->hubWatch().records()[d.firstActive].state;
         ctx.stoneId = (int)rec.stoneId;
         char buf[160];
-        if (rec.kind == (uint32_t)kSeamCalbusPink)
+        if (rec.kind == (uint32_t)kSeamHubPink)
             std::snprintf(buf, sizeof buf, "multipink - STONE %u - slot %d-%d - %.1f dB",
                           rec.stoneId, rec.u.pink.slotStart,
                           rec.u.pink.slotStart + rec.u.pink.slotCount - 1, rec.levelDb);

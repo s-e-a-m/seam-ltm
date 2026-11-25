@@ -102,10 +102,20 @@ software draws for the same preset, plot the total as a hypothesis.
 Bessel (BE) slopes are deliberately not modelled and are excluded from the
 sum rather than guessed.
 
+## `hub-sheet.py` — the hub's session sheet parser
+
+Parses the text sheet the hub writes per session (grammar: `plugins/_common/hub/seam_hub_sheet.h`), with the standard library only.
+
+```bash
+python3 tools/hub-sheet.py --check FILE       # exit 0 if every line is an event or its continuation
+python3 tools/hub-sheet.py --count FILE       # number of events
+python3 tools/hub-sheet.py --check-dir DIR    # --check on the single *-seam-sheet.txt in DIR
+```
+
 ## `check-minos.py` — minimum-macOS lint
 
 Reads the `LC_BUILD_VERSION` load command out of every built bundle and out of
-`libseamcalbus.dylib`, one slice of the universal binary at a time, and fails
+`libseamhub.dylib`, one slice of the universal binary at a time, and fails
 when any of them declares a minimum macOS newer than the floor the suite ships
 for.
 

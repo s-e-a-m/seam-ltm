@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 #include "ltglide_dsp.h"
+#include "ltglide_hub.h"
 #include <algorithm>
 #include <cmath>
 
@@ -414,7 +415,7 @@ TEST_CASE("passCount survives reset() and prepare()") {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// BusAnchor -- the calbus publish-policy bookkeeping extracted from
+// BusAnchor -- the hub publish-policy bookkeeping extracted from
 // LTGLIDEProcessor (ltglide_processor.cpp). SDK-free, pure logic over
 // uint64_t/int64_t/bool, so it is exercised here exactly as it runs in the
 // processor: per-sample onSample() calls inside a block's loop, then one
@@ -860,4 +861,26 @@ TEST_CASE("integration: the pre-glide Lead is SILENT (a fresh burst must not be 
     }
     REQUIRE(sawGlideTick);                  // the pass did reach the sweep
     CHECK(maxPreGlide == 0.0);              // the whole Lead was dead silent
+}
+
+TEST_CASE("glide state carries the pass anchor") {
+    auto s = makeGlideState(2, true, -12.0, 96000.0, 7, 123456, 20000.0, 20.0,
+                            10.0, 0.25, 1u, 2u);
+    CHECK(s.kind == kSeamHubGlide);
+    CHECK(s.stoneId == 2u);
+    CHECK(s.active == 1u);
+    CHECK(s.levelDb == -12.0);
+    CHECK(s.sampleRate == 96000.0);
+    CHECK(s.u.glide.passCounter == 7u);
+    CHECK(s.u.glide.passStartSample == 123456);
+    CHECK(s.u.glide.f0 == 20000.0);
+    CHECK(s.u.glide.f1 == 20.0);
+    CHECK(s.u.glide.durationSec == 10.0);
+    CHECK(s.u.glide.deltaSec == 0.25);
+    CHECK(s.u.glide.sweepMode == 1u);
+    CHECK(s.u.glide.diracMode == 2u);
+    // -1 on activation: the anchor is not known yet.
+    auto a = makeGlideState(2, false, -12.0, 96000.0, 7, -1, 1, 2, 3, 4, 0, 0);
+    CHECK(a.active == 0u);
+    CHECK(a.u.glide.passStartSample == -1);
 }

@@ -4,7 +4,8 @@
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include "ltglide_ids.h"
 #include "ltglide_dsp.h"
-#include "seam_calbus_client.h"
+#include "seam_hub_client.h"
+#include "ltglide_hub.h"
 
 #include <atomic>
 
@@ -70,7 +71,11 @@ private:
     std::atomic<int>    paramStoneId_{0};      // 0 = undeclared, 1..8
 
     // Calibration bus (Spec 2).
-    int32_t  busHandle_ = SEAM_CALBUS_NO_HANDLE;
+    int32_t  hubHandle_ = SEAM_HUB_NO_HANDLE;
+    // The instance number the hub gave this member, asked for again at the
+    // next registration so the sheet keeps calling it by the same name
+    // across the host's setActive cycles (0 until the first registration).
+    uint32_t hubInstance_ = 0;
     // Publish-policy bookkeeping (pass-start detect, running/idle edge
     // detect, anchor latch) -- extracted to the SDK-free ltglide::BusAnchor
     // so it is unit-tested (tests/ltglide_dsp_test.cpp) without depending on
@@ -79,7 +84,7 @@ private:
 
     // Publish this instance's record. Called from the audio thread.
     // hostStartSample is -1 when the host provides no valid continuous clock.
-    void publishBusRecord(int64_t hostStartSample);
+    void publishHubState(int64_t hostStartSample);
 
     // DSP.
     ltglide::GlissBurst    glide_;

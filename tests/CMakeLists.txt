@@ -1,7 +1,7 @@
 # SEAM-LTM unit tests (doctest; SDK-free DSP cores, except seam_state_test
 # which links the SDK base/common layers to test the IBStream decode rule)
 
-# seam_calbus_test spawns std::thread for its seqlock hammer/churn stress
+# seam_hub_state_test spawns std::thread for its seqlock hammer/churn stress
 # tests. Links fine without this on macOS/libc++ (pthread is pulled in
 # transitively), but not on Linux, which this suite also targets
 # (linuxmain.cpp exists in the plugin CMake files) — find and link it
@@ -178,6 +178,7 @@ add_executable(ltglide_dsp_test
 target_include_directories(ltglide_dsp_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/ltglide/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
 )
 target_compile_features(ltglide_dsp_test PRIVATE cxx_std_17)
 add_test(NAME ltglide_dsp_test COMMAND ltglide_dsp_test)
@@ -243,62 +244,16 @@ target_include_directories(strx_dsp_test PRIVATE
 target_compile_features(strx_dsp_test PRIVATE cxx_std_17)
 add_test(NAME strx_dsp_test COMMAND strx_dsp_test)
 
-add_executable(seam_calbus_test
-    seam_calbus_test.cpp
+add_executable(strx_hub_digest_test
+    strx_hub_digest_test.cpp
 )
-target_include_directories(seam_calbus_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-target_link_libraries(seam_calbus_test PRIVATE seam_calbus Threads::Threads)
-target_compile_features(seam_calbus_test PRIVATE cxx_std_17)
-add_test(NAME seam_calbus_test COMMAND seam_calbus_test)
-
-add_executable(seam_calbus_client_test
-    seam_calbus_client_test.cpp
-)
-target_include_directories(seam_calbus_client_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-# The client loads the dylib at runtime — it must exist before the test runs.
-add_dependencies(seam_calbus_client_test seam_calbus)
-target_compile_features(seam_calbus_client_test PRIVATE cxx_std_17)
-add_test(NAME seam_calbus_client_test COMMAND seam_calbus_client_test)
-set_tests_properties(seam_calbus_client_test PROPERTIES
-    ENVIRONMENT "SEAM_CALBUS_PATH=$<TARGET_FILE:seam_calbus>"
-)
-
-add_library(calbus_badversion_stub SHARED calbus_badversion_stub.cpp)
-target_include_directories(calbus_badversion_stub PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-target_compile_features(calbus_badversion_stub PRIVATE cxx_std_17)
-
-add_executable(seam_calbus_version_test
-    seam_calbus_version_test.cpp
-)
-target_include_directories(seam_calbus_version_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
-)
-add_dependencies(seam_calbus_version_test calbus_badversion_stub)
-target_compile_features(seam_calbus_version_test PRIVATE cxx_std_17)
-add_test(NAME seam_calbus_version_test COMMAND seam_calbus_version_test)
-set_tests_properties(seam_calbus_version_test PROPERTIES
-    ENVIRONMENT "SEAM_CALBUS_PATH=$<TARGET_FILE:calbus_badversion_stub>"
-)
-
-add_executable(strx_calbus_digest_test
-    strx_calbus_digest_test.cpp
-)
-target_include_directories(strx_calbus_digest_test PRIVATE
+target_include_directories(strx_hub_digest_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/strx/source
-    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/calbus
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
 )
-target_compile_features(strx_calbus_digest_test PRIVATE cxx_std_17)
-add_test(NAME strx_calbus_digest_test COMMAND strx_calbus_digest_test)
+target_compile_features(strx_hub_digest_test PRIVATE cxx_std_17)
+add_test(NAME strx_hub_digest_test COMMAND strx_hub_digest_test)
 
 add_executable(addelay_dsp_test
     addelay_dsp_test.cpp
@@ -324,6 +279,22 @@ if(Python3_Interpreter_FOUND)
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-uidesc.py)
 
+    # The hub sheet grammar's parser against the golden sheet.
+    add_test(NAME hub_sheet_golden
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../tools/hub-sheet.py
+                     --check ${CMAKE_CURRENT_SOURCE_DIR}/ref/hub-sheet-golden.txt)
+
+    # The sheet the writer really wrote, read back by the same parser:
+    # seam_hub_writer_test ("lines from four threads are never interleaved")
+    # leaves its one sheet in hub-sheet-roundtrip/ (the hub_sheet fixture),
+    # and --check-dir checks the single *-seam-sheet.txt found there.
+    add_test(NAME hub_sheet_roundtrip
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/../tools/hub-sheet.py
+                     --check-dir ${CMAKE_BINARY_DIR}/hub-sheet-roundtrip)
+    set_tests_properties(hub_sheet_roundtrip PROPERTIES FIXTURES_REQUIRED hub_sheet)
+
     # ─── Minimum macOS the built binaries declare ────────────────────────────
     # Reads the bundles and the calibration bus as they come out of this build
     # tree, so the thing checked is the artefact a release ships and not the
@@ -342,7 +313,7 @@ if(Python3_Interpreter_FOUND)
                  COMMAND ${Python3_EXECUTABLE}
                          ${CMAKE_CURRENT_SOURCE_DIR}/../tools/check-minos.py
                          ${_minos_bundles}
-                         $<TARGET_FILE:seam_calbus>)
+                         $<TARGET_FILE:seam_hub>)
     endif()
 else()
     message(STATUS "Python3 not found — uidesc lint tests will not be registered")
@@ -400,6 +371,7 @@ target_include_directories(multipink_pink_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/multipink/source
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/strx/source
     ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
 )
 target_compile_features(multipink_pink_test PRIVATE cxx_std_17)
 add_test(NAME multipink_pink_test COMMAND multipink_pink_test)
@@ -760,3 +732,125 @@ if(APPLE)
 endif()
 target_compile_features(alogos_state_test PRIVATE cxx_std_17)
 add_test(NAME alogos_state_test COMMAND alogos_state_test)
+
+# Every hub test registers members, and the first register starts a session
+# sheet. Without a conf of their own they would write into the operator's
+# ~/Documents/SEAM/sheets, so each hub test target gets SEAM_HUB_CONF pointing
+# at a conf in the build tree whose folder is in the build tree too.
+set(SEAM_HUB_TEST_CONF "${CMAKE_BINARY_DIR}/hub-test/hub.conf")
+file(WRITE "${SEAM_HUB_TEST_CONF}" "sheet-folder=${CMAKE_BINARY_DIR}/hub-test/sheets\n")
+# The churn case alone writes tens of MB of arrivals and departures there:
+# removed after the hub tests that use it, so repeated runs do not pile up.
+add_test(NAME hub_test_sheets_clean
+         COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/hub-test/sheets")
+set_tests_properties(hub_test_sheets_clean PROPERTIES FIXTURES_CLEANUP hub_test_sheets)
+
+# The hub's ABI contract: sizeof pins and the version, against the real dylib.
+add_executable(seam_hub_layout_test
+    seam_hub_layout_test.cpp
+)
+target_include_directories(seam_hub_layout_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_link_libraries(seam_hub_layout_test PRIVATE seam_hub)
+target_compile_features(seam_hub_layout_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_layout_test COMMAND seam_hub_layout_test)
+set_tests_properties(seam_hub_layout_test PROPERTIES ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
+
+# Members and wait-free states, ported from the earlier bus's tests. Spawns threads
+# for the seqlock hammer and churn cases, hence Threads.
+add_executable(seam_hub_state_test
+    seam_hub_state_test.cpp
+)
+target_include_directories(seam_hub_state_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_link_libraries(seam_hub_state_test PRIVATE seam_hub Threads::Threads)
+target_compile_features(seam_hub_state_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_state_test COMMAND seam_hub_state_test)
+set_tests_properties(seam_hub_state_test PROPERTIES ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
+
+# Proposals and the per-receiver lifecycle.
+add_executable(seam_hub_proposal_test
+    seam_hub_proposal_test.cpp
+)
+target_include_directories(seam_hub_proposal_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_link_libraries(seam_hub_proposal_test PRIVATE seam_hub)
+target_compile_features(seam_hub_proposal_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_proposal_test COMMAND seam_hub_proposal_test)
+set_tests_properties(seam_hub_proposal_test PROPERTIES ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
+
+# The sheet grammar: pure formatter, nothing to link but doctest.
+add_executable(seam_hub_sheet_test
+    seam_hub_sheet_test.cpp
+)
+target_include_directories(seam_hub_sheet_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(seam_hub_sheet_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_sheet_test COMMAND seam_hub_sheet_test)
+
+# The single writer of the session sheet. Each case sets its own conf at run
+# time; the default conf here only keeps a stray session out of ~/Documents.
+# The four-thread case leaves its sheet in hub-sheet-roundtrip/, which
+# hub_sheet_roundtrip (Python block above) checks with tools/hub-sheet.py.
+add_executable(seam_hub_writer_test
+    seam_hub_writer_test.cpp
+)
+target_include_directories(seam_hub_writer_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_link_libraries(seam_hub_writer_test PRIVATE seam_hub Threads::Threads)
+target_compile_features(seam_hub_writer_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_writer_test COMMAND seam_hub_writer_test)
+set_tests_properties(seam_hub_writer_test PROPERTIES
+    ENVIRONMENT "SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF};SEAM_HUB_TEST_SHEET_DIR=${CMAKE_BINARY_DIR}/hub-sheet-roundtrip"
+    FIXTURES_SETUP hub_sheet
+    FIXTURES_REQUIRED hub_test_sheets)
+
+# The client against the real dylib, and against a stub that must be refused.
+# Both go through SEAM_HUB_PATH, the only candidate when set.
+add_executable(seam_hub_client_test
+    seam_hub_client_test.cpp
+)
+target_include_directories(seam_hub_client_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+# The client loads the dylib at runtime: it must exist before the test runs.
+add_dependencies(seam_hub_client_test seam_hub)
+target_compile_features(seam_hub_client_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_client_test COMMAND seam_hub_client_test)
+set_tests_properties(seam_hub_client_test PROPERTIES
+    ENVIRONMENT "SEAM_HUB_PATH=$<TARGET_FILE:seam_hub>;SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)
+
+add_library(hub_badversion_stub SHARED hub_badversion_stub.cpp)
+target_include_directories(hub_badversion_stub PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(hub_badversion_stub PRIVATE cxx_std_17)
+
+add_executable(seam_hub_version_test
+    seam_hub_version_test.cpp
+)
+target_include_directories(seam_hub_version_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+add_dependencies(seam_hub_version_test hub_badversion_stub)
+target_compile_features(seam_hub_version_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_version_test COMMAND seam_hub_version_test)
+set_tests_properties(seam_hub_version_test PROPERTIES
+    ENVIRONMENT "SEAM_HUB_PATH=$<TARGET_FILE:hub_badversion_stub>;SEAM_HUB_CONF=${SEAM_HUB_TEST_CONF}"
+    FIXTURES_REQUIRED hub_test_sheets)

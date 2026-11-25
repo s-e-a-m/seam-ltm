@@ -92,9 +92,6 @@ add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
 # editor while Debug builds keep it for design work. Defining the macro on our
 # plugin targets here had no effect (they never test it), so it is omitted.
 
-# ─── Shared compiled libraries ───────────────────────────────────────────────
-add_subdirectory(plugins/_common/calbus)
-
 # ─── Plugins ─────────────────────────────────────────────────────────────────
 # smtg_add_vst3plugin installs a POST_BUILD symlink into
 # ~/Library/Audio/Plug-Ins/VST3, and the LAST build tree to compile a target
@@ -105,33 +102,71 @@ add_subdirectory(plugins/_common/calbus)
 #
 # Turn this OFF for any build tree that is not the one feeding the DAW:
 #   cmake -B build-test -DSEAM_BUILD_TESTS=ON -DSEAM_BUILD_PLUGINS=OFF
-# The unit tests need only the SDK-free cores (headers) and libseamcalbus, both
-# of which are configured above, outside this block.
+# The unit tests need only the SDK-free cores (headers) and libseamhub, both
+# of which are configured outside the plugin block below.
+# Declared before the hub's directory: the hub installs its dylib only from a
+# tree that builds plugins and links them (plugins/_common/hub/CMakeLists.txt).
 option(SEAM_BUILD_PLUGINS "Build the VST3 plugins (owns the ~/Library/Audio/Plug-Ins/VST3 symlinks)" ON)
 
+# ─── Shared compiled libraries ───────────────────────────────────────────────
+add_subdirectory(plugins/_common/hub)
+
+# ─── The VST validator, kept out of the operator's sheets ───────────────────
+# The SDK runs its validator as a POST_BUILD step of every plugin
+# (SMTG_RUN_VST_VALIDATOR, SMTG_AddVST3Library.cmake). The validator loads and
+# activates the plugin; a hub member then registers, which starts a session,
+# and the hub writes a sheet into the operator's folder (~/Documents/SEAM/sheets
+# by default) on every build. Build noise must not land among the sheets of
+# real sessions. So the SDK's step is turned off here (a normal variable, which
+# shadows the cache entry for every plugin directory below), and the same
+# validator runs after each plugin with SEAM_HUB_CONF naming a conf whose
+# folder is in this tree, and SEAM_HUB_PATH the dylib this tree just built
+# (the installed one may have another layout, or not exist: only the DAW's
+# tree installs it, plugins/_common/hub/CMakeLists.txt). The cache entry stays
+# the switch: -DSMTG_RUN_VST_VALIDATOR=OFF turns ours off too.
+set(SEAM_RUN_VST_VALIDATOR $CACHE{SMTG_RUN_VST_VALIDATOR})
+set(SMTG_RUN_VST_VALIDATOR OFF)
+
+set(SEAM_PLUGINS
+    sdmx xyprrot b2xrot lr2xhgr m2xhgr bamodulex bastooge ddelay addelay
+    multipink x2uhj abmodulex hilbert ltburst ltglide dslar strx lmo
+    stunedrev alogos delrm choir)
+
 if(SEAM_BUILD_PLUGINS)
-    add_subdirectory(plugins/sdmx)
-    add_subdirectory(plugins/xyprrot)
-    add_subdirectory(plugins/b2xrot)
-    add_subdirectory(plugins/lr2xhgr)
-    add_subdirectory(plugins/m2xhgr)
-    add_subdirectory(plugins/bamodulex)
-    add_subdirectory(plugins/bastooge)
-    add_subdirectory(plugins/ddelay)
-    add_subdirectory(plugins/addelay)
-    add_subdirectory(plugins/multipink)
-    add_subdirectory(plugins/x2uhj)
-    add_subdirectory(plugins/abmodulex)
-    add_subdirectory(plugins/hilbert)
-    add_subdirectory(plugins/ltburst)
-    add_subdirectory(plugins/ltglide)
-    add_subdirectory(plugins/dslar)
-    add_subdirectory(plugins/strx)
-    add_subdirectory(plugins/lmo)
-    add_subdirectory(plugins/stunedrev)
-    add_subdirectory(plugins/alogos)
-    add_subdirectory(plugins/delrm)
-    add_subdirectory(plugins/choir)
+    foreach(_p IN LISTS SEAM_PLUGINS)
+        add_subdirectory(plugins/${_p})
+    endforeach()
+
+    if(SEAM_RUN_VST_VALIDATOR AND TARGET validator)
+        set(_hubconf "${CMAKE_BINARY_DIR}/validator-hub.conf")
+        file(WRITE "${_hubconf}" "sheet-folder=${CMAKE_BINARY_DIR}/validator-sheets\n")
+        foreach(_p IN LISTS SEAM_PLUGINS)
+            get_property(_targets DIRECTORY plugins/${_p} PROPERTY BUILDSYSTEM_TARGETS)
+            foreach(_t IN LISTS _targets)
+                get_target_property(_pkg ${_t} SMTG_PLUGIN_PACKAGE_PATH)
+                if(NOT _pkg)
+                    continue()
+                endif()
+                # POST_BUILD cannot be attached from this directory (a TARGET
+                # build event must live in the target's own directory), so the
+                # step is a custom command on a stamp that depends on the
+                # plugin: it reruns whenever the plugin is rebuilt.
+                set(_stamp "${CMAKE_BINARY_DIR}/validator/${_t}-$<CONFIG>.stamp")
+                add_custom_command(
+                    OUTPUT  "${_stamp}"
+                    COMMAND ${CMAKE_COMMAND} -E echo "[SEAM] Validator started (${_t})..."
+                    COMMAND ${CMAKE_COMMAND} -E env
+                            "SEAM_HUB_CONF=${_hubconf}"
+                            "SEAM_HUB_PATH=$<TARGET_FILE:seam_hub>"
+                            $<TARGET_FILE:validator> "${_pkg}"
+                    COMMAND ${CMAKE_COMMAND} -E touch "${_stamp}"
+                    DEPENDS ${_t} seam_hub validator
+                    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+                    VERBATIM)
+                add_custom_target(${_t}_validate ALL DEPENDS "${_stamp}")
+            endforeach()
+        endforeach()
+    endif()
 else()
     message(STATUS "[SEAM] SEAM_BUILD_PLUGINS=OFF — plugins skipped; VST3 symlinks left untouched")
 endif()

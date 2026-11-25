@@ -1,5 +1,5 @@
 //──────────────────────────────────────────────────────────────────────────
-// SEAM-LTM · strx — calibration-bus status line (calbus Task 5).
+// SEAM-LTM · strx — hub status line.
 //
 // The one user-visible feature of the calibration bus, and its diagnostic:
 // it answers "which emitter am I hearing?" — the question the pool alone
@@ -9,7 +9,7 @@
 // Reads the bus from the GUI thread ONLY, on its own CVSTGUITimer, mirroring
 // StrxMeters/StrxGoniometer/StrxSpectrum: the timer just invalidates, and
 // draw() reads current state fresh on every paint. compose() reads the
-// digest CalbusWatch caches on the processor (strx_calbus_watch.h) — the
+// digest HubWatch caches on the processor (strx_hub_watch.h) — the
 // same digest the spectrum view uses — never its own walk of the snapshot.
 // strx's audio thread still never touches the bus directly: what process()
 // needs (glide mode, hold-reset) reaches it through two atomics the watch
@@ -23,7 +23,7 @@
 #include "vstgui/lib/ccolor.h"
 #include "vstgui/lib/cvstguitimer.h"
 
-#include "strx_calbus_watch.h"
+#include "strx_hub_watch.h"
 #include "strx_processor.h"
 
 #include <cstdio>
@@ -66,13 +66,13 @@ private:
 
     // recs[i].kind discriminates the union: only read the arm that matches.
     // r.u.glide.passStartSample < 0 has exactly one contracted meaning (no
-    // valid host continuous clock, seam_calbus.h:82) — it never signals
+    // valid host continuous clock, seam_hub.h) — it never signals
     // anything about whether the pass has ended.
-    static std::string describe(const SeamCalbusRecord& r) {
+    static std::string describe(const SeamHubState& r) {
         char stone[16];
         appendStone(stone, sizeof(stone), r.stoneId);
         char buf[192];
-        if (r.kind == (uint32_t)kSeamCalbusPink) {
+        if (r.kind == (uint32_t)kSeamHubPink) {
             std::snprintf(buf, sizeof(buf), "multipink \xC2\xB7 %s \xC2\xB7 slot %d-%d \xC2\xB7 %.1f dB",
                           stone, r.u.pink.slotStart,
                           r.u.pink.slotStart + r.u.pink.slotCount - 1, r.levelDb);
@@ -95,15 +95,15 @@ private:
         return buf;
     }
 
-    // Reads the ONE digest CalbusWatch caches for both this view and the
-    // spectrum (strx_calbus_digest.h) — never its own walk of the snapshot,
+    // Reads the ONE digest HubWatch caches for both this view and the
+    // spectrum (strx_hub_digest.h) — never its own walk of the snapshot,
     // so the two views cannot name different emitters at the same instant.
     std::string compose() {
-        if (!processor_) return "calbus unavailable";
-        Seam::strx::CalbusWatch& watch = processor_->calbusWatch();
-        const Seam::strx::CalbusDigest& d = watch.poll();
-        if (!d.available) return "calbus unavailable";
-        if (d.count == 0) return "calbus: no emitter";
+        if (!processor_) return "hub unavailable";
+        Seam::strx::HubWatch& watch = processor_->hubWatch();
+        const Seam::strx::HubDigest& d = watch.poll();
+        if (!d.available) return "hub unavailable";
+        if (d.count == 0) return "hub: no emitter";
 
         // One emitter sounds at a time BY METHOD (see the design doc), so the
         // first active record is the headline answer. But "by method" is an
@@ -116,10 +116,10 @@ private:
         // than one is sounding.
         if (d.firstActive < 0) {
             char buf[64];
-            std::snprintf(buf, sizeof(buf), "calbus: %d idle, none sounding", d.idleCount);
+            std::snprintf(buf, sizeof(buf), "hub: %d idle, none sounding", d.idleCount);
             return buf;
         }
-        std::string text = describe(watch.records()[d.firstActive]);
+        std::string text = describe(watch.records()[d.firstActive].state);
         if (d.activeCount > 1) {
             // Kept compact on purpose, not out of necessity: at 560px/11px
             // (Source Code Pro Light, ~6.6 px/char) the longest record is the
