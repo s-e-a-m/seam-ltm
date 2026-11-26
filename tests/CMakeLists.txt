@@ -255,6 +255,17 @@ target_include_directories(strx_hub_digest_test PRIVATE
 target_compile_features(strx_hub_digest_test PRIVATE cxx_std_17)
 add_test(NAME strx_hub_digest_test COMMAND strx_hub_digest_test)
 
+add_executable(lessness_view_test
+    lessness_view_test.cpp
+)
+target_include_directories(lessness_view_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/lessness/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(lessness_view_test PRIVATE cxx_std_17)
+add_test(NAME lessness_view_test COMMAND lessness_view_test)
+
 add_executable(addelay_dsp_test
     addelay_dsp_test.cpp
 )
