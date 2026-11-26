@@ -65,7 +65,7 @@ TEST_CASE("a proposal nobody hears says so") {
     REQUIRE(rows.size() == 1);
     CHECK_FALSE(rows[0].pending);
     CHECK(receiversLine(rows[0]) == "heard by nobody now");
-    CHECK(std::strlen(kStoneNote) > 0);
+    CHECK(std::strlen(kDecisionsNote) > 0);
 }
 
 TEST_CASE("the head carries mode, time and integration") {
@@ -107,6 +107,44 @@ TEST_CASE("the sheet line and its alarm") {
     CHECK(l.find("3 dropped") != std::string::npos);
     CHECK(l.find("folder unreachable") != std::string::npos);
     CHECK(sheetAlarm(s, true));
+}
+
+TEST_CASE("a sheet not open with nothing held raises no alarm") {
+    // Between begin() and open() on every new sheet, and while a sheet whose
+    // folder failed at its first open has nothing to write: nothing at risk.
+    SeamHubSheetStatus s{};
+    std::strcpy(s.path, "/tmp/a-seam-sheet.txt"); s.writing = 0; s.pendingLines = 0; s.droppedLines = 2;
+    const std::string l = sheetLine(s, true);
+    CHECK(l.find("not open, nothing held") != std::string::npos);
+    CHECK(l.find("unreachable") == std::string::npos);
+    CHECK_FALSE(sheetAlarm(s, true));
+    s.pendingLines = 1;   // the first held line: the alarm rises
+    CHECK(sheetAlarm(s, true));
+}
+
+TEST_CASE("the decisions note names both resets and fits its line") {
+    const std::string n = kDecisionsNote;
+    CHECK(n.find("stone") != std::string::npos);
+    CHECK(n.find("off-and-on") != std::string::npos);
+    CHECK(n.find("sheet keeps them") != std::string::npos);
+    CHECK((int)n.size() <= kNoteChars);
+}
+
+TEST_CASE("the footer names NEW SHEET only while a sheet is written") {
+    const std::string folder = "/tmp/next";
+    SeamHubSheetStatus s{};
+    std::strcpy(s.path, "/tmp/a-seam-sheet.txt");
+    s.writing = 1;
+    CHECK(footerLine(s, true, folder) == "next sheet in /tmp/next \xC2\xB7 NEW SHEET to start it");
+    CHECK(footerLine(s, true, "") == sheetLine(s, true));   // no folder waiting
+    // Held after the grace: sheet_new() is ignored, the held count stays.
+    s.writing = 0; s.pendingLines = 7;
+    CHECK(footerLine(s, true, folder) == sheetLine(s, true));
+    CHECK(footerLine(s, true, folder).find("7 lines held") != std::string::npos);
+    // No session: the next session starts there by itself, no button named.
+    SeamHubSheetStatus none{};
+    CHECK(footerLine(none, true, folder) == "next sheet in /tmp/next");
+    CHECK(footerLine(none, false, folder) == "hub unavailable");
 }
 
 TEST_CASE("the home folder reads as ~") {

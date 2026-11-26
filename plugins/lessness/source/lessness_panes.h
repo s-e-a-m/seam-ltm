@@ -147,7 +147,7 @@ private:
 };
 
 // — PROPOSALS —: the whole store, pending first, each as its head and, under
-// it, where each receiver stands; kStoneNote always on the pane's last line.
+// it, where each receiver stands; kDecisionsNote always on the pane's last line.
 class LessnessProposals : public LessnessPane {
 public:
     LessnessProposals(const VSTGUI::CRect& size, VSTGUI::CFontRef font, const VSTGUI::CColor& text)
@@ -178,7 +178,7 @@ protected:
             if (more > 0) out.push_back("+" + std::to_string(more) + " more proposals");
         }
         while ((int)out.size() < body) out.emplace_back();
-        out.push_back(lessness::kStoneNote);
+        out.push_back(lessness::kDecisionsNote);
         return out;
     }
 
@@ -215,9 +215,10 @@ protected:
 };
 
 // FOOTER: where the sheet is written and whether it is, in white, after a
-// red square when it is not (sheetAlarm). While a folder chosen with FOLDER
-// is waiting for the next sheet, the line says so instead, until the sheet's
-// path is inside that folder.
+// red square when lines are held for an unreachable folder (sheetAlarm).
+// While a folder chosen with FOLDER is waiting for the next sheet, the line
+// says so instead, until the sheet's path is inside that folder, except while
+// lines are held, whose count stays (footerLine).
 class LessnessSheet : public VSTGUI::CView {
 public:
     static constexpr uint32_t       kTimerMs = 250;
@@ -269,16 +270,15 @@ private:
         HubClient& hub = HubClient::instance();
         const bool available = hub.available();
         const SeamHubSheetStatus status = hub.sheetStatus();
-        std::string text = lessness::sheetLine(status, available);
         if (available && nextFolder_ && !nextFolder_->empty()) {
             const std::string path = hubsheet::detail::oneLine(status.path, sizeof status.path);
             const std::string& folder = *nextFolder_;
             if (path.compare(0, folder.size() + 1, folder + "/") == 0)
                 nextFolder_->clear();      // the sheet has moved there: done
-            else
-                text = "next sheet in " + lessness::tildePath(folder, std::getenv("HOME")) +
-                       " \xC2\xB7 NEW SHEET to start it";
         }
+        // footerLine decides when the waiting folder is shown, and when NEW
+        // SHEET may be named (lessness_view.h).
+        std::string text = lessness::footerLine(status, available, nextFolder_ ? *nextFolder_ : std::string());
         const bool alarm = lessness::sheetAlarm(status, available);
         if (text != text_ || alarm != alarm_) {
             text_ = std::move(text);

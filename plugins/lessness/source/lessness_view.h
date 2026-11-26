@@ -15,8 +15,8 @@
 // GUI thread only: it reads snapshots the GUI thread took (members(),
 // proposals(), sheet_status()); nothing here is safe to call from audio.
 //
-// Cites: seam_hub.h (types), seam_hub_sheet.h (who, stateObject, testWord,
-// idRef), README "Lifecycle, per receiver" (why kStoneNote).
+// Cites: seam_hub.h (types), seam_hub_sheet.h (who, stateObject, testWord),
+// README "Lifecycle, per receiver" (why kDecisionsNote).
 //──────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -38,9 +38,17 @@ namespace Seam { namespace lessness {
 
 using LifecycleOf = std::function<int32_t(uint32_t member, uint32_t epoch, uint64_t id)>;
 
-// A receiver's decisions belong to its current stone: see the README.
-inline const char* const kStoneNote =
-    "a receiver that changes stone no longer shows the decisions it took; the sheet keeps them";
+// Where a receiver stands on a proposal is kept per registration epoch and
+// per stone (README "Lifecycle, per receiver"). Two things therefore send its
+// applied and ignored back to arrived in the proposals pane: a change of
+// stone, and the host switching the receiver off and on, which the sheet
+// folds into one `resumes` line but which is a new registration all the same
+// (README "Open points"). The sheet keeps every decision. One line under the
+// pane: at most kNoteChars, what the 600 px pane holds at Source Code Pro 11
+// (0.6 em advance, 6.6 px a character).
+inline constexpr int kNoteChars = 90;
+inline const char* const kDecisionsNote =
+    "a stone change or a host off-and-on resets a receiver's decisions; the sheet keeps them";
 
 namespace detail {
 inline const char* lifecycleWord(int32_t l) {
@@ -148,18 +156,48 @@ inline std::string tildePath(const std::string& path, const char* home) {
     return path;
 }
 
+// The sheet's states as sheet_status() reports them (seam_hub.cpp, Sheet):
+//   no path                      no session (the writer clears the path when a
+//                                session ends with nothing held, publishEnded);
+//   path, writing                the sheet is being written;
+//   path, not writing, held > 0  the folder is unreachable and lines wait:
+//                                the alarm (spec 2026-11-25, the red mark is
+//                                for an unreachable folder);
+//   path, not writing, held 0    not open, nothing waiting. It still occurs:
+//                                for an instant between begin() and open() on
+//                                every new sheet (start, renew, a return in
+//                                the grace), and while a sheet whose folder
+//                                failed at its first open has nothing to
+//                                write. No alarm, because nothing is at risk
+//                                and a transient must not flash red; the
+//                                first line enqueued makes it held > 0, and
+//                                the alarm then rises if the folder is gone.
 inline std::string sheetLine(const SeamHubSheetStatus& s, bool available) {
     if (!available) return "hub unavailable";
     const std::string path = hubsheet::detail::oneLine(s.path, sizeof s.path);
     if (!detail::hasPath(s)) return "no session";
     std::string out = tildePath(path, std::getenv("HOME")) + "  ";
     if (s.writing) return out + "writing";
+    if (s.pendingLines == 0) return out + "not open, nothing held";
     return out + "folder unreachable  " + std::to_string(s.pendingLines) + " lines held  " +
            std::to_string(s.droppedLines) + " dropped";
 }
 
 inline bool sheetAlarm(const SeamHubSheetStatus& s, bool available) {
-    return !available || (detail::hasPath(s) && s.writing == 0);
+    return !available || (detail::hasPath(s) && s.writing == 0 && s.pendingLines > 0);
+}
+
+// The footer while a folder chosen with FOLDER waits for the next sheet.
+// NEW SHEET is named only while a sheet is being written: outside a session,
+// or while lines are held after the grace, the hub ignores sheet_new()
+// (seam_hub.cpp, writerMain; README "Open points"), so the hint would name a
+// button that does nothing. While lines are held the held count stays, with
+// its alarm: the unreachable folder matters more than the next one.
+inline std::string footerLine(const SeamHubSheetStatus& s, bool available, const std::string& nextFolder) {
+    if (!available || nextFolder.empty()) return sheetLine(s, available);
+    if (detail::hasPath(s) && s.writing == 0 && s.pendingLines > 0) return sheetLine(s, available);
+    const std::string next = "next sheet in " + tildePath(nextFolder, std::getenv("HOME"));
+    return s.writing ? next + " \xC2\xB7 NEW SHEET to start it" : next;
 }
 
 }} // namespace Seam::lessness

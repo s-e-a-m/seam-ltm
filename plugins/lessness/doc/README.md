@@ -11,7 +11,7 @@ The hub itself is described in `plugins/_common/hub/README.md`.
   Who is registered on the hub, each with its state.
 - **Proposals.**
   The proposals in the store, and for each one where every receiver stands: arrived, shown, applied, ignored.
-  Under the pane, a note says that a receiver that changes stone no longer shows the decisions it took; the sheet keeps them.
+  Under the pane, a note says that a change of stone, or the host switching a receiver off and on, resets the decisions it took in this pane; the sheet keeps them.
 - **The sheet.**
   The session sheet's path, whether it is being written, the lines held or dropped, and the last lines as the sheet carries them.
   A red mark in the footer, with the count of held lines, says the sheet cannot be written, for instance because its folder is on an unmounted volume, or because the hub is unavailable.
@@ -28,6 +28,7 @@ Two things, both on the sheet and nowhere else.
 - **FOLDER** chooses the folder of the next sheet.
   The current sheet keeps its place until a new one is started.
 - **NEW SHEET** closes the session sheet and starts a new one, in the folder FOLDER chose if one is waiting.
+  It acts only while a sheet is being written, and only then does the footer name it; outside a session the next one starts in the chosen folder by itself.
 
 Both are GUI-thread actions on the view, with no bound parameter, as `SAVE` is in `strx` (see `doc/style/ui-style.md`).
 It acts on no receiver and decides no proposal.
