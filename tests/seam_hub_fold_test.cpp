@@ -88,6 +88,14 @@ TEST_CASE("window zero writes everything even if the clock went back") {
     CHECK(q.size() == 3);
 }
 
+TEST_CASE("a leave in the future is ready, whatever the window") {
+    // The clock stepped back after the leave was enqueued: holding it until
+    // the clock catches up would hold every line behind it.
+    std::deque<Entry> q{other(0), mk(Kind::Leaves, "a#1", 5000), other(5001)};
+    CHECK(fold(q, 1000, kFoldMs) == q.size());
+    CHECK(q.size() == 3);
+}
+
 TEST_CASE("a leave followed by a leave of the same who is not folded") {
     std::deque<Entry> q{mk(Kind::Leaves, "a#1", 0), mk(Kind::Leaves, "a#1", 5),
                         mk(Kind::Arrives, "a#1", 10)};
