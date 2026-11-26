@@ -799,6 +799,17 @@ target_include_directories(seam_hub_sheet_test PRIVATE
 target_compile_features(seam_hub_sheet_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_sheet_test COMMAND seam_hub_sheet_test)
 
+# The fold of a host's leave-and-return into one resumes line: pure.
+add_executable(seam_hub_fold_test
+    seam_hub_fold_test.cpp
+)
+target_include_directories(seam_hub_fold_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(seam_hub_fold_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_fold_test COMMAND seam_hub_fold_test)
+
 # The single writer of the session sheet. Each case sets its own conf at run
 # time; the default conf here only keeps a stray session out of ~/Documents.
 # The four-thread case leaves its sheet in hub-sheet-roundtrip/, which
