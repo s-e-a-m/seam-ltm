@@ -107,6 +107,10 @@ TEST_CASE("the sheet line and its alarm") {
     CHECK(l.find("3 dropped") != std::string::npos);
     CHECK(l.find("folder unreachable") != std::string::npos);
     CHECK(sheetAlarm(s, true));
+    // The counts come before the path: a long path (a /Volumes one) runs
+    // off the pane's right edge, and what is clipped must be the path.
+    CHECK(l.rfind("folder unreachable  120 lines held  3 dropped  ", 0) == 0);
+    CHECK(l.substr(l.size() - std::strlen("/tmp/a-seam-sheet.txt")) == "/tmp/a-seam-sheet.txt");
 }
 
 TEST_CASE("a sheet not open with nothing held raises no alarm") {

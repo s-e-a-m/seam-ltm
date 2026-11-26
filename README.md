@@ -72,7 +72,7 @@ Every window follows the same grammar, described in
 
 ### Screenshots
 
-The 22 windows photographed after the UI standard landed, in the order
+The 23 windows photographed after the UI standard landed, in the order
 of the families above; a plugin joins the gallery when its photo exists.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |
@@ -87,17 +87,17 @@ of the families above; a plugin joins the gallery when its photo exists.
 |:---:|:---:|:---:|:---:|
 | ![X2UHJ](docs/img/x2uhj.png) | ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) |
 
-| STRX | DSLAR | DDELAY | HILBERT |
+| STRX | LESSNESS | DSLAR | DDELAY |
 |:---:|:---:|:---:|:---:|
-| ![STRX](docs/img/strx.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) |
+| ![STRX](docs/img/strx.png) | ![LESSNESS](docs/img/lessness.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) |
 
-| ADDELAY | LMO | STUNEDREV | DELRM |
+| HILBERT | ADDELAY | LMO | STUNEDREV |
 |:---:|:---:|:---:|:---:|
-| ![ADDELAY](docs/img/addelay.png) | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) |
+| ![HILBERT](docs/img/hilbert.png) | ![ADDELAY](docs/img/addelay.png) | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) |
 
-| CHOIR | ALOGOS |
-|:---:|:---:|
-| ![CHOIR](docs/img/choir.png) | ![ALOGOS](docs/img/alogos.png) |
+| DELRM | CHOIR | ALOGOS |
+|:---:|:---:|:---:|
+| ![DELRM](docs/img/delrm.png) | ![CHOIR](docs/img/choir.png) | ![ALOGOS](docs/img/alogos.png) |
 
 <!-- END plugins -->
 

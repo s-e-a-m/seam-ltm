@@ -85,14 +85,16 @@ VSTGUI::CView* PLUGIN_API LessnessProcessor::createCustomView(
     const std::string view(name);
 
     // Pane text is InfoFont (Source Code Pro Light 11), white; frames are
-    // Structure; the footer's alarm square is MeterInv.
+    // Structure, lit in SliderActive while pressed; the footer's alarm square
+    // is MeterInv.
     VSTGUI::CFontRef font = description ? description->getFont("InfoFont") : nullptr;
     VSTGUI::CColor text = VSTGUI::kWhiteCColor, structure = VSTGUI::kGreyCColor;
-    VSTGUI::CColor alarm(0xc0, 0x40, 0x40, 0xff);
+    VSTGUI::CColor alarm(0xc0, 0x40, 0x40, 0xff), active(0x4a, 0x9e, 0xc8, 0xff);
     if (description) {
         description->getColor("TextLight", text);
         description->getColor("Structure", structure);
         description->getColor("MeterInv", alarm);
+        description->getColor("SliderActive", active);
     }
 
     // Sizes match resource/lessness.uidesc; the description resizes the view
@@ -107,9 +109,10 @@ VSTGUI::CView* PLUGIN_API LessnessProcessor::createCustomView(
         return new LessnessSheet(VSTGUI::CRect(0, 0, 600, 18), font, text, alarm, nextFolder_);
     if (view == kViewFolder)
         return new LessnessFolderButton(VSTGUI::CRect(0, 0, 120, 22), font, structure, text,
-                                        nextFolder_);
+                                        active, nextFolder_);
     if (view == kViewNewSheet)
-        return new LessnessNewSheetButton(VSTGUI::CRect(0, 0, 120, 22), font, structure, text);
+        return new LessnessNewSheetButton(VSTGUI::CRect(0, 0, 120, 22), font, structure, text,
+                                          active);
     return nullptr;
 }
 

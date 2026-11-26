@@ -176,11 +176,13 @@ inline std::string sheetLine(const SeamHubSheetStatus& s, bool available) {
     if (!available) return "hub unavailable";
     const std::string path = hubsheet::detail::oneLine(s.path, sizeof s.path);
     if (!detail::hasPath(s)) return "no session";
-    std::string out = tildePath(path, std::getenv("HOME")) + "  ";
-    if (s.writing) return out + "writing";
-    if (s.pendingLines == 0) return out + "not open, nothing held";
-    return out + "folder unreachable  " + std::to_string(s.pendingLines) + " lines held  " +
-           std::to_string(s.droppedLines) + " dropped";
+    const std::string shown = tildePath(path, std::getenv("HOME"));
+    if (s.writing) return shown + "  writing";
+    if (s.pendingLines == 0) return shown + "  not open, nothing held";
+    // The alarm's counts lead: a long path (a /Volumes one) runs off the
+    // pane's right edge, and what gets clipped must be the path, not them.
+    return "folder unreachable  " + std::to_string(s.pendingLines) + " lines held  " +
+           std::to_string(s.droppedLines) + " dropped  " + shown;
 }
 
 inline bool sheetAlarm(const SeamHubSheetStatus& s, bool available) {
