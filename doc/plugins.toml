@@ -119,6 +119,14 @@ title = "Measurement and processing"
 Stereo M/S Analyser: goniometer, overlaid M/S Welch spectra, and In L / In R / M / S / Width meters, plus a status line fed by the calibration bus. It observes only — the audio is passed through unchanged and there are no automatable parameters"""
 
   [[family.plugin]]
+  name = "LESSNESS"
+  io = "any → same"
+  screenshot = "lessness.png"
+  faust = ""
+  description = """
+The hub's detector: members, their states, the proposals with where each receiver stands on them, and the session sheet, in one window. It never registers on the hub, so it opens no session and appears in none. The audio is passed through unchanged and there are no automatable parameters; it changes only the sheet's folder (FOLDER) and starts a new sheet (NEW SHEET)"""
+
+  [[family.plugin]]
   name = "DSLAR"
   io = "mono → mono"
   screenshot = "dslar.png"

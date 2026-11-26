@@ -21,6 +21,11 @@
 
 - [ ] `doc/scripts/test-doc.sh` checks the plugin count in the registry but not in the prose of the README and of `publish.py`: add a check, so the number cannot go stale again (2026-11-04).
 
+- [x] `lessness`: checked in Reaper (Giuseppe and the agent, 2026-11-26): `resumes` in the sheet, NEW SHEET, FOLDER (fixed: VSTGUI handed AppKit a nil type list and no chooser appeared), the red mark on a force-detached disk image, the return with the 6 held lines moved to `sheets-held/`, `tools/hub-sheet.py --check` on every sheet; screenshot `docs/img/lessness.png` added.
+- [ ] `lessness`, from the Reaper check: decide whether a new sheet re-declares the members present (a sheet opened by NEW SHEET names `strx#1` only at its first `resumes`), and whether the recent-lines pane starts empty on a new sheet (Giuseppe).
+- [ ] `lessness`: a live session with no usable sheet path (every name taken, `HOME` unset) and held lines reads as "no session" with no red mark; `sheetAlarm` should rise on `pendingLines > 0` whatever the path (final review of plan 2, 2026-11-26).
+- [ ] `lessness`, minor and deferred from plan 2's reviews: timers started in the constructors rather than in `attached()`; output channels beyond the input count not zeroed; no test for a null input channel; `SEAM_LESSNESS_PURE` split rather than a pure header; `tildePath` with `HOME` ending in `/`; the footer's dropped count is process-wide; lock-order comments in `seam_hub.cpp` omit `lifeMutex`.
+
 ## Repository structure
 
 - [ ] ([#11](https://github.com/s-e-a-m/seam-ltm/issues/11)) The repository has both `doc/` (style, study, the plugin registry) and `docs/` (screenshots, audio, superpowers). The workspace convention keeps one `docs/` for documentation source and `refs/` for reference material. Decide the final layout and move things once, rather than adding to both.

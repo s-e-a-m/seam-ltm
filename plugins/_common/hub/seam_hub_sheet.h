@@ -15,7 +15,7 @@
 // two spaces, object (free text, no newline). When the object is empty the
 // line ends after the verb, with no trailing spaces.
 // Continuation line: exactly "  | " then the row, no trailing spaces.
-// Verbs: arrives leaves state says shows applies ignores sheet.
+// Verbs: arrives leaves state says shows applies ignores sheet resumes.
 // who: "<name>#<instance>", or "hub" / "operator".
 //
 // Rows (columns padded with spaces, last column never padded):
@@ -50,6 +50,8 @@
 //   <decoder>   "test <N|W|X|Y|Z>  cut <%g>  bypass <on|off>  model <n>
 //                common <#id|->  difference <#id|->  piece <on|off>
 //                sub <on|off> <%g> Hz"
+//   resumes     "after <dt> ms": a leaves and an arrives of the same member with
+//               the same masks, folded into one line (seam_hub_fold.h)
 //   transitions "<type> #<id>[  (<detail>)]" for shows,
 //               "<type> #<id>  on <who>[  (<detail>)]" for applies/ignores;
 //               detail at most 31 characters, from the receiver
@@ -123,6 +125,17 @@ inline std::string header(const std::tm& start, int pid) {
         start.tm_year + 1900, start.tm_mon + 1, start.tm_mday,
         start.tm_hour, start.tm_min, start.tm_sec, pid, (unsigned)SEAM_HUB_VERSION);
     return b;
+}
+
+// A says/hears mask as type names, comma-separated, "-" when empty.
+inline std::string maskNames(uint32_t mask) {
+    static const struct { uint32_t type; const char* name; } kNames[] = {
+        {kSeamHubPink, "pink"}, {kSeamHubGlide, "glide"}, {kSeamHubDecoder, "decoder"},
+        {kSeamHubBandTable, "band-table"}, {kSeamHubSections, "sections"}};
+    std::string s;
+    for (const auto& n : kNames)
+        if (mask & SEAM_HUB_BIT(n.type)) { if (!s.empty()) s += ','; s += n.name; }
+    return s.empty() ? "-" : s;
 }
 
 inline std::string who(const char* name, uint32_t instance) {

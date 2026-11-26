@@ -5,13 +5,13 @@
 A pedagogical VST3 plugin suite for the [SEAM](https://github.com/s-e-a-m)
 project (Sustained Electro-Acoustic Music).
 
-Twenty-two plugins built directly on the Steinberg VST3 SDK — no JUCE, no
+Twenty-three plugins built directly on the Steinberg VST3 SDK — no JUCE, no
 frameworks. Clean C++17, VSTGUI for the interface, and the minimum code
 needed to do the job.
 
 ## Plugins
 
-Seventeen fall into three families: converters that move a signal from one
+Eighteen fall into three families: converters that move a signal from one
 spatial format to another, generators that produce the test signals a room
 is measured with, and the measurement and processing tools that listen to
 the result.
@@ -49,6 +49,7 @@ Every window follows the same grammar, described in
 | Plugin | I/O | Description |
 |---|---|---|
 | **STRX** | stereo → stereo | Stereo M/S Analyser: goniometer, overlaid M/S Welch spectra, and In L / In R / M / S / Width meters, plus a status line fed by the calibration bus. It observes only — the audio is passed through unchanged and there are no automatable parameters |
+| **LESSNESS** | any → same | The hub's detector: members, their states, the proposals with where each receiver stands on them, and the session sheet, in one window. It never registers on the hub, so it opens no session and appears in none. The audio is passed through unchanged and there are no automatable parameters; it changes only the sheet's folder (FOLDER) and starts a new sheet (NEW SHEET) |
 | **DSLAR** | mono → mono | Agostino Di Scipio's LAR homeostatic loop, hand-ported from `LAR.pd`: the feedforward half of a Larsen system whose loop is closed acoustically by the room. Drive, loop delay, decorrelation, target, steepness and control smoothing, with live r (Hann RMS) and g (loop gain) readouts |
 | **DDELAY** | 4ch → 4ch | Quad Alignment Delay for loudspeaker time-alignment. A distance in metres becomes an integer-sample delay at c = 331.4 m/s, rounded up to the next prime so that several instances stay incommensurable. All four channels share one value |
 | **HILBERT** | mono → stereo | Wideband Quadrature Transformer: one input becomes an in-phase and a quadrature branch held −90° apart from 20 Hz to 20 kHz. Both outputs are all-pass filtered, since the relationship belongs to the pair rather than to either signal. Two topologies — RBJ biquad cascade and Niemitalo polyphase — are selectable live and redesigned per sample rate by the same `seam_quadrature` engine X2UHJ uses internally |
@@ -71,7 +72,7 @@ Every window follows the same grammar, described in
 
 ### Screenshots
 
-The 22 windows photographed after the UI standard landed, in the order
+The 23 windows photographed after the UI standard landed, in the order
 of the families above; a plugin joins the gallery when its photo exists.
 
 | SDMX | B2XROT | XYPRROT | M2XHGR |
@@ -86,17 +87,17 @@ of the families above; a plugin joins the gallery when its photo exists.
 |:---:|:---:|:---:|:---:|
 | ![X2UHJ](docs/img/x2uhj.png) | ![LTBURST](docs/img/ltburst.png) | ![LTGLIDE](docs/img/ltglide.png) | ![MULTIPINK](docs/img/multipink.png) |
 
-| STRX | DSLAR | DDELAY | HILBERT |
+| STRX | LESSNESS | DSLAR | DDELAY |
 |:---:|:---:|:---:|:---:|
-| ![STRX](docs/img/strx.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) | ![HILBERT](docs/img/hilbert.png) |
+| ![STRX](docs/img/strx.png) | ![LESSNESS](docs/img/lessness.png) | ![DSLAR](docs/img/dslar.png) | ![DDELAY](docs/img/ddelay.png) |
 
-| ADDELAY | LMO | STUNEDREV | DELRM |
+| HILBERT | ADDELAY | LMO | STUNEDREV |
 |:---:|:---:|:---:|:---:|
-| ![ADDELAY](docs/img/addelay.png) | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) | ![DELRM](docs/img/delrm.png) |
+| ![HILBERT](docs/img/hilbert.png) | ![ADDELAY](docs/img/addelay.png) | ![LMO](docs/img/lmo.png) | ![STUNEDREV](docs/img/stunedrev.png) |
 
-| CHOIR | ALOGOS |
-|:---:|:---:|
-| ![CHOIR](docs/img/choir.png) | ![ALOGOS](docs/img/alogos.png) |
+| DELRM | CHOIR | ALOGOS |
+|:---:|:---:|:---:|
+| ![DELRM](docs/img/delrm.png) | ![CHOIR](docs/img/choir.png) | ![ALOGOS](docs/img/alogos.png) |
 
 <!-- END plugins -->
 

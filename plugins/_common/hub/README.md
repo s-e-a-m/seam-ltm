@@ -69,7 +69,7 @@ Version 1 was amended once, on 2026-11-25, before anything outside its branch de
 | `seam_hub_v1_post` | GUI | A proposal; returns its id, 0 when refused. |
 | `seam_hub_v1_proposals` | GUI | The stored proposals after an id, oldest first. |
 | `seam_hub_v1_lifecycle` | GUI | Where a proposal stands for the caller's own handle. |
-| `seam_hub_v1_lifecycle_of` | GUI | Where it stands for any receiver, named by `member` and `epoch` (the detector). |
+| `seam_hub_v1_lifecycle_of` | GUI | Where it stands for any receiver, named by `member` and `epoch` (`lessness`, the detector). |
 | `seam_hub_v1_transition` | GUI | Moves a proposal for a receiver, with an optional detail for the sheet. |
 | `seam_hub_v1_recent_lines` | GUI | The last sheet lines, rows and states included, newest kept. |
 | `seam_hub_v1_sheet_status` | GUI | The sheet's path, whether it is written, pending and dropped lines. |
@@ -114,7 +114,7 @@ This is discipline, not a guarantee; say it out loud when you add an emitter.
 
 **A handle is registered once and always released.**
 A plugin registers in `setActive(true)` only when it holds no handle, and unregisters in `setActive(false)` and again in `terminate()`.
-A host may activate twice in a row, and may terminate without a last deactivation; either way, a handle overwritten or never released leaves a ghost member on the hub, in the detector and in the sheet, for the life of the process.
+A host may activate twice in a row, and may terminate without a last deactivation; either way, a handle overwritten or never released leaves a ghost member on the hub, in `lessness` and in the sheet, for the life of the process.
 
 ## States: wait-free, per-slot seqlock
 
@@ -161,7 +161,7 @@ Each receiver sees each proposal move through `kSeamHubArrived` → `kSeamHubSho
 `transition()` returns `SEAM_HUB_OK` (0) on success, and a negative code when the proposal is unknown (-1), not heard by that receiver (-2), an illegal step (-3), or a decision without the operator (-4).
 The client adds -5 (`SEAM_HUB_ERR_NO_HUB`) when there is no hub or the receiver holds no handle: nothing was recorded, so it must never read as success.
 A `detail` (up to 31 characters) goes into the sheet line, so the line says what the operator did: `applies band-table #12  on bastone#1  (block common)`.
-`lifecycle_of(member, epoch, id)` reads where a proposal stands for any receiver, by the `member` and `epoch` that `members()` reports; it is how the detector shows every receiver's state without holding their handles.
+`lifecycle_of(member, epoch, id)` reads where a proposal stands for any receiver, by the `member` and `epoch` that `members()` reports; it is how `lessness`, the detector, shows every receiver's state without holding their handles.
 
 **Applying or ignoring requires `byOperator = 1`.**
 No member acts on what it hears by itself: a proposal changes a loudspeaker's equalisation, and that change must be a person's decision, taken at the screen.
@@ -178,9 +178,9 @@ When a stone read tears eight times in a row (a publisher hammering its slot), t
 ## The session sheet
 
 The hub keeps a text **sheet** of the session, one event per line, readable by a person and by `tools/hub-sheet.py`.
-It is always written, whether or not any detector is loaded: the record of a calibration should not depend on what happened to be running.
+It is always written, whether or not `lessness` is loaded: the record of a calibration should not depend on what happened to be running.
 
-The grammar and the formatter are `seam_hub_sheet.h`; its top comment is the reference (event line, continuation rows, verbs `arrives leaves state says shows applies ignores sheet`).
+The grammar and the formatter are `seam_hub_sheet.h`; its top comment is the reference (event line, continuation rows, verbs `arrives leaves state says shows applies ignores sheet resumes`).
 `tools/hub-sheet.py` is the independent parser: `--check FILE` validates a sheet, `--count FILE` counts events.
 The formatter is pure and has no I/O, so the grammar can be tested without a disk.
 
@@ -211,6 +211,22 @@ The writer ticks every `kWriterTick` = 250 ms, comparing member states and writi
   Both halves are needed: the first protects the data, the second the code.
   Only a library rejected before any use (version mismatch, missing symbols) is closed.
 
+### A toggle is one line
+
+Hosts switch a plugin off and on again without the operator asking: Reaper does it within the same millisecond.
+Written as it happens, the sheet would read `leaves` then `arrives`, as if the member had gone and come back, when the host only bypassed it.
+So the writer folds a `leaves` and the next event of the same `name#instance`, when that event is an `arrives` with the same declaration (`says` and `hears`) at most 1 s later (`kFoldMs`), into one line at the time of the arrival: `strx#1  resumes  after 0 ms`.
+A different declaration is a real change, and both lines stay; two instances are two members.
+The decision is pure and tested without a disk (`seam_hub_fold.h`); the writer applies it to its queue under `lineMutex` before every write (`foldLocked` in `seam_hub.cpp`).
+
+To keep the sheet in order of arrival, a `leaves` younger than the window waits in the queue, and the lines after it wait with it.
+That costs the host nothing.
+The last `unregister` waits for its `leaves` to be written or held, and a young `leaves` held for the window counts as handled, so it never waits the second.
+A sheet never keeps a young `leaves` past its own end: at quit, on `sheet_new()`, before the sheet closes and before held lines are spilled, the writer folds with no window and writes or spills everything.
+No window means nothing waits, not that nothing pairs: a pair already in the queue, within `kFoldMs`, is still one `resumes`.
+A return after that is an `arrives` in the next sheet, never folded across.
+A `leaves` that has been shown in the recent lines is final, and no later arrival folds it.
+
 ### Held lines belong to their sheet
 
 When the folder cannot be written (an unmounted share, a missing volume), the lines wait in the queue, bounded as above, and `sheet_status()` reports them as pending.
@@ -236,7 +252,10 @@ The conf is re-read at every sheet start, so a change takes effect on the next s
 With `HOME` unset there is no default folder, and the sheet is treated as unreachable instead of being written relative to the host's working directory.
 `sheet_set_folder()` rewrites the conf by `rename()`, so the writer can read it without a lock.
 `sheet_status()` reports the path, whether it is writing, the pending lines and the dropped count; `sheet_new()` asks for a fresh sheet.
+The path is empty when there is no session: the writer clears it as its last act, when a session ends with nothing held (`publishEnded` in `seam_hub.cpp`), and a sheet that holds lines keeps it.
+A path that is not being written means an unreachable folder only while lines are pending; with none pending it is a sheet not yet open (an instant at each new sheet) or one whose folder failed before it had anything to write, and `lessness` raises its red mark only while lines are pending (`sheetAlarm` in `plugins/lessness/source/lessness_view.h`).
 `recent_lines()` returns the last 256 lines as written or held, table rows and the writer's state lines included, the newest kept when the buffer is short: the detector's "last lines".
+They are fed after the fold, on the writer's tick, so `lessness` shows what the sheet carries: a `resumes`, never the `leaves` it replaced.
 
 **The privacy prompt.**
 `~/Documents` is protected by macOS: the first process that writes there triggers a "would like to access files in your Documents folder" prompt, per application.
@@ -283,13 +302,13 @@ They were recorded in the plan's working ledger, which is not kept; this list re
 
 **Behaviour.**
 
-- Reaper switches a plugin off and on again within the same millisecond, so the sheet shows `leaves` and `arrives` pairs for one instance.
-  Plan 2 should fold a leave and arrive of the same `name#instance` within about 1 s into nothing, or into one "reactivated" line.
 - When a member arrives in a held sheet after the grace period or after midnight, no date marker is written.
 - `sheet_new` is ignored while the writer is holding lines after the grace period with no members.
 - On a volume with a quota, the writer leaves nearly empty `-N` sheets at every pass; it should back off.
 - `levelDb` is printed with `%.1f` but compared exactly, so two state lines can look the same.
-- The proposal lifecycle follows the receiver's current stone, so a recorded state cannot be reached after a stone change; the rivelatore's GUI has to say so.
+- The proposal lifecycle follows the receiver's current stone, so a recorded state cannot be reached after a stone change; `lessness` says so under the proposals pane (`kDecisionsNote`).
+- The lifecycle is keyed by the registration epoch, so a host that switches a receiver off and on resets its `applied` and `ignored` to `arrived`, even though the sheet folds the toggle into one `resumes`; `lessness` names it in the same note.
+  Before plan 4's gesture ships, carry the lifecycle across a folded re-registration: the same `name#instance`, the same masks, within `kFoldMs`.
 - `stoneOf` fails open (0, hears everything) after 8 torn reads, and `members()` drops a live member after 8 torn attempts, as `calbus` did.
 - `proposals(afterId = UINT64_MAX)` wraps around and returns the whole store.
 

@@ -255,6 +255,31 @@ target_include_directories(strx_hub_digest_test PRIVATE
 target_compile_features(strx_hub_digest_test PRIVATE cxx_std_17)
 add_test(NAME strx_hub_digest_test COMMAND strx_hub_digest_test)
 
+add_executable(lessness_view_test
+    lessness_view_test.cpp
+)
+target_include_directories(lessness_view_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/lessness/source
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(lessness_view_test PRIVATE cxx_std_17)
+add_test(NAME lessness_view_test COMMAND lessness_view_test)
+
+# The pass-through and the bus rule live in lessness_processor.h, beside the
+# class that uses them; SEAM_LESSNESS_PURE keeps the header's SDK half out, so
+# the test needs neither the SDK nor VSTGUI.
+add_executable(lessness_passthrough_test
+    lessness_passthrough_test.cpp
+)
+target_include_directories(lessness_passthrough_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/lessness/source
+)
+target_compile_definitions(lessness_passthrough_test PRIVATE SEAM_LESSNESS_PURE=1)
+target_compile_features(lessness_passthrough_test PRIVATE cxx_std_17)
+add_test(NAME lessness_passthrough_test COMMAND lessness_passthrough_test)
+
 add_executable(addelay_dsp_test
     addelay_dsp_test.cpp
 )
@@ -798,6 +823,17 @@ target_include_directories(seam_hub_sheet_test PRIVATE
 )
 target_compile_features(seam_hub_sheet_test PRIVATE cxx_std_17)
 add_test(NAME seam_hub_sheet_test COMMAND seam_hub_sheet_test)
+
+# The fold of a host's leave-and-return into one resumes line: pure.
+add_executable(seam_hub_fold_test
+    seam_hub_fold_test.cpp
+)
+target_include_directories(seam_hub_fold_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/_common/hub
+)
+target_compile_features(seam_hub_fold_test PRIVATE cxx_std_17)
+add_test(NAME seam_hub_fold_test COMMAND seam_hub_fold_test)
 
 # The single writer of the session sheet. Each case sets its own conf at run
 # time; the default conf here only keeps a stray session out of ~/Documents.

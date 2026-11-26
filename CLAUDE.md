@@ -83,9 +83,9 @@ stays separate because an allocator must not depend on an optional dylib.
 
 ## Documentation and web publishing
 
-`doc/plugins.toml` is the registry of the twenty-two plugins and the single source for two outputs: the tables in `README.md` and the page at `/seam-ltm/` on the SEAM site.
+`doc/plugins.toml` is the registry of the twenty-three plugins and the single source for two outputs: the tables in `README.md` and the page at `/seam-ltm/` on the SEAM site.
 Never edit either output by hand — edit the registry and run `make -C doc doc` and `make -C doc publish`.
-`make -C doc test` verifies the registry, that the README is in sync with it, and that the generated page has all twenty-two cards.
+`make -C doc test` verifies the registry, that the README is in sync with it, and that the generated page has all twenty-three cards.
 
 TOML rather than YAML: `tomllib` is in the standard library from Python 3.11, and a documentation generator has to run on a freshly cloned machine without installing anything.
 

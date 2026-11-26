@@ -130,7 +130,7 @@ set(SMTG_RUN_VST_VALIDATOR OFF)
 set(SEAM_PLUGINS
     sdmx xyprrot b2xrot lr2xhgr m2xhgr bamodulex bastooge ddelay addelay
     multipink x2uhj abmodulex hilbert ltburst ltglide dslar strx lmo
-    stunedrev alogos delrm choir)
+    stunedrev alogos delrm choir lessness)
 
 if(SEAM_BUILD_PLUGINS)
     foreach(_p IN LISTS SEAM_PLUGINS)

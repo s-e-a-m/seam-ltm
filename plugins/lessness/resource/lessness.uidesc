@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SEAM LESSNESS, the hub's detector. L format for the width its text panes
+     need, having no controls (as strx). Zones: HEADER, OPS (two GUI actions
+     on views with no bound parameter), three text panes, FOOTER. All pane
+     text is InfoFont (Source Code Pro Light 11), so sheet lines keep their
+     columns. See doc/style/ui-style.md. -->
+<vstgui-ui-description version="1">
+    <fonts>
+        <font font-name="Source Code Pro Light" name="TitleFont" size="20"/>
+        <font font-name="Source Code Pro Light" name="SubtitleFont" size="13"/>
+        <font font-name="Source Code Pro Light" name="KnobLabelFont" size="12"/>
+        <font font-name="Source Code Pro Light" name="ValueFont" size="11"/>
+        <font font-name="Source Code Pro Light" name="InfoFont" size="11"/>
+    </fonts>
+    <colors>
+        <color name="BgDark" rgba="#292c2fff"/>
+        <color name="TextLight" rgba="#fcfbfdff"/>
+        <color name="SliderTrack" rgba="#444444ff"/>
+        <color name="SliderActive" rgba="#4a9ec8ff"/>
+        <color name="Structure" rgba="#888888ff"/>
+        <color name="MeterInv" rgba="#c04040ff"/>
+    </colors>
+
+    <template name="editor" class="CViewContainer" origin="0, 0" size="640, 620"
+              minSize="640, 620" maxSize="640, 620"
+              background-color="BgDark" background-color-draw-style="filled">
+
+        <!-- ── HEADER ─────────────────────────────────────────────────── -->
+        <view class="CTextLabel" origin="0, 14" size="640, 26" font="TitleFont"
+              font-color="TextLight" text-alignment="center" title="SEAM LESSNESS" transparent="true"/>
+        <view class="CTextLabel" origin="0, 42" size="640, 18" font="SubtitleFont"
+              font-color="TextLight" text-alignment="center" title="Hub Detector" transparent="true"/>
+        <view class="CTextLabel" origin="0, 60" size="640, 14" font="InfoFont"
+              font-color="TextLight" text-alignment="center"
+              title="states &#xB7; proposals &#xB7; sheet &#xB7; no sound touched" transparent="true"/>
+
+        <!-- ── OPS — the only two things lessness changes ─────────────── -->
+        <view class="CView" origin="190, 86" size="120, 22" custom-view-name="LessnessFolderButton"
+              tooltip="Choose the folder of the next sheet"/>
+        <view class="CView" origin="330, 86" size="120, 22" custom-view-name="LessnessNewSheetButton"
+              tooltip="Close the session sheet and start a new one"/>
+
+        <!-- ── Three panes, 600 px wide, 14 px lines ───────────────────── -->
+        <view class="CTextLabel" origin="0, 120" size="640, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="— MEMBERS —" transparent="true"/>
+        <view class="CView" origin="20, 138" size="600, 112" custom-view-name="LessnessMembers"
+              tooltip="Who is on the hub, and what each member is doing"/>
+
+        <view class="CTextLabel" origin="0, 256" size="640, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="— PROPOSALS —" transparent="true"/>
+        <view class="CView" origin="20, 274" size="600, 112" custom-view-name="LessnessProposals"
+              tooltip="Proposals in the store, pending first, and where each receiver stands"/>
+
+        <view class="CTextLabel" origin="0, 392" size="640, 16" font="InfoFont"
+              font-color="TextLight" text-alignment="center" title="— SHEET —" transparent="true"/>
+        <view class="CView" origin="20, 410" size="600, 84" custom-view-name="LessnessLines"
+              tooltip="The newest lines of the session sheet"/>
+
+        <!-- ── FOOTER — the sheet's status, then the logo ─────────────── -->
+        <view class="CView" origin="20, 502" size="600, 18" custom-view-name="LessnessSheet"
+              tooltip="Where the sheet is written, and whether it is"/>
+        <view class="CView" origin="200, 530" size="240, 77" bitmap="logo"/>
+    </template>
+
+    <bitmaps><bitmap name="logo" path="seam_logo.png"/></bitmaps>
+    <control-tags>
+    </control-tags>
+</vstgui-ui-description>
