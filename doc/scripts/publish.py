@@ -48,7 +48,7 @@ out = ["---", 'title: "SEAM-LTM — Plugin Suite"', "permalink: /seam-ltm/", "to
        "---", "",
        "<!-- GENERATO — non modificare qui: la fonte è doc/plugins.toml di seam-ltm -->"]
 out += [
-    "Twenty-two VST3 plugins for sustained electroacoustic music, built directly on the Steinberg VST3 SDK — no JUCE, no frameworks.",
+    "Twenty-three VST3 plugins for sustained electroacoustic music, built directly on the Steinberg VST3 SDK — no JUCE, no frameworks.",
     "Seventeen fall into three families: converters that move a signal from one spatial format to another, generators that produce the test signals a room is measured with, and the measurement and processing tools that listen to the result. The other five were written for specific works.",
     "",
     "Several of them are the C++ counterpart of an algorithm that also lives in Faust: where that is the case, the entry links the library source.",

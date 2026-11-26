@@ -26,6 +26,12 @@ host that coalesces the press and the release into one point, which is why
 ltglide gave up its momentary trigger — and nothing about writing a file needs
 the processor, so nothing about it is exposed.
 
+FOLDER and NEW SHEET joined with lessness (2026-11-26), for the same reason:
+they act on the hub's session sheet, not on the plugin's state, so each is a
+GUI-thread action on a view with no bound parameter. Choosing a folder and
+starting a sheet are one-off acts that a host must not record, replay or
+automate.
+
 SETUP precedes OPS because identity is declared once, before working.
 Runtime feedback — slot badges, pool status, meters — is FOOTER content.
 It is not SETUP: SETUP is what the user tells the plugin, FOOTER is what

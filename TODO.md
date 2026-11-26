@@ -21,6 +21,8 @@
 
 - [ ] `doc/scripts/test-doc.sh` checks the plugin count in the registry but not in the prose of the README and of `publish.py`: add a check, so the number cannot go stale again (2026-11-04).
 
+- [ ] `lessness`: check in Reaper (`multipink` → STONE → `strx`: `resumes` in the sheet, FOLDER, NEW SHEET, the red mark on an unmounted volume, `tools/hub-sheet.py --check`) and add the screenshot `docs/img/lessness.png`; `make -C doc test` and `uidesc_lint_selftest` stay red until it exists (Giuseppe, 2026-11-26).
+
 ## Repository structure
 
 - [ ] ([#11](https://github.com/s-e-a-m/seam-ltm/issues/11)) The repository has both `doc/` (style, study, the plugin registry) and `docs/` (screenshots, audio, superpowers). The workspace convention keeps one `docs/` for documentation source and `refs/` for reference material. Decide the final layout and move things once, rather than adding to both.
