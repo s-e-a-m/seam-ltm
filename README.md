@@ -5,13 +5,13 @@
 A pedagogical VST3 plugin suite for the [SEAM](https://github.com/s-e-a-m)
 project (Sustained Electro-Acoustic Music).
 
-Twenty-two plugins built directly on the Steinberg VST3 SDK — no JUCE, no
+Twenty-three plugins built directly on the Steinberg VST3 SDK — no JUCE, no
 frameworks. Clean C++17, VSTGUI for the interface, and the minimum code
 needed to do the job.
 
 ## Plugins
 
-Seventeen fall into three families: converters that move a signal from one
+Eighteen fall into three families: converters that move a signal from one
 spatial format to another, generators that produce the test signals a room
 is measured with, and the measurement and processing tools that listen to
 the result.

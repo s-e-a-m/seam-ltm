@@ -14,10 +14,12 @@ The hub itself is described in `plugins/_common/hub/README.md`.
   Under the pane, a note says that a receiver that changes stone no longer shows the decisions it took; the sheet keeps them.
 - **The sheet.**
   The session sheet's path, whether it is being written, the lines held or dropped, and the last lines as the sheet carries them.
-  A red mark in the footer, with the count of held lines, says the sheet cannot be written, for instance because its folder is on an unmounted volume.
+  A red mark in the footer, with the count of held lines, says the sheet cannot be written, for instance because its folder is on an unmounted volume, or because the hub is unavailable.
 - The window and the sheet use the same formatters, so they say the same things in the same words.
 
 The operator sees everything first: before anything is decided, the whole state of the session is on one screen.
+
+Without the hub library (null mode) every pane says `hub unavailable` and the audio still passes.
 
 ## What it changes
 
@@ -41,7 +43,8 @@ The sheet is written whether or not `lessness` is loaded.
 
 When the host stops and starts the transport, a member leaves and returns.
 The hub's writer folds that into a single `resumes` line in the sheet, instead of a `leaves` and an `arrives`.
-`lessness` shows the lines after the fold, so the members pane and the lines pane say `resumes`, never the `leaves` it replaced.
+The members pane shows the live members and their states, not sheet lines.
+The last-lines pane shows the sheet as it is carried, after the fold: a `resumes`, never the `leaves` it replaced.
 
 ## The name
 
