@@ -223,6 +223,7 @@ To keep the sheet in order of arrival, a `leaves` younger than the window waits 
 That costs the host nothing.
 The last `unregister` waits for its `leaves` to be written or held, and a young `leaves` held for the window counts as handled, so it never waits the second.
 A sheet never keeps a young `leaves` past its own end: at quit, on `sheet_new()`, before the sheet closes and before held lines are spilled, the writer folds with no window and writes or spills everything.
+No window means nothing waits, not that nothing pairs: a pair already in the queue, within `kFoldMs`, is still one `resumes`.
 A return after that is an `arrives` in the next sheet, never folded across.
 A `leaves` that has been shown in the recent lines is final, and no later arrival folds it.
 
@@ -251,6 +252,8 @@ The conf is re-read at every sheet start, so a change takes effect on the next s
 With `HOME` unset there is no default folder, and the sheet is treated as unreachable instead of being written relative to the host's working directory.
 `sheet_set_folder()` rewrites the conf by `rename()`, so the writer can read it without a lock.
 `sheet_status()` reports the path, whether it is writing, the pending lines and the dropped count; `sheet_new()` asks for a fresh sheet.
+The path is empty when there is no session: the writer clears it as its last act, when a session ends with nothing held (`publishEnded` in `seam_hub.cpp`), and a sheet that holds lines keeps it.
+A path that is not being written means an unreachable folder only while lines are pending; with none pending it is a sheet not yet open (an instant at each new sheet) or one whose folder failed before it had anything to write, and `lessness` raises its red mark only while lines are pending (`sheetAlarm` in `plugins/lessness/source/lessness_view.h`).
 `recent_lines()` returns the last 256 lines as written or held, table rows and the writer's state lines included, the newest kept when the buffer is short: the detector's "last lines".
 They are fed after the fold, on the writer's tick, so `lessness` shows what the sheet carries: a `resumes`, never the `leaves` it replaced.
 
@@ -303,7 +306,9 @@ They were recorded in the plan's working ledger, which is not kept; this list re
 - `sheet_new` is ignored while the writer is holding lines after the grace period with no members.
 - On a volume with a quota, the writer leaves nearly empty `-N` sheets at every pass; it should back off.
 - `levelDb` is printed with `%.1f` but compared exactly, so two state lines can look the same.
-- The proposal lifecycle follows the receiver's current stone, so a recorded state cannot be reached after a stone change; `lessness` says so under the proposals pane (`kStoneNote`).
+- The proposal lifecycle follows the receiver's current stone, so a recorded state cannot be reached after a stone change; `lessness` says so under the proposals pane (`kDecisionsNote`).
+- The lifecycle is keyed by the registration epoch, so a host that switches a receiver off and on resets its `applied` and `ignored` to `arrived`, even though the sheet folds the toggle into one `resumes`; `lessness` names it in the same note.
+  Before plan 4's gesture ships, carry the lifecycle across a folded re-registration: the same `name#instance`, the same masks, within `kFoldMs`.
 - `stoneOf` fails open (0, hears everything) after 8 torn reads, and `members()` drops a live member after 8 torn attempts, as `calbus` did.
 - `proposals(afterId = UINT64_MAX)` wraps around and returns the whole store.
 

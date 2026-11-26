@@ -80,6 +80,22 @@ TEST_CASE("window zero writes everything") {
     CHECK(fold(q, 0, 0) == 1);
 }
 
+TEST_CASE("window zero still folds the pairs that are present") {
+    // A close or a quit folds with window 0: a toggle already in the queue
+    // is still one `resumes`, as it would be on a tick.
+    std::deque<Entry> q{mk(Kind::Leaves, "a#1", 0), mk(Kind::Arrives, "a#1", 5)};
+    CHECK(fold(q, 5, 0) == 1);
+    REQUIRE(q.size() == 1);
+    CHECK(has(q[0].text, "resumes"));
+    CHECK(has(q[0].text, "after 5 ms"));
+}
+
+TEST_CASE("window zero does not fold a return after kFoldMs") {
+    std::deque<Entry> q{mk(Kind::Leaves, "a#1", 0), mk(Kind::Arrives, "a#1", kFoldMs + 1)};
+    CHECK(fold(q, kFoldMs + 1, 0) == 2);
+    CHECK(q.size() == 2);
+}
+
 TEST_CASE("window zero writes everything even if the clock went back") {
     // The system clock stepped back: the leave reads as written in the future.
     // A close or a quit (window 0) must still write it.

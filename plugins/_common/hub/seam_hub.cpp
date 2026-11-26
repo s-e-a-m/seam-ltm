@@ -1197,6 +1197,18 @@ struct Sheet {
         if (f) { std::fclose(f); f = nullptr; publishStatus(); }
     }
 
+    // The session is over and nothing is held: sheet_status() reads as no
+    // session (an empty path), not as the closed sheet's path with writing 0,
+    // which the detector would take for an unreachable folder and raise its
+    // alarm until the next session (lessness_view.h, sheetAlarm). Only the
+    // writer's last act calls it; a sheet that still holds lines keeps its
+    // path (Held lines, above), and a writer that goes on calls begin().
+    void publishEnded() {
+        std::lock_guard<std::mutex> lock(hub->statusMutex);
+        hub->statusPath[0] = '\0';
+        hub->statusWriting = 0;
+    }
+
     // The open file's size, after a flush. An append-mode stream need not
     // report the end before its first write, so it is asked to seek there.
     long endOffset() {
@@ -1441,11 +1453,14 @@ void writerMain(SeamHub* hub) {
     };
     Sheet sheet{hub};
     sheet.begin();
-    for (bool first = true;; first = false) {
+    // A pass right after begin() does not wait for the tick: until open()
+    // the new sheet reads "path, writing 0" with its arrival pending, which
+    // the detector would show as an unreachable folder for up to a tick.
+    for (bool afterBegin = true;;) {
         bool stop, renew, members;
         {
             std::unique_lock<std::mutex> lk(hub->ctlMutex);
-            if (!first) {
+            if (!afterBegin) {
                 const auto now = std::chrono::steady_clock::now();
                 auto until = now + kWriterTick;
                 // The end of the grace wakes the writer early; once it has
@@ -1455,6 +1470,7 @@ void writerMain(SeamHub* hub) {
                     until = hub->lingerUntil;
                 hub->wake.wait_until(lk, until, [hub] { return hub->stopReq || hub->renewReq || hub->flushReq; });
             }
+            afterBegin = false;
             stop = hub->stopReq;
             members = hub->liveMembers > 0;
             const bool closing = !members && std::chrono::steady_clock::now() >= hub->lingerUntil;
@@ -1514,7 +1530,22 @@ void writerMain(SeamHub* hub) {
             if (!sheet.path.empty()) continue;
             sheet.spill("session ended with nowhere to write");
         }
+        // A race, accepted: an `arrives` enqueued between the closeNow check
+        // above and this drain(0) is written into the closing sheet, and the
+        // new sheet that `back` starts below opens with that member present
+        // but without its arrival. Nothing is lost: the line is in the
+        // previous file, at its time, seconds before the new file's start,
+        // and the new sheet writes the member's state afresh (begin() clears
+        // `last`). An arrival after the drain stays in the queue and goes to
+        // the new sheet. Closing the window would mean holding ctlMutex
+        // across the drain, which takes lineMutex and may touch the disk:
+        // against the lock order (ctlMutex is a leaf) and against the rule
+        // that no mutex is held across a disk access.
         sheet.close();
+        // Published before the re-check, not after: once `running` is false
+        // a new writer may publish its own sheet, which this must not erase.
+        // A writer that goes on republishes its path in begin() below.
+        sheet.publishEnded();
         {
             std::lock_guard<std::mutex> lk(hub->ctlMutex);
             // Re-checked: a register (or a register and its unregister) that
@@ -1530,6 +1561,7 @@ void writerMain(SeamHub* hub) {
             }
         }
         sheet.begin();
+        afterBegin = true;
     }
 }
 

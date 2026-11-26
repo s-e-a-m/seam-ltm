@@ -200,8 +200,8 @@ bool recentHas(const std::string& needle) {
 
 // The writer has started this session's sheet in `folder`: it has picked the
 // name (and published it), which it does before its first attempt to open
-// it. The folder is part of the wait: until then the status still shows the
-// previous case's sheet.
+// it. The folder is part of the wait: until then the status shows no path
+// (the previous session ended) or, if a writer is still going, another sheet.
 bool sheetNamedIn(const std::string& folder) {
     return eventually([&] { return std::string(status().path).rfind(folder + "/", 0) == 0; });
 }
@@ -667,6 +667,27 @@ TEST_CASE("after the grace the sheet is closed and the writer is gone") {
     seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
     REQUIRE(waitWriterGone());
     CHECK(sheets(folder).size() == 2);
+}
+
+TEST_CASE("after the session ends the status has no path") {
+    // The closed sheet's path with writing 0 would read as an unreachable
+    // folder in lessness until the next session (lessness_view.h).
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("ended");
+    useFolder(folder);
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "strx", 0, 0, 0));
+    REQUIRE(waitWriterGone());
+    REQUIRE(sheets(folder).size() == 1);   // the session did write its sheet
+    const SeamHubSheetStatus st = status();
+    CHECK(st.path[0] == '\0');
+    CHECK(st.writing == 0u);
+    CHECK(st.pendingLines == 0u);
+    // The next session publishes its own path again.
+    const int32_t a = seam_hub_v1_register(hub, "strx", 0, 0, 0);
+    CHECK(sheetNamedIn(folder.string()));
+    CHECK(eventually([] { return status().writing == 1u; }));
+    seam_hub_v1_unregister(hub, a);
 }
 
 TEST_CASE("the last unregister returns within its 2 s bound even if the writer is stuck") {

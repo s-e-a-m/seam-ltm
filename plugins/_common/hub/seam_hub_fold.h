@@ -11,7 +11,10 @@
 // Pairing. A `leaves` pairs with the first later event of the same `who`
 // ("name#instance": two instances are two members) when that event is an
 // `arrives`, with the same `masks` (a different declaration is a real change
-// and both lines stay), at most windowMs later.
+// and both lines stay), at most kFoldMs later. The window passed to fold()
+// decides only what is ready, never what pairs: a pass with window 0 (a sheet
+// about to be left) still folds a pair already in the queue, so the same
+// toggle reads `resumes` whether it is written on a tick or at a close.
 //
 // Why the window holds the whole tail and not the `leaves` alone. The sheet
 // stays in order of arrival: while a `leaves` may still find its partner,
@@ -46,14 +49,15 @@ struct Entry {
 constexpr int64_t kFoldMs = 1000;
 
 // Folds, in place, every Leaves followed by an Arrives with the same `who`
-// and the same `masks`, at most windowMs later: the Leaves is erased and the
+// and the same `masks`, at most kFoldMs later: the Leaves is erased and the
 // Arrives becomes one `resumes` line at the Arrives' time, object
-// "after <dt> ms". Returns how many leading entries are ready to write: all
-// of them, unless some Leaves still without a partner is younger than
-// windowMs (nowMs - unixMs < windowMs), in which case the count stops just
-// before the first such Leaves. windowMs = 0 folds what pairs are present
-// and returns q.size(), even when the clock has stepped back: the writer
-// passes 0 when a sheet is about to be left, and then nothing may stay behind.
+// "after <dt> ms". windowMs does not change what pairs, only what is ready.
+// Returns how many leading entries are ready to write: all of them, unless
+// some Leaves still without a partner is younger than windowMs
+// (nowMs - unixMs < windowMs), in which case the count stops just before the
+// first such Leaves. windowMs = 0 still folds the pairs present and returns
+// q.size(), even when the clock has stepped back: the writer passes 0 when a
+// sheet is about to be left, and then nothing may stay behind.
 // A Leaves "in the future" (the clock stepped back after it was enqueued) is
 // never young, whatever the window: held until the clock caught up, it would
 // block every line behind it from the sheet and the recent lines for the
@@ -67,7 +71,7 @@ inline size_t fold(std::deque<Entry>& q, int64_t nowMs, int64_t windowMs) {
         const bool pairs = j < q.size() && q[j].kind == Kind::Arrives &&
                            q[j].masks == q[i].masks &&
                            q[j].unixMs - q[i].unixMs >= 0 &&
-                           q[j].unixMs - q[i].unixMs <= windowMs;
+                           q[j].unixMs - q[i].unixMs <= kFoldMs;
         if (!pairs) { ++i; continue; }
         const int64_t dt = q[j].unixMs - q[i].unixMs;
         q[j].text = hubsheet::event(q[j].unixMs, q[j].who, "resumes",
