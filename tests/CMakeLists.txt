@@ -266,6 +266,20 @@ target_include_directories(lessness_view_test PRIVATE
 target_compile_features(lessness_view_test PRIVATE cxx_std_17)
 add_test(NAME lessness_view_test COMMAND lessness_view_test)
 
+# The pass-through and the bus rule live in lessness_processor.h, beside the
+# class that uses them; SEAM_LESSNESS_PURE keeps the header's SDK half out, so
+# the test needs neither the SDK nor VSTGUI.
+add_executable(lessness_passthrough_test
+    lessness_passthrough_test.cpp
+)
+target_include_directories(lessness_passthrough_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../plugins/lessness/source
+)
+target_compile_definitions(lessness_passthrough_test PRIVATE SEAM_LESSNESS_PURE=1)
+target_compile_features(lessness_passthrough_test PRIVATE cxx_std_17)
+add_test(NAME lessness_passthrough_test COMMAND lessness_passthrough_test)
+
 add_executable(addelay_dsp_test
     addelay_dsp_test.cpp
 )
