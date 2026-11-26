@@ -43,17 +43,6 @@ inline const char* const kStoneNote =
     "a receiver that changes stone no longer shows the decisions it took; the sheet keeps them";
 
 namespace detail {
-// The hub prints masks as type names; same words as seam_hub.cpp, joined by
-// spaces here, "-" when empty.
-inline std::string maskNames(uint32_t mask) {
-    static const struct { uint32_t type; const char* name; } kNames[] = {
-        {kSeamHubPink, "pink"}, {kSeamHubGlide, "glide"}, {kSeamHubDecoder, "decoder"},
-        {kSeamHubBandTable, "band-table"}, {kSeamHubSections, "sections"}};
-    std::string s;
-    for (const auto& n : kNames)
-        if (mask & SEAM_HUB_BIT(n.type)) { if (!s.empty()) s += ' '; s += n.name; }
-    return s.empty() ? "-" : s;
-}
 inline const char* lifecycleWord(int32_t l) {
     switch (l) {
         case kSeamHubArrived: return "arrived";
@@ -62,6 +51,10 @@ inline const char* lifecycleWord(int32_t l) {
         case kSeamHubIgnored: return "ignored";
         default:              return "none";
     }
+}
+inline bool hasPath(const SeamHubSheetStatus& s) {
+    const std::string p = hubsheet::detail::oneLine(s.path, sizeof s.path);
+    return p.find_first_not_of(' ') != std::string::npos;
 }
 inline bool isPending(int32_t l) { return l == kSeamHubArrived || l == kSeamHubShown; }
 inline std::string memberWho(const SeamHubMember& m) {
@@ -73,7 +66,7 @@ inline std::string memberLine(const SeamHubMember& m) {
     const bool stone = m.hasState && m.state.stoneId != 0;
     return hubsheet::detail::pad(detail::memberWho(m), 11) + " stone " +
            (stone ? std::to_string(m.state.stoneId) : std::string("-")) +
-           "  says " + detail::maskNames(m.says) + "  hears " + detail::maskNames(m.hears);
+           "  says " + hubsheet::maskNames(m.says) + "  hears " + hubsheet::maskNames(m.hears);
 }
 
 inline std::string stateLine(const SeamHubMember& m) {
@@ -99,7 +92,8 @@ inline std::string proposalHead(const SeamHubProposal& p) {
         const SeamHubBandTable& b = p.u.table;
         s = "band-table #" + std::to_string(p.id) + "  " + author + "  stone " + std::to_string(p.stoneId) +
             "  " + (b.hasDecoder ? hubsheet::detail::testWord(b.decoder.test) : "-") + "  " + hm +
-            "  " + std::to_string((long long)std::llround(b.integrationSec)) + " s";
+            "  " + (std::isfinite(b.integrationSec) && std::fabs(b.integrationSec) < 1e15
+                 ? std::to_string((long long)std::llround(b.integrationSec)) : std::string("-")) + " s";
     } else if (p.type == kSeamHubSections) {
         const SeamHubSections& x = p.u.sections;
         s = "sections #" + std::to_string(p.id) + "  " + author + "  stone " + std::to_string(p.stoneId) +
@@ -157,7 +151,7 @@ inline std::string tildePath(const std::string& path, const char* home) {
 inline std::string sheetLine(const SeamHubSheetStatus& s, bool available) {
     if (!available) return "hub unavailable";
     const std::string path = hubsheet::detail::oneLine(s.path, sizeof s.path);
-    if (path.empty()) return "no session";
+    if (!detail::hasPath(s)) return "no session";
     std::string out = tildePath(path, std::getenv("HOME")) + "  ";
     if (s.writing) return out + "writing";
     return out + "folder unreachable  " + std::to_string(s.pendingLines) + " lines held  " +
@@ -165,7 +159,7 @@ inline std::string sheetLine(const SeamHubSheetStatus& s, bool available) {
 }
 
 inline bool sheetAlarm(const SeamHubSheetStatus& s, bool available) {
-    return !available || (s.path[0] != '\0' && s.writing == 0);
+    return !available || (detail::hasPath(s) && s.writing == 0);
 }
 
 }} // namespace Seam::lessness

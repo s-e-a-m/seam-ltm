@@ -2,6 +2,7 @@
 #include "doctest/doctest.h"
 #include "lessness_view.h"
 
+#include <cmath>
 #include <cstring>
 #include <ctime>
 
@@ -24,7 +25,7 @@ static SeamHubProposal prop(uint64_t id) {
 TEST_CASE("a member line names who, stone and masks") {
     SeamHubMember m = mem("strx", 1, 0, SEAM_HUB_BIT(kSeamHubPink) | SEAM_HUB_BIT(kSeamHubGlide) | SEAM_HUB_BIT(kSeamHubDecoder));
     m.hasState = 1; m.state.kind = kSeamHubPink; m.state.stoneId = 1;
-    CHECK(memberLine(m) == "strx#1      stone 1  says -  hears pink glide decoder");
+    CHECK(memberLine(m) == "strx#1      stone 1  says -  hears pink,glide,decoder");
 }
 
 TEST_CASE("no state reads as no state") {
@@ -113,4 +114,22 @@ TEST_CASE("the home folder reads as ~") {
     CHECK(tildePath("/opt/x", "/Users/g") == "/opt/x");
     CHECK(tildePath("/Users/g/x", nullptr) == "/Users/g/x");
     CHECK(tildePath("/Users/gg/x", "/Users/g") == "/Users/gg/x");
+}
+
+TEST_CASE("a non-finite integration prints a dash") {
+    SeamHubProposal p = prop(1);
+    p.u.table.integrationSec = std::nan("");
+    SeamHubMember m[1] = {mem("bastone", 1, 0, 0)};
+    LifecycleOf of = [](uint32_t, uint32_t, uint64_t) { return (int32_t)kSeamHubArrived; };
+    auto rows = proposalRows(&p, 1, m, 1, of);
+    CHECK(rows[0].head.find("  - s") != std::string::npos);
+    p.u.table.integrationSec = 1e300;
+    CHECK(proposalRows(&p, 1, m, 1, of)[0].head.find("  - s") != std::string::npos);
+}
+
+TEST_CASE("a path of control characters only is no session, with no alarm") {
+    SeamHubSheetStatus s{};
+    s.path[0] = '\n'; s.writing = 0;
+    CHECK(sheetLine(s, true) == "no session");
+    CHECK_FALSE(sheetAlarm(s, true));
 }

@@ -127,6 +127,17 @@ inline std::string header(const std::tm& start, int pid) {
     return b;
 }
 
+// A says/hears mask as type names, comma-separated, "-" when empty.
+inline std::string maskNames(uint32_t mask) {
+    static const struct { uint32_t type; const char* name; } kNames[] = {
+        {kSeamHubPink, "pink"}, {kSeamHubGlide, "glide"}, {kSeamHubDecoder, "decoder"},
+        {kSeamHubBandTable, "band-table"}, {kSeamHubSections, "sections"}};
+    std::string s;
+    for (const auto& n : kNames)
+        if (mask & SEAM_HUB_BIT(n.type)) { if (!s.empty()) s += ','; s += n.name; }
+    return s.empty() ? "-" : s;
+}
+
 inline std::string who(const char* name, uint32_t instance) {
     return std::string(name) + "#" + std::to_string(instance);
 }

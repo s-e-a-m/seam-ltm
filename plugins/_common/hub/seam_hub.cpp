@@ -203,16 +203,6 @@ int64_t nowMs() {
         std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
-std::string maskNames(uint32_t mask) {
-    static const struct { uint32_t type; const char* name; } kNames[] = {
-        {kSeamHubPink, "pink"}, {kSeamHubGlide, "glide"}, {kSeamHubDecoder, "decoder"},
-        {kSeamHubBandTable, "band-table"}, {kSeamHubSections, "sections"}};
-    std::string s;
-    for (const auto& n : kNames)
-        if (mask & SEAM_HUB_BIT(n.type)) { if (!s.empty()) s += ','; s += n.name; }
-    return s.empty() ? "-" : s;
-}
-
 std::string whoOf(const char* name, uint32_t instance) {
     return Seam::hubsheet::who(name, instance);
 }
@@ -568,7 +558,7 @@ int32_t registerLocked(SeamHub* hub, const char* name, uint32_t says, uint32_t h
         e.unixMs = nowMs();
         e.kind = Kind::Arrives;
         e.who = whoOf(s.name, inst);
-        e.masks = "says " + maskNames(says) + "  hears " + maskNames(hears);
+        e.masks = "says " + Seam::hubsheet::maskNames(says) + "  hears " + Seam::hubsheet::maskNames(hears);
         e.text = Seam::hubsheet::event(e.unixMs, e.who, "arrives", e.masks);
         hub->enqueue(std::move(e));
         return encodeHandle(i, g);
@@ -592,7 +582,7 @@ uint64_t unregisterLocked(SeamHub* hub, int32_t handle) {
     e.unixMs = nowMs();
     e.kind = Kind::Leaves;
     e.who = whoOf(s.name, s.instance);
-    e.masks = "says " + maskNames(s.says) + "  hears " + maskNames(s.hears);
+    e.masks = "says " + Seam::hubsheet::maskNames(s.says) + "  hears " + Seam::hubsheet::maskNames(s.hears);
     e.text = Seam::hubsheet::event(e.unixMs, e.who, "leaves", "");
     const uint64_t seq = hub->enqueue(std::move(e));
 

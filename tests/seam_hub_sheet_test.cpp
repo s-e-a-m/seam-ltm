@@ -147,3 +147,8 @@ TEST_CASE("section words") {
     for (char c : rows(p)) lines += (c == '\n');
     CHECK(lines == SEAM_HUB_MAX_SECTIONS);
 }
+
+TEST_CASE("mask names are the type names, comma-separated") {
+    CHECK(maskNames(0) == "-");
+    CHECK(maskNames(SEAM_HUB_BIT(kSeamHubPink) | SEAM_HUB_BIT(kSeamHubSections)) == "pink,sections");
+}
