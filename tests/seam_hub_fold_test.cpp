@@ -64,20 +64,41 @@ TEST_CASE("a return after the window is not folded") {
 
 TEST_CASE("two instances are two members") {
     std::deque<Entry> q{mk(Kind::Leaves, "strx#1", 0), mk(Kind::Arrives, "strx#2", 0)};
-    fold(q, 0, kFoldMs);
+    CHECK(fold(q, 0, kFoldMs) == 0);   // the leave of strx#1 is young, and nobody pairs it
     CHECK(q.size() == 2);
 }
 
 TEST_CASE("a change of masks is kept") {
     std::deque<Entry> q{mk(Kind::Leaves, "a#1", 0, "says -  hears pink"),
                         mk(Kind::Arrives, "a#1", 0, "says pink  hears -")};
-    fold(q, 0, kFoldMs);
+    CHECK(fold(q, 0, kFoldMs) == 0);   // the leave stays, young
     CHECK(q.size() == 2);
 }
 
 TEST_CASE("window zero writes everything") {
     std::deque<Entry> q{mk(Kind::Leaves, "a#1", 0)};
     CHECK(fold(q, 0, 0) == 1);
+}
+
+TEST_CASE("window zero writes everything even if the clock went back") {
+    // The system clock stepped back: the leave reads as written in the future.
+    // A close or a quit (window 0) must still write it.
+    std::deque<Entry> q{other(0), mk(Kind::Leaves, "a#1", 5000), other(5001)};
+    CHECK(fold(q, 1000, 0) == 3);
+    CHECK(q.size() == 3);
+}
+
+TEST_CASE("a leave followed by a leave of the same who is not folded") {
+    std::deque<Entry> q{mk(Kind::Leaves, "a#1", 0), mk(Kind::Leaves, "a#1", 5),
+                        mk(Kind::Arrives, "a#1", 10)};
+    // The first leave's next event of a#1 is a leave, so it has no partner;
+    // the second pairs with the arrival.
+    CHECK(fold(q, 2000, kFoldMs) == 2);
+    REQUIRE(q.size() == 2);
+    CHECK(q[0].kind == Kind::Leaves);
+    CHECK(has(q[0].text, "leaves"));
+    CHECK(has(q[1].text, "resumes"));
+    CHECK(has(q[1].text, "after 5 ms"));
 }
 
 TEST_CASE("chains fold pairwise") {

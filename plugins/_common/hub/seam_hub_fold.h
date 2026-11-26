@@ -52,7 +52,9 @@ constexpr int64_t kFoldMs = 1000;
 // of them, unless some Leaves still without a partner is younger than
 // windowMs (nowMs - unixMs < windowMs), in which case the count stops just
 // before the first such Leaves. windowMs = 0 folds what pairs are present
-// and returns q.size().
+// and returns q.size(), even when the clock has stepped back (a Leaves "in
+// the future"): the writer passes 0 when a sheet is about to be left, and
+// then nothing may stay behind.
 inline size_t fold(std::deque<Entry>& q, int64_t nowMs, int64_t windowMs) {
     for (size_t i = 0; i < q.size();) {
         if (q[i].kind != Kind::Leaves) { ++i; continue; }
@@ -70,7 +72,7 @@ inline size_t fold(std::deque<Entry>& q, int64_t nowMs, int64_t windowMs) {
         q.erase(q.begin() + (std::ptrdiff_t)i);   // the next candidate is now at i
     }
     for (size_t i = 0; i < q.size(); ++i)
-        if (q[i].kind == Kind::Leaves && nowMs - q[i].unixMs < windowMs) return i;
+        if (windowMs > 0 && q[i].kind == Kind::Leaves && nowMs - q[i].unixMs < windowMs) return i;
     return q.size();
 }
 

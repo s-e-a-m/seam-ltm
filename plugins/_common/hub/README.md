@@ -180,7 +180,7 @@ When a stone read tears eight times in a row (a publisher hammering its slot), t
 The hub keeps a text **sheet** of the session, one event per line, readable by a person and by `tools/hub-sheet.py`.
 It is always written, whether or not any detector is loaded: the record of a calibration should not depend on what happened to be running.
 
-The grammar and the formatter are `seam_hub_sheet.h`; its top comment is the reference (event line, continuation rows, verbs `arrives leaves state says shows applies ignores sheet`).
+The grammar and the formatter are `seam_hub_sheet.h`; its top comment is the reference (event line, continuation rows, verbs `arrives leaves state says shows applies ignores sheet resumes`).
 `tools/hub-sheet.py` is the independent parser: `--check FILE` validates a sheet, `--count FILE` counts events.
 The formatter is pure and has no I/O, so the grammar can be tested without a disk.
 
@@ -211,6 +211,21 @@ The writer ticks every `kWriterTick` = 250 ms, comparing member states and writi
   Both halves are needed: the first protects the data, the second the code.
   Only a library rejected before any use (version mismatch, missing symbols) is closed.
 
+### A toggle is one line
+
+Hosts switch a plugin off and on again without the operator asking: Reaper does it within the same millisecond.
+Written as it happens, the sheet would read `leaves` then `arrives`, as if the member had gone and come back, when the host only bypassed it.
+So the writer folds a `leaves` and the next event of the same `name#instance`, when that event is an `arrives` with the same declaration (`says` and `hears`) at most 1 s later (`kFoldMs`), into one line at the time of the arrival: `strx#1  resumes  after 0 ms`.
+A different declaration is a real change, and both lines stay; two instances are two members.
+The decision is pure and tested without a disk (`seam_hub_fold.h`); the writer applies it to its queue under `lineMutex` before every write (`foldLocked` in `seam_hub.cpp`).
+
+To keep the sheet in order of arrival, a `leaves` younger than the window waits in the queue, and the lines after it wait with it.
+That costs the host nothing.
+The last `unregister` waits for its `leaves` to be written or held, and a young `leaves` held for the window counts as handled, so it never waits the second.
+A sheet never keeps a young `leaves` past its own end: at quit, on `sheet_new()`, before the sheet closes and before held lines are spilled, the writer folds with no window and writes or spills everything.
+A return after that is an `arrives` in the next sheet, never folded across.
+A `leaves` that has been shown in the recent lines is final, and no later arrival folds it.
+
 ### Held lines belong to their sheet
 
 When the folder cannot be written (an unmounted share, a missing volume), the lines wait in the queue, bounded as above, and `sheet_status()` reports them as pending.
@@ -237,6 +252,7 @@ With `HOME` unset there is no default folder, and the sheet is treated as unreac
 `sheet_set_folder()` rewrites the conf by `rename()`, so the writer can read it without a lock.
 `sheet_status()` reports the path, whether it is writing, the pending lines and the dropped count; `sheet_new()` asks for a fresh sheet.
 `recent_lines()` returns the last 256 lines as written or held, table rows and the writer's state lines included, the newest kept when the buffer is short: the detector's "last lines".
+They are fed after the fold, on the writer's tick, so the detector shows what the sheet carries: a `resumes`, never the `leaves` it replaced.
 
 **The privacy prompt.**
 `~/Documents` is protected by macOS: the first process that writes there triggers a "would like to access files in your Documents folder" prompt, per application.
@@ -283,8 +299,6 @@ They were recorded in the plan's working ledger, which is not kept; this list re
 
 **Behaviour.**
 
-- Reaper switches a plugin off and on again within the same millisecond, so the sheet shows `leaves` and `arrives` pairs for one instance.
-  Plan 2 should fold a leave and arrive of the same `name#instance` within about 1 s into nothing, or into one "reactivated" line.
 - When a member arrives in a held sheet after the grace period or after midnight, no date marker is written.
 - `sheet_new` is ignored while the writer is holding lines after the grace period with no members.
 - On a volume with a quota, the writer leaves nearly empty `-N` sheets at every pass; it should back off.

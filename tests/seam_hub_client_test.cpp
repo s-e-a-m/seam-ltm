@@ -2,7 +2,9 @@
 #include "doctest/doctest.h"
 #include "seam_hub_client.h"
 
+#include <chrono>
 #include <cstring>
+#include <thread>
 
 // This test runs with SEAM_HUB_PATH pointing at the freshly built dylib
 // (see tests/CMakeLists.txt), so the client must find and load it.
@@ -149,7 +151,14 @@ TEST_CASE("the client reads the recent lines") {
     auto& c = Seam::HubClient::instance();
     REQUIRE(c.available());
     const int32_t h = c.registerMember("recent", 0, 0);
-    const std::string r = c.recentLines();
-    CHECK(r.find("recent#1      arrives") != std::string::npos);
+    // The recent lines are fed after the fold, on the writer's pass: polled,
+    // with a timeout only a failure reaches.
+    bool found = false;
+    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    while (!found && std::chrono::steady_clock::now() < until) {
+        found = c.recentLines().find("recent#1      arrives") != std::string::npos;
+        if (!found) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    CHECK(found);
     c.unregisterMember(h);
 }

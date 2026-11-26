@@ -346,6 +346,9 @@ TEST_CASE("an unreachable folder holds lines and never blocks") {
     CHECK(eventually([&] { seam_hub_v1_sheet_status(hub, &st); return st.writing == 1u; }));
     CHECK(std::string(st.path).rfind(folder.string(), 0) == 0);
     seam_hub_v1_unregister(hub, a);
+    // The last unregister returns once its `leaves` is written or held; a
+    // young one is held for the fold window, and written by the sheet's close.
+    REQUIRE(waitWriterGone());
 
     const fs::path spill = confDir / "sheets-held" / fs::path(oldPath).filename();
     REQUIRE(fs::exists(spill));
@@ -485,7 +488,12 @@ TEST_CASE("the recent lines carry rows and state lines") {
     // A tick writes the state line; unchanged, no later tick writes another.
     REQUIRE(eventually([] { return recentHas("multipink#1   state     pink  stone 2"); }));
     SeamHubProposal p = table(2);
-    REQUIRE(seam_hub_v1_post(hub, a, &p) != 0);
+    const uint64_t id = seam_hub_v1_post(hub, a, &p);
+    REQUIRE(id != 0);
+    // Rows reach the recent lines after the fold, on the writer's tick. The
+    // table's own `says` line is what is waited for (an earlier case's table
+    // has the same rows), and its rows come with it, in one entry.
+    REQUIRE(eventually([id] { return recentHas("says      band-table #" + std::to_string(id) + "  stone 2"); }));
     static char buf[64 * 1024];
     const int32_t n = seam_hub_v1_recent_lines(hub, buf, sizeof buf);
     const std::string all(buf);
@@ -636,8 +644,11 @@ TEST_CASE("a toggle within the grace continues the same sheet") {
     int headers = 0;
     for (const auto& l : lines) headers += l == "# SEAM hub sheet";
     CHECK(headers == 1);
-    CHECK(countVerb(lines, "arrives") == 2);
-    CHECK(countVerb(lines, "leaves") == 2);
+    // The toggle (a leave and an arrival 100 ms apart, the same declaration)
+    // is one `resumes` line: the host only bypassed the member.
+    CHECK(countVerb(lines, "arrives") == 1);
+    CHECK(countVerb(lines, "resumes") == 1);
+    CHECK(countVerb(lines, "leaves") == 1);
 }
 
 TEST_CASE("after the grace the sheet is closed and the writer is gone") {
@@ -760,4 +771,92 @@ TEST_CASE("quit never joins a writer a racing register just started") {
     seam_hub_v1_unregister(hub, a);      // lets a wrongly joined writer exit, so a RED run ends
     const int32_t r = quit.get();
     CHECK(r == 0);                       // the live writer was detached, not joined
+}
+
+TEST_CASE("a host toggle is written as one resumes line") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("hosttoggle");
+    useFolder(folder);
+    // The real grace, so the close (which writes with no window) cannot come
+    // between the leave and the return however slow the machine is.
+    seam_hub_test_set_grace_ms(10000);
+    // A name no other case uses: the recent lines are the process's.
+    const int32_t a = seam_hub_v1_register(hub, "hosttoggle", 0, SEAM_HUB_BIT(kSeamHubPink), 0);
+    const auto t0 = std::chrono::steady_clock::now();
+    seam_hub_v1_unregister(hub, a);
+    const int32_t b = seam_hub_v1_register(hub, "hosttoggle", 0, SEAM_HUB_BIT(kSeamHubPink), 1);
+    REQUIRE(msSince(t0) < 1000.0);   // the toggle fell within the fold window
+    // One tick past the window, the pair is folded and written.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000 + 250));
+    REQUIRE(sheetNamedIn(folder.string()));
+    const fs::path file = status().path;
+    REQUIRE(eventually([&] { return countVerb(fileLines(file), "resumes") == 1; }));
+    const auto lines = fileLines(file);
+    CHECK(countVerb(lines, "arrives") == 1);
+    CHECK(countVerb(lines, "resumes") == 1);
+    CHECK(countVerb(lines, "leaves") == 0);
+    bool after = false;
+    for (const auto& l : lines)
+        if (verbOf(l) == "resumes")
+            after = std::regex_search(l, std::regex(R"(hosttoggle#1  resumes   after \d+ ms$)"));
+    CHECK(after);
+    // The detector shows what the sheet carries: the resumes, never the leave.
+    const std::string recent = recentText();
+    CHECK(recent.find("hosttoggle#1  resumes") != std::string::npos);
+    CHECK(recent.find("hosttoggle#1  leaves") == std::string::npos);
+    seam_hub_test_set_grace_ms(kTestGraceMs);   // before the unregister that ends the case
+    seam_hub_v1_unregister(hub, b);
+}
+
+TEST_CASE("the last unregister does not wait for the fold window") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    useFolder(freshDir("nowait"));
+    const int32_t a = seam_hub_v1_register(hub, "nowait", 0, 0, 0);
+    const auto t0 = std::chrono::steady_clock::now();
+    seam_hub_v1_unregister(hub, a);
+    // Acknowledged as held, not after the 1 s window.
+    CHECK(msSince(t0) < 500.0);
+}
+
+TEST_CASE("a leave with nobody back is written after the window") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("lateleave");
+    useFolder(folder);
+    seam_hub_test_set_grace_ms(10000);   // the writer lingers: no close writes it
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "lateleave", 0, 0, 0));
+    REQUIRE(sheetNamedIn(folder.string()));
+    const fs::path file = status().path;
+    // The window and two ticks; the slack only for a loaded machine.
+    CHECK(eventually([&] {
+        const auto l = fileLines(file);
+        return !l.empty() && verbOf(l.back()) == "leaves";
+    }, 1000 + 2 * 250 + (int)kSlackMs));
+    CHECK(seam_hub_test_writer_alive() == 1);   // written by a tick, not by the close
+    CHECK(seam_hub_test_teardown() == 1);       // ends the 10 s linger at once
+}
+
+TEST_CASE("a short grace writes a young leave before closing") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("shortgrace");
+    useFolder(folder);   // grace 200 ms, shorter than the fold window
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "shortgrace", 0, 0, 0));
+    REQUIRE(waitWriterGone());
+    auto files = sheets(folder);
+    REQUIRE(files.size() == 1);
+    const fs::path first = files[0];
+    const auto lines = fileLines(first);
+    REQUIRE(!lines.empty());
+    CHECK(verbOf(lines.back()) == "leaves");
+    CHECK(lines.back().find("shortgrace#1") != std::string::npos);
+    // The next session's sheet does not carry it.
+    seam_hub_v1_unregister(hub, seam_hub_v1_register(hub, "second", 0, 0, 0));
+    REQUIRE(waitWriterGone());
+    files = sheets(folder);
+    REQUIRE(files.size() == 2);
+    for (const auto& f : files)
+        if (f != first) CHECK(fileText(f).find("shortgrace#1") == std::string::npos);
 }
