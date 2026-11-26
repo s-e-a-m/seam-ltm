@@ -22,6 +22,8 @@
 - [ ] `doc/scripts/test-doc.sh` checks the plugin count in the registry but not in the prose of the README and of `publish.py`: add a check, so the number cannot go stale again (2026-11-04).
 
 - [ ] `lessness`: check in Reaper (`multipink` → STONE → `strx`: `resumes` in the sheet, FOLDER, NEW SHEET, the red mark on an unmounted volume, `tools/hub-sheet.py --check`) and add the screenshot `docs/img/lessness.png`; `make -C doc test` and `uidesc_lint_selftest` stay red until it exists (Giuseppe, 2026-11-26).
+- [ ] `lessness`: a live session with no usable sheet path (every name taken, `HOME` unset) and held lines reads as "no session" with no red mark; `sheetAlarm` should rise on `pendingLines > 0` whatever the path (final review of plan 2, 2026-11-26).
+- [ ] `lessness`, minor and deferred from plan 2's reviews: timers started in the constructors rather than in `attached()`; output channels beyond the input count not zeroed; no test for a null input channel; `SEAM_LESSNESS_PURE` split rather than a pure header; `tildePath` with `HOME` ending in `/`; the footer's dropped count is process-wide; lock-order comments in `seam_hub.cpp` omit `lifeMutex`.
 
 ## Repository structure
 
