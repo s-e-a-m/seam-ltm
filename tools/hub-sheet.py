@@ -15,7 +15,7 @@ import os
 import re
 import sys
 
-VERBS = ("arrives", "leaves", "state", "says", "shows", "applies", "ignores", "sheet", "resumes")
+VERBS = ("arrives", "leaves", "state", "says", "shows", "applies", "ignores", "sheet", "resumes", "present")
 EVENT = re.compile(r"^(\d\d:\d\d:\d\d\.\d\d\d)  (\S+) *  (%s)(?:  (.*))?$" % "|".join(VERBS))
 ROW = re.compile(r"^  \| (.*)$")
 

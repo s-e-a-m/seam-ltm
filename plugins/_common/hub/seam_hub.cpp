@@ -1130,6 +1130,7 @@ struct Sheet {
     long        committed = 0;
     std::chrono::steady_clock::time_point retryAfter{};
     std::string notice;          // a `sheet` notice owed to this file, written after the header
+    bool        declare = false; // a renewed sheet owes a `present` line per member (snapshotStates)
 
     void publishStatus() {
         std::lock_guard<std::mutex> lock(hub->statusMutex);
@@ -1181,9 +1182,16 @@ struct Sheet {
     }
 
     // A new sheet: new start time, the conf re-read, states written afresh
-    // so the new file stands on its own.
+    // so the new file stands on its own. The recent lines start afresh too:
+    // the detector shows them above this sheet's path, so they must be this
+    // sheet's lines. Nothing in the queue has reached them yet at this point
+    // (renew and close drain or spill it first), so nothing goes unshown.
     void begin() {
         close();
+        {
+            std::lock_guard<std::mutex> lock(hub->lineMutex);
+            hub->recent.clear();
+        }
         start = std::time(nullptr);
         pickName(sheetFolder());
         headerDone = false;
@@ -1353,7 +1361,27 @@ struct Sheet {
     // A `state` line for each member whose state differs from the last one
     // written for its epoch. Read through readMember(), the same seqlock read
     // as members(); enqueued like any line, so order stays order of arrival.
+    //
+    // On a renewed sheet, first a `present` line for each member, with what
+    // it says and hears: the members' `arrives` are in the previous file,
+    // and the new one must say who is there on its own. Only a renew owes
+    // them; a session's first sheet, and a sheet that a return keeps alive,
+    // get their members' own `arrives`. A member that registers between the
+    // renew and this pass is named twice, by its `arrives` and its `present`,
+    // both true: accepted, as the rarer race at the sheet's close is.
     void snapshotStates() {
+        if (declare) {
+            declare = false;
+            for (int32_t i = 0; i < SEAM_HUB_MAX_MEMBERS; ++i) {
+                SeamHubMember m;
+                uint32_t epoch = 0;
+                if (!readMember(hub, i, m, epoch)) continue;
+                hub->enqueue(Seam::hubsheet::event(nowMs(), whoOf(m.name, m.instance), "present",
+                                                   "says " + Seam::hubsheet::maskNames(m.says) +
+                                                   "  hears " + Seam::hubsheet::maskNames(m.hears)),
+                             /*mirrored=*/false);
+            }
+        }
         for (int32_t i = 0; i < SEAM_HUB_MAX_MEMBERS; ++i) {
             SeamHubMember m;
             uint32_t epoch = 0;
@@ -1496,6 +1524,7 @@ void writerMain(SeamHub* hub) {
             } else {
                 sheet.begin();
             }
+            sheet.declare = true;
         }
         if (members && !stop) sheet.snapshotStates();
         // Under stop no sheet is opened (no create_directories, no fopen on a

@@ -15,7 +15,7 @@
 // two spaces, object (free text, no newline). When the object is empty the
 // line ends after the verb, with no trailing spaces.
 // Continuation line: exactly "  | " then the row, no trailing spaces.
-// Verbs: arrives leaves state says shows applies ignores sheet resumes.
+// Verbs: arrives leaves state says shows applies ignores sheet resumes present.
 // who: "<name>#<instance>", or "hub" / "operator".
 //
 // Rows (columns padded with spaces, last column never padded):
@@ -52,6 +52,8 @@
 //                sub <on|off> <%g> Hz"
 //   resumes     "after <dt> ms": a leaves and an arrives of the same member with
 //               the same masks, folded into one line (seam_hub_fold.h)
+//   present     "says <mask>  hears <mask>", as arrives: a member already there
+//               when a sheet is renewed (sheet_new), first in the new file
 //   transitions "<type> #<id>[  (<detail>)]" for shows,
 //               "<type> #<id>  on <who>[  (<detail>)]" for applies/ignores;
 //               detail at most 31 characters, from the receiver

@@ -15,6 +15,7 @@
   | peak        111.4  2.00  -6.0
   | highshelf  8000.0  0.71  +2.5
 14:34:00.500  strx#1        resumes   after 0 ms
+14:34:05.000  strx#1        present   says -  hears pink,glide,decoder
 14:34:10.000  operator      ignores   band-table #12  on strx#2
 14:40:00.000  hub           sheet     folder unreachable, 120 lines held
 14:41:00.000  strx#1        leaves

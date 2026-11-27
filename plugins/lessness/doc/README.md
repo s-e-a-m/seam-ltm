@@ -29,6 +29,7 @@ Two things, both on the sheet and nowhere else.
   The current sheet keeps its place until a new one is started.
 - **NEW SHEET** closes the session sheet and starts a new one, in the folder FOLDER chose if one is waiting.
   It acts only while a sheet is being written, and only then does the footer name it; outside a session the next one starts in the chosen folder by itself.
+  The new sheet opens with a `present` line for each member, and the last-lines pane starts empty with it.
 
 Both are GUI-thread actions on the view, with no bound parameter, as `SAVE` is in `strx` (see `doc/style/ui-style.md`).
 It acts on no receiver and decides no proposal.

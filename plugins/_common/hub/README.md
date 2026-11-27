@@ -180,7 +180,8 @@ When a stone read tears eight times in a row (a publisher hammering its slot), t
 The hub keeps a text **sheet** of the session, one event per line, readable by a person and by `tools/hub-sheet.py`.
 It is always written, whether or not `lessness` is loaded: the record of a calibration should not depend on what happened to be running.
 
-The grammar and the formatter are `seam_hub_sheet.h`; its top comment is the reference (event line, continuation rows, verbs `arrives leaves state says shows applies ignores sheet resumes`).
+The grammar and the formatter are `seam_hub_sheet.h`; its top comment is the reference (event line, continuation rows, verbs `arrives leaves state says shows applies ignores sheet resumes present`).
+A sheet opened by `sheet_new()` starts with a `present` line for each member already there, with what it says and hears, before their states: their `arrives` are in the previous file, and each sheet reads on its own.
 `tools/hub-sheet.py` is the independent parser: `--check FILE` validates a sheet, `--count FILE` counts events.
 The formatter is pure and has no I/O, so the grammar can be tested without a disk.
 
@@ -256,6 +257,7 @@ The path is empty when there is no session: the writer clears it as its last act
 A path that is not being written means an unreachable folder only while lines are pending; with none pending it is a sheet not yet open (an instant at each new sheet) or one whose folder failed before it had anything to write, and `lessness` raises its red mark only while lines are pending (`sheetAlarm` in `plugins/lessness/source/lessness_view.h`).
 `recent_lines()` returns the last 256 lines as written or held, table rows and the writer's state lines included, the newest kept when the buffer is short: the detector's "last lines".
 They are fed after the fold, on the writer's tick, so `lessness` shows what the sheet carries: a `resumes`, never the `leaves` it replaced.
+They start empty with each new sheet, a session's first or one from `sheet_new()`: `lessness` shows them above the sheet's path, so they are that sheet's lines only.
 
 **The privacy prompt.**
 `~/Documents` is protected by macOS: the first process that writes there triggers a "would like to access files in your Documents folder" prompt, per application.
