@@ -510,6 +510,60 @@ TEST_CASE("the recent lines carry rows and state lines") {
     seam_hub_v1_unregister(hub, a);
 }
 
+TEST_CASE("a new sheet names the members present, and its recent lines start afresh") {
+    Cleanup cleanup;
+    SeamHub* hub = seam_hub_v1_get();
+    const fs::path folder = freshDir("present");
+    useFolder(folder);
+    const int32_t a = seam_hub_v1_register(hub, "declpink", SEAM_HUB_BIT(kSeamHubPink), 0, 0);
+    const int32_t b = seam_hub_v1_register(hub, "decllisten", 0, SEAM_HUB_BIT(kSeamHubPink), 0);
+    SeamHubState s{};
+    s.kind = kSeamHubPink;
+    s.stoneId = 3;
+    seam_hub_v1_publish_state(hub, a, &s);
+    REQUIRE(eventually([] { return recentHas("declpink#1    state     pink  stone 3"); }));
+    SeamHubSheetStatus st;
+    seam_hub_v1_sheet_status(hub, &st);
+    const std::string first = st.path;
+
+    // NEW SHEET: the new file names who is there, with what each says and
+    // hears, before anything else of theirs, so it reads on its own.
+    seam_hub_v1_sheet_new(hub);
+    REQUIRE(eventually([&] {
+        seam_hub_v1_sheet_status(hub, &st);
+        return st.writing == 1u && first != st.path;
+    }));
+    REQUIRE(eventually([] { return recentHas("declpink#1    state     pink  stone 3"); }));
+    // The recent lines are the new sheet's alone: the detector shows them
+    // above the new sheet's path, so none of the old sheet's lines stay.
+    const std::string recent = recentText();
+    CHECK(recent.find("declpink#1    present   says pink  hears -") != std::string::npos);
+    CHECK(recent.find("decllisten#1  present   says -  hears pink") != std::string::npos);
+    CHECK(recent.find("arrives") == std::string::npos);
+
+    seam_hub_v1_unregister(hub, b);
+    seam_hub_v1_unregister(hub, a);
+    REQUIRE(waitWriterGone());
+    const auto files = sheets(folder);
+    REQUIRE(files.size() == 2);
+    const fs::path second = files[0] == fs::path(first) ? files[1] : files[0];
+    const auto before = fileLines(first);
+    const auto after = fileLines(second);
+    // The first sheet saw them arrive: no `present` there.
+    CHECK(countVerb(before, "arrives") == 2);
+    CHECK(countVerb(before, "present") == 0);
+    CHECK(countVerb(after, "arrives") == 0);
+    CHECK(countVerb(after, "present") == 2);
+    // Each `present` comes before the member's state.
+    size_t present = after.size(), state = after.size();
+    for (size_t i = 0; i < after.size(); ++i) {
+        if (present == after.size() && after[i].find("declpink#1    present") != std::string::npos) present = i;
+        if (state == after.size() && after[i].find("declpink#1    state") != std::string::npos) state = i;
+    }
+    CHECK(present < state);
+    CHECK(state < after.size());
+}
+
 TEST_CASE("the file name carries the pid") {
     Cleanup cleanup;
     SeamHub* hub = seam_hub_v1_get();
